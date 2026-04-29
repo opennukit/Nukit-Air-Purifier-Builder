@@ -16,6 +16,12 @@ import { generateAirPurifier } from "../src/boxes/generators/airPurifier";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "../src/buildDiagnostics";
 import { createAirPurifierCutPanels } from "../src/airPurifierPanels";
 import { edgeSections } from "../src/cutGeometry";
+import {
+  createPrintableKit,
+  createPrintableThreeMfExport,
+  partFitsPrintBed,
+  type PrintVolumePresetId,
+} from "../src/printableKit";
 
 describe("AirPurifier Boxes.py port", () => {
   test("uses the generated Boxes document for summary and SVG output", () => {
@@ -300,6 +306,51 @@ describe("AirPurifier Boxes.py port", () => {
       filterThickness: 10,
     });
     expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("custom-filter-range");
+  });
+
+  test("splits printable kits to fit common desktop printer beds", () => {
+    const layout = createLayout(defaultSettings);
+
+    for (const presetId of ["bed-256", "bed-320"] as const satisfies readonly PrintVolumePresetId[]) {
+      const kit = createPrintableKit(layout, presetId);
+
+      expect(kit.summary.partCount).toBeGreaterThan(layout.cutPanels.length);
+      expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
+      expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
+      expect(kit.summary.oversizedPartCount).toBe(0);
+      expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+      expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
+      expect(kit.parts.some((part) => part.kind === "dovetail-glue-key")).toBe(true);
+    }
+  });
+
+  test("keeps the unsplit print preset as one printable part per cut panel", () => {
+    const layout = createLayout(defaultSettings);
+    const kit = createPrintableKit(layout, "unsplit");
+
+    expect(kit.summary.partCount).toBe(layout.cutPanels.length);
+    expect(kit.summary.panelTileCount).toBe(layout.cutPanels.length);
+    expect(kit.summary.glueKeyCount).toBe(0);
+    expect(kit.summary.splitPanelCount).toBe(0);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.summary.retainedCutFeatureCount).toBe(kit.summary.sourceCutFeatureCount);
+    expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+  });
+
+  test("exports a browser-native 3MF print package", () => {
+    const layout = createLayout(defaultSettings);
+    const printExport = createPrintableThreeMfExport(layout, "bed-320");
+    const content = new TextDecoder("latin1").decode(printExport.bytes);
+
+    expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
+    expect(printExport.mimeType).toBe("model/3mf");
+    expect(printExport.bytes[0]).toBe(0x50);
+    expect(printExport.bytes[1]).toBe(0x4b);
+    expect(content).toContain("[Content_Types].xml");
+    expect(content).toContain("3D/3dmodel.model");
+    expect(content).toContain('<model unit="millimeter"');
+    expect(content).toContain("dovetail glue key");
+    expect(printExport.kit.preset.id).toBe("bed-320");
   });
 });
 

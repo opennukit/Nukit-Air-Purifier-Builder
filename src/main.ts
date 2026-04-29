@@ -20,6 +20,16 @@ import {
   type RawPurifierSettings,
 } from "./airPurifier";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "./buildDiagnostics";
+import {
+  createPrintableKit,
+  createPrintableThreeMfExport,
+  exportFormats,
+  findPrintVolumePreset,
+  printVolumePresets,
+  readExportFormat,
+  type ExportFormat,
+  type PrintVolumePresetId,
+} from "./printableKit";
 import { PurifierThreePreview } from "./threePreview";
 
 type FieldName = keyof RawPurifierSettings;
@@ -31,6 +41,8 @@ const initialUrlParams = new URLSearchParams(window.location.search);
 let settings = decodeSettings(window.location.search);
 let previewMode: PreviewMode = readPreviewMode(initialUrlParams.get("previewMode"));
 let controlsTab: ControlsTab = readControlsTab(initialUrlParams.get("controlsTab"));
+let exportFormat: ExportFormat = readExportFormat(initialUrlParams.get("exportFormat"));
+let printVolumePresetId: PrintVolumePresetId = findPrintVolumePreset(initialUrlParams.get("printVolume")).id;
 let threePreview: PurifierThreePreview | null = null;
 const transientLabelTimers = new WeakMap<HTMLElement, number>();
 
@@ -146,17 +158,12 @@ function renderShell(): void {
                 <p class="eyebrow">Export</p>
                 <h2>Cut readiness</h2>
               </div>
-              <div class="export-diagnostics" id="exportDiagnostics"></div>
-              <div class="export-drawing-card">
-                <div>
-                  <span>File format</span>
-                  <strong>SVG drawing</strong>
-                  <small>Cut paths, labels, and scale marker for laser software.</small>
-                </div>
-                <button class="primary-button export-drawing-button" type="button" data-action="export-drawing">
-                  Export Drawing
-                </button>
+              ${exportControlField("exportFormat", "File format", exportFormats.map((format) => [format, exportFormatLabel(format)]))}
+              <div data-print-volume-control>
+                ${exportControlField("printVolume", "Print volume", printVolumePresets.map((preset) => [preset.id, preset.label]))}
               </div>
+              <div class="export-diagnostics" id="exportDiagnostics"></div>
+              <div class="export-drawing-card" id="exportFormatDetail"></div>
             </section>
           </div>
         </aside>
@@ -205,6 +212,7 @@ function syncControls(): void {
     }
   }
   syncFilterPresetUi();
+  syncExportControls(createLayout(settings));
 }
 
 function renderPreview(): void {
@@ -248,11 +256,26 @@ function renderPreview(): void {
   }
   syncOpenCutSheetDialog(layout);
   syncExportDiagnostics(layout);
+  syncExportControls(layout);
 }
 
 function handleInput(event: Event): void {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  if (target.name === "exportFormat") {
+    exportFormat = readExportFormat(target.value);
+    syncExportControls(createLayout(settings));
+    syncUrl();
+    return;
+  }
+
+  if (target.name === "printVolume") {
+    printVolumePresetId = findPrintVolumePreset(target.value).id;
+    syncExportControls(createLayout(settings));
+    syncUrl();
     return;
   }
 
@@ -454,6 +477,64 @@ function syncExportDiagnostics(layout: ReturnType<typeof createLayout>, mode: "n
   `;
 }
 
+function syncExportControls(layout: ReturnType<typeof createLayout>): void {
+  const formatControl = app.querySelector<HTMLSelectElement>('[name="exportFormat"]');
+  if (formatControl !== null) {
+    formatControl.value = exportFormat;
+  }
+
+  const printVolumeControl = app.querySelector<HTMLElement>("[data-print-volume-control]");
+  if (printVolumeControl !== null) {
+    printVolumeControl.hidden = exportFormat !== "print-3mf";
+  }
+
+  const volumeSelect = app.querySelector<HTMLSelectElement>('[name="printVolume"]');
+  if (volumeSelect !== null) {
+    volumeSelect.value = printVolumePresetId;
+    volumeSelect.disabled = exportFormat !== "print-3mf";
+  }
+
+  const detail = app.querySelector<HTMLElement>("#exportFormatDetail");
+  if (detail !== null) {
+    detail.innerHTML = exportDetailHtml(layout);
+  }
+
+  for (const button of app.querySelectorAll<HTMLElement>('[data-action="export-drawing"]')) {
+    button.textContent = exportActionLabel();
+  }
+}
+
+function exportDetailHtml(layout: ReturnType<typeof createLayout>): string {
+  if (exportFormat === "print-3mf") {
+    const printKit = createPrintableKit(layout, printVolumePresetId);
+    const partSummary =
+      `${printKit.summary.partCount} parts: ` +
+      `${printKit.summary.panelTileCount} panel tiles and ` +
+      `${printKit.summary.glueKeyCount} dovetail glue keys.`;
+    return `
+      <div>
+        <span>3D print kit</span>
+        <strong>${escapeHtml(printKit.preset.label)}</strong>
+        <small>${escapeHtml(partSummary)}</small>
+      </div>
+      <button class="primary-button export-drawing-button" type="button" data-action="export-drawing">
+        ${exportActionLabel()}
+      </button>
+    `;
+  }
+
+  return `
+    <div>
+      <span>File format</span>
+      <strong>SVG drawing</strong>
+      <small>Cut paths, labels, and scale marker for laser software.</small>
+    </div>
+    <button class="primary-button export-drawing-button" type="button" data-action="export-drawing">
+      ${exportActionLabel()}
+    </button>
+  `;
+}
+
 function diagnosticItem(diagnostic: BuildDiagnostic): string {
   return `<div class="diagnostic-item ${diagnostic.severity}">
     <strong>${escapeHtml(diagnostic.title)}</strong>
@@ -473,6 +554,15 @@ function exportDrawing(): void {
     return;
   }
 
+  if (exportFormat === "print-3mf") {
+    exportPrintKit(layout);
+    return;
+  }
+
+  exportSvgDrawing(layout);
+}
+
+function exportSvgDrawing(layout: ReturnType<typeof createLayout>): void {
   const svg = createLaserSvg(layout);
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -483,6 +573,25 @@ function exportDrawing(): void {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportPrintKit(layout: ReturnType<typeof createLayout>): void {
+  const printExport = createPrintableThreeMfExport(layout, printVolumePresetId);
+  const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = printExport.filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function openCutSheetDialog(): void {
@@ -562,6 +671,8 @@ function encodeShareState(): string {
   const params = new URLSearchParams(encodeSettings(settings));
   params.set("previewMode", previewMode);
   params.set("controlsTab", controlsTab);
+  params.set("exportFormat", exportFormat);
+  params.set("printVolume", printVolumePresetId);
   return params.toString();
 }
 
@@ -585,6 +696,15 @@ function numberField(name: FieldName, label: string, suffix: string, step: numbe
 }
 
 function selectField(name: FieldName, label: string, options: Array<[string, string]>): string {
+  return `<label class="field">
+    <span>${label}</span>
+    <select name="${name}">
+      ${options.map(([value, text]) => `<option value="${value}">${text}</option>`).join("")}
+    </select>
+  </label>`;
+}
+
+function exportControlField(name: "exportFormat" | "printVolume", label: string, options: Array<[string, string]>): string {
   return `<label class="field">
     <span>${label}</span>
     <select name="${name}">
@@ -632,6 +752,17 @@ function cameraPresetLabel(preset: RawPurifierSettings["cameraPreset"]): string 
     return "Side";
   }
   return "Top";
+}
+
+function exportFormatLabel(format: ExportFormat): string {
+  if (format === "print-3mf") {
+    return "3MF print kit";
+  }
+  return "SVG drawing";
+}
+
+function exportActionLabel(): string {
+  return exportFormat === "print-3mf" ? "Export 3D Print Kit" : "Export Drawing";
 }
 
 function toggleField(name: FieldName, label: string): string {
