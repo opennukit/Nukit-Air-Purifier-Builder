@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.playwright-cli/
+.playwright-mcp/
+.venv-boxes/
+output/
+*.png
