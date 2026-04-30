@@ -62,6 +62,8 @@ const woodColor = 0xc7965a;
 const edgeColor = 0x4f3822;
 const burnColor = 0x2b1a0f;
 const filterColor = 0xeef1e6;
+const groundY = -0.58;
+const homePreviewRotationX = -Math.PI / 2;
 
 export class PurifierThreePreview {
   private readonly scene = new Scene();
@@ -77,6 +79,7 @@ export class PurifierThreePreview {
   private latestLayout: LayoutResult | null = null;
   private hoveredDimensionId: string | null = null;
   private dimensionTargets: Object3D[] = [];
+  private readonly modelFocus = new Vector3();
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -111,7 +114,7 @@ export class PurifierThreePreview {
       new MeshBasicMaterial({ color: 0x1f6f56, transparent: true, opacity: 0.06 }),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.58;
+    ground.position.y = groundY;
     this.staticSceneGroup.add(ground);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -145,6 +148,7 @@ export class PurifierThreePreview {
     this.disposeObject(this.modelGroup);
     this.modelGroup.clear();
     this.modelGroup.position.set(0, 0, 0);
+    this.modelGroup.rotation.set(0, 0, 0);
     this.hoveredDimensionId = null;
     this.dimensionTargets = [];
     this.renderer.domElement.style.cursor = "";
@@ -207,9 +211,14 @@ export class PurifierThreePreview {
     if (!settings.preview.explodedView) {
       this.modelGroup.add(createSeamGroup(assembly.seams, seamMaterial));
     }
+
+    this.modelGroup.rotation.x = homePreviewRotationX;
     const outline = new Box3().setFromObject(this.modelGroup);
     const center = outline.getCenter(new Vector3());
     this.modelGroup.position.sub(center);
+    const centeredOutline = new Box3().setFromObject(this.modelGroup);
+    this.modelGroup.position.y += groundY - centeredOutline.min.y;
+    new Box3().setFromObject(this.modelGroup).getCenter(this.modelFocus);
 
     if (settings.preview.showDimensions) {
       const dimensionGroup = createDimensionGroup(assembly.dimensions);
@@ -242,11 +251,11 @@ export class PurifierThreePreview {
         layout.summary.chamberHeight,
       ) * sceneScale;
     const position = cameraPosition(settings.preview.cameraPreset, maxDimension);
-    this.camera.position.set(position.x, position.y, position.z);
+    this.camera.position.copy(this.modelFocus).add(position);
     this.camera.near = 0.01;
     this.camera.far = 100;
     this.camera.updateProjectionMatrix();
-    this.controls.target.set(0, 0, 0);
+    this.controls.target.copy(this.modelFocus);
     this.controls.autoRotate = settings.preview.autoRotate && !settings.preview.showDimensions;
     this.controls.update();
   }

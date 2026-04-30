@@ -71,122 +71,109 @@ function renderShell(): void {
           <p class="eyebrow">Browser generator</p>
           <h1>Nukit Open Air Purifier</h1>
         </div>
-        ${fabricationMethodField()}
         <div class="topbar-actions">
           <button class="ghost-button" type="button" data-action="copy-url">Copy URL</button>
           <button class="primary-button" type="button" data-action="export-drawing">Export Drawing</button>
         </div>
       </header>
 
-      <section class="workspace" aria-label="Open air purifier builder">
-        <section class="preview-pane" aria-label="Live preview">
-          <div class="preview-toolbar" aria-label="Preview mode">
-            <div class="preview-mode-group">
-              <button class="mode-button" type="button" data-mode="enclosure">3D enclosure</button>
-              <button class="mode-button" type="button" data-mode="cut-sheet" data-method-preview="laser-svg">Laser sheet</button>
-              <button class="mode-button" type="button" data-mode="print-sheets" data-method-preview="print-3mf">Print sheets</button>
+      <section class="method-workbench" aria-label="Manufacturing workspace">
+        ${fabricationMethodField()}
+        <section class="workspace" aria-label="Open air purifier builder">
+          <section class="preview-pane" aria-label="Live preview">
+            <div class="preview-toolbar" aria-label="Preview mode">
+              <div class="preview-mode-group">
+                <button class="mode-button" type="button" data-mode="enclosure">3D enclosure</button>
+                <button class="mode-button" type="button" data-mode="cut-sheet" data-method-preview="laser-svg">Laser sheet</button>
+                <button class="mode-button" type="button" data-mode="print-sheets" data-method-preview="print-3mf">Print sheets</button>
+              </div>
+              <button class="ghost-button preview-maximize-button" type="button" data-action="maximize-preview" hidden>
+                Maximize
+              </button>
             </div>
-            <button class="ghost-button preview-maximize-button" type="button" data-action="maximize-preview" hidden>
-              Maximize
-            </button>
-          </div>
 
-          <div class="preview-stage" id="previewStage"></div>
+            <div class="preview-stage" id="previewStage"></div>
 
-          <div class="summary-grid" id="summaryGrid"></div>
+            <div class="summary-grid" id="summaryGrid"></div>
 
+          </section>
+
+          <aside class="controls-pane" aria-label="Build settings">
+            <div class="controls-tabs" role="tablist" aria-label="Control groups">
+              <button class="controls-tab" id="build-controls-tab" type="button" role="tab" data-controls-tab="build" aria-controls="build-controls-panel">Build</button>
+              <button class="controls-tab" id="fabrication-controls-tab" type="button" role="tab" data-controls-tab="fabrication" aria-controls="fabrication-controls-panel">Fabrication</button>
+            </div>
+
+            <div class="tab-panel build-controls" id="build-controls-panel" role="tabpanel" aria-labelledby="build-controls-tab" data-controls-panel="build">
+              <section class="control-section build-section">
+                <div class="section-heading">
+                  <p class="eyebrow">Build</p>
+                  <h2>Filter and fan</h2>
+                </div>
+                ${selectField("filterPreset", "Filter", filterPresets.map((preset) => [preset.id, preset.label]))}
+                <div class="filter-preset-card" id="filterPresetDetail"></div>
+                <div class="custom-dimensions" data-custom-filter-dimensions>
+                  ${numberField("filterWidth", "Filter width", "mm", 1)}
+                  ${numberField("filterDepth", "Filter depth", "mm", 1)}
+                  ${numberField("filterThickness", "Filter thickness", "mm", 0.1)}
+                </div>
+                ${selectField("fanPreset", "Fan type", fanProductPresets.map((preset) => [preset.id, preset.label]))}
+                <div class="fan-preset-card" id="fanPresetDetail"></div>
+                <div data-custom-fan-size>
+                  ${selectField("fanDiameter", "Fan size", fanDiameters.map((diameter) => [String(diameter), `${diameter} mm`]))}
+                </div>
+              </section>
+
+              <div class="secondary-controls-column">
+                <section class="control-section layout-section">
+                  <div class="section-heading">
+                    <p class="eyebrow">Layout</p>
+                    <h2>Fan placement</h2>
+                  </div>
+                  <div class="fan-grid">
+                    ${fanField("fansLeft", "Left")}
+                    ${fanField("fansRight", "Right")}
+                    ${fanField("fansTop", "Top")}
+                    ${fanField("fansBottom", "Bottom")}
+                  </div>
+                  ${segmentedField("filters", "Filters", [
+                    ["1", "One side"],
+                    ["2", "Both sides"],
+                  ])}
+                </section>
+              </div>
+            </div>
+
+            <div class="tab-panel fabrication-controls" id="fabrication-controls-panel" role="tabpanel" aria-labelledby="fabrication-controls-tab" data-controls-panel="fabrication">
+              <section class="control-section fabrication-settings-section">
+                <div class="section-heading">
+                  <p class="eyebrow">Fabrication</p>
+                  <h2>Material and fit</h2>
+                </div>
+                ${numberField("materialThickness", "Material thickness", "mm", 0.1)}
+                ${numberField("rim", "Filter rim", "mm", 1)}
+                ${numberField("screwHoleDiameter", "Fan screw holes", "mm", 0.1)}
+                ${numberField("kerfFit", "Fit allowance", "mm", 0.01)}
+                ${toggleField("splitFrames", "Split large frame panels")}
+                <div data-laser-output-controls>
+                  ${toggleField("labels", "Engrave part labels")}
+                  ${numberField("referenceScale", "Reference scale", "mm", 1)}
+                </div>
+              </section>
+              <section class="control-section export-section">
+                <div class="section-heading">
+                  <p class="eyebrow">Export</p>
+                  <h2>Fabrication readiness</h2>
+                </div>
+                <div data-print-volume-control>
+                  ${exportControlField("printVolume", "Print volume", printVolumePresets.map((preset) => [preset.id, preset.label]))}
+                </div>
+                <div class="export-diagnostics" id="exportDiagnostics"></div>
+                <div class="export-drawing-card" id="exportDetail"></div>
+              </section>
+            </div>
+          </aside>
         </section>
-
-        <aside class="controls-pane" aria-label="Build settings">
-          <div class="controls-tabs" role="tablist" aria-label="Control groups">
-            <button class="controls-tab" id="build-controls-tab" type="button" role="tab" data-controls-tab="build" aria-controls="build-controls-panel">Build</button>
-            <button class="controls-tab" id="fabrication-controls-tab" type="button" role="tab" data-controls-tab="fabrication" aria-controls="fabrication-controls-panel">Fabrication</button>
-          </div>
-
-          <div class="tab-panel build-controls" id="build-controls-panel" role="tabpanel" aria-labelledby="build-controls-tab" data-controls-panel="build">
-            <section class="control-section build-section">
-              <div class="section-heading">
-                <p class="eyebrow">Build</p>
-                <h2>Filter and fan</h2>
-              </div>
-              ${selectField("filterPreset", "Filter", filterPresets.map((preset) => [preset.id, preset.label]))}
-              <div class="filter-preset-card" id="filterPresetDetail"></div>
-              <div class="custom-dimensions" data-custom-filter-dimensions>
-                ${numberField("filterWidth", "Filter width", "mm", 1)}
-                ${numberField("filterDepth", "Filter depth", "mm", 1)}
-                ${numberField("filterThickness", "Filter thickness", "mm", 0.1)}
-              </div>
-              ${selectField("fanPreset", "Fan type", fanProductPresets.map((preset) => [preset.id, preset.label]))}
-              <div class="fan-preset-card" id="fanPresetDetail"></div>
-              <div data-custom-fan-size>
-                ${selectField("fanDiameter", "Fan size", fanDiameters.map((diameter) => [String(diameter), `${diameter} mm`]))}
-              </div>
-              ${segmentedField("filters", "Filters", [
-                ["1", "One side"],
-                ["2", "Both sides"],
-              ])}
-            </section>
-
-            <div class="secondary-controls-column">
-              <section class="control-section layout-section">
-                <div class="section-heading">
-                  <p class="eyebrow">Layout</p>
-                  <h2>Fan placement</h2>
-                </div>
-                <div class="fan-grid">
-                  ${fanField("fansLeft", "Left")}
-                  ${fanField("fansRight", "Right")}
-                  ${fanField("fansTop", "Top")}
-                  ${fanField("fansBottom", "Bottom")}
-                </div>
-              </section>
-
-              <section class="control-section view-section">
-                <div class="section-heading">
-                  <p class="eyebrow">View</p>
-                  <h2>3D render</h2>
-                </div>
-                ${selectField("cameraPreset", "Camera", cameraPresets.map((preset) => [preset, cameraPresetLabel(preset)]))}
-                ${toggleField("showFilterMedia", "Show filters")}
-                ${toggleField("showFans", "Show fans")}
-                ${toggleField("showFilterFrame", "Show filter frame")}
-                ${toggleField("transparentWalls", "Transparent walls")}
-                ${toggleField("explodedView", "Exploded view")}
-                ${toggleField("showDimensions", "Show dimensions")}
-                ${toggleField("autoRotate", "Auto rotate")}
-              </section>
-            </div>
-          </div>
-
-          <div class="tab-panel fabrication-controls" id="fabrication-controls-panel" role="tabpanel" aria-labelledby="fabrication-controls-tab" data-controls-panel="fabrication">
-            <section class="control-section fabrication-settings-section">
-              <div class="section-heading">
-                <p class="eyebrow">Fabrication</p>
-                <h2>Material and fit</h2>
-              </div>
-              ${numberField("materialThickness", "Material thickness", "mm", 0.1)}
-              ${numberField("rim", "Filter rim", "mm", 1)}
-              ${numberField("screwHoleDiameter", "Fan screw holes", "mm", 0.1)}
-              ${numberField("kerfFit", "Fit allowance", "mm", 0.01)}
-              ${toggleField("splitFrames", "Split large frame panels")}
-              <div data-laser-output-controls>
-                ${toggleField("labels", "Engrave part labels")}
-                ${numberField("referenceScale", "Reference scale", "mm", 1)}
-              </div>
-            </section>
-            <section class="control-section export-section">
-              <div class="section-heading">
-                <p class="eyebrow">Export</p>
-                <h2>Fabrication readiness</h2>
-              </div>
-              <div data-print-volume-control>
-                ${exportControlField("printVolume", "Print volume", printVolumePresets.map((preset) => [preset.id, preset.label]))}
-              </div>
-              <div class="export-diagnostics" id="exportDiagnostics"></div>
-              <div class="export-drawing-card" id="exportDetail"></div>
-            </section>
-          </div>
-        </aside>
       </section>
 
       <dialog class="sheet-dialog" id="sheetDialog" aria-labelledby="sheetDialogTitle">
@@ -215,8 +202,15 @@ function renderShell(): void {
 }
 
 function syncControls(): void {
+  syncSettingsControls(app);
+  syncFilterPresetUi();
+  syncFanPresetUi();
+  syncExportControls(createLayout(settings));
+}
+
+function syncSettingsControls(root: ParentNode): void {
   for (const [key, value] of Object.entries(settings)) {
-    const controls = app.querySelectorAll(`[name="${key}"]`);
+    const controls = root.querySelectorAll(`[name="${key}"]`);
     for (const control of controls) {
       if (control instanceof HTMLInputElement) {
         if (control.type === "checkbox") {
@@ -231,9 +225,6 @@ function syncControls(): void {
       }
     }
   }
-  syncFilterPresetUi();
-  syncFanPresetUi();
-  syncExportControls(createLayout(settings));
 }
 
 function renderPreview(): void {
@@ -248,12 +239,16 @@ function renderPreview(): void {
     stage.classList.remove("is-sheet-preview");
     let host = stage.querySelector<HTMLElement>(".three-preview-host");
     if (host === null) {
-      stage.innerHTML = `<div class="three-preview-host" aria-label="Interactive 3D enclosure preview"></div>`;
+      stage.innerHTML = `
+        ${previewViewControlsHtml()}
+        <div class="three-preview-host" aria-label="Interactive 3D enclosure preview"></div>
+      `;
       host = requireElement(stage.querySelector<HTMLElement>(".three-preview-host"), "Three preview host not found");
     }
     if (threePreview === null) {
       threePreview = new PurifierThreePreview(host);
     }
+    syncPreviewViewControls(stage);
     threePreview.update(layout);
   } else {
     threePreview?.destroy();
@@ -371,18 +366,32 @@ function handleClick(event: MouseEvent): void {
   const actionName = action.getAttribute("data-action");
   if (actionName === "export-drawing") {
     exportDrawing();
+    return;
   }
 
   if (actionName === "copy-url") {
     void copyUrl(action);
+    return;
   }
 
   if (actionName === "maximize-preview") {
     openSheetDialog();
+    return;
   }
 
   if (actionName === "close-preview-dialog") {
     closeSheetDialog();
+    return;
+  }
+
+  if (actionName === "toggle-rotation") {
+    settings = {
+      ...settings,
+      autoRotate: !settings.autoRotate,
+    };
+    syncControls();
+    syncUrl();
+    renderPreview();
   }
 }
 
@@ -484,6 +493,16 @@ function syncPreviewModeButtons(): void {
     const methodPreview = button.dataset.methodPreview;
     button.hidden = methodPreview !== undefined && methodPreview !== fabricationMethod;
   }
+}
+
+function syncPreviewViewControls(root: ParentNode = app): void {
+  syncSettingsControls(root);
+  const rotationButton = root.querySelector<HTMLElement>('[data-action="toggle-rotation"]');
+  if (rotationButton === null) {
+    return;
+  }
+  rotationButton.textContent = settings.autoRotate ? "Stop rotation" : "Rotate model";
+  rotationButton.setAttribute("aria-pressed", String(settings.autoRotate));
 }
 
 function syncFilterPresetUi(): void {
@@ -883,6 +902,26 @@ function fabricationMethodField(): string {
         .join("")}
     </div>
   </fieldset>`;
+}
+
+function previewViewControlsHtml(): string {
+  return `<div class="preview-view-controls" data-preview-view-controls>
+    <button class="preview-rotation-button" type="button" data-action="toggle-rotation">Stop rotation</button>
+    <details class="preview-settings-menu">
+      <summary>View</summary>
+      <div class="preview-settings-panel">
+        ${selectField("cameraPreset", "Camera", cameraPresets.map((preset) => [preset, cameraPresetLabel(preset)]))}
+        <div class="preview-toggle-grid">
+          ${toggleField("showFilterMedia", "Show filters")}
+          ${toggleField("showFans", "Show fans")}
+          ${toggleField("showFilterFrame", "Show frame")}
+          ${toggleField("transparentWalls", "Transparent walls")}
+          ${toggleField("explodedView", "Exploded view")}
+          ${toggleField("showDimensions", "Show dimensions")}
+        </div>
+      </div>
+    </details>
+  </div>`;
 }
 
 function segmentedField(name: FieldName, label: string, options: Array<[string, string]>): string {

@@ -50,7 +50,7 @@ button {
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 18px;
   width: 100%;
@@ -174,12 +174,32 @@ button {
   transform: translateY(-1px);
 }
 
+.method-workbench {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 1440px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgb(248 245 236 / 74%);
+  box-shadow: var(--shadow);
+}
+
+.method-workbench > .fabrication-method-field {
+  justify-self: start;
+  min-width: min(420px, 100%);
+}
+
 .workspace {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
   align-items: stretch;
 }
 
@@ -187,7 +207,6 @@ button {
 .controls-pane {
   border: 1px solid var(--line);
   background: rgb(248 245 236 / 86%);
-  box-shadow: var(--shadow);
 }
 
 .preview-pane {
@@ -230,6 +249,7 @@ button {
 }
 
 .preview-stage {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 460px;
@@ -256,6 +276,79 @@ button {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.preview-view-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.preview-rotation-button,
+.preview-settings-menu summary {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 253 246 / 88%);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: 0 10px 28px rgb(51 42 27 / 10%);
+  backdrop-filter: blur(10px);
+}
+
+.preview-rotation-button {
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.preview-rotation-button[aria-pressed="true"] {
+  background: var(--ink);
+  color: white;
+}
+
+.preview-settings-menu {
+  position: relative;
+}
+
+.preview-settings-menu summary {
+  min-width: 72px;
+  padding: 0 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.preview-settings-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.preview-settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(330px, calc(100vw - 32px));
+  max-height: min(520px, calc(100svh - 180px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgb(255 253 246 / 96%);
+  box-shadow: 0 20px 60px rgb(51 42 27 / 20%);
+  backdrop-filter: blur(14px);
+}
+
+.preview-settings-panel .field {
+  margin-top: 0;
+}
+
+.preview-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
 }
 
 .sheet-preview {
@@ -391,20 +484,6 @@ button {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
-}
-
-.view-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 14px;
-}
-
-.view-section .section-heading,
-.view-section .field {
-  grid-column: 1 / -1;
 }
 
 .section-heading {
@@ -865,9 +944,9 @@ button {
     line-height: 1.22;
   }
 
-  .view-section {
-    margin-top: 12px;
-    padding-top: 12px;
+  .method-workbench {
+    height: 100%;
+    overflow: hidden;
   }
 
   .workspace {
@@ -982,10 +1061,6 @@ button {
     border-top: 1px solid var(--line);
   }
 
-  .view-section {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .fan-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1002,7 +1077,11 @@ button {
     margin-bottom: 10px;
   }
 
-  .fabrication-method-field {
+  .method-workbench {
+    padding: 10px;
+  }
+
+  .method-workbench > .fabrication-method-field {
     width: 100%;
     min-width: 0;
   }
@@ -1026,6 +1105,23 @@ button {
     height: 330px;
   }
 
+  .preview-view-controls {
+    top: 8px;
+    right: 8px;
+    gap: 6px;
+  }
+
+  .preview-rotation-button,
+  .preview-settings-menu summary {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .preview-toggle-grid {
+    grid-template-columns: 1fr;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1039,10 +1135,6 @@ button {
   }
 
   .fan-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .view-section {
     grid-template-columns: 1fr;
   }
 }
