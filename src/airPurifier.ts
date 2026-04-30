@@ -222,6 +222,7 @@ export type PreviewSettings = {
   transparentWalls: boolean;
   explodedView: boolean;
   showDimensions: boolean;
+  autoRotate: boolean;
   cameraPreset: CameraPreset;
 };
 
@@ -364,6 +365,7 @@ export type RawPurifierSettings = {
   transparentWalls: boolean;
   explodedView: boolean;
   showDimensions: boolean;
+  autoRotate: boolean;
   cameraPreset: CameraPreset;
   labels: boolean;
   referenceScale: Millimeters;
@@ -420,6 +422,7 @@ export const defaultSettings: RawPurifierSettings = {
   transparentWalls: false,
   explodedView: false,
   showDimensions: false,
+  autoRotate: true,
   cameraPreset: "official",
   labels: true,
   referenceScale: 100,
@@ -467,6 +470,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       transparentWalls: raw.transparentWalls,
       explodedView: raw.explodedView,
       showDimensions: raw.showDimensions,
+      autoRotate: raw.autoRotate,
       cameraPreset: cameraPresets.includes(raw.cameraPreset) ? raw.cameraPreset : defaultSettings.cameraPreset,
     },
   };
@@ -505,6 +509,7 @@ export function toRawSettings(input: PurifierInput): RawPurifierSettings {
     transparentWalls: input.preview.transparentWalls,
     explodedView: input.preview.explodedView,
     showDimensions: input.preview.showDimensions,
+    autoRotate: input.preview.autoRotate,
     cameraPreset: input.preview.cameraPreset,
     labels: input.cutting.labels,
     referenceScale: input.cutting.referenceScale.type === "enabled" ? input.cutting.referenceScale.length : 0,
@@ -641,6 +646,7 @@ export function encodeSettings(input: PurifierInput): string {
   params.set("transparentWalls", String(settings.transparentWalls));
   params.set("explodedView", String(settings.explodedView));
   params.set("showDimensions", String(settings.showDimensions));
+  params.set("autoRotate", String(settings.autoRotate));
   params.set("cameraPreset", settings.cameraPreset);
   params.set("labels", String(settings.labels));
   params.set("referenceScale", formatNumber(settings.referenceScale));
@@ -676,6 +682,7 @@ export function decodeSettings(search: string): RawPurifierSettings {
     transparentWalls: readBoolean(params, "transparentWalls", defaultSettings.transparentWalls),
     explodedView: readBoolean(params, "explodedView", defaultSettings.explodedView),
     showDimensions: readBoolean(params, "showDimensions", defaultSettings.showDimensions),
+    autoRotate: readBoolean(params, "autoRotate", defaultSettings.autoRotate),
     cameraPreset: readCameraPreset(params, "cameraPreset", defaultSettings.cameraPreset),
     labels: readBoolean(params, "labels", defaultSettings.labels),
     referenceScale: readNumber(params, "referenceScale", defaultSettings.referenceScale),

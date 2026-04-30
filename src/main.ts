@@ -148,6 +148,7 @@ function renderShell(): void {
                 ${toggleField("transparentWalls", "Transparent walls")}
                 ${toggleField("explodedView", "Exploded view")}
                 ${toggleField("showDimensions", "Show dimensions")}
+                ${toggleField("autoRotate", "Auto rotate")}
               </section>
             </div>
           </div>

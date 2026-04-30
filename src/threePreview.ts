@@ -247,7 +247,7 @@ export class PurifierThreePreview {
     this.camera.far = 100;
     this.camera.updateProjectionMatrix();
     this.controls.target.set(0, 0, 0);
-    this.controls.autoRotate = settings.preview.cameraPreset === "official" && !settings.preview.showDimensions;
+    this.controls.autoRotate = settings.preview.autoRotate && !settings.preview.showDimensions;
     this.controls.update();
   }
 

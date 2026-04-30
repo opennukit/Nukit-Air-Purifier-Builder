@@ -161,6 +161,7 @@ describe("AirPurifier Boxes.py port", () => {
   test("keeps URL boundary parsing valid for booleans, fan counts, and constrained rims", () => {
     const malformedBoolean = decodeSettings("showFans=maybe");
     const explicitFalse = decodeSettings("showFans=0");
+    const rotationDisabled = decodeSettings("autoRotate=0");
     const highFanCount = decodeSettings("fansLeft=8");
     const smallCustomLayout = createLayout({
       ...defaultSettings,
@@ -173,6 +174,7 @@ describe("AirPurifier Boxes.py port", () => {
 
     expect(malformedBoolean.showFans).toBe(defaultSettings.showFans);
     expect(explicitFalse.showFans).toBe(false);
+    expect(rotationDisabled.autoRotate).toBe(false);
     expect(highFanCount.fansLeft).toBe(8);
     expect(smallCustomLayout.rawSettings.rim).toBeLessThanOrEqual((smallCustomLayout.summary.workingDepth - 1) / 2);
     expect(smallCustomLayout.cutPanels.every((panel) => panel.width > 0 && panel.height > 0)).toBe(true);
@@ -190,6 +192,7 @@ describe("AirPurifier Boxes.py port", () => {
     expect(layout.configuration.filter.type).toBe("preset");
     expect(layout.configuration.fan.banks.left.type).toBe("auto");
     expect(layout.configuration.frameConstruction.type).toBe("split-rails");
+    expect(layout.configuration.preview.autoRotate).toBe(true);
     expect(layout.configuration.cutting.referenceScale).toEqual({ type: "enabled", length: 100 });
     expect(layout.summary.resolvedFans).toEqual({ left: 3, right: 3, top: 0, bottom: 0 });
     expect("sheet" in draftPanels[0]!).toBe(false);
