@@ -19,7 +19,9 @@ import { edgeSections } from "../src/cutGeometry";
 import {
   createPrintableKit,
   createPrintableThreeMfExport,
+  findPrintVolumePreset,
   partFitsPrintBed,
+  printVolumePresets,
   type PrintVolumePresetId,
 } from "../src/printableKit";
 
@@ -310,8 +312,24 @@ describe("AirPurifier Boxes.py port", () => {
 
   test("splits printable kits to fit common desktop printer beds", () => {
     const layout = createLayout(defaultSettings);
+    const boundedPresetIds = printVolumePresets
+      .filter((preset) => preset.bed.type === "bounded")
+      .map((preset) => preset.id);
 
-    for (const presetId of ["bed-256", "bed-320"] as const satisfies readonly PrintVolumePresetId[]) {
+    expect(boundedPresetIds).toEqual([
+      "bed-180",
+      "bed-220",
+      "bed-225",
+      "bed-prusa-mk",
+      "bed-256",
+      "bed-300",
+      "bed-h2-safe",
+      "bed-350",
+      "bed-prusa-xl",
+      "bed-420",
+    ] satisfies readonly PrintVolumePresetId[]);
+
+    for (const presetId of boundedPresetIds) {
       const kit = createPrintableKit(layout, presetId);
 
       expect(kit.summary.partCount).toBeGreaterThan(layout.cutPanels.length);
@@ -322,6 +340,11 @@ describe("AirPurifier Boxes.py port", () => {
       expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
       expect(kit.parts.some((part) => part.kind === "dovetail-glue-key")).toBe(true);
     }
+  });
+
+  test("keeps the 256 mm print bed as the default and redirects the legacy 320 mm URL", () => {
+    expect(findPrintVolumePreset(null).id).toBe("bed-256");
+    expect(findPrintVolumePreset("bed-320").id).toBe("bed-h2-safe");
   });
 
   test("keeps the unsplit print preset as one printable part per cut panel", () => {
@@ -339,7 +362,7 @@ describe("AirPurifier Boxes.py port", () => {
 
   test("exports a browser-native 3MF print package", () => {
     const layout = createLayout(defaultSettings);
-    const printExport = createPrintableThreeMfExport(layout, "bed-320");
+    const printExport = createPrintableThreeMfExport(layout, "bed-h2-safe");
     const content = new TextDecoder("latin1").decode(printExport.bytes);
 
     expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
@@ -350,7 +373,7 @@ describe("AirPurifier Boxes.py port", () => {
     expect(content).toContain("3D/3dmodel.model");
     expect(content).toContain('<model unit="millimeter"');
     expect(content).toContain("dovetail glue key");
-    expect(printExport.kit.preset.id).toBe("bed-320");
+    expect(printExport.kit.preset.id).toBe("bed-h2-safe");
   });
 });
 

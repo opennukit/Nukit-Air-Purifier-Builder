@@ -515,6 +515,7 @@ function exportDetailHtml(layout: ReturnType<typeof createLayout>): string {
       <div>
         <span>3D print kit</span>
         <strong>${escapeHtml(printKit.preset.label)}</strong>
+        <small>${escapeHtml(printVolumePresetDetail(printKit.preset.description, printKit.preset.examples))}</small>
         <small>${escapeHtml(partSummary)}</small>
       </div>
       <button class="primary-button export-drawing-button" type="button" data-action="export-drawing">
@@ -763,6 +764,13 @@ function exportFormatLabel(format: ExportFormat): string {
 
 function exportActionLabel(): string {
   return exportFormat === "print-3mf" ? "Export 3D Print Kit" : "Export Drawing";
+}
+
+function printVolumePresetDetail(description: string, examples: readonly string[]): string {
+  if (examples.length === 0) {
+    return description;
+  }
+  return `${description} Examples: ${examples.join(", ")}.`;
 }
 
 function toggleField(name: FieldName, label: string): string {
