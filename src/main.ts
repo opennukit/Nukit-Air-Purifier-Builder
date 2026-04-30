@@ -28,7 +28,7 @@ import { evaluateBuildDiagnostics, summarizeBuildReadiness, type BuildDiagnostic
 import {
   createPrintableKit,
   createPrintableThreeMfExport,
-  exportFormats,
+  exportFormats as fabricationMethods,
   findPrintVolumePreset,
   printVolumePresets,
   readExportFormat,
@@ -40,6 +40,7 @@ import { PurifierThreePreview } from "./threePreview";
 
 type FieldName = keyof RawPurifierSettings;
 type ControlsTab = "build" | "fabrication";
+type FabricationMethod = ExportFormat;
 
 const app = requireElement(document.querySelector<HTMLElement>("#app"), "App root not found");
 const initialUrlParams = new URLSearchParams(window.location.search);
@@ -47,12 +48,15 @@ const initialUrlParams = new URLSearchParams(window.location.search);
 let settings = decodeSettings(window.location.search);
 let previewMode: PreviewMode = readPreviewMode(initialUrlParams.get("previewMode"));
 let controlsTab: ControlsTab = readControlsTab(initialUrlParams.get("controlsTab"));
-let exportFormat: ExportFormat = readExportFormat(initialUrlParams.get("exportFormat"));
+let fabricationMethod: FabricationMethod = readFabricationMethod(
+  initialUrlParams.get("fabricationMethod") ?? initialUrlParams.get("exportFormat"),
+  previewMode,
+);
 let printVolumePresetId: PrintVolumePresetId = findPrintVolumePreset(initialUrlParams.get("printVolume")).id;
 let threePreview: PurifierThreePreview | null = null;
 const transientLabelTimers = new WeakMap<HTMLElement, number>();
 
-syncFabricationMethodToPreviewMode();
+syncPreviewModeToFabricationMethod();
 renderShell();
 syncControlTabs();
 syncControls();
@@ -67,6 +71,7 @@ function renderShell(): void {
           <p class="eyebrow">Browser generator</p>
           <h1>Nukit Open Air Purifier</h1>
         </div>
+        ${fabricationMethodField()}
         <div class="topbar-actions">
           <button class="ghost-button" type="button" data-action="copy-url">Copy URL</button>
           <button class="primary-button" type="button" data-action="export-drawing">Export Drawing</button>
@@ -78,8 +83,8 @@ function renderShell(): void {
           <div class="preview-toolbar" aria-label="Preview mode">
             <div class="preview-mode-group">
               <button class="mode-button" type="button" data-mode="enclosure">3D enclosure</button>
-              <button class="mode-button" type="button" data-mode="cut-sheet">Laser sheet</button>
-              <button class="mode-button" type="button" data-mode="print-sheets">Print sheets</button>
+              <button class="mode-button" type="button" data-mode="cut-sheet" data-method-preview="laser-svg">Laser sheet</button>
+              <button class="mode-button" type="button" data-mode="print-sheets" data-method-preview="print-3mf">Print sheets</button>
             </div>
             <button class="ghost-button preview-maximize-button" type="button" data-action="maximize-preview" hidden>
               Maximize
@@ -174,12 +179,11 @@ function renderShell(): void {
                 <p class="eyebrow">Export</p>
                 <h2>Fabrication readiness</h2>
               </div>
-              ${exportControlField("exportFormat", "Method", exportFormats.map((format) => [format, exportFormatLabel(format)]))}
               <div data-print-volume-control>
                 ${exportControlField("printVolume", "Print volume", printVolumePresets.map((preset) => [preset.id, preset.label]))}
               </div>
               <div class="export-diagnostics" id="exportDiagnostics"></div>
-              <div class="export-drawing-card" id="exportFormatDetail"></div>
+              <div class="export-drawing-card" id="exportDetail"></div>
             </section>
           </div>
         </aside>
@@ -234,6 +238,7 @@ function syncControls(): void {
 
 function renderPreview(): void {
   settings = normalizeRawSettings(settings);
+  syncPreviewModeToFabricationMethod();
   const layout = createLayout(settings);
   const stage = requireElement(app.querySelector("#previewStage"), "Preview stage not found");
   const summary = requireElement(app.querySelector("#summaryGrid"), "Summary grid not found");
@@ -263,9 +268,7 @@ function renderPreview(): void {
 
   summary.innerHTML = previewSummaryHtml(layout);
 
-  for (const button of app.querySelectorAll("[data-mode]")) {
-    button.classList.toggle("is-active", button.getAttribute("data-mode") === previewMode);
-  }
+  syncPreviewModeButtons();
   const maximizeButton = app.querySelector<HTMLButtonElement>('[data-action="maximize-preview"]');
   if (maximizeButton !== null) {
     maximizeButton.hidden = previewMode === "enclosure";
@@ -281,11 +284,9 @@ function handleInput(event: Event): void {
     return;
   }
 
-  if (target.name === "exportFormat") {
-    exportFormat = readExportFormat(target.value);
-    if (previewMode !== "enclosure") {
-      previewMode = exportFormat === "print-3mf" ? "print-sheets" : "cut-sheet";
-    }
+  if (target.name === "fabricationMethod") {
+    fabricationMethod = readFabricationMethod(target.value, previewMode);
+    syncPreviewModeToFabricationMethod();
     syncExportControls(createLayout(settings));
     syncUrl();
     renderPreview();
@@ -348,7 +349,7 @@ function handleClick(event: MouseEvent): void {
   const mode = target.closest("[data-mode]");
   if (mode instanceof HTMLElement) {
     previewMode = readPreviewMode(mode.getAttribute("data-mode"));
-    syncFabricationMethodToPreviewMode();
+    syncPreviewModeToFabricationMethod();
     syncUrl();
     renderPreview();
     return;
@@ -440,13 +441,25 @@ function readControlsTab(value: string | null): ControlsTab {
   return value === "fabrication" || value === "cutting" ? "fabrication" : "build";
 }
 
-function syncFabricationMethodToPreviewMode(): void {
-  if (previewMode === "print-sheets") {
-    exportFormat = "print-3mf";
+function readFabricationMethod(value: string | null, fallbackPreviewMode: PreviewMode): FabricationMethod {
+  if (value !== null) {
+    return readExportFormat(value);
   }
-  if (previewMode === "cut-sheet") {
-    exportFormat = "laser-svg";
+  if (fallbackPreviewMode === "print-sheets") {
+    return "print-3mf";
   }
+  return "laser-svg";
+}
+
+function syncPreviewModeToFabricationMethod(): void {
+  if (previewMode === "enclosure") {
+    return;
+  }
+  previewMode = previewModeForFabricationMethod(fabricationMethod);
+}
+
+function previewModeForFabricationMethod(method: FabricationMethod): PreviewMode {
+  return method === "print-3mf" ? "print-sheets" : "cut-sheet";
 }
 
 function isFilterDimensionName(name: FieldName): name is "filterWidth" | "filterDepth" | "filterThickness" {
@@ -462,6 +475,14 @@ function syncControlTabs(): void {
 
   for (const panel of app.querySelectorAll<HTMLElement>("[data-controls-panel]")) {
     panel.hidden = panel.getAttribute("data-controls-panel") !== controlsTab;
+  }
+}
+
+function syncPreviewModeButtons(): void {
+  for (const button of app.querySelectorAll<HTMLElement>("[data-mode]")) {
+    button.classList.toggle("is-active", button.getAttribute("data-mode") === previewMode);
+    const methodPreview = button.dataset.methodPreview;
+    button.hidden = methodPreview !== undefined && methodPreview !== fabricationMethod;
   }
 }
 
@@ -593,31 +614,30 @@ function syncExportDiagnostics(layout: ReturnType<typeof createLayout>, mode: "n
 }
 
 function syncExportControls(layout: ReturnType<typeof createLayout>): void {
-  const formatControl = app.querySelector<HTMLSelectElement>('[name="exportFormat"]');
-  if (formatControl !== null) {
-    formatControl.value = exportFormat;
+  for (const control of app.querySelectorAll<HTMLInputElement>('[name="fabricationMethod"]')) {
+    control.checked = control.value === fabricationMethod;
   }
 
   const printVolumeControl = app.querySelector<HTMLElement>("[data-print-volume-control]");
   if (printVolumeControl !== null) {
-    printVolumeControl.hidden = exportFormat !== "print-3mf";
+    printVolumeControl.hidden = fabricationMethod !== "print-3mf";
   }
 
   const laserOutputControls = app.querySelector<HTMLElement>("[data-laser-output-controls]");
   if (laserOutputControls !== null) {
-    laserOutputControls.hidden = exportFormat !== "laser-svg";
+    laserOutputControls.hidden = fabricationMethod !== "laser-svg";
     for (const control of laserOutputControls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) {
-      control.disabled = exportFormat !== "laser-svg";
+      control.disabled = fabricationMethod !== "laser-svg";
     }
   }
 
   const volumeSelect = app.querySelector<HTMLSelectElement>('[name="printVolume"]');
   if (volumeSelect !== null) {
     volumeSelect.value = printVolumePresetId;
-    volumeSelect.disabled = exportFormat !== "print-3mf";
+    volumeSelect.disabled = fabricationMethod !== "print-3mf";
   }
 
-  const detail = app.querySelector<HTMLElement>("#exportFormatDetail");
+  const detail = app.querySelector<HTMLElement>("#exportDetail");
   if (detail !== null) {
     detail.innerHTML = exportDetailHtml(layout);
   }
@@ -628,7 +648,7 @@ function syncExportControls(layout: ReturnType<typeof createLayout>): void {
 }
 
 function exportDetailHtml(layout: ReturnType<typeof createLayout>): string {
-  if (exportFormat === "print-3mf") {
+  if (fabricationMethod === "print-3mf") {
     const printKit = createPrintableKit(layout, printVolumePresetId);
     const printPlan = createPrintableSheetPlan(layout, printVolumePresetId);
     const partSummary =
@@ -679,7 +699,7 @@ function exportDrawing(): void {
     return;
   }
 
-  if (exportFormat === "print-3mf") {
+  if (fabricationMethod === "print-3mf") {
     exportPrintKit(layout);
     return;
   }
@@ -807,7 +827,7 @@ function encodeShareState(): string {
   const params = new URLSearchParams(encodeSettings(settings));
   params.set("previewMode", previewMode);
   params.set("controlsTab", controlsTab);
-  params.set("exportFormat", exportFormat);
+  params.set("fabricationMethod", fabricationMethod);
   params.set("printVolume", printVolumePresetId);
   return params.toString();
 }
@@ -840,13 +860,29 @@ function selectField(name: FieldName, label: string, options: Array<[string, str
   </label>`;
 }
 
-function exportControlField(name: "exportFormat" | "printVolume", label: string, options: Array<[string, string]>): string {
+function exportControlField(name: "printVolume", label: string, options: Array<[string, string]>): string {
   return `<label class="field">
     <span>${label}</span>
     <select name="${name}">
       ${options.map(([value, text]) => `<option value="${value}">${text}</option>`).join("")}
     </select>
   </label>`;
+}
+
+function fabricationMethodField(): string {
+  return `<fieldset class="fabrication-method-field">
+    <legend>Make with</legend>
+    <div>
+      ${fabricationMethods
+        .map(
+          (method) => `<label>
+            <input type="radio" name="fabricationMethod" value="${method}" />
+            <span>${fabricationMethodLabel(method)}</span>
+          </label>`,
+        )
+        .join("")}
+    </div>
+  </fieldset>`;
 }
 
 function segmentedField(name: FieldName, label: string, options: Array<[string, string]>): string {
@@ -890,15 +926,15 @@ function cameraPresetLabel(preset: RawPurifierSettings["cameraPreset"]): string 
   return "Top";
 }
 
-function exportFormatLabel(format: ExportFormat): string {
-  if (format === "print-3mf") {
-    return "3D printing (3MF)";
+function fabricationMethodLabel(method: FabricationMethod): string {
+  if (method === "print-3mf") {
+    return "3D print";
   }
-  return "Laser cutting (SVG)";
+  return "Laser cut";
 }
 
 function exportActionLabel(): string {
-  return exportFormat === "print-3mf" ? "Export 3D Print Kit" : "Export Laser Drawing";
+  return fabricationMethod === "print-3mf" ? "Export 3D Print Kit" : "Export Laser Drawing";
 }
 
 function printVolumePresetDetail(description: string, examples: readonly string[]): string {

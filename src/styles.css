@@ -49,10 +49,10 @@ button {
 }
 
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  gap: 18px;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto 20px;
@@ -83,6 +83,62 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.fabrication-method-field {
+  min-width: 250px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fabrication-method-field legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fabrication-method-field div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+}
+
+.fabrication-method-field label {
+  position: relative;
+}
+
+.fabrication-method-field input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fabrication-method-field span {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  color: var(--ink);
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabrication-method-field input:checked + span {
+  background: var(--ink);
+  color: white;
+}
+
+.fabrication-method-field input:focus-visible + span,
+.segmented-field input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .primary-button,
@@ -149,8 +205,7 @@ button {
 }
 
 .preview-mode-group {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: inline-flex;
   gap: 6px;
   padding: 4px;
   border: 1px solid var(--line);
@@ -168,6 +223,10 @@ button {
 .mode-button.is-active {
   background: var(--ink);
   color: white;
+}
+
+[data-method-preview][hidden] {
+  display: none;
 }
 
 .preview-stage {
@@ -850,6 +909,7 @@ button {
 
   .topbar {
     align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .topbar-actions {
@@ -938,7 +998,13 @@ button {
   }
 
   .topbar {
+    grid-template-columns: 1fr;
     margin-bottom: 10px;
+  }
+
+  .fabrication-method-field {
+    width: 100%;
+    min-width: 0;
   }
 
   .topbar h1 {
