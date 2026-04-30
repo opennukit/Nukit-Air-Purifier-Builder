@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  applyFanProductPreset,
   applyFilterPreset,
   createLaserSvg,
   createLayout,
   customFilterPresetId,
+  customFanProductPresetId,
   decodeSettings,
   defaultSettings,
   encodeSettings,
@@ -126,6 +128,33 @@ describe("AirPurifier Boxes.py port", () => {
 
     const encodedCustom = encodeSettings(customSettings);
     expect(decodeSettings(encodedCustom).filterPreset).toBe(customFilterPresetId);
+  });
+
+  test("uses fan product presets for product help, cut hole size, and encoded URLs", () => {
+    const mobiusSettings = applyFanProductPreset(defaultSettings, "cleanairkits-mobius-120p");
+    const layout = createLayout(mobiusSettings);
+    const fanPanel = requiredFanPanel(layout);
+    const fanCut = requiredCircleCut(fanPanel, "fan");
+    const encoded = encodeSettings(layout.rawSettings);
+    const decoded = decodeSettings(encoded);
+
+    expect(layout.rawSettings.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(layout.rawSettings.fanDiameter).toBe(120);
+    expect(layout.configuration.fan.productSelection.type).toBe("preset");
+    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x50b8ff);
+    expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
+    expect(decoded.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(decoded.fanDiameter).toBe(120);
+  });
+
+  test("preserves legacy custom fan diameters and lets fan presets own their diameter", () => {
+    const legacyCustom = decodeSettings("fanDiameter=120");
+    const noctuaUrl = decodeSettings("fanPreset=noctua-nf-a14&fanDiameter=120");
+
+    expect(legacyCustom.fanPreset).toBe(customFanProductPresetId);
+    expect(legacyCustom.fanDiameter).toBe(120);
+    expect(noctuaUrl.fanPreset).toBe("noctua-nf-a14");
+    expect(noctuaUrl.fanDiameter).toBe(140);
   });
 
   test("keeps URL boundary parsing valid for booleans, fan counts, and constrained rims", () => {
@@ -397,6 +426,14 @@ function requiredPanel(panels: ReturnType<typeof createLayout>["cutPanels"], id:
   const panel = panels.find((entry) => entry.id === id);
   if (panel === undefined) {
     throw new Error(`requiredPanel: Missing ${id}`);
+  }
+  return panel;
+}
+
+function requiredFanPanel(layout: ReturnType<typeof createLayout>) {
+  const panel = layout.cutPanels.find((entry) => entry.cuts.some((cut) => cut.type === "circle" && cut.role === "fan"));
+  if (panel === undefined) {
+    throw new Error("requiredFanPanel: Missing fan panel");
   }
   return panel;
 }

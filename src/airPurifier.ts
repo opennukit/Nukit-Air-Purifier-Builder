@@ -57,8 +57,133 @@ export type FanSpec = {
   cutClearance: Millimeters;
 };
 
+export type FanAppearance = {
+  readonly frameColor: number;
+  readonly ringColor: number;
+  readonly bladeColor: number;
+  readonly hubColor: number;
+  readonly accentColor: number;
+  readonly bladeOpacity: number;
+};
+
+export const fanProductPresetIds = [
+  "nukit-arctic-p14",
+  "cleanairkits-mobius-120p",
+  "noctua-nf-a14",
+  "custom",
+] as const;
+
+export type FanProductPresetId = (typeof fanProductPresetIds)[number];
+
+export type PresetFanProductId = Exclude<FanProductPresetId, "custom">;
+
+export type FanProductPreset = {
+  readonly id: FanProductPresetId;
+  readonly label: string;
+  readonly detail: string;
+  readonly diameter: FanDiameter;
+  readonly source: string;
+  readonly productUrl?: string;
+  readonly powerNote: string;
+  readonly buyingNotes: readonly string[];
+  readonly appearance: FanAppearance;
+};
+
+export type PresetFanProduct = FanProductPreset & {
+  readonly id: PresetFanProductId;
+};
+
+export const customFanProductPresetId: FanProductPresetId = "custom";
+export const defaultFanProductPresetId: PresetFanProductId = "nukit-arctic-p14";
+
+export const fanProductPresets: readonly FanProductPreset[] = [
+  {
+    id: "nukit-arctic-p14",
+    label: "ARCTIC P14 PWM PST",
+    detail: "Nukit baseline recommendation: black 140 mm pressure-optimized PWM fan with PST daisy-chain cabling.",
+    diameter: 140,
+    source: "Nukit README / ARCTIC P14 PWM PST",
+    productUrl: "https://www.arctic.de/en/P14-PWM-PST/ACFAN00125A",
+    powerNote: "4-pin PWM PST, 12 V",
+    buyingNotes: ["Good low-cost default", "PST cabling can simplify multi-fan wiring"],
+    appearance: {
+      frameColor: 0x111817,
+      ringColor: 0x050807,
+      bladeColor: 0x49525a,
+      hubColor: 0x919a96,
+      accentColor: 0x253a38,
+      bladeOpacity: 0.84,
+    },
+  },
+  {
+    id: "cleanairkits-mobius-120p",
+    label: "Cooler Master Mobius 120P",
+    detail: "CleanAirKits Luggable Ultra style: high-pressure 120 mm Mobius fan family.",
+    diameter: 120,
+    source: "CleanAirKits Luggables / Cooler Master Mobius 120P",
+    productUrl: "https://www.coolermaster.com/en-global/products/mobius-120p-argb/",
+    powerNote: "4-pin PWM, 12 V",
+    buyingNotes: ["Matches the Luggable Ultra fan size", "Black retail or ARGB versions may vary by region"],
+    appearance: {
+      frameColor: 0x080d11,
+      ringColor: 0x151c22,
+      bladeColor: 0x202b33,
+      hubColor: 0x8a969c,
+      accentColor: 0x50b8ff,
+      bladeOpacity: 0.88,
+    },
+  },
+  {
+    id: "noctua-nf-a14",
+    label: "Noctua NF-A14 PWM",
+    detail: "Premium quiet 140 mm option with Noctua's recognizable beige frame and brown blades.",
+    diameter: 140,
+    source: "Noctua NF-A14 PWM",
+    productUrl: "https://noctua.at/en/nf-a14-pwm",
+    powerNote: "4-pin PWM, 12 V",
+    buyingNotes: ["Premium acoustic choice", "Color is intentionally visible in the preview"],
+    appearance: {
+      frameColor: 0xd6bd8d,
+      ringColor: 0xb79a67,
+      bladeColor: 0x6b3b25,
+      hubColor: 0xe2cda4,
+      accentColor: 0x8f5b35,
+      bladeOpacity: 0.92,
+    },
+  },
+  {
+    id: "custom",
+    label: "Custom fan",
+    detail: "Use a generic fan size and enter the diameter separately.",
+    diameter: 140,
+    source: "User supplied fan",
+    powerNote: "Check the fan datasheet",
+    buyingNotes: ["Verify screw spacing before cutting", "Check voltage and current draw"],
+    appearance: {
+      frameColor: 0x111817,
+      ringColor: 0x060a09,
+      bladeColor: 0x657179,
+      hubColor: 0x9aa39f,
+      accentColor: 0x3c6f61,
+      bladeOpacity: 0.84,
+    },
+  },
+];
+
+export type FanProductSelection =
+  | {
+      readonly type: "preset";
+      readonly presetId: PresetFanProductId;
+      readonly product: PresetFanProduct;
+    }
+  | {
+      readonly type: "custom";
+      readonly product: FanProductPreset;
+    };
+
 export type FanConfiguration = {
   spec: FanSpec;
+  productSelection: FanProductSelection;
   banks: FanBanks<FanCountRequest>;
 };
 
@@ -222,6 +347,7 @@ export type RawPurifierSettings = {
   filterDepth: Millimeters;
   filterThickness: Millimeters;
   rim: Millimeters;
+  fanPreset: FanProductPresetId;
   fanDiameter: FanDiameter;
   filters: FilterCount;
   splitFrames: boolean;
@@ -277,6 +403,7 @@ export const defaultSettings: RawPurifierSettings = {
   filterDepth: 495.3,
   filterThickness: 19.1,
   rim: 30,
+  fanPreset: defaultFanProductPresetId,
   fanDiameter: 140,
   filters: 2,
   splitFrames: true,
@@ -303,7 +430,9 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
   const preset = findFilterPreset(raw.filterPreset);
   const dimensions = normalizeFilterDimensions(preset.id === customFilterPresetId ? rawFilterDimensions(raw) : preset.dimensions);
   const materialThickness = clamp(raw.materialThickness, 1.5, 9);
-  const fanSpec = findFanSpec(raw.fanDiameter);
+  const fanProductPreset = findFanProductPreset(raw.fanPreset);
+  const fanDiameter = fanProductPreset.id === customFanProductPresetId ? raw.fanDiameter : fanProductPreset.diameter;
+  const fanSpec = findFanSpec(fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
   const workingDepth = dimensions.depth - materialThickness;
   const chamberHeight = fanSpec.diameter + 2 + filterCount * (dimensions.thickness + materialThickness);
@@ -314,6 +443,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
     filterCount,
     fan: {
       spec: fanSpec,
+      productSelection: createFanProductSelection(fanProductPreset.id),
       banks: {
         left: fanCountRequestFromNumber(raw.fansLeft),
         right: fanCountRequestFromNumber(raw.fansRight),
@@ -358,6 +488,7 @@ export function toRawSettings(input: PurifierInput): RawPurifierSettings {
     filterDepth: filterDimensions.depth,
     filterThickness: filterDimensions.thickness,
     rim: input.cutting.rim,
+    fanPreset: input.fan.productSelection.type === "preset" ? input.fan.productSelection.presetId : customFanProductPresetId,
     fanDiameter: input.fan.spec.diameter,
     filters: input.filterCount,
     splitFrames: input.frameConstruction.type === "split-rails",
@@ -405,6 +536,18 @@ export function findFanSpec(diameter: FanDiameter): FanSpec {
   return fanSpecs.find((spec) => spec.diameter === diameter) ?? fanSpecs[fanSpecs.length - 1];
 }
 
+export function findFanProductPreset(id: FanProductPresetId): FanProductPreset {
+  return fanProductPresets.find((preset) => preset.id === id) ?? findPresetFanProduct(defaultFanProductPresetId);
+}
+
+export function findPresetFanProduct(id: PresetFanProductId): PresetFanProduct {
+  const preset = fanProductPresets.find((entry): entry is PresetFanProduct => entry.id === id && isPresetFanProductId(entry.id));
+  if (preset === undefined) {
+    throw new Error(`findPresetFanProduct: Missing fan product ${id}`);
+  }
+  return preset;
+}
+
 export function applyFilterPreset(settings: RawPurifierSettings, presetId: FilterPresetId): RawPurifierSettings {
   const preset = findFilterPreset(presetId);
   if (preset.id === customFilterPresetId) {
@@ -420,6 +563,22 @@ export function applyFilterPreset(settings: RawPurifierSettings, presetId: Filte
     filterWidth: preset.dimensions.width,
     filterDepth: preset.dimensions.depth,
     filterThickness: preset.dimensions.thickness,
+  };
+}
+
+export function applyFanProductPreset(settings: RawPurifierSettings, presetId: FanProductPresetId): RawPurifierSettings {
+  const preset = findFanProductPreset(presetId);
+  if (preset.id === customFanProductPresetId) {
+    return {
+      ...settings,
+      fanPreset: customFanProductPresetId,
+    };
+  }
+
+  return {
+    ...settings,
+    fanPreset: preset.id,
+    fanDiameter: preset.diameter,
   };
 }
 
@@ -465,6 +624,7 @@ export function encodeSettings(input: PurifierInput): string {
   params.set("filterDepth", formatNumber(settings.filterDepth));
   params.set("filterThickness", formatNumber(settings.filterThickness));
   params.set("rim", formatNumber(settings.rim));
+  params.set("fanPreset", settings.fanPreset);
   params.set("fanDiameter", String(settings.fanDiameter));
   params.set("filters", String(settings.filters));
   params.set("splitFrames", String(settings.splitFrames));
@@ -490,6 +650,8 @@ export function encodeSettings(input: PurifierInput): string {
 export function decodeSettings(search: string): RawPurifierSettings {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const filterPreset = readFilterPreset(params);
+  const fanDiameter = readFanDiameter(params, "fanDiameter", defaultSettings.fanDiameter);
+  const fanPreset = readFanProductPreset(params, fanDiameter);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
     filterPreset,
@@ -497,7 +659,8 @@ export function decodeSettings(search: string): RawPurifierSettings {
     filterDepth: readNumber(params, "filterDepth", defaultSettings.filterDepth),
     filterThickness: readNumber(params, "filterThickness", defaultSettings.filterThickness),
     rim: readNumber(params, "rim", defaultSettings.rim),
-    fanDiameter: readFanDiameter(params, "fanDiameter", defaultSettings.fanDiameter),
+    fanPreset,
+    fanDiameter,
     filters: readFilterCount(params, "filters", defaultSettings.filters),
     splitFrames: readBoolean(params, "splitFrames", defaultSettings.splitFrames),
     fansLeft: readInteger(params, "fansLeft", defaultSettings.fansLeft),
@@ -557,8 +720,26 @@ function createFilterSelection(presetId: FilterPresetId, dimensions: FilterDimen
   };
 }
 
+function createFanProductSelection(presetId: FanProductPresetId): FanProductSelection {
+  if (isPresetFanProductId(presetId)) {
+    return {
+      type: "preset",
+      presetId,
+      product: findPresetFanProduct(presetId),
+    };
+  }
+  return {
+    type: "custom",
+    product: findFanProductPreset(customFanProductPresetId),
+  };
+}
+
 function isPresetFilterId(id: FilterPresetId): id is PresetFilterId {
   return id !== customFilterPresetId;
+}
+
+function isPresetFanProductId(id: FanProductPresetId): id is PresetFanProductId {
+  return id !== customFanProductPresetId;
 }
 
 function fanCountRequestFromNumber(value: number): FanCountRequest {
@@ -610,6 +791,17 @@ function readFanDiameter(params: URLSearchParams, key: string, fallback: FanDiam
   const parsed = Number(params.get(key));
   const found = fanDiameters.find((diameter) => diameter === parsed);
   return found ?? fallback;
+}
+
+function readFanProductPreset(params: URLSearchParams, fanDiameter: FanDiameter): FanProductPresetId {
+  const value = params.get("fanPreset");
+  const found = fanProductPresetIds.find((preset) => preset === value);
+  if (found !== undefined) {
+    return found;
+  }
+  return fanDiameter === findFanProductPreset(defaultSettings.fanPreset).diameter
+    ? defaultSettings.fanPreset
+    : customFanProductPresetId;
 }
 
 function readFilterPreset(params: URLSearchParams): FilterPresetId {

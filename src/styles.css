@@ -393,7 +393,8 @@ button {
   font-weight: 700;
 }
 
-.filter-preset-card {
+.filter-preset-card,
+.fan-preset-card {
   display: grid;
   gap: 4px;
   margin: -4px 0 12px;
@@ -406,16 +407,19 @@ button {
   line-height: 1.35;
 }
 
-.filter-preset-card strong {
+.filter-preset-card strong,
+.fan-preset-card strong {
   color: var(--ink);
   font-size: 0.9rem;
 }
 
-.filter-preset-card span {
+.filter-preset-card span,
+.fan-preset-card span {
   overflow-wrap: anywhere;
 }
 
-.filter-preset-card dl {
+.filter-preset-card dl,
+.fan-preset-card dl {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -423,23 +427,72 @@ button {
 }
 
 .filter-preset-card dt,
-.filter-preset-card dd {
+.filter-preset-card dd,
+.fan-preset-card dt,
+.fan-preset-card dd {
   margin: 0;
 }
 
-.filter-preset-card dt {
+.filter-preset-card dt,
+.fan-preset-card dt {
   color: rgb(102 113 105 / 82%);
   font-size: 0.68rem;
   text-transform: uppercase;
 }
 
-.filter-preset-card dd {
+.filter-preset-card dd,
+.fan-preset-card dd {
   overflow-wrap: anywhere;
   color: var(--ink);
   font-size: 0.76rem;
 }
 
+.fan-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.fan-color-swatches {
+  display: flex;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.fan-color-swatches span {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgb(23 32 28 / 18%);
+  background: var(--swatch-color);
+}
+
+.fan-preset-card small,
+.fan-preset-card a {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.fan-preset-card .parts-note {
+  margin-top: 4px;
+  line-height: 1.28;
+}
+
+.fan-preset-card a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.fan-preset-card a:hover {
+  text-decoration: underline;
+}
+
 .custom-dimensions[hidden] {
+  display: none;
+}
+
+[data-custom-fan-size][hidden] {
   display: none;
 }
 
@@ -688,15 +741,68 @@ button {
     height: 100svh;
     min-height: 0;
     overflow: hidden;
-    padding: 22px clamp(32px, 3vw, 46px);
+    padding: 18px clamp(32px, 3vw, 46px);
   }
 
   .topbar {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .topbar h1 {
-    font-size: clamp(2rem, 3.6vw, 4rem);
+    font-size: clamp(2rem, 3.25vw, 3.8rem);
+  }
+
+  .preview-pane,
+  .controls-pane {
+    padding: 16px;
+  }
+
+  .controls-tabs {
+    margin-bottom: 12px;
+  }
+
+  .section-heading {
+    margin-bottom: 10px;
+  }
+
+  .section-heading h2 {
+    font-size: 1.08rem;
+  }
+
+  .field,
+  .toggle-field {
+    gap: 6px;
+    margin: 8px 0;
+  }
+
+  .field input,
+  .field select {
+    min-height: 38px;
+  }
+
+  .filter-preset-card,
+  .fan-preset-card {
+    gap: 3px;
+    margin: -2px 0 9px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    line-height: 1.28;
+  }
+
+  .filter-preset-card dl,
+  .fan-preset-card dl {
+    gap: 6px;
+    margin-top: 3px;
+  }
+
+  .fan-preset-card .parts-note {
+    margin-top: 2px;
+    line-height: 1.22;
+  }
+
+  .view-section {
+    margin-top: 12px;
+    padding-top: 12px;
   }
 
   .workspace {

@@ -35,7 +35,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { filterSelectionDimensions, type LayoutResult } from "./airPurifier";
+import { filterSelectionDimensions, type FanAppearance, type LayoutResult } from "./airPurifier";
 import {
   createAssemblyModel,
   formatDimension,
@@ -62,8 +62,6 @@ const woodColor = 0xc7965a;
 const edgeColor = 0x4f3822;
 const burnColor = 0x2b1a0f;
 const filterColor = 0xeef1e6;
-const fanColor = 0x111817;
-const bladeColor = 0x657179;
 
 export class PurifierThreePreview {
   private readonly scene = new Scene();
@@ -160,6 +158,7 @@ export class PurifierThreePreview {
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.5 : 0.68);
+    const fanAppearance = settings.fan.productSelection.product.appearance;
 
     for (const panel of assembly.panels) {
       this.modelGroup.add(
@@ -167,6 +166,7 @@ export class PurifierThreePreview {
           panel,
           settings.cutting.materialThickness,
           settings.preview.showFans,
+          fanAppearance,
           settings.preview.explodedView,
           wood,
           darkEdge,
@@ -184,6 +184,7 @@ export class PurifierThreePreview {
               rail,
               settings.cutting.materialThickness,
               false,
+              fanAppearance,
               settings.preview.explodedView,
               railWood,
               darkEdge,
@@ -313,6 +314,7 @@ function createPanelGroup(
   part: AssemblyPanelPart,
   materialThickness: number,
   showFans: boolean,
+  fanAppearance: FanAppearance,
   exploded: boolean,
   material: Material,
   edgeMaterial: Material,
@@ -345,6 +347,7 @@ function createPanelGroup(
               materialThickness * sceneScale * 0.5 + 0.014,
             ),
             radius: cut.radius * sceneScale,
+            appearance: fanAppearance,
           }),
         );
       }
@@ -756,7 +759,7 @@ function cameraPosition(preset: LayoutResult["configuration"]["preview"]["camera
   return new Vector3(maxDimension * 1.75, maxDimension * 1.05, maxDimension * 2.05);
 }
 
-function createFan({ axis, position, radius }: FanPlacement): Group {
+function createFan({ axis, position, radius, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
   const fan = new Group();
   fan.position.copy(position);
   if (axis === "x") {
@@ -765,25 +768,27 @@ function createFan({ axis, position, radius }: FanPlacement): Group {
     fan.rotation.x = Math.PI / 2;
   }
 
+  fan.add(createFanFrame(radius, appearance));
+
   const housing = new Mesh(
     new CylinderGeometry(radius, radius, 0.035, 72),
-    new MeshStandardMaterial({ color: fanColor, roughness: 0.58, metalness: 0.12 }),
+    new MeshStandardMaterial({ color: appearance.ringColor, roughness: 0.58, metalness: 0.12 }),
   );
   housing.castShadow = true;
   fan.add(housing);
 
   const hub = new Mesh(
     new CylinderGeometry(radius * 0.28, radius * 0.28, 0.047, 48),
-    new MeshStandardMaterial({ color: 0x9aa39f, roughness: 0.45, metalness: 0.08 }),
+    new MeshStandardMaterial({ color: appearance.hubColor, roughness: 0.45, metalness: 0.08 }),
   );
   fan.add(hub);
 
   const bladeMaterial = new MeshStandardMaterial({
-    color: bladeColor,
+    color: appearance.bladeColor,
     roughness: 0.62,
     metalness: 0.04,
     transparent: true,
-    opacity: 0.84,
+    opacity: appearance.bladeOpacity,
     side: DoubleSide,
   });
   for (let index = 0; index < 5; index += 1) {
@@ -793,6 +798,35 @@ function createFan({ axis, position, radius }: FanPlacement): Group {
   }
 
   return fan;
+}
+
+function createFanFrame(radius: number, appearance: FanAppearance): Group {
+  const frame = new Group();
+  const size = radius * 2.15;
+  const barWidth = radius * 0.26;
+  const depth = 0.032;
+  const material = new MeshStandardMaterial({ color: appearance.frameColor, roughness: 0.62, metalness: 0.08 });
+  const accentMaterial = new MeshStandardMaterial({ color: appearance.accentColor, roughness: 0.5, metalness: 0.12 });
+
+  const top = new Mesh(new BoxGeometry(size, depth, barWidth), material);
+  top.position.z = size / 2 - barWidth / 2;
+  const bottom = new Mesh(new BoxGeometry(size, depth, barWidth), material);
+  bottom.position.z = -size / 2 + barWidth / 2;
+  const left = new Mesh(new BoxGeometry(barWidth, depth, size), material);
+  left.position.x = -size / 2 + barWidth / 2;
+  const right = new Mesh(new BoxGeometry(barWidth, depth, size), material);
+  right.position.x = size / 2 - barWidth / 2;
+
+  frame.add(top, bottom, left, right);
+  const cornerOffset = size / 2 - barWidth / 2;
+  for (const x of [-cornerOffset, cornerOffset]) {
+    for (const z of [-cornerOffset, cornerOffset]) {
+      const accent = new Mesh(new CylinderGeometry(radius * 0.075, radius * 0.075, depth * 1.2, 24), accentMaterial);
+      accent.position.set(x, -0.002, z);
+      frame.add(accent);
+    }
+  }
+  return frame;
 }
 
 function createBladeGeometry(radius: number): BufferGeometry {

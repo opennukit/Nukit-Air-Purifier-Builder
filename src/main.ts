@@ -1,20 +1,25 @@
 import "./styles.css";
 import {
+  applyFanProductPreset,
   applyFilterPreset,
   automaticFanCount,
   cameraPresets,
   createLaserSvg,
   createLayout,
   customFilterPresetId,
+  customFanProductPresetId,
   decodeSettings,
   defaultSettings,
   encodeSettings,
   fanDiameters,
+  fanProductPresets,
   fixedFanCountOptions,
   filterPresets,
+  findFanProductPreset,
   findFilterPreset,
   formatMillimeters,
   normalizeRawSettings,
+  type FanProductPresetId,
   type FilterPresetId,
   type PreviewMode,
   type RawPurifierSettings,
@@ -102,7 +107,11 @@ function renderShell(): void {
                 ${numberField("filterDepth", "Filter depth", "mm", 1)}
                 ${numberField("filterThickness", "Filter thickness", "mm", 0.1)}
               </div>
-              ${selectField("fanDiameter", "Fan size", fanDiameters.map((diameter) => [String(diameter), `${diameter} mm`]))}
+              ${selectField("fanPreset", "Fan type", fanProductPresets.map((preset) => [preset.id, preset.label]))}
+              <div class="fan-preset-card" id="fanPresetDetail"></div>
+              <div data-custom-fan-size>
+                ${selectField("fanDiameter", "Fan size", fanDiameters.map((diameter) => [String(diameter), `${diameter} mm`]))}
+              </div>
               ${segmentedField("filters", "Filters", [
                 ["1", "One side"],
                 ["2", "Both sides"],
@@ -212,6 +221,7 @@ function syncControls(): void {
     }
   }
   syncFilterPresetUi();
+  syncFanPresetUi();
   syncExportControls(createLayout(settings));
 }
 
@@ -286,6 +296,8 @@ function handleInput(event: Event): void {
 
   if (name === "filterPreset") {
     settings = applyFilterPreset(settings, readFilterPresetControlValue(target));
+  } else if (name === "fanPreset") {
+    settings = applyFanProductPreset(settings, readFanProductPresetControlValue(target));
   } else {
     settings = {
       ...settings,
@@ -295,6 +307,12 @@ function handleInput(event: Event): void {
       settings = {
         ...settings,
         filterPreset: customFilterPresetId,
+      };
+    }
+    if (name === "fanDiameter") {
+      settings = {
+        ...settings,
+        fanPreset: customFanProductPresetId,
       };
     }
   }
@@ -398,6 +416,11 @@ function readFilterPresetControlValue(target: HTMLInputElement | HTMLSelectEleme
   return preset?.id ?? defaultSettings.filterPreset;
 }
 
+function readFanProductPresetControlValue(target: HTMLInputElement | HTMLSelectElement): FanProductPresetId {
+  const preset = fanProductPresets.find((entry) => entry.id === target.value);
+  return preset?.id ?? defaultSettings.fanPreset;
+}
+
 function readControlsTab(value: string | null): ControlsTab {
   return value === "cutting" ? "cutting" : "build";
 }
@@ -460,6 +483,74 @@ function syncFilterPresetUi(): void {
 
 function formatExamples(examples: readonly string[]): string {
   return examples.length > 0 ? ` (${examples.join(", ")})` : "";
+}
+
+function syncFanPresetUi(): void {
+  const layout = createLayout(settings);
+  const product = findFanProductPreset(settings.fanPreset);
+  const totalFans = totalResolvedFans(layout.summary.resolvedFans);
+  const detail = app.querySelector<HTMLElement>("#fanPresetDetail");
+  if (detail !== null) {
+    const sourceLink =
+      product.productUrl === undefined
+        ? ""
+        : ` <a href="${escapeHtml(product.productUrl)}" target="_blank" rel="noreferrer">Source</a>`;
+    detail.innerHTML = `
+      <div class="fan-card-header">
+        <div>
+          <strong>${escapeHtml(product.label)}</strong>
+          <span>${escapeHtml(product.detail)}</span>
+        </div>
+        <div class="fan-color-swatches" aria-label="Fan colors">
+          <span style="--swatch-color: #${hexColor(product.appearance.frameColor)}"></span>
+          <span style="--swatch-color: #${hexColor(product.appearance.bladeColor)}"></span>
+          <span style="--swatch-color: #${hexColor(product.appearance.hubColor)}"></span>
+        </div>
+      </div>
+      <dl>
+        <div>
+          <dt>Size</dt>
+          <dd>${layout.configuration.fan.spec.diameter} mm</dd>
+        </div>
+        <div>
+          <dt>Buy</dt>
+          <dd>${totalFans}</dd>
+        </div>
+        <div>
+          <dt>Power</dt>
+          <dd>${escapeHtml(product.powerNote)}</dd>
+        </div>
+      </dl>
+      <small class="parts-note">${escapeHtml(purchaseSummary(product.buyingNotes, totalFans, layout.configuration.fan.spec.diameter))}</small>
+      <small>${escapeHtml(product.source)}${sourceLink}</small>
+    `;
+  }
+
+  const customFanSize = app.querySelector<HTMLElement>("[data-custom-fan-size]");
+  if (customFanSize === null) {
+    return;
+  }
+
+  const isCustom = settings.fanPreset === customFanProductPresetId;
+  customFanSize.hidden = !isCustom;
+  for (const control of customFanSize.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) {
+    control.disabled = !isCustom;
+  }
+}
+
+function purchaseSummary(notes: readonly string[], totalFans: number, fanDiameter: number): string {
+  const dynamicItems = [
+    `${totalFans} x ${fanDiameter} mm fans`,
+    `${totalFans} x ${fanDiameter} mm fan guards`,
+    "12 V power/control",
+    "PWM splitter or barrel-jack adapter",
+    "fasteners/glue",
+  ];
+  return `Buy: ${[...dynamicItems, ...notes].join("; ")}.`;
+}
+
+function hexColor(color: number): string {
+  return color.toString(16).padStart(6, "0");
 }
 
 function syncExportDiagnostics(layout: ReturnType<typeof createLayout>, mode: "normal" | "attention" = "normal"): void {
