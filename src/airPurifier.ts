@@ -18,7 +18,7 @@ export const fanSpecs: readonly FanSpec[] = [
 
 export type FilterCount = 1 | 2;
 
-export type PreviewMode = "enclosure" | "cut-sheet";
+export type PreviewMode = "enclosure" | "cut-sheet" | "print-sheets";
 
 export const cameraPresets = ["official", "front", "side", "top"] as const;
 

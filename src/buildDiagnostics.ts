@@ -26,7 +26,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       id: "no-fans",
       severity: "warning",
       title: "No fans resolved",
-      detail: "At least one fan opening is needed before the cut sheet is useful.",
+      detail: "At least one fan opening is needed before fabrication export is useful.",
     });
   }
 
@@ -57,7 +57,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       id: "large-unsplit-frame",
       severity: "warning",
       title: "Large unsplit frame",
-      detail: "The filter frame is wider than many desktop laser beds. Split frames are safer for this size.",
+      detail: "The filter frame is wider than many desktop fabrication beds. Split frames are safer for this size.",
     });
   }
 
@@ -66,7 +66,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       id: "large-sheet",
       severity: "warning",
       title: "Large sheet layout",
-      detail: "The arranged SVG exceeds 1500 mm on one side and may need manual nesting before cutting.",
+      detail: "The arranged laser drawing exceeds 1500 mm on one side and may need manual nesting.",
     });
   }
 
@@ -89,7 +89,7 @@ export function summarizeBuildReadiness(layout: LayoutResult): BuildDiagnostic {
       id: "warnings",
       severity: "warning",
       title: `${warnings.length} export check${warnings.length === 1 ? "" : "s"}`,
-      detail: "Review the cut readiness checks before sending the SVG to the laser.",
+      detail: "Review the fabrication checks before exporting.",
     };
   }
 

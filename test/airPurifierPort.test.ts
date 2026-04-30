@@ -26,6 +26,7 @@ import {
   printVolumePresets,
   type PrintVolumePresetId,
 } from "../src/printableKit";
+import { createPrintableSheetPlan, renderPrintableSheetsSvg } from "../src/printSheetPreview";
 
 describe("AirPurifier Boxes.py port", () => {
   test("uses the generated Boxes document for summary and SVG output", () => {
@@ -387,6 +388,28 @@ describe("AirPurifier Boxes.py port", () => {
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.summary.retainedCutFeatureCount).toBe(kit.summary.sourceCutFeatureCount);
     expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+  });
+
+  test("lays printable kit parts onto previewable print sheets", () => {
+    const layout = createLayout(defaultSettings);
+    const plan = createPrintableSheetPlan(layout, "bed-256");
+    const svg = renderPrintableSheetsSvg(layout, "bed-256");
+
+    expect(plan.kit.preset.id).toBe("bed-256");
+    expect(plan.sheets.length).toBeGreaterThan(1);
+    expect(plan.sheets.every((sheet) => sheet.placements.length > 0)).toBe(true);
+    expect(plan.sheets.every((sheet) => sheet.placements.every((placement) => placement.fits))).toBe(true);
+    expect(
+      plan.sheets.every((sheet) =>
+        sheet.placements.every(
+          (placement) =>
+            placement.x + placement.part.width <= sheet.width + 0.001 &&
+            placement.y + placement.part.depth <= sheet.depth + 0.001,
+        ),
+      ),
+    ).toBe(true);
+    expect(svg).toContain("Nukit Open Air Purifier 3D Print Sheets");
+    expect(svg).toContain("Print sheet 1");
   });
 
   test("exports a browser-native 3MF print package", () => {

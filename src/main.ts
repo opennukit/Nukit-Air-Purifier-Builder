@@ -35,10 +35,11 @@ import {
   type ExportFormat,
   type PrintVolumePresetId,
 } from "./printableKit";
+import { createPrintableSheetPlan, renderPrintableSheetsSvg } from "./printSheetPreview";
 import { PurifierThreePreview } from "./threePreview";
 
 type FieldName = keyof RawPurifierSettings;
-type ControlsTab = "build" | "cutting";
+type ControlsTab = "build" | "fabrication";
 
 const app = requireElement(document.querySelector<HTMLElement>("#app"), "App root not found");
 const initialUrlParams = new URLSearchParams(window.location.search);
@@ -51,10 +52,12 @@ let printVolumePresetId: PrintVolumePresetId = findPrintVolumePreset(initialUrlP
 let threePreview: PurifierThreePreview | null = null;
 const transientLabelTimers = new WeakMap<HTMLElement, number>();
 
+syncFabricationMethodToPreviewMode();
 renderShell();
 syncControlTabs();
 syncControls();
 renderPreview();
+syncUrl();
 
 function renderShell(): void {
   app.innerHTML = `
@@ -75,9 +78,10 @@ function renderShell(): void {
           <div class="preview-toolbar" aria-label="Preview mode">
             <div class="preview-mode-group">
               <button class="mode-button" type="button" data-mode="enclosure">3D enclosure</button>
-              <button class="mode-button" type="button" data-mode="cut-sheet">Cut sheet</button>
+              <button class="mode-button" type="button" data-mode="cut-sheet">Laser sheet</button>
+              <button class="mode-button" type="button" data-mode="print-sheets">Print sheets</button>
             </div>
-            <button class="ghost-button preview-maximize-button" type="button" data-action="maximize-cut-sheet" hidden>
+            <button class="ghost-button preview-maximize-button" type="button" data-action="maximize-preview" hidden>
               Maximize
             </button>
           </div>
@@ -91,7 +95,7 @@ function renderShell(): void {
         <aside class="controls-pane" aria-label="Build settings">
           <div class="controls-tabs" role="tablist" aria-label="Control groups">
             <button class="controls-tab" id="build-controls-tab" type="button" role="tab" data-controls-tab="build" aria-controls="build-controls-panel">Build</button>
-            <button class="controls-tab" id="cutting-controls-tab" type="button" role="tab" data-controls-tab="cutting" aria-controls="cutting-controls-panel">Cutting</button>
+            <button class="controls-tab" id="fabrication-controls-tab" type="button" role="tab" data-controls-tab="fabrication" aria-controls="fabrication-controls-panel">Fabrication</button>
           </div>
 
           <div class="tab-panel build-controls" id="build-controls-panel" role="tabpanel" aria-labelledby="build-controls-tab" data-controls-panel="build">
@@ -148,26 +152,28 @@ function renderShell(): void {
             </div>
           </div>
 
-          <div class="tab-panel cutting-controls" id="cutting-controls-panel" role="tabpanel" aria-labelledby="cutting-controls-tab" data-controls-panel="cutting">
-            <section class="control-section cutting-section">
+          <div class="tab-panel fabrication-controls" id="fabrication-controls-panel" role="tabpanel" aria-labelledby="fabrication-controls-tab" data-controls-panel="fabrication">
+            <section class="control-section fabrication-settings-section">
               <div class="section-heading">
-                <p class="eyebrow">Cutting</p>
+                <p class="eyebrow">Fabrication</p>
                 <h2>Material and fit</h2>
               </div>
               ${numberField("materialThickness", "Material thickness", "mm", 0.1)}
               ${numberField("rim", "Filter rim", "mm", 1)}
               ${numberField("screwHoleDiameter", "Fan screw holes", "mm", 0.1)}
-              ${numberField("kerfFit", "Kerf fit allowance", "mm", 0.01)}
-              ${toggleField("splitFrames", "Split frames for smaller laser beds")}
-              ${toggleField("labels", "Engrave part labels")}
-              ${numberField("referenceScale", "Reference scale", "mm", 1)}
+              ${numberField("kerfFit", "Fit allowance", "mm", 0.01)}
+              ${toggleField("splitFrames", "Split large frame panels")}
+              <div data-laser-output-controls>
+                ${toggleField("labels", "Engrave part labels")}
+                ${numberField("referenceScale", "Reference scale", "mm", 1)}
+              </div>
             </section>
             <section class="control-section export-section">
               <div class="section-heading">
                 <p class="eyebrow">Export</p>
-                <h2>Cut readiness</h2>
+                <h2>Fabrication readiness</h2>
               </div>
-              ${exportControlField("exportFormat", "File format", exportFormats.map((format) => [format, exportFormatLabel(format)]))}
+              ${exportControlField("exportFormat", "Method", exportFormats.map((format) => [format, exportFormatLabel(format)]))}
               <div data-print-volume-control>
                 ${exportControlField("printVolume", "Print volume", printVolumePresets.map((preset) => [preset.id, preset.label]))}
               </div>
@@ -178,16 +184,16 @@ function renderShell(): void {
         </aside>
       </section>
 
-      <dialog class="cut-sheet-dialog" id="cutSheetDialog" aria-labelledby="cutSheetDialogTitle">
-        <div class="cut-sheet-dialog-surface">
-          <header class="cut-sheet-dialog-bar">
+      <dialog class="sheet-dialog" id="sheetDialog" aria-labelledby="sheetDialogTitle">
+        <div class="sheet-dialog-surface">
+          <header class="sheet-dialog-bar">
             <div>
-              <p class="eyebrow">Cut sheet</p>
-              <h2 id="cutSheetDialogTitle">Laser layout</h2>
+              <p class="eyebrow" id="sheetDialogEyebrow">Fabrication preview</p>
+              <h2 id="sheetDialogTitle">Layout</h2>
             </div>
-            <button class="ghost-button" type="button" data-action="close-cut-sheet-dialog">Close</button>
+            <button class="ghost-button" type="button" data-action="close-preview-dialog">Close</button>
           </header>
-          <div class="cut-sheet-dialog-preview" id="cutSheetDialogPreview"></div>
+          <div class="sheet-dialog-preview" id="sheetDialogPreview"></div>
         </div>
       </dialog>
 
@@ -233,6 +239,7 @@ function renderPreview(): void {
 
   if (previewMode === "enclosure") {
     stage.classList.add("is-three-preview");
+    stage.classList.remove("is-sheet-preview");
     let host = stage.querySelector<HTMLElement>(".three-preview-host");
     if (host === null) {
       stage.innerHTML = `<div class="three-preview-host" aria-label="Interactive 3D enclosure preview"></div>`;
@@ -246,25 +253,23 @@ function renderPreview(): void {
     threePreview?.destroy();
     threePreview = null;
     stage.classList.remove("is-three-preview");
-    stage.innerHTML = `<div class="cut-sheet-preview">${createLaserSvg(layout)}</div>`;
+    stage.classList.add("is-sheet-preview");
+    stage.innerHTML =
+      previewMode === "print-sheets"
+        ? `<div class="sheet-preview print-sheet-preview">${renderPrintableSheetsSvg(layout, printVolumePresetId)}</div>`
+        : `<div class="sheet-preview laser-sheet-preview">${createLaserSvg(layout)}</div>`;
   }
 
-  summary.innerHTML = `
-    ${summaryItem("Panels", String(layout.summary.panelCount))}
-    ${summaryItem("Chamber height", formatMillimeters(layout.summary.chamberHeight))}
-    ${summaryItem("Working depth", formatMillimeters(layout.summary.workingDepth))}
-    ${summaryItem("Fans", `${totalResolvedFans(layout.summary.resolvedFans)}`)}
-    ${summaryItem("Sheet", `${formatMillimeters(layout.summary.sheetWidth)} x ${formatMillimeters(layout.summary.sheetHeight)}`)}
-  `;
+  summary.innerHTML = previewSummaryHtml(layout);
 
   for (const button of app.querySelectorAll("[data-mode]")) {
     button.classList.toggle("is-active", button.getAttribute("data-mode") === previewMode);
   }
-  const maximizeButton = app.querySelector<HTMLButtonElement>('[data-action="maximize-cut-sheet"]');
+  const maximizeButton = app.querySelector<HTMLButtonElement>('[data-action="maximize-preview"]');
   if (maximizeButton !== null) {
-    maximizeButton.hidden = previewMode !== "cut-sheet";
+    maximizeButton.hidden = previewMode === "enclosure";
   }
-  syncOpenCutSheetDialog(layout);
+  syncOpenSheetDialog(layout);
   syncExportDiagnostics(layout);
   syncExportControls(layout);
 }
@@ -277,8 +282,12 @@ function handleInput(event: Event): void {
 
   if (target.name === "exportFormat") {
     exportFormat = readExportFormat(target.value);
+    if (previewMode !== "enclosure") {
+      previewMode = exportFormat === "print-3mf" ? "print-sheets" : "cut-sheet";
+    }
     syncExportControls(createLayout(settings));
     syncUrl();
+    renderPreview();
     return;
   }
 
@@ -286,6 +295,7 @@ function handleInput(event: Event): void {
     printVolumePresetId = findPrintVolumePreset(target.value).id;
     syncExportControls(createLayout(settings));
     syncUrl();
+    renderPreview();
     return;
   }
 
@@ -329,14 +339,15 @@ function handleClick(event: MouseEvent): void {
     return;
   }
 
-  if (target.id === "cutSheetDialog") {
-    closeCutSheetDialog();
+  if (target.id === "sheetDialog") {
+    closeSheetDialog();
     return;
   }
 
   const mode = target.closest("[data-mode]");
   if (mode instanceof HTMLElement) {
     previewMode = readPreviewMode(mode.getAttribute("data-mode"));
+    syncFabricationMethodToPreviewMode();
     syncUrl();
     renderPreview();
     return;
@@ -364,12 +375,12 @@ function handleClick(event: MouseEvent): void {
     void copyUrl(action);
   }
 
-  if (actionName === "maximize-cut-sheet") {
-    openCutSheetDialog();
+  if (actionName === "maximize-preview") {
+    openSheetDialog();
   }
 
-  if (actionName === "close-cut-sheet-dialog") {
-    closeCutSheetDialog();
+  if (actionName === "close-preview-dialog") {
+    closeSheetDialog();
   }
 }
 
@@ -408,7 +419,10 @@ function readControlValue(
 }
 
 function readPreviewMode(value: string | null): PreviewMode {
-  return value === "cut-sheet" ? "cut-sheet" : "enclosure";
+  if (value === "cut-sheet" || value === "print-sheets") {
+    return value;
+  }
+  return "enclosure";
 }
 
 function readFilterPresetControlValue(target: HTMLInputElement | HTMLSelectElement): FilterPresetId {
@@ -422,7 +436,16 @@ function readFanProductPresetControlValue(target: HTMLInputElement | HTMLSelectE
 }
 
 function readControlsTab(value: string | null): ControlsTab {
-  return value === "cutting" ? "cutting" : "build";
+  return value === "fabrication" || value === "cutting" ? "fabrication" : "build";
+}
+
+function syncFabricationMethodToPreviewMode(): void {
+  if (previewMode === "print-sheets") {
+    exportFormat = "print-3mf";
+  }
+  if (previewMode === "cut-sheet") {
+    exportFormat = "laser-svg";
+  }
 }
 
 function isFilterDimensionName(name: FieldName): name is "filterWidth" | "filterDepth" | "filterThickness" {
@@ -579,6 +602,14 @@ function syncExportControls(layout: ReturnType<typeof createLayout>): void {
     printVolumeControl.hidden = exportFormat !== "print-3mf";
   }
 
+  const laserOutputControls = app.querySelector<HTMLElement>("[data-laser-output-controls]");
+  if (laserOutputControls !== null) {
+    laserOutputControls.hidden = exportFormat !== "laser-svg";
+    for (const control of laserOutputControls.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) {
+      control.disabled = exportFormat !== "laser-svg";
+    }
+  }
+
   const volumeSelect = app.querySelector<HTMLSelectElement>('[name="printVolume"]');
   if (volumeSelect !== null) {
     volumeSelect.value = printVolumePresetId;
@@ -598,16 +629,17 @@ function syncExportControls(layout: ReturnType<typeof createLayout>): void {
 function exportDetailHtml(layout: ReturnType<typeof createLayout>): string {
   if (exportFormat === "print-3mf") {
     const printKit = createPrintableKit(layout, printVolumePresetId);
+    const printPlan = createPrintableSheetPlan(layout, printVolumePresetId);
     const partSummary =
       `${printKit.summary.partCount} parts: ` +
       `${printKit.summary.panelTileCount} panel tiles and ` +
       `${printKit.summary.glueKeyCount} dovetail glue keys.`;
     return `
       <div>
-        <span>3D print kit</span>
+        <span>3D printing</span>
         <strong>${escapeHtml(printKit.preset.label)}</strong>
         <small>${escapeHtml(printVolumePresetDetail(printKit.preset.description, printKit.preset.examples))}</small>
-        <small>${escapeHtml(partSummary)}</small>
+        <small>${escapeHtml(`${printPlan.sheets.length} print sheets. ${partSummary}`)}</small>
       </div>
       <button class="primary-button export-drawing-button" type="button" data-action="export-drawing">
         ${exportActionLabel()}
@@ -617,7 +649,7 @@ function exportDetailHtml(layout: ReturnType<typeof createLayout>): string {
 
   return `
     <div>
-      <span>File format</span>
+      <span>Laser cutting</span>
       <strong>SVG drawing</strong>
       <small>Cut paths, labels, and scale marker for laser software.</small>
     </div>
@@ -638,8 +670,8 @@ function exportDrawing(): void {
   const layout = createLayout(settings);
   const diagnostics = evaluateBuildDiagnostics(layout);
   syncExportDiagnostics(layout, diagnostics.length > 0 ? "attention" : "normal");
-  if (diagnostics.length > 0 && controlsTab !== "cutting") {
-    controlsTab = "cutting";
+  if (diagnostics.length > 0 && controlsTab !== "fabrication") {
+    controlsTab = "fabrication";
     syncControlTabs();
     syncUrl();
     flashDownloadButtons("Review checks");
@@ -686,37 +718,48 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return buffer;
 }
 
-function openCutSheetDialog(): void {
+function openSheetDialog(): void {
   const dialog = requireElement(
-    app.querySelector<HTMLDialogElement>("#cutSheetDialog"),
-    "Cut sheet dialog not found",
+    app.querySelector<HTMLDialogElement>("#sheetDialog"),
+    "Sheet dialog not found",
   );
-  syncCutSheetDialog(createLayout(settings));
+  syncSheetDialog(createLayout(settings));
   if (!dialog.open) {
     dialog.showModal();
   }
 }
 
-function closeCutSheetDialog(): void {
+function closeSheetDialog(): void {
   const dialog = requireElement(
-    app.querySelector<HTMLDialogElement>("#cutSheetDialog"),
-    "Cut sheet dialog not found",
+    app.querySelector<HTMLDialogElement>("#sheetDialog"),
+    "Sheet dialog not found",
   );
   dialog.close();
 }
 
-function syncOpenCutSheetDialog(layout: ReturnType<typeof createLayout>): void {
-  const dialog = app.querySelector<HTMLDialogElement>("#cutSheetDialog");
+function syncOpenSheetDialog(layout: ReturnType<typeof createLayout>): void {
+  const dialog = app.querySelector<HTMLDialogElement>("#sheetDialog");
   if (dialog?.open === true) {
-    syncCutSheetDialog(layout);
+    syncSheetDialog(layout);
   }
 }
 
-function syncCutSheetDialog(layout: ReturnType<typeof createLayout>): void {
+function syncSheetDialog(layout: ReturnType<typeof createLayout>): void {
   const preview = requireElement(
-    app.querySelector<HTMLElement>("#cutSheetDialogPreview"),
-    "Cut sheet dialog preview not found",
+    app.querySelector<HTMLElement>("#sheetDialogPreview"),
+    "Sheet dialog preview not found",
   );
+  const eyebrow = requireElement(app.querySelector<HTMLElement>("#sheetDialogEyebrow"), "Sheet dialog eyebrow not found");
+  const title = requireElement(app.querySelector<HTMLElement>("#sheetDialogTitle"), "Sheet dialog title not found");
+  if (previewMode === "print-sheets") {
+    eyebrow.textContent = "3D printing";
+    title.textContent = "Print sheets";
+    preview.innerHTML = renderPrintableSheetsSvg(layout, printVolumePresetId);
+    return;
+  }
+
+  eyebrow.textContent = "Laser cutting";
+  title.textContent = "Laser sheet";
   preview.innerHTML = createLaserSvg(layout);
 }
 
@@ -848,13 +891,13 @@ function cameraPresetLabel(preset: RawPurifierSettings["cameraPreset"]): string 
 
 function exportFormatLabel(format: ExportFormat): string {
   if (format === "print-3mf") {
-    return "3MF print kit";
+    return "3D printing (3MF)";
   }
-  return "SVG drawing";
+  return "Laser cutting (SVG)";
 }
 
 function exportActionLabel(): string {
-  return exportFormat === "print-3mf" ? "Export 3D Print Kit" : "Export Drawing";
+  return exportFormat === "print-3mf" ? "Export 3D Print Kit" : "Export Laser Drawing";
 }
 
 function printVolumePresetDetail(description: string, examples: readonly string[]): string {
@@ -876,6 +919,27 @@ function summaryItem(label: string, value: string): string {
     <span>${label}</span>
     <strong>${value}</strong>
   </div>`;
+}
+
+function previewSummaryHtml(layout: ReturnType<typeof createLayout>): string {
+  if (previewMode === "print-sheets") {
+    const plan = createPrintableSheetPlan(layout, printVolumePresetId);
+    return `
+      ${summaryItem("Print sheets", String(plan.sheets.length))}
+      ${summaryItem("Panel tiles", String(plan.kit.summary.panelTileCount))}
+      ${summaryItem("Glue keys", String(plan.kit.summary.glueKeyCount))}
+      ${summaryItem("Split panels", String(plan.kit.summary.splitPanelCount))}
+      ${summaryItem("Bed", plan.kit.preset.label)}
+    `;
+  }
+
+  return `
+    ${summaryItem("Panels", String(layout.summary.panelCount))}
+    ${summaryItem("Chamber height", formatMillimeters(layout.summary.chamberHeight))}
+    ${summaryItem("Working depth", formatMillimeters(layout.summary.workingDepth))}
+    ${summaryItem("Fans", `${totalResolvedFans(layout.summary.resolvedFans)}`)}
+    ${summaryItem("Sheet", `${formatMillimeters(layout.summary.sheetWidth)} x ${formatMillimeters(layout.summary.sheetHeight)}`)}
+  `;
 }
 
 function totalResolvedFans(resolvedFans: ReturnType<typeof createLayout>["summary"]["resolvedFans"]): number {
