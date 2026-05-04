@@ -1,9 +1,9 @@
 import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
 import type { LayoutResult } from "./airPurifier";
-import type { CutFeature, CutPanel, RectCut } from "./cutGeometry";
-import { createThreeMfPackage, type MeshObject, type MeshTriangle, type MeshVertex } from "./threeMf";
+import type { CutFeature, CutPanel, CutPoint, RectCut } from "./cutGeometry";
+import { createStoredZipPackage, createThreeMfPackage, type MeshObject, type MeshTriangle, type MeshVertex } from "./threeMf";
 
-export const exportFormats = ["laser-svg", "print-3mf"] as const;
+export const exportFormats = ["print-3mf", "laser-svg"] as const;
 
 export type ExportFormat = (typeof exportFormats)[number];
 
@@ -87,6 +87,26 @@ export type PrintableThreeMfExport = {
   readonly mimeType: string;
   readonly bytes: Uint8Array;
   readonly kit: PrintableKit;
+  readonly sheetPlan: PrintableSheetPlan;
+};
+
+export type PrintSheetPlacement = {
+  readonly part: PrintablePart;
+  readonly x: number;
+  readonly y: number;
+  readonly fits: boolean;
+};
+
+export type PrintSheet = {
+  readonly index: number;
+  readonly width: number;
+  readonly depth: number;
+  readonly placements: readonly PrintSheetPlacement[];
+};
+
+export type PrintableSheetPlan = {
+  readonly kit: PrintableKit;
+  readonly sheets: readonly PrintSheet[];
 };
 
 type PanelCut = {
@@ -98,6 +118,7 @@ type PanelTile = {
   readonly panel: CutPanel;
   readonly id: string;
   readonly name: string;
+  readonly outline: readonly CutPoint[];
   readonly x0: number;
   readonly x1: number;
   readonly y0: number;
@@ -120,12 +141,11 @@ type SplitAxisResult = {
   readonly cuts: readonly number[];
 };
 
-type PackedPart = {
-  readonly part: PrintablePart;
-  readonly position: MeshVertex;
+type MutablePrintSheet = Omit<PrintSheet, "placements"> & {
+  readonly placements: PrintSheetPlacement[];
 };
 
-const printPartGap = 8;
+const sheetGap = 8;
 const splitSearchStep = 0.5;
 const minimumTileSize = 42;
 const cutSplitClearance = 4;
@@ -133,6 +153,7 @@ const glueKeyWidth = 36;
 const glueKeyDepth = 18;
 const glueKeyHeight = 3;
 const glueKeySpacing = 95;
+const unboundedPreviewWidth = 1000;
 
 export const printVolumePresets: readonly PrintVolumePreset[] = [
   {
@@ -255,20 +276,126 @@ export function createPrintableKit(layout: LayoutResult, presetId: PrintVolumePr
 
 export function createPrintableThreeMfExport(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableThreeMfExport {
   const kit = createPrintableKit(layout, presetId);
-  const packedParts = packPrintableParts(kit.parts, kit.preset.bed);
-  const objects: MeshObject[] = packedParts.map(({ part, position }) => ({
-    name: part.name,
-    vertices: part.mesh.vertices,
-    triangles: part.mesh.triangles,
-    position,
+  return createPrintableThreeMfExportFromKit(
+    kit,
+    "Nukit Open Air Purifier print kit",
+    "nukit-open-air-purifier-print-kit.3mf",
+  );
+}
+
+export function createPrintableThreeMfExportFromKit(
+  kit: PrintableKit,
+  title: string,
+  filename: string,
+): PrintableThreeMfExport {
+  const sheetPlan = createPrintableSheetPlanFromKit(kit);
+  const sheetPackages = sheetPlan.sheets.map((sheet) => ({
+    name: `sheet-${String(sheet.index).padStart(2, "0")}.3mf`,
+    content: createThreeMfPackage(`${title} - sheet ${sheet.index}`, createThreeMfObjectsFromSheet(sheet)),
   }));
+  const isSingleSheet = sheetPackages.length === 1;
+  const bytes = isSingleSheet ? sheetPackages[0]!.content : createStoredZipPackage(sheetPackages);
 
   return {
-    filename: "nukit-open-air-purifier-print-kit.3mf",
-    mimeType: "model/3mf",
-    bytes: createThreeMfPackage("Nukit Open Air Purifier print kit", objects),
+    filename: isSingleSheet ? filename : filename.replace(/\.3mf$/u, ".zip"),
+    mimeType: isSingleSheet ? "model/3mf" : "application/zip",
+    bytes,
     kit,
+    sheetPlan,
   };
+}
+
+export function createPrintableSheetPlan(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableSheetPlan {
+  const kit = createPrintableKit(layout, presetId);
+  return createPrintableSheetPlanFromKit(kit);
+}
+
+export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableSheetPlan {
+  return {
+    kit,
+    sheets: arrangePrintSheets(kit.parts, kit.preset.bed),
+  };
+}
+
+function createThreeMfObjectsFromSheet(sheet: PrintSheet): MeshObject[] {
+  return sheet.placements.map((placement) => ({
+    name: placement.part.name,
+    vertices: placement.part.mesh.vertices,
+    triangles: placement.part.mesh.triangles,
+    position: { x: placement.x, y: placement.y, z: 0 },
+  }));
+}
+
+function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): PrintSheet[] {
+  const sheets: MutablePrintSheet[] = [emptyPrintSheet(1, previewSheetWidth(parts, bed), previewSheetDepth(parts, bed))];
+  let cursorX = 0;
+  let cursorY = 0;
+  let rowDepth = 0;
+
+  for (const part of parts) {
+    let sheet = requiredLastSheet(sheets);
+    const partFits = partFitsPrintBed(part, bed);
+
+    if (cursorX > 0 && cursorX + part.width > sheet.width) {
+      cursorX = 0;
+      cursorY += rowDepth + sheetGap;
+      rowDepth = 0;
+    }
+
+    if (bed.type === "bounded" && cursorY > 0 && cursorY + part.depth > sheet.depth) {
+      sheet = emptyPrintSheet(sheets.length + 1, previewSheetWidth(parts, bed), previewSheetDepth(parts, bed));
+      sheets.push(sheet);
+      cursorX = 0;
+      cursorY = 0;
+      rowDepth = 0;
+    }
+
+    sheet.placements.push({
+      part,
+      x: cursorX,
+      y: cursorY,
+      fits: partFits,
+    });
+    cursorX += part.width + sheetGap;
+    rowDepth = Math.max(rowDepth, part.depth);
+  }
+
+  return sheets.filter((sheet) => sheet.placements.length > 0);
+}
+
+function emptyPrintSheet(index: number, width: number, depth: number): MutablePrintSheet {
+  return {
+    index,
+    width,
+    depth,
+    placements: [],
+  };
+}
+
+function previewSheetWidth(parts: readonly PrintablePart[], bed: PrintBed): number {
+  if (bed.type === "bounded") {
+    return bed.width;
+  }
+  const widestPart = Math.max(...parts.map((part) => part.width), 1);
+  return Math.max(unboundedPreviewWidth, widestPart);
+}
+
+function previewSheetDepth(parts: readonly PrintablePart[], bed: PrintBed): number {
+  if (bed.type === "bounded") {
+    return bed.depth;
+  }
+  return Math.max(
+    parts.reduce((total, part) => total + part.depth + sheetGap, 0),
+    320,
+  );
+}
+
+function requiredLastSheet(sheets: readonly MutablePrintSheet[]): MutablePrintSheet {
+  const sheet = sheets[sheets.length - 1];
+  if (sheet === undefined) {
+    throw new Error("requiredLastSheet: Missing print sheet");
+  }
+  return sheet;
 }
 
 function createPrintablePartsForPanel(panel: CutPanel, materialThickness: number, preset: PrintVolumePreset): PrintablePart[] {
@@ -281,8 +408,20 @@ function createPrintablePartsForPanel(panel: CutPanel, materialThickness: number
 
 function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset: PrintVolumePreset): PanelTile[] {
   const printCriticalCuts = cuts.filter((cut) => isPrintCriticalCut(cut.cut));
-  const xAxis = splitAxis(panel.nominalWidth, maxPrintableWidth(preset), printCriticalCuts.map((cut) => xBlockedRange(cut.bounds)));
-  const yAxis = splitAxis(panel.nominalHeight, maxPrintableDepth(preset), printCriticalCuts.map((cut) => yBlockedRange(cut.bounds)));
+  const panelOutline = panelOutlineInNominalCoordinates(panel);
+  const outlineBounds = pointsBounds(panelOutline);
+  const outlineOverhangWidth = Math.max(0, outlineBounds.maxX - outlineBounds.minX - panel.nominalWidth);
+  const outlineOverhangDepth = Math.max(0, outlineBounds.maxY - outlineBounds.minY - panel.nominalHeight);
+  const xAxis = splitAxis(
+    panel.nominalWidth,
+    maxPrintableWidth(preset) - outlineOverhangWidth,
+    printCriticalCuts.map((cut) => xBlockedRange(cut.bounds)),
+  );
+  const yAxis = splitAxis(
+    panel.nominalHeight,
+    maxPrintableDepth(preset) - outlineOverhangDepth,
+    printCriticalCuts.map((cut) => yBlockedRange(cut.bounds)),
+  );
   const xCuts = [0, ...xAxis.cuts, panel.nominalWidth];
   const yCuts = [0, ...yAxis.cuts, panel.nominalHeight];
   const tiles: PanelTile[] = [];
@@ -293,10 +432,19 @@ function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset:
       const x1 = requiredArrayValue(xCuts, columnIndex + 1, "splitPanelIntoTiles x1");
       const y0 = requiredArrayValue(yCuts, rowIndex, "splitPanelIntoTiles y0");
       const y1 = requiredArrayValue(yCuts, rowIndex + 1, "splitPanelIntoTiles y1");
+      const clipBounds = {
+        minX: columnIndex === 0 ? outlineBounds.minX : x0,
+        maxX: columnIndex === xCuts.length - 2 ? outlineBounds.maxX : x1,
+        minY: rowIndex === 0 ? outlineBounds.minY : y0,
+        maxY: rowIndex === yCuts.length - 2 ? outlineBounds.maxY : y1,
+      };
+      const clippedOutline = clipPolygonToBounds(panelOutline, clipBounds);
+      const tileBounds = pointsBounds(clippedOutline);
       tiles.push({
         panel,
         id: tileId(panel.id, columnIndex, rowIndex, xCuts.length - 1, yCuts.length - 1),
         name: tileName(panel.name, columnIndex, rowIndex, xCuts.length - 1, yCuts.length - 1),
+        outline: translatePoints(clippedOutline, -tileBounds.minX, -tileBounds.minY),
         x0,
         x1,
         y0,
@@ -306,8 +454,10 @@ function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset:
         columnCount: xCuts.length - 1,
         rowCount: yCuts.length - 1,
         cuts: cuts
-          .filter((panelCut) => boundsInsideTile(panelCut.bounds, x0, x1, y0, y1))
-          .map((panelCut) => translateCutToTile(panelCut.cut, x0, y0)),
+          .filter((panelCut) =>
+            boundsInsideTile(panelCut.bounds, clipBounds.minX, clipBounds.maxX, clipBounds.minY, clipBounds.maxY),
+          )
+          .map((panelCut) => translateCutToTile(panelCut.cut, tileBounds.minX, tileBounds.minY)),
       });
     }
   }
@@ -349,8 +499,9 @@ function findSafeSplit(target: number, minimum: number, maximum: number, blocked
 }
 
 function createPanelTilePart(tile: PanelTile, materialThickness: number): PrintablePart {
-  const width = tile.x1 - tile.x0;
-  const depth = tile.y1 - tile.y0;
+  const bounds = pointsBounds(tile.outline);
+  const width = bounds.maxX - bounds.minX;
+  const depth = bounds.maxY - bounds.minY;
   return {
     id: tile.id,
     name: tile.name,
@@ -361,7 +512,7 @@ function createPanelTilePart(tile: PanelTile, materialThickness: number): Printa
     height: materialThickness,
     cutFeatureCount: tile.cuts.length,
     printCriticalCutFeatureCount: tile.cuts.filter(isPrintCriticalCut).length,
-    mesh: createPlateMesh(width, depth, materialThickness, tile.cuts),
+    mesh: createPlateMesh(tile.outline, materialThickness, tile.cuts),
   };
 }
 
@@ -409,12 +560,16 @@ function glueKeyCountForLength(length: number): number {
   return Math.max(1, Math.ceil(length / glueKeySpacing));
 }
 
-function createPlateMesh(width: number, depth: number, height: number, cuts: readonly CutFeature[]): PrintableMesh {
+function createPlateMesh(outline: readonly CutPoint[], height: number, cuts: readonly CutFeature[]): PrintableMesh {
   const shape = new Shape();
-  shape.moveTo(0, 0);
-  shape.lineTo(width, 0);
-  shape.lineTo(width, depth);
-  shape.lineTo(0, depth);
+  const firstPoint = outline[0];
+  if (firstPoint === undefined) {
+    throw new Error("createPlateMesh: Outline is empty");
+  }
+  shape.moveTo(firstPoint.x, firstPoint.y);
+  for (const point of outline.slice(1)) {
+    shape.lineTo(point.x, point.y);
+  }
   shape.closePath();
 
   for (const cut of cuts) {
@@ -528,6 +683,21 @@ function toPanelCut(cut: CutFeature, panel: CutPanel): PanelCut {
   };
 }
 
+function panelOutlineInNominalCoordinates(panel: CutPanel): CutPoint[] {
+  return translatePoints(
+    panel.outline,
+    panel.nominalWidth / 2 - panel.assemblyCenter.x,
+    panel.nominalHeight / 2 - panel.assemblyCenter.y,
+  );
+}
+
+function translatePoints(points: readonly CutPoint[], offsetX: number, offsetY: number): CutPoint[] {
+  return points.map((point) => ({
+    x: roundMillimeters(point.x + offsetX),
+    y: roundMillimeters(point.y + offsetY),
+  }));
+}
+
 function translateCut(cut: CutFeature, offsetX: number, offsetY: number): CutFeature {
   if (cut.type === "circle") {
     return {
@@ -547,6 +717,89 @@ function translateCutToTile(cut: CutFeature, x0: number, y0: number): CutFeature
   return translateCut(cut, -x0, -y0);
 }
 
+function clipPolygonToBounds(points: readonly CutPoint[], bounds: Bounds2): CutPoint[] {
+  return clipPolygonAgainstEdge(
+    clipPolygonAgainstEdge(
+      clipPolygonAgainstEdge(clipPolygonAgainstEdge(points, (point) => point.x >= bounds.minX, verticalIntersection(bounds.minX)), (point) => point.x <= bounds.maxX, verticalIntersection(bounds.maxX)),
+      (point) => point.y >= bounds.minY,
+      horizontalIntersection(bounds.minY),
+    ),
+    (point) => point.y <= bounds.maxY,
+    horizontalIntersection(bounds.maxY),
+  );
+}
+
+function clipPolygonAgainstEdge(
+  points: readonly CutPoint[],
+  isInside: (point: CutPoint) => boolean,
+  intersectionAtBoundary: (from: CutPoint, to: CutPoint) => CutPoint,
+): CutPoint[] {
+  if (points.length === 0) {
+    return [];
+  }
+  const clipped: CutPoint[] = [];
+  let previous = points[points.length - 1]!;
+  let previousInside = isInside(previous);
+
+  for (const current of points) {
+    const currentInside = isInside(current);
+    if (currentInside && !previousInside) {
+      clipped.push(intersectionAtBoundary(previous, current));
+    }
+    if (currentInside) {
+      clipped.push(current);
+    } else if (previousInside) {
+      clipped.push(intersectionAtBoundary(previous, current));
+    }
+    previous = current;
+    previousInside = currentInside;
+  }
+
+  return removeAdjacentDuplicatePoints(clipped);
+}
+
+function verticalIntersection(x: number): (from: CutPoint, to: CutPoint) => CutPoint {
+  return (from, to) => {
+    const t = (x - from.x) / (to.x - from.x || 1);
+    return {
+      x: roundMillimeters(x),
+      y: roundMillimeters(from.y + (to.y - from.y) * t),
+    };
+  };
+}
+
+function horizontalIntersection(y: number): (from: CutPoint, to: CutPoint) => CutPoint {
+  return (from, to) => {
+    const t = (y - from.y) / (to.y - from.y || 1);
+    return {
+      x: roundMillimeters(from.x + (to.x - from.x) * t),
+      y: roundMillimeters(y),
+    };
+  };
+}
+
+function removeAdjacentDuplicatePoints(points: readonly CutPoint[]): CutPoint[] {
+  const unique: CutPoint[] = [];
+  for (const point of points) {
+    const previous = unique[unique.length - 1];
+    if (previous === undefined || Math.abs(previous.x - point.x) > 0.001 || Math.abs(previous.y - point.y) > 0.001) {
+      unique.push(point);
+    }
+  }
+  const first = unique[0];
+  const last = unique[unique.length - 1];
+  if (
+    first !== undefined &&
+    last !== undefined &&
+    unique.length > 1 &&
+    Math.abs(first.x - last.x) <= 0.001 &&
+    Math.abs(first.y - last.y) <= 0.001
+  ) {
+    unique.pop();
+  }
+  return unique;
+}
+
 function cutBounds(cut: CutFeature): Bounds2 {
   if (cut.type === "circle") {
     return {
@@ -561,6 +814,18 @@ function cutBounds(cut: CutFeature): Bounds2 {
     maxX: cut.x + cut.width,
     minY: cut.y,
     maxY: cut.y + cut.height,
+  };
+}
+
+function pointsBounds(points: readonly CutPoint[]): Bounds2 {
+  if (points.length === 0) {
+    throw new Error("pointsBounds: Cannot calculate bounds for empty point set");
+  }
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxY: Math.max(...points.map((point) => point.y)),
   };
 }
 
@@ -623,30 +888,6 @@ export function partFitsPrintBed(part: PrintablePart, bed: PrintBed): boolean {
     return true;
   }
   return part.width <= bed.width + 0.001 && part.depth <= bed.depth + 0.001 && part.height <= bed.height + 0.001;
-}
-
-function packPrintableParts(parts: readonly PrintablePart[], bed: PrintBed): PackedPart[] {
-  const rowWidth = bed.type === "bounded" ? bed.width : 1000;
-  const packed: PackedPart[] = [];
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowDepth = 0;
-
-  for (const part of parts) {
-    if (cursorX > 0 && cursorX + part.width > rowWidth) {
-      cursorX = 0;
-      cursorY += rowDepth + printPartGap;
-      rowDepth = 0;
-    }
-    packed.push({
-      part,
-      position: { x: cursorX, y: cursorY, z: 0 },
-    });
-    cursorX += part.width + printPartGap;
-    rowDepth = Math.max(rowDepth, part.depth);
-  }
-
-  return packed;
 }
 
 function maxPrintableWidth(preset: PrintVolumePreset): number {

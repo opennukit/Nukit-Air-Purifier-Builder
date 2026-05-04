@@ -1,48 +1,22 @@
 import type { LayoutResult } from "./airPurifier";
 import {
-  createPrintableKit,
-  partFitsPrintBed,
-  type PrintBed,
-  type PrintableKit,
-  type PrintablePart,
+  createPrintableSheetPlan as createPrintableSheetPlanFromLayout,
+  createPrintableSheetPlanFromKit,
+  type PrintSheet,
+  type PrintSheetPlacement,
+  type PrintableSheetPlan,
   type PrintVolumePresetId,
 } from "./printableKit";
 
-export type PrintSheetPlacement = {
-  readonly part: PrintablePart;
-  readonly x: number;
-  readonly y: number;
-  readonly fits: boolean;
-};
+export { createPrintableSheetPlanFromKit };
+export type { PrintSheet, PrintSheetPlacement, PrintableSheetPlan };
 
-export type PrintSheet = {
-  readonly index: number;
-  readonly width: number;
-  readonly depth: number;
-  readonly placements: readonly PrintSheetPlacement[];
-};
-
-export type PrintableSheetPlan = {
-  readonly kit: PrintableKit;
-  readonly sheets: readonly PrintSheet[];
-};
-
-type MutablePrintSheet = Omit<PrintSheet, "placements"> & {
-  readonly placements: PrintSheetPlacement[];
-};
-
-const sheetGap = 8;
 const svgPadding = 18;
 const sheetLabelHeight = 18;
 const sheetSpacing = 26;
-const unboundedPreviewWidth = 1000;
 
 export function createPrintableSheetPlan(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableSheetPlan {
-  const kit = createPrintableKit(layout, presetId);
-  return {
-    kit,
-    sheets: arrangePrintSheets(kit.parts, kit.preset.bed),
-  };
+  return createPrintableSheetPlanFromLayout(layout, presetId);
 }
 
 export function renderPrintableSheetsSvg(layout: LayoutResult, presetId: PrintVolumePresetId): string {
@@ -79,76 +53,6 @@ export function renderPrintableSheetsSvg(layout: LayoutResult, presetId: PrintVo
   </style>
 ${sheetGroups.join("\n")}
 </svg>`;
-}
-
-function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): PrintSheet[] {
-  const sheets: MutablePrintSheet[] = [emptyPrintSheet(1, previewSheetWidth(parts, bed), previewSheetDepth(parts, bed))];
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowDepth = 0;
-
-  for (const part of parts) {
-    let sheet = requiredLastSheet(sheets);
-    const partFits = partFitsPrintBed(part, bed);
-
-    if (cursorX > 0 && cursorX + part.width > sheet.width) {
-      cursorX = 0;
-      cursorY += rowDepth + sheetGap;
-      rowDepth = 0;
-    }
-
-    if (cursorY > 0 && cursorY + part.depth > sheet.depth) {
-      sheet = emptyPrintSheet(sheets.length + 1, previewSheetWidth(parts, bed), previewSheetDepth(parts, bed));
-      sheets.push(sheet);
-      cursorX = 0;
-      cursorY = 0;
-      rowDepth = 0;
-    }
-
-    sheet.placements.push({
-      part,
-      x: cursorX,
-      y: cursorY,
-      fits: partFits,
-    });
-    cursorX += part.width + sheetGap;
-    rowDepth = Math.max(rowDepth, part.depth);
-  }
-
-  return sheets.filter((sheet) => sheet.placements.length > 0);
-}
-
-function emptyPrintSheet(index: number, width: number, depth: number): MutablePrintSheet {
-  return {
-    index,
-    width,
-    depth,
-    placements: [],
-  };
-}
-
-function previewSheetWidth(parts: readonly PrintablePart[], bed: PrintBed): number {
-  if (bed.type === "bounded") {
-    return bed.width;
-  }
-  const widestPart = Math.max(...parts.map((part) => part.width), 1);
-  return Math.max(unboundedPreviewWidth, widestPart);
-}
-
-function previewSheetDepth(parts: readonly PrintablePart[], bed: PrintBed): number {
-  if (bed.type === "bounded") {
-    return bed.depth;
-  }
-  const deepestPart = Math.max(...parts.map((part) => part.depth), 1);
-  return Math.max(deepestPart, 320);
-}
-
-function requiredLastSheet(sheets: readonly MutablePrintSheet[]): MutablePrintSheet {
-  const sheet = sheets[sheets.length - 1];
-  if (sheet === undefined) {
-    throw new Error("requiredLastSheet: Missing print sheet");
-  }
-  return sheet;
 }
 
 function renderSheet(sheet: PrintSheet, x: number, y: number, labelY: number): string {

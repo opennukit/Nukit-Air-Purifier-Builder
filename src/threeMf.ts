@@ -19,16 +19,20 @@ export type MeshObject = {
 
 const modelPath = "3D/3dmodel.model";
 const mimeType = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml";
-const textEncoder = new TextEncoder();
 const crcTable = createCrcTable();
+const textEncoder = new TextEncoder();
+
+export type StoredZipFile = {
+  readonly name: string;
+  readonly content: Uint8Array;
+};
 
 export function createThreeMfPackage(title: string, objects: readonly MeshObject[]): Uint8Array {
-  const files = [
-    zipFile("[Content_Types].xml", contentTypesXml()),
-    zipFile("_rels/.rels", relationshipsXml()),
-    zipFile(modelPath, modelXml(title, objects)),
-  ];
-  return createZip(files);
+  return createStoredZipPackage([
+    textZipFile("[Content_Types].xml", contentTypesXml()),
+    textZipFile("_rels/.rels", relationshipsXml()),
+    textZipFile(modelPath, modelXml(title, objects)),
+  ]);
 }
 
 function contentTypesXml(): string {
@@ -98,27 +102,36 @@ ${triangles}
     </object>`;
 }
 
-type ZipFile = {
+type PreparedZipFile = {
   readonly name: string;
   readonly content: Uint8Array;
   readonly crc: number;
 };
 
 type CentralDirectoryEntry = {
-  readonly file: ZipFile;
+  readonly file: PreparedZipFile;
   readonly localHeaderOffset: number;
 };
 
-function zipFile(name: string, content: string): ZipFile {
-  const encoded = textEncoder.encode(content);
+function textZipFile(name: string, content: string): StoredZipFile {
   return {
     name,
-    content: encoded,
-    crc: crc32(encoded),
+    content: textEncoder.encode(content),
   };
 }
 
-function createZip(files: readonly ZipFile[]): Uint8Array {
+export function createStoredZipPackage(files: readonly StoredZipFile[]): Uint8Array {
+  return createZip(files.map(prepareZipFile));
+}
+
+function prepareZipFile(file: StoredZipFile): PreparedZipFile {
+  return {
+    ...file,
+    crc: crc32(file.content),
+  };
+}
+
+function createZip(files: readonly PreparedZipFile[]): Uint8Array {
   const localParts: Uint8Array[] = [];
   const centralEntries: CentralDirectoryEntry[] = [];
   let offset = 0;
@@ -136,7 +149,7 @@ function createZip(files: readonly ZipFile[]): Uint8Array {
   return concatBytes([...localParts, ...centralParts, endRecord]);
 }
 
-function createLocalFileHeader(file: ZipFile): Uint8Array {
+function createLocalFileHeader(file: PreparedZipFile): Uint8Array {
   const filename = textEncoder.encode(file.name);
   const header = new Uint8Array(30 + filename.length);
   const view = new DataView(header.buffer);
