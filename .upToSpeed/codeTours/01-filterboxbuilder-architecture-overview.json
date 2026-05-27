@@ -13,7 +13,7 @@
       "type": "revealFiles",
       "id": "01-project-shape",
       "title": "Project Shape",
-      "description": "The app is intentionally small at the runtime boundary: Vite serves `index.html`, Bun runs tests and scripts, and the browser loads `src/main.ts`. The README keeps the upstream hardware context next to the generated web app.",
+      "description": "The app is intentionally small at the runtime boundary: Vite serves `index.html`, Bun runs tests and scripts, and the browser loads `src/app/main.ts`. The README keeps the upstream hardware context next to the generated web app.",
       "files": [
         "README.md",
         "package.json",
@@ -40,7 +40,7 @@
       "type": "highlight",
       "id": "01-browser-entry",
       "title": "Browser Entry Point",
-      "description": "The HTML file has one mount node and one module script. That keeps the browser boundary clear: all app state, event handling, rendering, and export behavior starts in `src/main.ts`.",
+      "description": "The HTML file has one mount node and one module script. That keeps the browser boundary clear: all app state, event handling, rendering, and export behavior starts in `src/app/main.ts`.",
       "file": "index.html",
       "highlight": [
         {
@@ -55,7 +55,7 @@
       "id": "01-workbench-boot",
       "title": "Workbench Boot State",
       "description": "The initial settings and workbench state are decoded from the URL before controls or previews render. This is why shared URLs can recreate both fabrication mode and view state.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 90,
@@ -69,7 +69,7 @@
       "id": "01-layout-join-point",
       "title": "Domain Join Point",
       "description": "The layout function is the main domain handoff. Browser controls give it raw settings, and it returns normalized settings, cut panels, summary numbers, SVG data, and diagnostics used elsewhere.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 1356,
@@ -83,7 +83,7 @@
       "id": "01-preview-classes",
       "title": "Preview Classes",
       "description": "The browser workbench owns two renderer instances. One renders the assembled enclosure; the other renders cut sheets or print sheets. Later tours separate what each renderer receives from how it draws.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 376,
@@ -101,7 +101,7 @@
       "id": "01-export-route",
       "title": "Export Route",
       "description": "Exports stay client-side too. The active settings choose either SVG drawing export or 3MF/static-file export, and the workbench decides which action is visible.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1418,
@@ -123,7 +123,7 @@
         "In static SVG files checked into the repo"
       ],
       "correct": 1,
-      "explanation": "`index.html` loads `src/main.ts` at line 15, and `package.json` only defines Vite/Bun scripts on lines 6-13. There is no backend runtime in this project."
+      "explanation": "`index.html` loads `src/app/main.ts` at line 15, and `package.json` only defines Vite/Bun scripts on lines 6-13. There is no backend runtime in this project."
     },
     {
       "type": "textOnly",

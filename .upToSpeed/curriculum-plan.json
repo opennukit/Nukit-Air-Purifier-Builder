@@ -10,8 +10,8 @@
       "package.json",
       "index.html",
       "vite.config.ts",
-      "src/main.ts",
-      "src/airPurifier.ts"
+      "src/app/main.ts",
+      "src/domain/purifier/airPurifier.ts"
     ],
     "prerequisites": []
   },
@@ -22,7 +22,7 @@
     "section": "Data Structures",
     "goal": "Understand raw settings, normalized settings, presets, and workbench state.",
     "targetFiles": [
-      "src/airPurifier.ts",
+      "src/domain/purifier/airPurifier.ts",
       "src/workbenchState.ts",
       "src/printDesignSettingsMemory.ts"
     ],
@@ -37,10 +37,10 @@
     "section": "Data Structures",
     "goal": "Understand the output structures used by geometry, print, preview, and export paths.",
     "targetFiles": [
-      "src/cutGeometry.ts",
+      "src/fabrication/laser/cutGeometry.ts",
       "src/printableKit.ts",
-      "src/threeMf.ts",
-      "src/staticPrintReferences.ts"
+      "src/fabrication/printing/threeMf.ts",
+      "src/resources/static-print-references/references.ts"
     ],
     "prerequisites": [
       "02-filterboxbuilder-settings-vocabulary"
@@ -53,10 +53,10 @@
     "section": "Core Business Logic",
     "goal": "Trace raw settings into normalized layout, geometry, cut sheets, and diagnostics.",
     "targetFiles": [
-      "src/airPurifier.ts",
-      "src/airPurifierGeometry.ts",
-      "src/airPurifierPanels.ts",
-      "src/buildDiagnostics.ts"
+      "src/domain/purifier/airPurifier.ts",
+      "src/domain/purifier/geometry.ts",
+      "src/fabrication/laser/panels.ts",
+      "src/fabrication/buildDiagnostics.ts"
     ],
     "prerequisites": [
       "02-filterboxbuilder-settings-vocabulary",
@@ -70,10 +70,10 @@
     "section": "Core Business Logic",
     "goal": "Understand cut panels, edge profiles, Boxes drawing documents, and SVG rendering.",
     "targetFiles": [
-      "src/cutGeometry.ts",
-      "src/boxes/kernel.ts",
-      "src/boxes/svg.ts",
-      "scripts/airpurifier-oracle.ts"
+      "src/fabrication/laser/cutGeometry.ts",
+      "src/ports/boxes/kernel.ts",
+      "src/ports/boxes/svg.ts",
+      "scripts/boxes-port/airpurifier-oracle.ts"
     ],
     "prerequisites": [
       "04-filterboxbuilder-layout-pipeline"
@@ -86,7 +86,7 @@
     "section": "Core Business Logic",
     "goal": "Understand how flat panels become positioned assembly parts and dimension guides.",
     "targetFiles": [
-      "src/assemblyModel.ts",
+      "src/fabrication/assemblyModel.ts",
       "src/threePreview.ts"
     ],
     "prerequisites": [
@@ -101,7 +101,7 @@
     "goal": "Trace generated print parts, sheet plans, split panels, and 3MF package input.",
     "targetFiles": [
       "src/printableKit.ts",
-      "src/printDesignKit.ts",
+      "src/fabrication/printing/printDesignKit.ts",
       "src/printSheetPreview.ts"
     ],
     "prerequisites": [
@@ -118,8 +118,8 @@
     "targetFiles": [
       "src/corsiRosenthalKit.ts",
       "src/donutFilterKit.ts",
-      "src/staticPrintReferences.ts",
-      "src/staticStlAssets.ts"
+      "src/resources/static-print-references/references.ts",
+      "src/rendering/three/staticPrintAssets.ts"
     ],
     "prerequisites": [
       "03-filterboxbuilder-variant-models",
@@ -135,7 +135,7 @@
     "targetFiles": [
       "src/threePreview.ts",
       "src/printSheetThreePreview.ts",
-      "src/staticStlAssets.ts"
+      "src/rendering/three/staticPrintAssets.ts"
     ],
     "prerequisites": [
       "06-filterboxbuilder-assembly-model",
@@ -149,7 +149,7 @@
     "section": "Interface and UI",
     "goal": "Understand the imperative DOM shell, controls, tabs, preview updates, and URL state.",
     "targetFiles": [
-      "src/main.ts",
+      "src/app/main.ts",
       "src/styles.css",
       "src/workbenchState.ts"
     ],
@@ -165,10 +165,10 @@
     "section": "Interface and Outputs",
     "goal": "Understand downloads, diagnostics, purchase lists, sheet dialogs, summaries, and share URLs.",
     "targetFiles": [
-      "src/main.ts",
-      "src/buildDiagnostics.ts",
-      "src/printDesignKit.ts",
-      "src/threeMf.ts"
+      "src/app/main.ts",
+      "src/fabrication/buildDiagnostics.ts",
+      "src/fabrication/printing/printDesignKit.ts",
+      "src/fabrication/printing/threeMf.ts"
     ],
     "prerequisites": [
       "07-filterboxbuilder-printable-kit-generation",
@@ -184,8 +184,8 @@
     "targetFiles": [
       "package.json",
       "vite.config.ts",
-      "test/airPurifierPort.test.ts",
-      "scripts/boxes-port-audit.ts"
+      "test/ports/boxes/airPurifierCutSheetEquivalence.test.ts",
+      "scripts/boxes-port/boxes-port-audit.ts"
     ],
     "prerequisites": [
       "11-filterboxbuilder-user-outputs"

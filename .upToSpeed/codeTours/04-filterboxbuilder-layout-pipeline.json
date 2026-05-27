@@ -14,7 +14,7 @@
       "id": "04-default-settings",
       "title": "Default Settings",
       "description": "Defaults are real domain settings, not scattered UI fallbacks. They set the initial print design, filter dimensions, fan choice, fabrication settings, and preview toggles.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 863,
@@ -28,7 +28,7 @@
       "id": "04-normalize-settings",
       "title": "Settings Normalization",
       "description": "Normalization resolves ids into product objects and stores the normalized result. This gives later modules a consistent view of filter, fan, cutting, and print design choices.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 906,
@@ -42,7 +42,7 @@
       "id": "04-normalize-raw",
       "title": "Raw Boundary Normalization",
       "description": "The raw normalizer converts user-editable fields into canonical raw settings. It keeps URL compatibility while preventing old query parameters from leaking into the domain layer.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 959,
@@ -56,7 +56,7 @@
       "id": "04-geometry-factory",
       "title": "Geometry Factory",
       "description": "Geometry sizing is isolated in one factory. It turns normalized settings into working depth, chamber height, rim sizes, fan layers, and filter layer positions.",
-      "file": "src/airPurifierGeometry.ts",
+      "file": "src/domain/purifier/geometry.ts",
       "highlight": [
         {
           "start": 29,
@@ -70,7 +70,7 @@
       "id": "04-panel-generation",
       "title": "Panel Generation",
       "description": "Cut sheet creation delegates to panel generation first, then lays panels out into a drawing document. This means previews and export can share the same panel list.",
-      "file": "src/airPurifierPanels.ts",
+      "file": "src/fabrication/laser/panels.ts",
       "highlight": [
         {
           "start": 34,
@@ -84,7 +84,7 @@
       "id": "04-corsi-layout",
       "title": "Corsi Layout Branch",
       "description": "Corsi-Rosenthal mode has topology-specific defaults for fan count and face placement. The layout keeps those choices explicit instead of hiding them in the renderer.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 1301,
@@ -97,8 +97,8 @@
       "type": "highlight",
       "id": "04-layout-body",
       "title": "Layout Body",
-      "description": "The layout body combines raw normalization, normalized settings, geometry, cut sheet, SVG, diagnostics, and summaries. This is the single handoff used by UI, previews, and exports.",
-      "file": "src/airPurifier.ts",
+      "description": "The layout body combines raw normalization, normalized settings, geometry, cut sheet data, and summaries. This is the single handoff used by UI, previews, and exports.",
+      "file": "src/fabrication/purifierLayout.ts",
       "highlight": [
         {
           "start": 1356,
@@ -112,7 +112,7 @@
       "id": "04-diagnostics",
       "title": "Diagnostics",
       "description": "Diagnostics inspect the finished layout and return user-facing warnings. They do not change geometry; they describe risk such as fan margins, unusual filter dimensions, or print bed fit.",
-      "file": "src/buildDiagnostics.ts",
+      "file": "src/fabrication/buildDiagnostics.ts",
       "highlight": [
         {
           "start": 19,
@@ -134,7 +134,7 @@
         "It stores all generated STL files in memory"
       ],
       "correct": 0,
-      "explanation": "`LayoutResult` is assembled by `createLayout` on lines 1356-1378, and includes normalized settings, geometry output, cut sheet data, SVG, diagnostics, and summary data."
+      "explanation": "`LayoutResult` is assembled by `createLayout` in `src/fabrication/purifierLayout.ts`, and includes normalized settings, geometry output, cut sheet data, and summary data."
     },
     {
       "type": "textOnly",

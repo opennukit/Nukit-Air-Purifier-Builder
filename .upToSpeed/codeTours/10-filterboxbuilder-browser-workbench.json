@@ -14,7 +14,7 @@
       "id": "10-shell-markup",
       "title": "Shell Markup",
       "description": "The browser shell is created directly in TypeScript. The markup defines the main manufacturing tabs, preview pane, controls pane, and purchase list mount point.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 117,
@@ -28,7 +28,7 @@
       "id": "10-sync-controls",
       "title": "Control Sync",
       "description": "Control sync pushes current settings and workbench state back into DOM inputs. It also refreshes design-specific controls, export controls, and readiness messaging.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 324,
@@ -42,7 +42,7 @@
       "id": "10-render-preview",
       "title": "Preview Render Loop",
       "description": "Preview rendering synchronizes workbench state, builds a fresh layout, and dispatches to the active preview renderer. This is the workbench side of the renderer contract.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 353,
@@ -56,7 +56,7 @@
       "id": "10-event-handler",
       "title": "Input Event Handler",
       "description": "The shared input handler updates state, remembers design-specific settings, synchronizes URL state, and rerenders. It keeps most controls on the same update path.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 427,
@@ -70,7 +70,7 @@
       "id": "10-design-selection",
       "title": "Design Selection",
       "description": "Design selection uses the settings memory module, switches to enclosure preview when needed, and moves the controls tab to design for static references.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 645,
@@ -84,7 +84,7 @@
       "id": "10-design-specific-controls",
       "title": "Design-Specific Controls",
       "description": "The workbench chooses which specialized controls are visible based on fabrication method and active print design. That keeps Corsi and donut controls out of unrelated workflows.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 971,
@@ -98,7 +98,7 @@
       "id": "10-url-sync",
       "title": "URL Sync",
       "description": "URL sync writes both purifier settings and workbench state into query parameters. Shared URLs therefore preserve design, preview mode, fabrication method, and print volume.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1565,
@@ -134,7 +134,7 @@
         "Only the last downloaded filename"
       ],
       "correct": 0,
-      "explanation": "`syncUrl` starts at line 1565 in `src/main.ts` and appends values from both `encodeSettings` and `encodeWorkbenchState`."
+      "explanation": "`syncUrl` starts at line 1565 in `src/app/main.ts` and appends values from both `encodeSettings` and `encodeWorkbenchState`."
     },
     {
       "type": "textOnly",

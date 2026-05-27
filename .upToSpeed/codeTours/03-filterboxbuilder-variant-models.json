@@ -14,7 +14,7 @@
       "id": "03-layout-result",
       "title": "Layout Result",
       "description": "The layout result carries both user-facing summary data and machine-facing geometry. Most other modules receive this object rather than reading raw form values.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 853,
@@ -28,7 +28,7 @@
       "id": "03-cut-features",
       "title": "Cut Features",
       "description": "Cut features are typed geometry operations: circles, rectangles, paths, labels, and optional operation metadata. The laser and preview paths share this representation.",
-      "file": "src/cutGeometry.ts",
+      "file": "src/fabrication/laser/cutGeometry.ts",
       "highlight": [
         {
           "start": 33,
@@ -42,7 +42,7 @@
       "id": "03-cut-panel",
       "title": "Cut Panel",
       "description": "A cut panel combines physical dimensions, a sheet placement, an outline, features, and optional assembly metadata. That assembly metadata later tells the preview how to position the part.",
-      "file": "src/cutGeometry.ts",
+      "file": "src/fabrication/laser/cutGeometry.ts",
       "highlight": [
         {
           "start": 89,
@@ -70,7 +70,7 @@
       "id": "03-mesh-object",
       "title": "3MF Mesh Object",
       "description": "3MF export is driven by mesh objects and plates. Mesh data stays independent from DOM and Three.js scene objects, so export can run in the browser without depending on the preview scene.",
-      "file": "src/threeMf.ts",
+      "file": "src/fabrication/printing/threeMf.ts",
       "highlight": [
         {
           "start": 13,
@@ -112,7 +112,7 @@
       "id": "03-static-reference",
       "title": "Static Print Reference",
       "description": "Static references point at curated STL assets, license metadata, preview assembly assets, and print plate assets. They enter the same UI as parametric generators, but their source geometry is external.",
-      "file": "src/staticPrintReferences.ts",
+      "file": "src/resources/static-print-references/references.ts",
       "highlight": [
         {
           "start": 71,
@@ -134,7 +134,7 @@
         "`BuildDiagnostic`"
       ],
       "correct": 0,
-      "explanation": "`PrintDesignModel` starts at line 169 in `src/airPurifier.ts` and has branches for generated, Corsi, donut, and static reference designs."
+      "explanation": "`PrintDesignModel` starts at line 169 in `src/domain/purifier/airPurifier.ts` and has branches for generated, Corsi, donut, and static reference designs."
     },
     {
       "type": "textOnly",

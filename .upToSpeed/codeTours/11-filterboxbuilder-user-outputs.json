@@ -14,7 +14,7 @@
       "id": "11-readiness-summary",
       "title": "Readiness Summary",
       "description": "Build readiness condenses diagnostics into one export-facing message. It reports warnings when present and otherwise returns a ready state for the current layout.",
-      "file": "src/buildDiagnostics.ts",
+      "file": "src/fabrication/buildDiagnostics.ts",
       "highlight": [
         {
           "start": 85,
@@ -28,7 +28,7 @@
       "id": "11-export-diagnostics",
       "title": "Export Diagnostics UI",
       "description": "The workbench renders active diagnostics into the fabrication area. This code reads the active layout and shows the current warnings without mutating the model.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 897,
@@ -42,7 +42,7 @@
       "id": "11-export-controls",
       "title": "Export Controls",
       "description": "Export controls are synchronized from layout and fabrication mode. The button text, visible print design controls, purchase list, and design-specific controls all update together.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 906,
@@ -56,7 +56,7 @@
       "id": "11-purchase-list",
       "title": "Purchase List",
       "description": "The purchase list derives required off-the-shelf parts from the active layout. Static references can provide their own source files and license links, while generated designs use chosen fan and filter presets.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1096,
@@ -70,7 +70,7 @@
       "id": "11-svg-export",
       "title": "SVG Export",
       "description": "SVG export creates a blob from the layout SVG and triggers a browser download. The drawing content already came from the layout and Boxes renderer.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1418,
@@ -84,7 +84,7 @@
       "id": "11-print-export",
       "title": "Print Export",
       "description": "Print export branches between static reference file links and generated 3MF packages. Generated packages come from the print design export path, not the preview scene.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1431,
@@ -98,7 +98,7 @@
       "id": "11-sheet-dialog",
       "title": "Sheet Dialog",
       "description": "The sheet dialog uses the same active print sheet plan as the main preview. Opening the dialog changes display scale, not the underlying part data.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1481,
@@ -112,7 +112,7 @@
       "id": "11-summary-html",
       "title": "Preview Summary",
       "description": "Preview summaries are design-aware. Static references, Corsi, donut, and generated Nukit designs each get the summary fields that make sense for that model.",
-      "file": "src/main.ts",
+      "file": "src/app/main.ts",
       "highlight": [
         {
           "start": 1868,
@@ -134,7 +134,7 @@
         "From the static README files"
       ],
       "correct": 0,
-      "explanation": "`exportPrintKit` starts at line 1431 in `src/main.ts` and calls `createPrintDesignThreeMfExport` for generated print designs."
+      "explanation": "`exportPrintKit` starts at line 1431 in `src/app/main.ts` and calls `createPrintDesignThreeMfExport` for generated print designs."
     },
     {
       "type": "textOnly",

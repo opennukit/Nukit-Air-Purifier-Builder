@@ -14,7 +14,7 @@
       "id": "08-design-presets",
       "title": "Design Presets",
       "description": "Design presets are the user-facing catalog. Each preset carries model data, recommended fan and filter counts, source and license metadata, and defaults used when the design is selected.",
-      "file": "src/airPurifier.ts",
+      "file": "src/domain/purifier/airPurifier.ts",
       "highlight": [
         {
           "start": 640,
@@ -98,7 +98,7 @@
       "id": "08-static-references",
       "title": "Static Reference Catalog",
       "description": "Static references wrap curated STL projects with file lists, plate previews, assembled previews, and attribution. They are shown in the same selector as generated models.",
-      "file": "src/staticPrintReferences.ts",
+      "file": "src/resources/static-print-references/references.ts",
       "highlight": [
         {
           "start": 101,
@@ -112,7 +112,7 @@
       "id": "08-static-loader",
       "title": "Static Asset Loader",
       "description": "Static STL assets load asynchronously from public URLs and are converted into Three.js meshes. The loader also chooses a print orientation for plate previews.",
-      "file": "src/staticStlAssets.ts",
+      "file": "src/rendering/three/staticPrintAssets.ts",
       "highlight": [
         {
           "start": 103,
@@ -134,7 +134,7 @@
         "They all bypass `createLayout`"
       ],
       "correct": 0,
-      "explanation": "`createPrintDesignKit` in `src/printDesignKit.ts` starts at line 17 and routes model-specific generators behind one call shape."
+      "explanation": "`createPrintDesignKit` in `src/fabrication/printing/printDesignKit.ts` starts at line 17 and routes model-specific generators behind one call shape."
     },
     {
       "type": "textOnly",

@@ -8,8 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "bun run typecheck && vite build",
     "test": "bun test",
-    "port:audit": "bun scripts/boxes-port-audit.ts",
-    "oracle:airpurifier": "bun scripts/airpurifier-oracle.ts",
+    "port:audit": "bun scripts/boxes-port/boxes-port-audit.ts",
+    "oracle:airpurifier": "bun scripts/boxes-port/airpurifier-oracle.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
   "devDependencies": {

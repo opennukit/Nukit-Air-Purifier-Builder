@@ -56,7 +56,7 @@
       "id": "07-design-router",
       "title": "Design Router",
       "description": "The print design router chooses Corsi, donut, or generated Nukit kit creation from the active layout. This keeps UI export code from knowing every model-specific generator.",
-      "file": "src/printDesignKit.ts",
+      "file": "src/fabrication/printing/printDesignKit.ts",
       "highlight": [
         {
           "start": 17,

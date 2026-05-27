@@ -1,0 +1,1118 @@
+import { describe, expect, test } from "bun:test";
+import {
+  applyFanProductPreset,
+  applyFilterPreset,
+  applyDonutFilterPreset,
+  applyPrintDesignPreset,
+  automaticFanCount,
+  corsiFanCountFits,
+  corsiFanGridFit,
+  customFanProductPresetId,
+  decodeSettings,
+  defaultSettings,
+  encodeSettings,
+  donutFilterPresets,
+  findDonutFilterPreset,
+  isStaticReferencePrintDesignId,
+  normalizeSettings,
+  printDesignPresets,
+  publicPrintDesignPresets,
+  resolveCorsiRosenthalLayout,
+  resolveCorsiRosenthalFanCount,
+  staticPrintReferenceForPreset,
+} from "@/domain/purifier/airPurifier";
+import { createLayout } from "@/fabrication/purifierLayout";
+import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";
+import { createAssemblyModel } from "@/fabrication/assemblyModel";
+import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
+import {
+  createPrintableKit,
+  createPrintableThreeMfExport,
+  findPrintVolumePreset,
+  partFitsPrintBed,
+  printVolumePresets,
+  type PrintVolumePresetId,
+} from "@/fabrication/printing/printableKit";
+import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
+import { createCorsiRosenthalModel } from "@/domain/designs/corsi-rosenthal/model";
+import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight } from "@/domain/designs/donut-filter/model";
+import { createPrintableSheetPlan } from "@/fabrication/printing/printableKit";
+import { createThreeMfPackage, type MeshObject } from "@/fabrication/printing/threeMf";
+
+describe("FilterBoxBuilder purifier workflow", () => {
+  test("can hide installed filter media without changing the cut sheet", () => {
+    const withFilters = createLayout({ ...defaultSettings, showFilterMedia: true, showFans: true, showBananaScale: false });
+    const withoutFilters = createLayout({ ...defaultSettings, showFilterMedia: false, showFans: false, showBananaScale: true });
+    const encoded = encodeSettings(withoutFilters.rawSettings);
+
+    expect(withoutFilters.rawSettings.showFilterMedia).toBe(false);
+    expect(withoutFilters.rawSettings.showFans).toBe(false);
+    expect(withoutFilters.rawSettings.showBananaScale).toBe(true);
+    expect(withoutFilters.cutSheet).toEqual(withFilters.cutSheet);
+    expect(decodeSettings(encoded).showFilterMedia).toBe(false);
+    expect(decodeSettings(encoded).showFans).toBe(false);
+    expect(decodeSettings(encoded).showBananaScale).toBe(true);
+  });
+
+  test("uses purchasable filter presets while preserving custom measured dimensions", () => {
+    const luggablePreset = requiredFilterPreset("merv13-20x25x1");
+    const luggableSettings = createLayout(applyFilterPreset(defaultSettings, luggablePreset.id)).rawSettings;
+
+    expect(luggableSettings.filterPreset).toBe("merv13-20x25x1");
+    expect(luggableSettings.filterWidth).toBeCloseTo(luggablePreset.dimensions.width);
+    expect(luggableSettings.filterDepth).toBeCloseTo(luggablePreset.dimensions.depth);
+    expect(luggableSettings.filterThickness).toBeCloseTo(luggablePreset.dimensions.thickness);
+
+    const customSettings = decodeSettings("filterWidth=300&filterDepth=240&filterThickness=22");
+    expect(customSettings.filterPreset).toBe(customFilterPresetId);
+    expect(customSettings.filterWidth).toBe(300);
+    expect(customSettings.filterDepth).toBe(240);
+    expect(customSettings.filterThickness).toBe(22);
+
+    const encodedCustom = encodeSettings(customSettings);
+    expect(decodeSettings(encodedCustom).filterPreset).toBe(customFilterPresetId);
+  });
+
+  test("uses fan product presets for product help, cut hole size, and encoded URLs", () => {
+    const mobiusSettings = applyFanProductPreset(defaultSettings, "cleanairkits-mobius-120p");
+    const layout = createLayout(mobiusSettings);
+    const fanPanel = requiredFanPanel(layout);
+    const fanCut = requiredCircleCut(fanPanel, "fan");
+    const encoded = encodeSettings(layout.rawSettings);
+    const decoded = decodeSettings(encoded);
+
+    expect(layout.rawSettings.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(layout.rawSettings.fanDiameter).toBe(120);
+    expect(layout.configuration.fan.productSelection.type).toBe("preset");
+    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x50b8ff);
+    expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
+    expect(decoded.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(decoded.fanDiameter).toBe(120);
+  });
+
+  test("preserves legacy custom fan diameters and lets fan presets own their diameter", () => {
+    const legacyCustom = decodeSettings("fanDiameter=120");
+    const noctuaUrl = decodeSettings("fanPreset=noctua-nf-a14&fanDiameter=120");
+    const noctuaLayout = createLayout(noctuaUrl);
+    const noctuaPrintExport = createPrintableThreeMfExport(noctuaLayout, "bed-256");
+    const noctuaPrintContent = new TextDecoder("latin1").decode(noctuaPrintExport.bytes);
+
+    expect(legacyCustom.fanPreset).toBe(customFanProductPresetId);
+    expect(legacyCustom.fanDiameter).toBe(120);
+    expect(noctuaUrl.fanPreset).toBe("noctua-nf-a14");
+    expect(noctuaUrl.fanDiameter).toBe(140);
+    expect(noctuaLayout.configuration.fan.productSelection.type).toBe("preset");
+    expect(noctuaLayout.configuration.fan.productSelection.product.appearance.previewCadModel).toEqual({
+      type: "noctua-nf-a14-public-cad",
+      sourceUrl: "https://www.noctua.at/en/3d-cad-models",
+      assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
+      usage: "preview-only",
+    });
+    expect(noctuaPrintContent).not.toContain("A14_Frame_Public");
+    expect(noctuaPrintContent).not.toContain("Noctua NF-A14 Public CAD");
+  });
+
+  test("keeps URL boundary parsing valid for booleans, fan counts, and constrained rims", () => {
+    const malformedBoolean = decodeSettings("showFans=maybe");
+    const explicitFalse = decodeSettings("showFans=0");
+    const rotationDisabled = decodeSettings("autoRotate=0");
+    const bananaEnabled = decodeSettings("showBananaScale=1");
+    const printSeamsEnabled = decodeSettings("showPrintSeams=1");
+    const printPlateLabelsEnabled = decodeSettings("showPrintPlateLabels=1");
+    const highFanCount = decodeSettings("fansLeft=8");
+    const smallCustomLayout = createLayout({
+      ...defaultSettings,
+      filterPreset: customFilterPresetId,
+      filterWidth: 120,
+      filterDepth: 120,
+      materialThickness: 9,
+      rim: 90,
+    });
+
+    expect(malformedBoolean.showFans).toBe(defaultSettings.showFans);
+    expect(explicitFalse.showFans).toBe(false);
+    expect(rotationDisabled.autoRotate).toBe(false);
+    expect(bananaEnabled.showBananaScale).toBe(true);
+    expect(printSeamsEnabled.showPrintSeams).toBe(true);
+    expect(printPlateLabelsEnabled.showPrintPlateLabels).toBe(true);
+    expect(highFanCount.fansLeft).toBe(8);
+    expect(smallCustomLayout.rawSettings.rim).toBeLessThanOrEqual((smallCustomLayout.summary.workingDepth - 1) / 2);
+    expect(smallCustomLayout.cutPanels.every((panel) => panel.width > 0 && panel.height > 0)).toBe(true);
+  });
+
+  test("keeps preset dimensions derived from the preset id", () => {
+    const normalized = normalizeSettings(defaultSettings);
+    const normalizedAgain = normalizeSettings(normalized);
+    const dimensions = filterSelectionDimensions(normalized.filter);
+
+    expect(normalized.filter).toEqual({ type: "preset", presetId: "merv13-20x25x1" });
+    expect(dimensions).toEqual({
+      width: defaultSettings.filterWidth,
+      depth: defaultSettings.filterDepth,
+      thickness: defaultSettings.filterThickness,
+    });
+    Object.assign(dimensions, { width: 1 });
+    expect(filterSelectionDimensions(normalized.filter).width).toBe(defaultSettings.filterWidth);
+    expect(normalizedAgain).toEqual(normalized);
+  });
+
+  test("builds explicit assembly parts for walls, filter frames, media, and dimensions", () => {
+    const layout = createLayout(defaultSettings);
+    const assembly = createAssemblyModel(layout);
+    const frontRailPanel = requiredPanel(layout.cutPanels, "filter-1-front-long-rail");
+    const frontRail = assembly.filterRails.find((part) => part.id === "filter-1-front-long-rail");
+    const innerRail = assembly.filterRails.find((part) => part.id === "filter-1-inner-long-rail");
+    const lowerFilterY = -layout.summary.chamberHeight / 2 + defaultSettings.filterThickness / 2;
+    const upperFilterY = layout.summary.chamberHeight / 2 - defaultSettings.filterThickness / 2;
+    const lowerOuterFrameY = -layout.summary.chamberHeight / 2 + defaultSettings.materialThickness / 2;
+    const lowerInnerFrameY =
+      -layout.summary.chamberHeight / 2 + defaultSettings.filterThickness + defaultSettings.materialThickness / 2;
+
+    expect(assembly.panels.map((part) => part.role).sort()).toEqual([
+      "front-fan-wall",
+      "left-side-wall",
+      "rear-fan-wall",
+      "right-side-wall",
+    ]);
+    expect(assembly.filterRails).toHaveLength(16);
+    expect(assembly.filterRails.every((part) => part.role === "filter-rail" && part.panel.outline.length > 4)).toBe(true);
+    expect(assembly.filterFrames).toHaveLength(8);
+    expect(assembly.filterMedia).toHaveLength(2);
+    expect(assembly.seams).toHaveLength(12);
+    expect(assembly.dimensions.map((dimension) => dimension.label)).toEqual(["A", "B", "C", "E", "G"]);
+    expect(assembly.dimensions[0]?.measurement).toEqual({ value: layout.rawSettings.filterWidth, description: "filter width" });
+    expect(assembly.dimensions.every((dimension) => dimension.labelOffset.length === 3)).toBe(true);
+    expect(frontRailPanel.assembly).toEqual({ type: "filter-rail", filterIndex: 0, railKey: "front-long" });
+    expect(frontRail?.position[1]).toBeCloseTo(lowerOuterFrameY);
+    expect(frontRail?.position[2]).toBeCloseTo(-layout.summary.workingDepth / 2 + defaultSettings.rim / 2);
+    expect(frontRail?.rotation).toEqual([Math.PI / 2, 0, 0]);
+    expect(innerRail?.position[1]).toBeCloseTo(lowerInnerFrameY);
+    expect(innerRail?.position[2]).toBeCloseTo(-layout.summary.workingDepth / 2 + defaultSettings.rim / 2);
+    expect(innerRail?.rotation).toEqual([Math.PI / 2, 0, 0]);
+    expect(assembly.filterMedia[0]?.position[1]).toBeCloseTo(lowerFilterY);
+    expect(assembly.filterMedia[1]?.position[1]).toBeCloseTo(upperFilterY);
+    expect(assembly.filterMedia[0]?.size[0]).toBeCloseTo(defaultSettings.filterWidth);
+    expect(assembly.filterMedia[0]?.size[1]).toBeCloseTo(defaultSettings.filterThickness);
+    expect(assembly.filterMedia[0]?.size[2]).toBeCloseTo(defaultSettings.filterDepth);
+  });
+
+  test("assembles unsplit filter frame panels on horizontal filter faces", () => {
+    const layout = createLayout({ ...defaultSettings, splitFrames: false });
+    const assembly = createAssemblyModel(layout);
+    const lowerOuterFrameY = -layout.summary.chamberHeight / 2 + defaultSettings.materialThickness / 2;
+    const lowerInnerFrameY =
+      -layout.summary.chamberHeight / 2 + defaultSettings.filterThickness + defaultSettings.materialThickness / 2;
+    const frontFrame = assembly.filterRails.find((part) => part.id === "filter-1-front-frame");
+    const rearFrame = assembly.filterRails.find((part) => part.id === "filter-1-rear-frame");
+
+    expect(assembly.filterRails).toHaveLength(4);
+    expect(frontFrame?.role).toBe("filter-frame-panel");
+    expect(frontFrame?.position[0]).toBe(0);
+    expect(frontFrame?.position[1]).toBeCloseTo(lowerOuterFrameY);
+    expect(frontFrame?.position[2]).toBe(0);
+    expect(rearFrame?.position[0]).toBe(0);
+    expect(rearFrame?.position[1]).toBeCloseTo(lowerInnerFrameY);
+    expect(rearFrame?.position[2]).toBe(0);
+    expect(frontFrame?.rotation).toEqual([Math.PI / 2, 0, 0]);
+    expect(rearFrame?.rotation).toEqual([Math.PI / 2, 0, 0]);
+  });
+
+  test("assembles the one-filter closed back as the opposite horizontal face", () => {
+    const layout = createLayout({ ...defaultSettings, filters: 1 });
+    const assembly = createAssemblyModel(layout);
+    const closedBack = assembly.panels.find((part) => part.id === "closed-back-panel");
+    const closedBackY = layout.summary.chamberHeight / 2 - defaultSettings.materialThickness / 2;
+    const filterMedia = assembly.filterMedia.find((part) => part.id === "filter-media-1");
+
+    expect(closedBack?.role).toBe("closed-back");
+    expect(closedBack?.position[0]).toBe(0);
+    expect(closedBack?.position[1]).toBeCloseTo(closedBackY);
+    expect(closedBack?.position[2]).toBe(0);
+    expect(closedBack?.rotation).toEqual([Math.PI / 2, 0, 0]);
+    expect(filterMedia?.size).toEqual([
+      defaultSettings.filterWidth,
+      defaultSettings.filterThickness,
+      defaultSettings.filterDepth,
+    ]);
+  });
+
+  test("keeps one-filter top teeth aligned around the closed-back face", () => {
+    const layout = createLayout({ ...defaultSettings, filters: 1 });
+    const assembly = createAssemblyModel(layout);
+    const frontWall = requiredAssemblyPanel(assembly, "bottom-fan-wall");
+    const rearWall = requiredAssemblyPanel(assembly, "top-fan-wall");
+    const leftWall = requiredAssemblyPanel(assembly, "left-side-wall");
+    const rightWall = requiredAssemblyPanel(assembly, "right-side-wall");
+
+    expect(panelTopToothY(rearWall)).toBeCloseTo(panelTopToothY(frontWall));
+    expect(panelTopToothY(leftWall)).toBeCloseTo(panelTopToothY(frontWall));
+    expect(panelTopToothY(rightWall)).toBeCloseTo(panelTopToothY(frontWall));
+  });
+
+  test("reports export readiness warnings before drawing export", () => {
+    const defaultLayout = createLayout(defaultSettings);
+    expect(evaluateBuildDiagnostics(defaultLayout)).toEqual([]);
+    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("info");
+
+    const noFanLayout = createLayout({
+      ...defaultSettings,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: 0,
+      fansBottom: 0,
+    });
+    expect(evaluateBuildDiagnostics(noFanLayout).map((diagnostic) => diagnostic.id)).toContain("no-fans");
+
+    const customLayout = createLayout({
+      ...defaultSettings,
+      filterPreset: customFilterPresetId,
+      filterWidth: 130,
+      filterDepth: 130,
+      filterThickness: 10,
+    });
+    expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("custom-filter-range");
+  });
+
+  test("splits printable kits to fit common desktop printer beds", () => {
+    const layout = createLayout(defaultSettings);
+    const boundedPresetIds = printVolumePresets
+      .filter((preset) => preset.bed.type === "bounded")
+      .map((preset) => preset.id);
+
+    expect(boundedPresetIds).toEqual([
+      "bed-180",
+      "bed-220",
+      "bed-225",
+      "bed-prusa-mk",
+      "bed-256",
+      "bed-300",
+      "bed-h2-safe",
+      "bed-350",
+      "bed-prusa-xl",
+      "bed-420",
+    ] satisfies readonly PrintVolumePresetId[]);
+
+    for (const presetId of boundedPresetIds) {
+      const kit = createPrintableKit(layout, presetId);
+
+      expect(kit.summary.partCount).toBeGreaterThan(layout.cutPanels.length);
+      expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
+      expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
+      expect(kit.summary.oversizedPartCount).toBe(0);
+      expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+      expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
+      expect(kit.parts.some((part) => part.kind === "dovetail-glue-key")).toBe(true);
+      expect(
+        kit.parts
+          .filter((part) => part.kind === "panel-tile")
+          .some((part) => part.sourceTile !== undefined && part.sourceTile.columnCount + part.sourceTile.rowCount > 2),
+      ).toBe(true);
+    }
+  });
+
+  test("keeps the 256 mm print bed as the default and redirects the legacy 320 mm URL", () => {
+    expect(findPrintVolumePreset(null).id).toBe("bed-256");
+    expect(findPrintVolumePreset("bed-320").id).toBe("bed-h2-safe");
+  });
+
+  test("keeps public print designs split between generated and curated static models", () => {
+    expect(publicPrintDesignPresets.map((preset) => preset.id)).toEqual([
+      "nukit-open-air",
+      "static-cr-14x20-base",
+    ]);
+    expect(printDesignPresets.map((preset) => preset.id)).toContain("corsi-rosenthal");
+    expect(printDesignPresets.map((preset) => preset.id)).toContain("donut-hepa-adapter");
+    expect(publicPrintDesignPresets[0]?.detail).toContain("dovetail lap keys");
+    expect(publicPrintDesignPresets.filter((preset) => isStaticReferencePrintDesignId(preset.id))).toHaveLength(1);
+    const staticCr16x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-16x20-140");
+    const staticCr14x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base");
+    const staticCr16x20Reference = staticCr16x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr16x20Preset);
+    const staticCr14x20Reference = staticCr14x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr14x20Preset);
+
+    expect(staticCr16x20Reference?.previewAssets).toHaveLength(15);
+    expect(staticCr14x20Reference?.assembledPreview).toEqual({
+      type: "source-part-set",
+      assets: expect.any(Array),
+    });
+    expect(staticCr14x20Reference?.assembledPreviewOrientation).toBe("source-fans-up");
+    expect(
+      staticCr14x20Reference?.assembledPreview?.type === "source-part-set"
+        ? staticCr14x20Reference.assembledPreview.assets
+        : [],
+    ).toHaveLength(12);
+    expect(staticCr14x20Reference?.platePreviewAssets).toHaveLength(19);
+    expect(staticCr14x20Reference?.previewAssets).toHaveLength(20);
+    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFanCount).toBe(4);
+    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFilterCount).toBe(2);
+    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFilterPreset).toBe(
+      "merv13-14x20x1",
+    );
+    expect(staticCr14x20Reference?.printEstimate?.estimatedFilamentKilograms).toBe(1);
+    expect(staticCr14x20Reference?.printEstimate?.assumptions.infillPercent).toBe(15);
+    const externalStaticReferencePreset = printDesignPresets.find((preset) => preset.id === "static-modular-20x20-reference");
+    const externalStaticReference =
+      externalStaticReferencePreset === undefined ? undefined : staticPrintReferenceForPreset(externalStaticReferencePreset);
+    expect(externalStaticReference?.usePolicy.type).toBe("external-only");
+    expect(defaultSettings.materialThickness).toBe(6);
+  });
+
+  test("applies static reference defaults without making them parametric generators", () => {
+    const settings = applyPrintDesignPreset(defaultSettings, "static-cr-16x20-140");
+    const decoded = decodeSettings(encodeSettings(settings));
+    const layout = createLayout(settings);
+
+    expect(settings.printDesign).toBe("static-cr-16x20-140");
+    expect(settings.filterPreset).toBe("merv13-16x20x1");
+    expect(settings.fanPreset).toBe("nukit-arctic-p14");
+    expect(settings.fansTop).toBe(5);
+    expect(settings.splitFrames).toBe(false);
+    expect(decoded.printDesign).toBe("static-cr-16x20-140");
+    expect(staticPrintReferenceForPreset(layout.configuration.printDesign)?.printablesId).toBe("1251061");
+    expect(() => createPrintDesignKit(layout, "bed-256")).toThrow(/Static reference designs/);
+  });
+
+  test("applies the Corsi-Rosenthal printable design defaults explicitly", () => {
+    const settings = applyPrintDesignPreset(defaultSettings, "corsi-rosenthal");
+    const layout = createLayout(settings);
+    const encoded = encodeSettings(settings);
+    const decoded = decodeSettings(encoded);
+
+    expect(settings.printDesign).toBe("corsi-rosenthal");
+    expect(settings.filterPreset).toBe("ikea-starkvind");
+    expect(settings.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(settings.corsiMode).toBe("top-exhaust");
+    expect(settings.corsiFilterCount).toBe(4);
+    expect(settings.corsiFanCount).toBe(automaticFanCount);
+    expect(settings.fansLeft).toBe(0);
+    expect(settings.fansRight).toBe(0);
+    expect(settings.fansTop).toBe(0);
+    expect(settings.fansBottom).toBe(0);
+    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
+    expect(layout.configuration.printDesign.label).toContain("Corsi-Rosenthal");
+    expect(layout.configuration.printDesign.label).not.toContain("glue");
+    expect(decoded.printDesign).toBe("corsi-rosenthal");
+    expect(decoded.corsiMode).toBe("top-exhaust");
+    expect(decoded.corsiFilterCount).toBe(4);
+    expect(decoded.corsiFanCount).toBe(automaticFanCount);
+  });
+
+  test("generates Corsi-Rosenthal printable parts instead of laser panel tiles", () => {
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
+    const kit = createPrintDesignKit(layout, "bed-256");
+    const printExport = createPrintDesignThreeMfExport(layout, "bed-256");
+    const content = new TextDecoder("latin1").decode(printExport.bytes);
+
+    expect(kit.summary.partCount).toBeGreaterThan(30);
+    expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
+    expect(kit.parts.some((part) => part.name.startsWith("Fan pop-in retainer"))).toBe(false);
+    expect(kit.parts.some((part) => part.name.startsWith("Modular rail connector"))).toBe(true);
+    expect(kit.parts.some((part) => part.name.startsWith("Filter X brace strip"))).toBe(false);
+    expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
+    expect(printExport.filename).toBe("corsi-rosenthal-print-kit.3mf");
+    expect(printExport.mimeType).toBe("model/3mf");
+    expect(printExport.sheetPlan.sheets.length).toBeGreaterThan(1);
+    expect(content).toContain("Corsi-Rosenthal box print kit");
+    expect(content).toContain("Snap-in fan cassette");
+  });
+
+  test("keeps the Corsi-Rosenthal selector to one modular printable model", () => {
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
+    const model = createCorsiRosenthalModel(layout);
+    const kit = createPrintDesignKit(layout, "unsplit");
+
+    expect(printDesignPresets.filter((preset) => preset.id === "corsi-rosenthal")).toHaveLength(1);
+    expect(layout.rawSettings.filterPreset).toBe("ikea-starkvind");
+    expect(layout.rawSettings.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(layout.rawSettings.fanDiameter).toBe(120);
+    expect(layout.rawSettings.corsiFanCount).toBe(automaticFanCount);
+    expect(layout.rawSettings.corsiFilterCount).toBe(4);
+    expect(model.frameStyle).toBe("modular-rail");
+    expect(model.filterThickness).toBeCloseTo(38.1);
+    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
+      ["top", 4, 2, 2],
+    ]);
+    expect(kit.parts.filter((part) => part.name.startsWith("Modular corner block"))).toHaveLength(8);
+    expect(kit.parts.filter((part) => part.name.startsWith("Modular ") && part.name.includes("frame unit"))).toHaveLength(12);
+    expect(kit.parts.filter((part) => part.name.startsWith("Modular rail connector")).length).toBeGreaterThanOrEqual(8);
+    expect(kit.parts.filter((part) => part.name.startsWith("Modular rail connector")).length).toBeLessThan(24);
+    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
+    expect(kit.summary.partCount).toBeLessThan(90);
+  });
+
+  test("applies print design defaults for sparse design URLs", () => {
+    const decoded = decodeSettings("printDesign=corsi-rosenthal");
+    const withAutoFanParam = decodeSettings("printDesign=corsi-rosenthal&corsiFanCount=auto");
+    const withExplicitFanCount = decodeSettings("printDesign=corsi-rosenthal&corsiFanCount=6");
+
+    expect(decoded.printDesign).toBe("corsi-rosenthal");
+    expect(decoded.filterPreset).toBe("ikea-starkvind");
+    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(decoded.corsiFanCount).toBe(automaticFanCount);
+    expect(withAutoFanParam.filterPreset).toBe("ikea-starkvind");
+    expect(withAutoFanParam.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(withAutoFanParam.corsiFanCount).toBe(automaticFanCount);
+    expect(withExplicitFanCount.filterPreset).toBe("ikea-starkvind");
+    expect(withExplicitFanCount.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(withExplicitFanCount.corsiFanCount).toBe(automaticFanCount);
+  });
+
+  test("migrates the old modular Corsi-Rosenthal design URL to the single Corsi model", () => {
+    const decoded = decodeSettings("printDesign=modular-corsi-rosenthal");
+
+    expect(decoded.printDesign).toBe("corsi-rosenthal");
+    expect(decoded.filterPreset).toBe("ikea-starkvind");
+    expect(resolveCorsiRosenthalFanCount(createLayout(decoded))).toBe(4);
+  });
+
+  test("rejects unsupported Corsi-Rosenthal fan counts before model creation", () => {
+    const invalidSettings = {
+      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
+      corsiFanCount: 5,
+    };
+    const layout = createLayout(invalidSettings);
+    const model = createCorsiRosenthalModel(layout);
+
+    expect(layout.rawSettings.corsiFanCount).toBe(automaticFanCount);
+    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
+    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
+      ["top", 4, 2, 2],
+    ]);
+  });
+
+  test("lays out the default Corsi-Rosenthal fans as a 2 by 2 top panel grid", () => {
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
+    const model = createCorsiRosenthalModel(layout);
+
+    expect(model.fanCount).toBe(4);
+    expect(model.mode).toBe("top-exhaust");
+    expect(model.filterFaces.map((face) => face.side)).toEqual(["front", "right", "back", "left"]);
+    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount])).toEqual([["top", 4]]);
+    expect(model.sealedFaces.map((face) => face.side)).toEqual(["bottom"]);
+    expect(model.faceRoles.map((face) => [face.side, face.role])).toEqual([
+      ["front", "filter"],
+      ["right", "filter"],
+      ["back", "filter"],
+      ["left", "filter"],
+      ["top", "fan"],
+      ["bottom", "sealed"],
+    ]);
+    expect(model.fanGrid.columns).toBe(2);
+    expect(model.fanGrid.rows).toBe(2);
+  });
+
+  test("keeps every Corsi-Rosenthal face assigned to filter, fan, or seal", () => {
+    const cases = [
+      ...[1, 2, 3, 4, 5].map((filterCount) => ({ mode: "top-exhaust" as const, filterCount })),
+      ...[1, 2, 3, 4].map((filterCount) => ({ mode: "side-exhaust" as const, filterCount })),
+    ];
+
+    for (const testCase of cases) {
+      const model = createCorsiRosenthalModel(
+        createLayout({
+          ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
+          corsiMode: testCase.mode,
+          corsiFilterCount: testCase.filterCount,
+        }),
+      );
+
+      expect(model.faceRoles).toHaveLength(6);
+      expect(new Set(model.faceRoles.map((face) => face.side)).size).toBe(6);
+      expect(model.faceRoles.every((face) => ["filter", "fan", "sealed"].includes(face.role))).toBe(true);
+      expect(model.filterFaces.length + model.fanPanels.length + model.sealedFaces.length).toBe(6);
+    }
+  });
+
+  test("canonicalizes Corsi-Rosenthal fan counts that cannot fit the selected face", () => {
+    const requestedEightFans = createLayout({
+      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
+      corsiFanCount: 8,
+    });
+    const model = createCorsiRosenthalModel(requestedEightFans);
+
+    expect(requestedEightFans.rawSettings.corsiFanCount).toBe(automaticFanCount);
+    expect(resolveCorsiRosenthalFanCount(requestedEightFans)).toBe(4);
+    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
+      ["top", 4, 2, 2],
+    ]);
+    expect(
+      corsiFanCountFits({
+        mode: "top-exhaust",
+        fanCount: 8,
+        filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
+        fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
+      }),
+    ).toBe(false);
+    expect(
+      corsiFanGridFit({
+        mode: "top-exhaust",
+        fanCount: 8,
+        filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
+        fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
+      }).type,
+    ).toBe("does-not-fit");
+    const invalidFit = corsiFanGridFit({
+      mode: "side-exhaust",
+      fanCount: 3,
+      filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
+      fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
+    });
+
+    expect(invalidFit).toEqual({
+      type: "invalid",
+      mode: "side-exhaust",
+      fanCount: 3,
+      reason: "side-exhaust-requires-even-fan-count",
+    });
+    expect("requiredWidth" in invalidFit).toBe(false);
+  });
+
+  test("supports the flipped Corsi-Rosenthal side-exhaust topology", () => {
+    const layout = createLayout({
+      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
+      corsiMode: "side-exhaust",
+      corsiFilterCount: 5,
+      corsiFanCount: 4,
+    });
+    const model = createCorsiRosenthalModel(layout);
+    const corsiLayout = resolveCorsiRosenthalLayout(layout);
+
+    expect(corsiLayout).toEqual({ mode: "side-exhaust", filterCount: 4, fanCount: 4 });
+    expect(model.filterFaces.map((face) => face.side)).toEqual(["front", "back", "top", "bottom"]);
+    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount])).toEqual([
+      ["left", 2],
+      ["right", 2],
+    ]);
+    expect(model.sealedFaces).toEqual([]);
+  });
+
+  test("uses dedicated Corsi-Rosenthal fan count and ignores hidden wall-bank fans", () => {
+    const layout = createLayout({
+      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
+      corsiFanCount: 4,
+      fansLeft: 5,
+      fansRight: 3,
+      fansTop: 0,
+      fansBottom: 0,
+    });
+    const kit = createPrintDesignKit(layout, "bed-256");
+
+    expect(layout.rawSettings.fansLeft).toBe(0);
+    expect(layout.rawSettings.fansRight).toBe(0);
+    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
+    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
+  });
+
+  test("migrates legacy Corsi-Rosenthal fan count from fansLeft", () => {
+    const decoded = decodeSettings("printDesign=corsi-rosenthal&fansLeft=6&fansRight=2&fansTop=1");
+    const encoded = encodeSettings(decoded);
+
+    expect(decoded.filterPreset).toBe("ikea-starkvind");
+    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(decoded.corsiFanCount).toBe(automaticFanCount);
+    expect(decoded.fansLeft).toBe(0);
+    expect(decoded.fansRight).toBe(0);
+    expect(decoded.fansTop).toBe(0);
+    expect(encoded).toContain("corsiFanCount=-1");
+    expect(encoded).toContain("fansLeft=0");
+  });
+
+  test("generates the donut HEPA fan adaptor from explicit round-filter settings", () => {
+    const settings = applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter");
+    const layout = createLayout(settings);
+    const model = createDonutFilterModel(layout);
+    const kit = createPrintDesignKit(layout, "bed-256");
+    const printExport = createPrintDesignThreeMfExport(layout, "bed-256");
+    const content = new TextDecoder("latin1").decode(printExport.bytes);
+
+    expect(settings.printDesign).toBe("donut-hepa-adapter");
+    expect(settings.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(settings.fanDiameter).toBe(120);
+    expect(settings.donutFilterPreset).toBe("big-clive-silentnight-92");
+    expect(settings.donutFilterHoleDiameter).toBe(92);
+    expect(settings.donutCapEnabled).toBe(true);
+    expect(model.filter).toEqual({ outerDiameter: 125, length: 150, holeDiameter: 92 });
+    expect(model.adapter.screwCenters).toEqual([
+      { x: 7.5, y: 7.5 },
+      { x: 112.5, y: 7.5 },
+      { x: 112.5, y: 112.5 },
+      { x: 7.5, y: 112.5 },
+    ]);
+    expect(donutAdapterTotalHeight(model)).toBeGreaterThan(28);
+    expect(donutCapTotalHeight(model)).toBe(11.5);
+    expect(kit.parts.map((part) => part.name)).toEqual([
+      "Donut filter fan adaptor",
+      "Printed fan guard",
+      "Press-fit filter blanking cap",
+    ]);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
+    expect(printExport.filename).toBe("donut-hepa-adapter-print-kit.3mf");
+    expect(printExport.mimeType).toBe("model/3mf");
+    expect(content).toContain("Donut HEPA fan adaptor print kit");
+    expect(content).toContain("Donut filter fan adaptor");
+  });
+
+  test("applies donut HEPA defaults for sparse URLs while preserving measured filter edits", () => {
+    const defaults = decodeSettings("printDesign=donut-hepa-adapter");
+    const measured = decodeSettings("printDesign=donut-hepa-adapter&donutFilterHoleDiameter=86&donutFilterLength=180&donutCapEnabled=false");
+    const preset = decodeSettings("printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini");
+    const encoded = encodeSettings(measured);
+
+    expect(defaults.printDesign).toBe("donut-hepa-adapter");
+    expect(defaults.donutFilterPreset).toBe("big-clive-silentnight-92");
+    expect(defaults.donutFilterOuterDiameter).toBe(125);
+    expect(defaults.donutFilterLength).toBe(150);
+    expect(defaults.donutFilterHoleDiameter).toBe(92);
+    expect(defaults.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(preset.donutFilterPreset).toBe("levoit-core-mini");
+    expect(preset.donutFilterOuterDiameter).toBe(159);
+    expect(preset.donutFilterLength).toBe(135);
+    expect(measured.donutFilterHoleDiameter).toBe(86);
+    expect(measured.donutFilterLength).toBe(180);
+    expect(measured.donutCapEnabled).toBe(false);
+    expect(measured.donutFilterPreset).toBe("custom");
+    expect(encoded).toContain("donutFilterHoleDiameter=86");
+    expect(encoded).toContain("donutFilterPreset=custom");
+    expect(encoded).toContain("donutCapEnabled=false");
+  });
+
+  test("uses explicit round-filter presets and does not clamp large measured cartridges to 320 mm", () => {
+    const levoitCore300 = applyDonutFilterPreset(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"), "levoit-core-300");
+    const measuredLarge = decodeSettings(
+      "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=360&donutFilterLength=440&donutFilterHoleDiameter=128",
+    );
+
+    expect(donutFilterPresets.map((preset) => preset.id)).toContain("levoit-core-300");
+    expect(findDonutFilterPreset("levoit-core-300").productUrl ?? "").toContain("core300");
+    expect(levoitCore300.donutFilterOuterDiameter).toBe(193);
+    expect(levoitCore300.donutFilterLength).toBe(147);
+    expect(levoitCore300.donutFilterHoleDiameter).toBe(120);
+    expect(measuredLarge.donutFilterPreset).toBe("custom");
+    expect(measuredLarge.donutFilterOuterDiameter).toBe(360);
+    expect(measuredLarge.donutFilterLength).toBe(440);
+    expect(measuredLarge.donutFilterHoleDiameter).toBe(128);
+  });
+
+  test("keeps the unsplit print preset as one printable part per cut panel", () => {
+    const layout = createLayout(defaultSettings);
+    const kit = createPrintableKit(layout, "unsplit");
+
+    expect(kit.summary.partCount).toBe(layout.cutPanels.length);
+    expect(kit.summary.panelTileCount).toBe(layout.cutPanels.length);
+    expect(kit.summary.glueKeyCount).toBe(0);
+    expect(kit.summary.splitPanelCount).toBe(0);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.summary.retainedCutFeatureCount).toBe(kit.summary.sourceCutFeatureCount);
+    expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+  });
+
+  test("lays printable kit parts onto previewable print sheets", () => {
+    const layout = createLayout(defaultSettings);
+    const plan = createPrintableSheetPlan(layout, "bed-256");
+
+    expect(plan.kit.preset.id).toBe("bed-256");
+    expect(plan.sheets.length).toBeGreaterThan(1);
+    expect(plan.sheets.every((sheet) => sheet.placements.length > 0)).toBe(true);
+    expect(plan.sheets.every((sheet) => sheet.placements.every((placement) => placement.fits))).toBe(true);
+    expect(
+      plan.sheets.every((sheet) =>
+        sheet.placements.every(
+          (placement) =>
+            placement.x + placement.part.width <= sheet.width + 0.001 &&
+            placement.y + placement.part.depth <= sheet.depth + 0.001,
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  test("exports panel outlines in single-sheet 3MF packages", () => {
+    const layout = createLayout(defaultSettings);
+    const printExport = createPrintableThreeMfExport(layout, "unsplit");
+    const model = parseThreeMfModel(printExport.bytes);
+    const sourcePanel = requiredPanel(layout.cutPanels, "bottom-fan-wall");
+    const exportedPanel = requiredThreeMfObject(model, "Bottom fan wall print panel");
+    const bounds = meshBounds(exportedPanel.vertices);
+
+    expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
+    expect(printExport.mimeType).toBe("model/3mf");
+    expect(bounds.width).toBeCloseTo(sourcePanel.width);
+    expect(bounds.depth).toBeCloseTo(sourcePanel.height);
+    expect(exportedPanel.triangles.length).toBeGreaterThan(12);
+    expectTriangleIndicesValid(exportedPanel);
+  });
+
+  test("exports bounded-bed print kits as one multi-plate 3MF package", () => {
+    const layout = createLayout(defaultSettings);
+    const printExport = createPrintableThreeMfExport(layout, "bed-256");
+    const model = parseThreeMfModel(printExport.bytes);
+    const modelSettings = parseThreeMfModelSettings(printExport.bytes);
+    let nextObjectId = 1;
+    const expectedPlates = printExport.sheetPlan.sheets.map((sheet) => ({
+      name: `Print plate ${sheet.index}`,
+      instances: sheet.placements.map((placement) => ({
+        objectId: nextObjectId++,
+        instanceId: 0,
+        objectName: placement.part.name,
+        x: placement.x,
+        y: placement.y,
+      })),
+    }));
+    const expectedPlacements = expectedPlates.flatMap((plate) => plate.instances);
+
+    expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
+    expect(printExport.mimeType).toBe("model/3mf");
+    expect(printExport.bytes[0]).toBe(0x50);
+    expect(printExport.bytes[1]).toBe(0x4b);
+    expect(listStoredZipFileNames(printExport.bytes)).toEqual([
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "3D/3dmodel.model",
+      "Metadata/model_settings.config",
+    ]);
+    expect(new TextDecoder().decode(readStoredZipEntry(printExport.bytes, "[Content_Types].xml"))).toContain(
+      '<Override PartName="/Metadata/model_settings.config" ContentType="application/xml"/>',
+    );
+    expect(printExport.kit.preset.id).toBe("bed-256");
+    expect(model.unit).toBe("millimeter");
+    expect(model.objects.map((object) => object.name)).toEqual(expectedPlacements.map((placement) => placement.objectName));
+    expect(model.buildItems.map((item) => item.position.x)).toEqual(expectedPlacements.map((placement) => placement.x));
+    expect(model.buildItems.map((item) => item.position.y)).toEqual(expectedPlacements.map((placement) => placement.y));
+
+    expect(modelSettings.plates.map((plate) => plate.name)).toEqual(expectedPlates.map((plate) => plate.name));
+    expect(modelSettings.plates.map((plate) => plate.instances)).toEqual(
+      expectedPlates.map((plate) =>
+        plate.instances.map((instance) => ({
+          objectId: instance.objectId,
+          instanceId: instance.instanceId,
+        })),
+      ),
+    );
+
+    for (const [plateIndex, plate] of modelSettings.plates.entries()) {
+      const sheet = printExport.sheetPlan.sheets[plateIndex];
+      if (sheet === undefined) {
+        throw new Error(`exports bounded-bed print kits: Missing sheet for plate ${plate.name}`);
+      }
+
+      for (const instance of plate.instances) {
+        const item = model.buildItems.find((entry) => entry.objectId === instance.objectId);
+        if (item === undefined) {
+          throw new Error(`exports bounded-bed print kits: Missing build item ${instance.objectId}`);
+        }
+        const object = requiredThreeMfObjectById(model, instance.objectId);
+        expectTriangleIndicesValid(object);
+        const bounds = transformedBounds(meshBounds(object.vertices), item.position);
+        expect(bounds.minX).toBeGreaterThanOrEqual(-0.01);
+        expect(bounds.minY).toBeGreaterThanOrEqual(-0.01);
+        expect(bounds.maxX).toBeLessThanOrEqual(sheet.width + 0.01);
+        expect(bounds.maxY).toBeLessThanOrEqual(sheet.depth + 0.01);
+      }
+    }
+  });
+
+  test("rejects invalid 3MF plate object assignments", () => {
+    const objects = [minimalThreeMfObject("A"), minimalThreeMfObject("B")];
+    const cases = [
+      {
+        objectIndices: [0.5, 1],
+        message: "createThreeMfPackage: MeshPlate.objectIndices[0][0] must be an integer, got 0.5",
+      },
+      {
+        objectIndices: [0, 2],
+        message: "createThreeMfPackage: MeshPlate.objectIndices[0][1] 2 is out of range for 2 objects",
+      },
+      {
+        objectIndices: [0, 0],
+        message: "createThreeMfPackage: MeshPlate.objectIndices object 0 is assigned more than once",
+      },
+      {
+        objectIndices: [0],
+        message: "createThreeMfPackage: MeshPlate.objectIndices missing object index 1",
+      },
+    ];
+
+    for (const testCase of cases) {
+      expect(() =>
+        createThreeMfPackage("Invalid package", objects, [{ name: "Plate 1", objectIndices: testCase.objectIndices }]),
+      ).toThrow(testCase.message);
+    }
+  });
+});
+
+function requiredFilterPreset(id: string) {
+  const preset = filterPresets.find((entry) => entry.id === id);
+  if (preset === undefined) {
+    throw new Error(`requiredFilterPreset: Missing ${id}`);
+  }
+  return preset;
+}
+
+function minimalThreeMfObject(name: string): MeshObject {
+  return {
+    name,
+    vertices: [],
+    triangles: [],
+    position: { x: 0, y: 0, z: 0 },
+  };
+}
+
+function requiredPanel(panels: ReturnType<typeof createLayout>["cutPanels"], id: string) {
+  const panel = panels.find((entry) => entry.id === id);
+  if (panel === undefined) {
+    throw new Error(`requiredPanel: Missing ${id}`);
+  }
+  return panel;
+}
+
+function requiredFanPanel(layout: ReturnType<typeof createLayout>) {
+  const panel = layout.cutPanels.find((entry) => entry.cuts.some((cut) => cut.type === "circle" && cut.role === "fan"));
+  if (panel === undefined) {
+    throw new Error("requiredFanPanel: Missing fan panel");
+  }
+  return panel;
+}
+
+function requiredCircleCut(panel: ReturnType<typeof requiredPanel>, role: "fan" | "screw") {
+  const cut = panel.cuts.find((entry) => entry.type === "circle" && entry.role === role);
+  if (cut === undefined || cut.type !== "circle") {
+    throw new Error(`requiredCircleCut: Missing ${role} on ${panel.id}`);
+  }
+  return cut;
+}
+
+function requiredAssemblyPanel(assembly: ReturnType<typeof createAssemblyModel>, id: string) {
+  const panel = [...assembly.panels, ...assembly.filterRails].find((part) => part.id === id);
+  if (panel === undefined) {
+    throw new Error(`requiredAssemblyPanel: Missing ${id}`);
+  }
+  return panel;
+}
+
+function panelTopToothY(part: ReturnType<typeof requiredAssemblyPanel>): number {
+  const top = Math.max(...part.panel.outline.map((point) => point.y));
+  return roundCoordinate(part.position[1] + top - part.panel.assemblyCenter.y);
+}
+
+function roundCoordinate(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+type ParsedThreeMfModel = {
+  readonly unit: string;
+  readonly objects: readonly ParsedThreeMfObject[];
+  readonly buildItems: readonly ParsedThreeMfBuildItem[];
+};
+
+type ParsedThreeMfModelSettings = {
+  readonly plates: readonly ParsedThreeMfPlate[];
+};
+
+type ParsedThreeMfPlate = {
+  readonly name: string;
+  readonly instances: readonly ParsedThreeMfPlateInstance[];
+};
+
+type ParsedThreeMfPlateInstance = {
+  readonly objectId: number;
+  readonly instanceId: number;
+};
+
+type ParsedThreeMfObject = {
+  readonly id: number;
+  readonly name: string;
+  readonly vertices: readonly { readonly x: number; readonly y: number; readonly z: number }[];
+  readonly triangles: readonly { readonly v1: number; readonly v2: number; readonly v3: number }[];
+};
+
+type ParsedThreeMfBuildItem = {
+  readonly objectId: number;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+};
+
+type Bounds3 = {
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minY: number;
+  readonly maxY: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+  readonly width: number;
+  readonly depth: number;
+};
+
+function parseThreeMfModel(bytes: Uint8Array): ParsedThreeMfModel {
+  const modelXml = new TextDecoder().decode(readStoredZipEntry(bytes, "3D/3dmodel.model"));
+  const unit = /<model unit="([^"]+)"/u.exec(modelXml)?.[1];
+  if (unit === undefined) {
+    throw new Error("parseThreeMfModel: Missing model unit");
+  }
+
+  const objects = Array.from(modelXml.matchAll(/<object id="(\d+)" type="model" name="([^"]+)">([\s\S]*?)<\/object>/gu)).map(
+    (match) => ({
+      id: Number(match[1]),
+      name: unescapeXml(match[2] ?? ""),
+      vertices: Array.from((match[3] ?? "").matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/gu)).map(
+        (vertexMatch) => ({
+          x: Number(vertexMatch[1]),
+          y: Number(vertexMatch[2]),
+          z: Number(vertexMatch[3]),
+        }),
+      ),
+      triangles: Array.from((match[3] ?? "").matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"\/>/gu)).map(
+        (triangleMatch) => ({
+          v1: Number(triangleMatch[1]),
+          v2: Number(triangleMatch[2]),
+          v3: Number(triangleMatch[3]),
+        }),
+      ),
+    }),
+  );
+  const buildItems = Array.from(modelXml.matchAll(/<item objectid="(\d+)" transform="([^"]+)"\/>/gu)).map((match) => {
+    const transform = (match[2] ?? "").split(" ").map(Number);
+    return {
+      objectId: Number(match[1]),
+      position: {
+        x: transform[9] ?? 0,
+        y: transform[10] ?? 0,
+        z: transform[11] ?? 0,
+      },
+    };
+  });
+
+  return { unit, objects, buildItems };
+}
+
+function parseThreeMfModelSettings(bytes: Uint8Array): ParsedThreeMfModelSettings {
+  const modelSettingsXml = new TextDecoder().decode(readStoredZipEntry(bytes, "Metadata/model_settings.config"));
+  const plates = Array.from(modelSettingsXml.matchAll(/<plate>([\s\S]*?)<\/plate>/gu)).map((plateMatch) => {
+    const plateXml = plateMatch[1] ?? "";
+    const name = readMetadataValue(plateXml, "plater_name");
+    const instances = Array.from(plateXml.matchAll(/<model_instance>([\s\S]*?)<\/model_instance>/gu)).map((instanceMatch) => {
+      const instanceXml = instanceMatch[1] ?? "";
+      return {
+        objectId: Number(readMetadataValue(instanceXml, "object_id")),
+        instanceId: Number(readMetadataValue(instanceXml, "instance_id")),
+      };
+    });
+    return { name, instances };
+  });
+  return { plates };
+}
+
+function readMetadataValue(xml: string, key: string): string {
+  const match = new RegExp(`<metadata key="${key}" value="([^"]*)"/>`, "u").exec(xml);
+  if (match?.[1] === undefined) {
+    throw new Error(`readMetadataValue: Missing ${key}`);
+  }
+  return unescapeXml(match[1]);
+}
+
+function listStoredZipFileNames(bytes: Uint8Array): string[] {
+  const names: string[] = [];
+  visitStoredZipEntries(bytes, (name) => {
+    names.push(name);
+  });
+  return names;
+}
+
+function readStoredZipEntry(bytes: Uint8Array, expectedName: string): Uint8Array {
+  let found: Uint8Array | null = null;
+  visitStoredZipEntries(bytes, (name, content) => {
+    if (name === expectedName) {
+      found = content;
+    }
+  });
+  if (found === null) {
+    throw new Error(`readStoredZipEntry: Missing ${expectedName}`);
+  }
+  return found;
+}
+
+function visitStoredZipEntries(bytes: Uint8Array, visit: (name: string, content: Uint8Array) => void): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const decoder = new TextDecoder();
+  let offset = 0;
+  while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+    const compressionMethod = view.getUint16(offset + 8, true);
+    if (compressionMethod !== 0) {
+      throw new Error(`visitStoredZipEntries: Unsupported compression method ${compressionMethod}`);
+    }
+    const compressedSize = view.getUint32(offset + 18, true);
+    const fileNameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const contentStart = nameStart + fileNameLength + extraLength;
+    const contentEnd = contentStart + compressedSize;
+    const name = decoder.decode(bytes.slice(nameStart, nameStart + fileNameLength));
+    visit(name, bytes.slice(contentStart, contentEnd));
+    offset = contentEnd;
+  }
+}
+
+function requiredThreeMfObject(model: ParsedThreeMfModel, name: string): ParsedThreeMfObject {
+  const object = model.objects.find((entry) => entry.name === name);
+  if (object === undefined) {
+    throw new Error(`requiredThreeMfObject: Missing ${name}`);
+  }
+  return object;
+}
+
+function requiredThreeMfObjectById(model: ParsedThreeMfModel, id: number): ParsedThreeMfObject {
+  const object = model.objects.find((entry) => entry.id === id);
+  if (object === undefined) {
+    throw new Error(`requiredThreeMfObjectById: Missing ${id}`);
+  }
+  return object;
+}
+
+function meshBounds(vertices: ParsedThreeMfObject["vertices"]): Bounds3 {
+  return boundsFromExtents({
+    minX: Math.min(...vertices.map((vertex) => vertex.x)),
+    maxX: Math.max(...vertices.map((vertex) => vertex.x)),
+    minY: Math.min(...vertices.map((vertex) => vertex.y)),
+    maxY: Math.max(...vertices.map((vertex) => vertex.y)),
+    minZ: Math.min(...vertices.map((vertex) => vertex.z)),
+    maxZ: Math.max(...vertices.map((vertex) => vertex.z)),
+  });
+}
+
+function transformedBounds(bounds: Bounds3, position: ParsedThreeMfBuildItem["position"]): Bounds3 {
+  return boundsFromExtents({
+    minX: bounds.minX + position.x,
+    maxX: bounds.maxX + position.x,
+    minY: bounds.minY + position.y,
+    maxY: bounds.maxY + position.y,
+    minZ: bounds.minZ + position.z,
+    maxZ: bounds.maxZ + position.z,
+  });
+}
+
+function boundsFromExtents(extents: Omit<Bounds3, "width" | "depth">): Bounds3 {
+  return {
+    ...extents,
+    width: extents.maxX - extents.minX,
+    depth: extents.maxY - extents.minY,
+  };
+}
+
+function expectTriangleIndicesValid(object: ParsedThreeMfObject): void {
+  for (const triangle of object.triangles) {
+    expect(triangle.v1).toBeGreaterThanOrEqual(0);
+    expect(triangle.v2).toBeGreaterThanOrEqual(0);
+    expect(triangle.v3).toBeGreaterThanOrEqual(0);
+    expect(triangle.v1).toBeLessThan(object.vertices.length);
+    expect(triangle.v2).toBeLessThan(object.vertices.length);
+    expect(triangle.v3).toBeLessThan(object.vertices.length);
+  }
+}
+
+function unescapeXml(value: string): string {
+  return value
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&amp;", "&");
+}

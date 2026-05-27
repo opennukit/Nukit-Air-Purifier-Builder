@@ -42,7 +42,7 @@
       "id": "12-port-tests",
       "title": "Boxes Port Tests",
       "description": "The port tests check SVG generation, sheet dimensions, layer metadata, and operation labels. They protect the browser-side Boxes port against accidental output drift.",
-      "file": "test/airPurifierPort.test.ts",
+      "file": "test/ports/boxes/airPurifierCutSheetEquivalence.test.ts",
       "highlight": [
         {
           "start": 49,
@@ -56,7 +56,7 @@
       "id": "12-cut-panel-tests",
       "title": "Cut Panel Source Tests",
       "description": "These tests assert that cut panels, not ad hoc SVG primitives, are the source for output and preview geometry. They also check assembled panel roles.",
-      "file": "test/airPurifierPort.test.ts",
+      "file": "test/ports/boxes/airPurifierCutSheetEquivalence.test.ts",
       "highlight": [
         {
           "start": 76,
@@ -98,7 +98,7 @@
       "id": "12-oracle-script",
       "title": "Upstream Oracle",
       "description": "The oracle script runs the upstream Python generator and compares selected facts with the local TypeScript layout. It is a focused bridge for port validation.",
-      "file": "scripts/airpurifier-oracle.ts",
+      "file": "scripts/boxes-port/airpurifier-oracle.ts",
       "highlight": [
         {
           "start": 7,
@@ -112,7 +112,7 @@
       "id": "12-audit-script",
       "title": "Boxes Port Audit",
       "description": "The audit script compares generated summaries across ported Boxes generators. It helps identify which generators are parity-checked and which are still intentionally out of scope.",
-      "file": "scripts/boxes-port-audit.ts",
+      "file": "scripts/boxes-port/boxes-port-audit.ts",
       "highlight": [
         {
           "start": 25,
@@ -148,7 +148,7 @@
         "They generate the public favicon"
       ],
       "correct": 0,
-      "explanation": "`scripts/airpurifier-oracle.ts` reads an upstream root at line 7, and `scripts/boxes-port-audit.ts` maps upstream generator files on lines 25-29."
+      "explanation": "`scripts/boxes-port/airpurifier-oracle.ts` reads an upstream root at line 7, and `scripts/boxes-port/boxes-port-audit.ts` maps upstream generator files on lines 25-29."
     },
     {
       "type": "textOnly",

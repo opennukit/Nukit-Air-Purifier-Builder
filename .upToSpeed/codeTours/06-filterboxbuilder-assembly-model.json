@@ -14,7 +14,7 @@
       "id": "06-panel-part",
       "title": "Panel Parts",
       "description": "An assembly panel part keeps the cut panel id, role, size, position, rotation, thickness, and optional explode direction together. The renderer can draw it without re-deciding where it belongs.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 14,
@@ -28,7 +28,7 @@
       "id": "06-dimensions",
       "title": "Dimension Guides",
       "description": "Dimension guides are model data, not overlay-only UI state. They define axis, endpoints, label, and size so the renderer can draw readable measurements in the scene.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 33,
@@ -42,7 +42,7 @@
       "id": "06-model-shape",
       "title": "Assembly Model Shape",
       "description": "The model groups all previewable assembly pieces: panels, filter frame parts, filter media boxes, dimension guides, and seam cues. This is the preview contract for generated Nukit layouts.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 54,
@@ -56,7 +56,7 @@
       "id": "06-model-factory",
       "title": "Assembly Factory",
       "description": "The factory recalculates geometry from the normalized layout and derives a physical bounding box. It then gathers structural panel parts, filter frame parts, and guides.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 63,
@@ -70,7 +70,7 @@
       "id": "06-panel-placement",
       "title": "Placed Panels",
       "description": "Panel placement is copied from cut panel assembly metadata into a renderer-friendly part. This keeps the flat cut sheet and 3D assembly tied to the same source.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 120,
@@ -84,7 +84,7 @@
       "id": "06-filter-frames",
       "title": "Filter Frame Parts",
       "description": "Filter frame parts are calculated per filter layer. Their explode direction follows the layer, which lets exploded view move filter-related parts away from the enclosure in the right direction.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 190,
@@ -98,7 +98,7 @@
       "id": "06-dimension-guide-factory",
       "title": "Dimension Guide Factory",
       "description": "Dimension guide creation uses the final width, height, and depth. These values are the same physical size users see in the preview summary.",
-      "file": "src/assemblyModel.ts",
+      "file": "src/fabrication/assemblyModel.ts",
       "highlight": [
         {
           "start": 235,
