@@ -1,0 +1,146 @@
+{
+  "title": "9 FilterBoxBuilder: Three.js Preview Rendering",
+  "id": "09-filterboxbuilder-three-preview-rendering",
+  "position": 9,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "09-overview",
+      "title": "Overview: Three.js Preview",
+      "description": "The specialized design tour covered what data gets produced. This tour shows how previews consume that data: scene setup, generated enclosure rebuilds, static STL loading, fan visuals, print sheet rendering, scale references, dimensions, and cleanup."
+    },
+    {
+      "type": "highlight",
+      "id": "09-preview-class",
+      "title": "Preview Class",
+      "description": "The preview class owns the Three.js scene, camera, renderer, controls, labels, and animation state. The workbench calls `update`, but the class owns rendering details.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 189,
+          "end": 207
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-update-method",
+      "title": "Update Method",
+      "description": "Updates receive a full layout and preview settings. The method decides whether the scene needs a model rebuild, then applies view toggles and camera behavior.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 253,
+          "end": 265
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-rebuild-routing",
+      "title": "Rebuild Routing",
+      "description": "Generated models and static references follow different rebuild paths. Static references load external assets; generated models come from layout and assembly data.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 290,
+          "end": 306
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-static-rebuild",
+      "title": "Static Reference Rebuild",
+      "description": "Static reference rebuilds mark a loading state, await STL assets, then only apply the loaded meshes if the request token still matches the latest requested design.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 397,
+          "end": 414
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-static-assets",
+      "title": "Preview Asset Map",
+      "description": "The static asset map connects design ids to loader functions, preview scaling, and optional assembled asset choices. This isolates curated external assets from the renderer core.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 2952,
+          "end": 2966
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-fan-visual",
+      "title": "Fan Visual",
+      "description": "Fan visuals are generated as scene objects with frame, blades, hub, and guard details. The renderer can animate rotors without affecting the domain model.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 3139,
+          "end": 3154
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-print-sheet-preview",
+      "title": "Print Sheet Preview",
+      "description": "The print-sheet preview has its own renderer class. It accepts a sheet plan and preview settings, then lays plates and parts into a Three.js scene.",
+      "file": "src/printSheetThreePreview.ts",
+      "highlight": [
+        {
+          "start": 89,
+          "end": 107
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "09-static-sheet-assets",
+      "title": "Static Print Assets",
+      "description": "Static print-sheet previews load each STL asset, orient it for bed display, and add it to the corresponding plate. That is why static references can show real part geometry.",
+      "file": "src/printSheetThreePreview.ts",
+      "highlight": [
+        {
+          "start": 149,
+          "end": 166
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "09-mcq-static-token",
+      "title": "Quick Check",
+      "description": "",
+      "text": "Why does static reference rebuild use a load token?",
+      "answers": [
+        "To avoid applying an older async STL load after the user changes design",
+        "To make the exported 3MF file smaller",
+        "To store camera presets in localStorage",
+        "To disable fan animation during loading"
+      ],
+      "correct": 0,
+      "explanation": "`rebuildStaticReferenceModel` starts at line 397 in `src/threePreview.ts`, creates a token, awaits assets, and compares the token before using the result."
+    },
+    {
+      "type": "textOnly",
+      "id": "09-summary",
+      "title": "Summary",
+      "description": "The Three.js layer renders a view over domain data and static assets. It does not replace the layout, kit, or export models. The next tour explains how the browser workbench coordinates these pieces with controls and URL state."
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "title": "5 FilterBoxBuilder: Laser Geometry and SVG",
+  "id": "05-filterboxbuilder-laser-geometry-svg",
+  "position": 5,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "05-overview",
+      "title": "Overview: Laser Geometry",
+      "description": "The layout tour ended with cut panels and an SVG document. This tour explains how those panels are shaped: edge profiles, finger holes, drawing primitives, the TypeScript Boxes layer, and parity scripts against the upstream Python generator."
+    },
+    {
+      "type": "highlight",
+      "id": "05-geometry-shape",
+      "title": "Shared Geometry",
+      "description": "The geometry type gathers the dimensions needed by both cutting and assembly. It keeps filter size, chamber height, depth, fan layers, and filter layers in one calculated object.",
+      "file": "src/airPurifierGeometry.ts",
+      "highlight": [
+        {
+          "start": 13,
+          "end": 25
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-cut-panel-draft",
+      "title": "Panel Drafts",
+      "description": "Panel drafts describe a panel before sheet placement is assigned. They already carry width, height, edge sections, features, and optional assembly role.",
+      "file": "src/cutGeometry.ts",
+      "highlight": [
+        {
+          "start": 72,
+          "end": 81
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-edge-sections",
+      "title": "Edge Sections",
+      "description": "Edges are split into typed sections. Finger, plain, and dovetail sections can live on the same side, which lets laser and print variants share panel outlines while changing connector strategy.",
+      "file": "src/cutGeometry.ts",
+      "highlight": [
+        {
+          "start": 93,
+          "end": 103
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-rectangular-panel",
+      "title": "Rectangular Panel Builder",
+      "description": "The rectangular panel builder turns dimensions and edge sections into an outline. Features are added separately, so holes and labels do not have to be encoded into the outer path.",
+      "file": "src/cutGeometry.ts",
+      "highlight": [
+        {
+          "start": 129,
+          "end": 141
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-finger-holes",
+      "title": "Finger Hole Slots",
+      "description": "Finger holes are generated as cut features along a span. This function handles count, spacing, and rotation, which makes slot placement deterministic enough to test.",
+      "file": "src/cutGeometry.ts",
+      "highlight": [
+        {
+          "start": 256,
+          "end": 270
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-boxes-document",
+      "title": "Boxes Document",
+      "description": "The Boxes layer is a small drawing kernel. It stores sheets, shapes, and operations in a browser-friendly representation before SVG rendering.",
+      "file": "src/boxes/kernel.ts",
+      "highlight": [
+        {
+          "start": 14,
+          "end": 22
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-boxes-generator",
+      "title": "Air Purifier Generator",
+      "description": "The ported generator creates walls and places finger holes with the same abstractions as the generic Boxes kernel. This path is used by compatibility tests and audit scripts.",
+      "file": "src/boxes/generators/airPurifier.ts",
+      "highlight": [
+        {
+          "start": 43,
+          "end": 52
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-svg-renderer",
+      "title": "SVG Renderer",
+      "description": "SVG rendering receives a Boxes document and writes XML layers. The renderer is a final formatting step; geometry decisions already happened before this point.",
+      "file": "src/boxes/svg.ts",
+      "highlight": [
+        {
+          "start": 4,
+          "end": 16
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "05-port-oracle",
+      "title": "Port Oracle Script",
+      "description": "The oracle script compares local layout facts against the upstream Boxes.py implementation. It is a developer tool for checking the TypeScript port, not a production dependency.",
+      "file": "scripts/airpurifier-oracle.ts",
+      "highlight": [
+        {
+          "start": 7,
+          "end": 21
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "05-mcq-panel-source",
+      "title": "Quick Check",
+      "description": "",
+      "text": "Which structure is shared by the laser SVG path and the assembled preview path?",
+      "answers": [
+        "Cut panels",
+        "CSS selectors",
+        "Bun test snapshots",
+        "Vite server options"
+      ],
+      "correct": 0,
+      "explanation": "`CutPanel` starts at line 89 in `src/cutGeometry.ts` and includes outline, features, sheet placement, and optional assembly metadata."
+    },
+    {
+      "type": "textOnly",
+      "id": "05-summary",
+      "title": "Summary",
+      "description": "Laser geometry flows from calculated dimensions into typed panel outlines, features, drawing documents, and SVG. The next tour shows how those same panels become a physical assembly for the 3D preview."
+    }
+  ]
+}

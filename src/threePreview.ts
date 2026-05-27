@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   CanvasTexture,
   CircleGeometry,
+  ArrowHelper,
   CylinderGeometry,
   DirectionalLight,
   DoubleSide,
@@ -24,6 +25,7 @@ import {
   Path,
   PCFShadowMap,
   PerspectiveCamera,
+  PlaneGeometry,
   Raycaster,
   Scene,
   Shape,
@@ -37,13 +39,23 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
   filterSelectionDimensions,
   isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
+  isStaticReferencePrintDesignId,
+  staticPrintReferenceForPreset,
   type FanAppearance,
   type LayoutResult,
 } from "./airPurifier";
+import {
+  loadStaticPrintAssemblyAssets,
+  loadStaticPrintAssets,
+  type LoadedStaticPrintAssembly,
+  type LoadedStaticPrintAsset,
+} from "./staticStlAssets";
+import type { StaticPrintPreviewAsset, StaticPrintReference } from "./staticPrintReferences";
 import {
   createAssemblyModel,
   formatDimension,
@@ -51,14 +63,17 @@ import {
   type AssemblyPanelPart,
   type DimensionGuide,
   type DimensionMeasurement,
+  type MillimeterSize3,
   type MillimeterVector3,
   type Vector3Tuple,
 } from "./assemblyModel";
 import type { AssemblyLineCue } from "./assemblyModel";
 import { createCorsiRosenthalModel } from "./corsiRosenthalModel";
-import type { CorsiFaceSide, CorsiFanGrid, CorsiFanPanel, CorsiFilterFace } from "./corsiRosenthalModel";
+import type { CorsiFaceSide, CorsiFanGrid, CorsiFanPanel, CorsiFilterFace, CorsiSealedFace } from "./corsiRosenthalModel";
 import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight, type DonutFilterModel } from "./donutFilterModel";
 import type { CutFeature, CutPanel, RectCut } from "./cutGeometry";
+import type { PrintableSheetPlan } from "./printSheetPreview";
+import type { PrintableTileSource } from "./printableKit";
 
 type FanAxis = "x" | "y" | "z";
 
@@ -68,15 +83,53 @@ type FanPlacement = {
   radius: number;
 };
 
+type FanCadPreviewAsset = {
+  readonly schema: "filterboxbuilder-fan-cad-preview-v1";
+  readonly usage: "preview-only-purchased-part-visual";
+  readonly unit: "millimeter";
+  readonly nominalDiameter: number;
+  readonly bounds: {
+    readonly center: readonly [number, number, number];
+  };
+  readonly meshes: readonly FanCadPreviewMesh[];
+};
+
+type FanCadPreviewMesh = {
+  readonly name: string;
+  readonly color?: readonly [number, number, number];
+  readonly position: readonly number[];
+  readonly index: readonly number[];
+};
+
+type LoadedFanCadModel = {
+  readonly nominalDiameter: number;
+  readonly meshes: readonly LoadedFanCadMesh[];
+};
+
+type LoadedFanCadMesh = {
+  readonly name: string;
+  readonly geometry: BufferGeometry;
+  readonly color: number;
+  readonly isRotor: boolean;
+};
+
 type CameraPose = {
   readonly offsetFromTarget: Vector3;
   readonly viewScale: number;
+};
+
+type PanelPrintSeam = {
+  readonly orientation: "vertical" | "horizontal";
+  readonly offset: number;
+  readonly start: number;
+  readonly end: number;
 };
 
 type CorsiPreviewMetrics = {
   readonly mode: "top-exhaust" | "side-exhaust";
   readonly filterFaces: readonly CorsiFilterFace[];
   readonly fanPanels: readonly CorsiFanPanel[];
+  readonly sealedFaces: readonly CorsiSealedFace[];
   readonly filterWidth: number;
   readonly filterHeight: number;
   readonly filterThickness: number;
@@ -89,13 +142,46 @@ type CorsiPreviewMetrics = {
   readonly fanCassetteOuter: number;
 };
 
+type StaticReferenceAssembledPreviewPose = {
+  readonly meshRotationX: number;
+  readonly rotateWholePreview: boolean;
+  readonly installedPartLayout: "source-front" | "source-side-fans" | "fan-panel-up";
+};
+
+type StaticReferenceAssemblyMetrics = {
+  readonly footprintWidth: number;
+  readonly footprintDepth: number;
+  readonly height: number;
+};
+
+type StaticReferencePurchasedPartExplosion = {
+  readonly exploded: boolean;
+  readonly assembly?: LoadedStaticPrintAssembly;
+};
+
 const sceneScale = 1 / 260;
+const staticReferenceSceneScale = sceneScale * 0.72;
 const woodColor = 0xc7965a;
 const edgeColor = 0x4f3822;
 const burnColor = 0x2b1a0f;
 const filterColor = 0xeef1e6;
 const groundY = -0.58;
 const homePreviewRotationX = -Math.PI / 2;
+const panelCutOverlayLift = 1.4 * sceneScale;
+const panelPrintSeamOverlayLift = 2.1 * sceneScale;
+const filterMediaPreviewClearanceMillimeters = 3;
+const bananaReferenceLength = 180 * sceneScale;
+const bananaReferenceRadius = 14 * sceneScale;
+const oneMeterCubeSize = 1000 * sceneScale;
+const staticReferenceExplodeDistance = 46 * sceneScale;
+const bananaScaleAssetUrl = "/vendor/banana/banana.glb";
+const dimensionLabelNormalScale = new Vector3(1.28, 0.367, 1);
+const dimensionLabelHoverScale = new Vector3(1.78, 0.51, 1);
+const staticReferencePreviewZoom = 1.52;
+const generatedPreviewZoom = 1.5;
+const generatedPreviewZoomReferenceMillimeters = 360;
+const minimumLargeModelPreviewZoom = 0.85;
+const previewControlClearanceTargetOffset = 0.1;
 // Local +Y is the exhaust/back side of the fan, which faces outside the purifier.
 // Positive Y rotation reads as slow clockwise motion from that outside view.
 const fanRotorAngularVelocity = 0.9;
@@ -107,6 +193,7 @@ export class PurifierThreePreview {
   private readonly controls: OrbitControls;
   private readonly modelGroup = new Group();
   private readonly staticSceneGroup = new Group();
+  private readonly scaleReferenceGroup = new Group();
   private readonly resizeObserver: ResizeObserver;
   private readonly raycaster = new Raycaster();
   private readonly pointer = new Vector2();
@@ -118,6 +205,7 @@ export class PurifierThreePreview {
   private readonly modelFocus = new Vector3();
   private latestViewScale = 1;
   private previousAnimationTime = performance.now();
+  private staticReferenceLoadToken = 0;
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -134,13 +222,14 @@ export class PurifierThreePreview {
     this.controls.autoRotateSpeed = 0.55;
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
-    this.controls.maxDistance = 5.2;
+    this.controls.maxDistance = 14;
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.clearDimensionHover);
 
     this.scene.add(this.modelGroup);
     this.scene.add(this.staticSceneGroup);
+    this.scene.add(this.scaleReferenceGroup);
     this.scene.add(new HemisphereLight(0xfff7e8, 0x7d897d, 2.2));
     const keyLight = new DirectionalLight(0xffffff, 2.4);
     keyLight.position.set(2.5, 3.5, 3.2);
@@ -161,7 +250,7 @@ export class PurifierThreePreview {
     this.animate();
   }
 
-  update(layout: LayoutResult): void {
+  update(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null = null): void {
     const previousLayout = this.latestLayout;
     const previousPose = previousLayout === null ? null : this.captureCameraPose();
     const shouldApplyPresetCamera =
@@ -169,7 +258,7 @@ export class PurifierThreePreview {
       previousLayout.configuration.preview.cameraPreset !== layout.configuration.preview.cameraPreset;
 
     this.latestLayout = layout;
-    this.rebuildModel(layout);
+    this.rebuildModel(layout, printSeamPlan);
     if (shouldApplyPresetCamera) {
       this.frameModel(layout);
     } else {
@@ -193,19 +282,27 @@ export class PurifierThreePreview {
     this.controls.dispose();
     this.disposeObject(this.modelGroup);
     this.disposeObject(this.staticSceneGroup);
+    this.disposeObject(this.scaleReferenceGroup);
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 
-  private rebuildModel(layout: LayoutResult): void {
+  private rebuildModel(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null): void {
+    this.staticReferenceLoadToken += 1;
     this.disposeObject(this.modelGroup);
     this.modelGroup.clear();
+    this.disposeObject(this.scaleReferenceGroup);
+    this.scaleReferenceGroup.clear();
     this.modelGroup.position.set(0, 0, 0);
     this.modelGroup.rotation.set(0, 0, 0);
     this.hoveredDimensionId = null;
     this.dimensionTargets = [];
     this.fanRotors.length = 0;
     this.renderer.domElement.style.cursor = "";
+    if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
+      this.rebuildStaticReferenceModel(layout, this.staticReferenceLoadToken);
+      return;
+    }
     if (isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
       this.rebuildDonutFilterModel(layout);
       return;
@@ -221,6 +318,8 @@ export class PurifierThreePreview {
     const railWood = createWoodMaterial(false);
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
+    const printSeamMaterial = new LineBasicMaterial({ color: 0x2b6fd6, transparent: true, opacity: 0.9 });
+    const panelPrintSeams = createPanelPrintSeams(printSeamPlan);
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.5 : 0.68);
@@ -237,6 +336,8 @@ export class PurifierThreePreview {
         darkEdge,
         cutMark,
         screwMark,
+        panelPrintSeams.get(panel.id) ?? [],
+        printSeamMaterial,
       );
       collectFanRotors(panelGroup, this.fanRotors);
       this.modelGroup.add(panelGroup);
@@ -256,6 +357,8 @@ export class PurifierThreePreview {
               darkEdge,
               cutMark,
               screwMark,
+              panelPrintSeams.get(rail.id) ?? [],
+              printSeamMaterial,
             ),
           );
         }
@@ -280,7 +383,9 @@ export class PurifierThreePreview {
     this.modelGroup.position.sub(center);
     const centeredOutline = new Box3().setFromObject(this.modelGroup);
     this.modelGroup.position.y += groundY - centeredOutline.min.y;
-    new Box3().setFromObject(this.modelGroup).getCenter(this.modelFocus);
+    const settledOutline = new Box3().setFromObject(this.modelGroup);
+    this.addScaleReference(layout, settledOutline);
+    this.updateModelFocus(settledOutline);
 
     if (settings.preview.showDimensions) {
       const dimensionGroup = createDimensionGroup(assembly.dimensions);
@@ -289,8 +394,430 @@ export class PurifierThreePreview {
     }
   }
 
+  private rebuildStaticReferenceModel(layout: LayoutResult, loadToken: number): void {
+    const reference = staticPrintReferenceForPreset(layout.configuration.printDesign);
+    const previewAssets = reference === undefined ? [] : staticReferencePreviewAssets(reference);
+    if (reference === undefined || previewAssets.length === 0) {
+      this.addStaticReferencePlaceholder();
+      const outline = this.settleModelOnGround();
+      this.addScaleReference(layout, outline);
+      this.updateModelFocus(outline);
+      return;
+    }
+
+    const assetsPromise =
+      reference.assembledPreview?.type !== "source-part-set"
+        ? loadStaticPrintAssets(previewAssets).then((assets) => ({ type: "assets" as const, assets }))
+        : loadStaticPrintAssemblyAssets(reference.assembledPreview.assets).then((assembly) => ({ type: "assembly" as const, assembly }));
+
+    void assetsPromise
+      .then((loaded) => {
+        if (loadToken !== this.staticReferenceLoadToken) {
+          const disposableAssets = loaded.type === "assets" ? loaded.assets : loaded.assembly.assets;
+          for (const asset of disposableAssets) {
+            asset.geometry.dispose();
+          }
+          return;
+        }
+        this.disposeObject(this.modelGroup);
+        this.modelGroup.clear();
+        this.modelGroup.position.set(0, 0, 0);
+        this.modelGroup.rotation.set(0, 0, 0);
+        if (loaded.type === "assembly") {
+          if (loaded.assembly.assets.length === 0) {
+            this.addStaticReferencePlaceholder();
+          } else {
+            this.addStaticReferenceAssembledBoards(loaded.assembly, layout);
+          }
+        } else if (loaded.assets.length === 0) {
+          this.addStaticReferencePlaceholder();
+        } else if (reference.assembledPreview?.type === "single-source-asset") {
+          this.addStaticReferenceAssembledAsset(loaded.assets[0], layout);
+        } else {
+          this.addStaticReferenceAssetGrid(loaded.assets);
+        }
+        const outline = this.settleModelOnGround();
+        this.disposeObject(this.scaleReferenceGroup);
+        this.scaleReferenceGroup.clear();
+        this.addScaleReference(layout, outline);
+        if (layout.configuration.preview.showDimensions) {
+          const dimensionGroup = createStaticReferenceDimensionGroup(boundsInModelGroupSpace(outline, this.modelGroup));
+          this.modelGroup.add(dimensionGroup);
+          this.dimensionTargets = collectDimensionTargets(dimensionGroup);
+        }
+        this.updateModelFocus(new Box3().setFromObject(this.modelGroup));
+        this.frameModel(layout);
+      })
+      .catch((error) => {
+        console.warn("rebuildStaticReferenceModel: Failed to load static STL reference", error);
+        if (loadToken !== this.staticReferenceLoadToken) {
+          return;
+        }
+        this.disposeObject(this.modelGroup);
+        this.modelGroup.clear();
+        this.addStaticReferencePlaceholder();
+        const outline = this.settleModelOnGround();
+        this.disposeObject(this.scaleReferenceGroup);
+        this.scaleReferenceGroup.clear();
+        this.addScaleReference(layout, outline);
+        this.updateModelFocus(new Box3().setFromObject(this.modelGroup));
+        this.frameModel(layout);
+      });
+  }
+
+  private addStaticReferencePlaceholder(): void {
+    const material = new MeshStandardMaterial({ color: 0x22312b, roughness: 0.68, metalness: 0.04 });
+    const edgeMaterial = new LineBasicMaterial({ color: 0x0f1814, transparent: true, opacity: 0.7 });
+    for (let index = 0; index < 5; index += 1) {
+      const geometry = new BoxGeometry(0.22 + index * 0.035, 0.035, 0.16);
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set((index - 2) * 0.28, 0, (index % 2) * 0.22);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.modelGroup.add(mesh);
+      const edges = new LineSegments(new EdgesGeometry(geometry), edgeMaterial);
+      edges.position.copy(mesh.position);
+      this.modelGroup.add(edges);
+    }
+  }
+
+  private addStaticReferenceAssembledAsset(asset: LoadedStaticPrintAsset | undefined, layout: LayoutResult): void {
+    if (asset === undefined) {
+      this.addStaticReferencePlaceholder();
+      return;
+    }
+    const material = new MeshStandardMaterial({ color: 0x151a1b, roughness: 0.66, metalness: 0.05 });
+    const edgeMaterial = new LineBasicMaterial({ color: 0x53605a, transparent: true, opacity: 0.5 });
+    const pose = staticReferenceAssembledPreviewPose(layout);
+    const previewGroup = pose.rotateWholePreview ? new Group() : this.modelGroup;
+    const mesh = new Mesh(asset.geometry, material);
+    mesh.name = `static-reference-assembled-${asset.asset.name}`;
+    mesh.scale.setScalar(sceneScale);
+    if (!pose.rotateWholePreview) {
+      mesh.rotation.x = pose.meshRotationX;
+    }
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    previewGroup.add(mesh);
+
+    const edges = new LineSegments(new EdgesGeometry(asset.geometry), edgeMaterial);
+    edges.scale.copy(mesh.scale);
+    edges.rotation.copy(mesh.rotation);
+    previewGroup.add(edges);
+    this.addStaticReferencePurchasedParts(asset, layout, pose, previewGroup, { exploded: false });
+    if (pose.rotateWholePreview) {
+      previewGroup.rotation.x = pose.meshRotationX;
+      this.modelGroup.add(previewGroup);
+    }
+  }
+
+  private addStaticReferenceAssembledBoards(assembly: LoadedStaticPrintAssembly, layout: LayoutResult): void {
+    const material = new MeshStandardMaterial({ color: 0x151a1b, roughness: 0.66, metalness: 0.05 });
+    const edgeMaterial = new LineBasicMaterial({ color: 0x53605a, transparent: true, opacity: 0.5 });
+    const pose = staticReferenceAssembledPreviewPose(layout);
+    const previewGroup = pose.rotateWholePreview ? new Group() : this.modelGroup;
+    const shouldExplode = layout.configuration.preview.explodedView;
+
+    for (const asset of assembly.assets) {
+      const explodeOffset = staticReferenceBoardExplodeOffset(asset.geometry, assembly, shouldExplode);
+      const mesh = new Mesh(asset.geometry, material);
+      mesh.name = `static-reference-assembled-board-${asset.asset.name}`;
+      mesh.scale.setScalar(sceneScale);
+      mesh.position.copy(explodeOffset);
+      if (!pose.rotateWholePreview) {
+        mesh.rotation.x = pose.meshRotationX;
+      }
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      previewGroup.add(mesh);
+
+      const edges = new LineSegments(new EdgesGeometry(asset.geometry), edgeMaterial);
+      edges.scale.copy(mesh.scale);
+      edges.position.copy(explodeOffset);
+      edges.rotation.copy(mesh.rotation);
+      previewGroup.add(edges);
+    }
+
+    this.addStaticReferencePurchasedParts(assembly, layout, pose, previewGroup, { exploded: shouldExplode, assembly });
+    if (pose.rotateWholePreview) {
+      previewGroup.rotation.x = pose.meshRotationX;
+      this.modelGroup.add(previewGroup);
+    }
+  }
+
+  private addStaticReferencePurchasedParts(
+    assembly: StaticReferenceAssemblyMetrics,
+    layout: LayoutResult,
+    pose: StaticReferenceAssembledPreviewPose,
+    target: Group = this.modelGroup,
+    explosion: StaticReferencePurchasedPartExplosion = { exploded: false },
+  ): void {
+    const settings = layout.configuration;
+    const assetWidth = assembly.footprintWidth * sceneScale;
+    const assetDepth = assembly.footprintDepth * sceneScale;
+    const assetHeight = assembly.height * sceneScale;
+
+    if (settings.preview.showFilterMedia) {
+      if (pose.installedPartLayout === "fan-panel-up") {
+        this.addStaticReferenceTopFilter(assembly, layout, target);
+      } else if (pose.installedPartLayout === "source-side-fans") {
+        this.addStaticReferenceSideFanFilters(assembly, layout, target);
+      } else {
+        this.addStaticReferenceFilter(assembly, layout, target);
+      }
+    }
+
+    if (!settings.preview.showFans) {
+      return;
+    }
+
+    const fanRadius = (settings.fan.spec.diameter / 2) * sceneScale;
+    if (pose.installedPartLayout === "source-side-fans") {
+      const fanY = 0;
+      const fanZ = -fanRadius * 0.12;
+      const centerSpacing = Math.min(assetWidth / 4, fanRadius * 2.08);
+      for (const x of [-1.5, -0.5, 0.5, 1.5].map((multiplier) => multiplier * centerSpacing)) {
+        const position = staticReferencePurchasedPartPosition(new Vector3(x, fanY, fanZ), explosion);
+        const fan = createFan({
+          axis: "z",
+          position,
+          radius: fanRadius,
+          appearance: settings.fan.productSelection.product.appearance,
+        });
+        fan.name = "static-reference-installed-side-fan";
+        collectFanRotors(fan, this.fanRotors);
+        target.add(fan);
+      }
+      return;
+    }
+
+    if (pose.installedPartLayout === "fan-panel-up") {
+      const fanY = assetDepth / 2 + 8 * sceneScale;
+      const fanZ = -assetHeight * 0.145;
+      const fanSpacing = Math.min(assetWidth * 0.245, fanRadius * 2.1);
+      for (const x of [-fanSpacing, fanSpacing]) {
+        const position = staticReferencePurchasedPartPosition(new Vector3(x, fanY, fanZ), explosion);
+        const fan = createFan({
+          axis: "y",
+          position,
+          radius: fanRadius,
+          appearance: settings.fan.productSelection.product.appearance,
+        });
+        fan.name = "static-reference-installed-top-fan";
+        collectFanRotors(fan, this.fanRotors);
+        target.add(fan);
+      }
+      return;
+    }
+
+    const fanY = assetHeight * 0.145;
+    const fanZ = assetDepth / 2 + fanRadius * 0.12;
+    const fanSpacing = Math.min(assetWidth * 0.25, fanRadius * 2.12);
+    for (const x of [-fanSpacing * 1.5, -fanSpacing * 0.5, fanSpacing * 0.5, fanSpacing * 1.5]) {
+      const position = staticReferencePurchasedPartPosition(new Vector3(x, fanY, fanZ), explosion);
+      const fan = createFan({
+        axis: "z",
+        position,
+        radius: fanRadius,
+        appearance: settings.fan.productSelection.product.appearance,
+      });
+      fan.name = "static-reference-installed-fan";
+      collectFanRotors(fan, this.fanRotors);
+      target.add(fan);
+    }
+  }
+
+  private addStaticReferenceFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
+    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
+    const filterHeight = Math.min(filterDimensions.depth, Math.max(1, asset.height - 24)) * sceneScale;
+    const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
+    const assetHeight = asset.height * sceneScale;
+    const assetDepth = asset.footprintDepth * sceneScale;
+
+    const filter = new Mesh(
+      new BoxGeometry(filterWidth, filterHeight, filterThickness),
+      createFilterMediaMaterial(0.72),
+    );
+    filter.name = "static-reference-installed-filter";
+    filter.position.set(0, assetHeight * 0.5, assetDepth * 0.12);
+    filter.castShadow = true;
+    filter.receiveShadow = true;
+    target.add(filter);
+
+    const gasketMaterial = new MeshStandardMaterial({
+      color: 0xf3f0de,
+      roughness: 0.66,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.88,
+    });
+    const railThickness = Math.max(8 * sceneScale, filterThickness * 0.92);
+    const railDepth = filterThickness * 1.16;
+    for (const [x, y, width, height] of [
+      [0, filterHeight / 2 - railThickness / 2, filterWidth, railThickness],
+      [0, -filterHeight / 2 + railThickness / 2, filterWidth, railThickness],
+      [-filterWidth / 2 + railThickness / 2, 0, railThickness, filterHeight],
+      [filterWidth / 2 - railThickness / 2, 0, railThickness, filterHeight],
+    ] as const) {
+      const rail = new Mesh(new BoxGeometry(width, height, railDepth), gasketMaterial);
+      rail.position.set(filter.position.x + x, filter.position.y + y, filter.position.z + filterThickness * 0.08);
+      rail.castShadow = true;
+      rail.receiveShadow = true;
+      target.add(rail);
+    }
+
+    const pleatMaterial = new LineBasicMaterial({ color: 0xc7cdbc, transparent: true, opacity: 0.62 });
+    const z = filter.position.z + filterThickness / 2 + 0.003;
+    const positions: number[] = [];
+    for (let index = 0; index <= 26; index += 1) {
+      const x = filter.position.x - filterWidth / 2 + (filterWidth * index) / 26;
+      positions.push(x, filter.position.y - filterHeight / 2, z, x, filter.position.y + filterHeight / 2, z);
+    }
+    for (let index = 0; index <= 14; index += 1) {
+      const y = filter.position.y - filterHeight / 2 + (filterHeight * index) / 14;
+      positions.push(filter.position.x - filterWidth / 2, y, z, filter.position.x + filterWidth / 2, y, z);
+    }
+    const pleats = new LineSegments(new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3)), pleatMaterial);
+    pleats.name = "static-reference-filter-pleats";
+    target.add(pleats);
+  }
+
+  private addStaticReferenceSideFanFilters(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
+    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
+    const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
+    const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
+    const assetHeight = asset.footprintDepth * sceneScale;
+    const assetDepth = asset.height * sceneScale;
+
+    for (const side of [-1, 1]) {
+      const filter = new Mesh(
+        new BoxGeometry(filterWidth, filterThickness, filterDepth),
+        createFilterMediaMaterial(0.58),
+      );
+      filter.name = side > 0 ? "static-reference-installed-top-filter" : "static-reference-installed-bottom-filter";
+      filter.position.set(0, side * (assetHeight / 2 - filterThickness / 2 - 7 * sceneScale), assetDepth / 2);
+      filter.castShadow = true;
+      filter.receiveShadow = true;
+      target.add(filter);
+
+      const pleatMaterial = new LineBasicMaterial({ color: 0xc7cdbc, transparent: true, opacity: side > 0 ? 0.62 : 0.42 });
+      const y = filter.position.y + side * (filterThickness / 2 + 0.003);
+      const positions: number[] = [];
+      for (let index = 0; index <= 26; index += 1) {
+        const x = filter.position.x - filterWidth / 2 + (filterWidth * index) / 26;
+        positions.push(x, y, filter.position.z - filterDepth / 2, x, y, filter.position.z + filterDepth / 2);
+      }
+      for (let index = 0; index <= 14; index += 1) {
+        const z = filter.position.z - filterDepth / 2 + (filterDepth * index) / 14;
+        positions.push(filter.position.x - filterWidth / 2, y, z, filter.position.x + filterWidth / 2, y, z);
+      }
+      const pleats = new LineSegments(
+        new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3)),
+        pleatMaterial,
+      );
+      pleats.name = side > 0 ? "static-reference-top-filter-pleats" : "static-reference-bottom-filter-pleats";
+      target.add(pleats);
+    }
+  }
+
+  private addStaticReferenceTopFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
+    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
+    const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
+    const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
+    const assetDepth = asset.footprintDepth * sceneScale;
+    const assetHeight = asset.height * sceneScale;
+
+    const filter = new Mesh(
+      new BoxGeometry(filterWidth, filterThickness, filterDepth),
+      createFilterMediaMaterial(0.72),
+    );
+    filter.name = "static-reference-installed-top-filter";
+    filter.position.set(0, assetDepth / 2 - filterThickness / 2 - 26 * sceneScale, -assetHeight * 0.5);
+    filter.castShadow = true;
+    filter.receiveShadow = true;
+    target.add(filter);
+
+    const gasketMaterial = new MeshStandardMaterial({
+      color: 0xf3f0de,
+      roughness: 0.66,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.88,
+    });
+    const railThickness = Math.max(8 * sceneScale, filterThickness * 0.92);
+    for (const [x, z, width, depth] of [
+      [0, filterDepth / 2 - railThickness / 2, filterWidth, railThickness],
+      [0, -filterDepth / 2 + railThickness / 2, filterWidth, railThickness],
+      [-filterWidth / 2 + railThickness / 2, 0, railThickness, filterDepth],
+      [filterWidth / 2 - railThickness / 2, 0, railThickness, filterDepth],
+    ] as const) {
+      const rail = new Mesh(new BoxGeometry(width, railThickness, depth), gasketMaterial);
+      rail.position.set(filter.position.x + x, filter.position.y + filterThickness * 0.1, filter.position.z + z);
+      rail.castShadow = true;
+      rail.receiveShadow = true;
+      target.add(rail);
+    }
+
+    const pleatMaterial = new LineBasicMaterial({ color: 0xc7cdbc, transparent: true, opacity: 0.62 });
+    const y = filter.position.y + filterThickness / 2 + 0.003;
+    const positions: number[] = [];
+    for (let index = 0; index <= 26; index += 1) {
+      const x = filter.position.x - filterWidth / 2 + (filterWidth * index) / 26;
+      positions.push(x, y, filter.position.z - filterDepth / 2, x, y, filter.position.z + filterDepth / 2);
+    }
+    for (let index = 0; index <= 14; index += 1) {
+      const z = filter.position.z - filterDepth / 2 + (filterDepth * index) / 14;
+      positions.push(filter.position.x - filterWidth / 2, y, z, filter.position.x + filterWidth / 2, y, z);
+    }
+    const pleats = new LineSegments(new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3)), pleatMaterial);
+    pleats.name = "static-reference-top-filter-pleats";
+    target.add(pleats);
+  }
+
+  private addStaticReferenceAssetGrid(assets: readonly LoadedStaticPrintAsset[]): void {
+    const material = new MeshStandardMaterial({ color: 0x8f5b35, roughness: 0.58, metalness: 0.02 });
+    const darkMaterial = new MeshStandardMaterial({ color: 0x151a1b, roughness: 0.66, metalness: 0.05 });
+    const columns = Math.max(1, Math.ceil(Math.sqrt(assets.length * 0.8)));
+    const maxFootprintWidth = Math.max(...assets.map((asset) => asset.footprintWidth), 1) * staticReferenceSceneScale;
+    const maxFootprintDepth = Math.max(...assets.map((asset) => asset.footprintDepth), 1) * staticReferenceSceneScale;
+    const gap = 28 * staticReferenceSceneScale;
+    const cellWidth = maxFootprintWidth + gap;
+    const cellDepth = maxFootprintDepth + gap;
+
+    assets.forEach((asset, index) => {
+      const geometry = asset.geometry;
+      geometry.computeVertexNormals();
+      const mesh = new Mesh(geometry, asset.asset.name.toLowerCase().includes("fan") ? darkMaterial : material);
+      mesh.name = `static-reference-${asset.asset.name}`;
+      mesh.scale.setScalar(staticReferenceSceneScale);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      mesh.position.set(
+        (column - (columns - 1) / 2) * cellWidth,
+        0,
+        (row - (Math.ceil(assets.length / columns) - 1) / 2) * cellDepth,
+      );
+      this.modelGroup.add(mesh);
+    });
+  }
+
+  private settleModelOnGround(): Box3 {
+    const outline = new Box3().setFromObject(this.modelGroup);
+    const center = outline.getCenter(new Vector3());
+    this.modelGroup.position.sub(center);
+    const centeredOutline = new Box3().setFromObject(this.modelGroup);
+    this.modelGroup.position.y += groundY - centeredOutline.min.y;
+    return new Box3().setFromObject(this.modelGroup);
+  }
+
   private addAssemblyBox(part: AssemblyBoxPart, exploded: boolean, material: Material, edgeMaterial: Material): void {
-    const [width, height, depth] = part.size;
+    const [width, height, depth] = visualAssemblyBoxSize(part);
     const geometry = new BoxGeometry(width * sceneScale, height * sceneScale, depth * sceneScale);
     const mesh = new Mesh(geometry, material);
     mesh.name = part.id;
@@ -304,6 +831,40 @@ export class PurifierThreePreview {
     this.modelGroup.add(edges);
   }
 
+  private addScaleReference(layout: LayoutResult, modelBounds: Box3): void {
+    if (!layout.configuration.preview.showBananaScale) {
+      return;
+    }
+
+    const banana = createBananaScaleReference();
+    const bananaBounds = new Box3().setFromObject(banana);
+    const gap = Math.max(34 * sceneScale, modelBounds.getSize(new Vector3()).length() * 0.035);
+    banana.rotation.y = 0;
+    banana.position.set(
+      modelBounds.min.x + bananaReferenceLength * 0.72,
+      groundY - bananaBounds.min.y + 0.009,
+      modelBounds.max.z + gap - bananaBounds.min.z,
+    );
+    this.scaleReferenceGroup.add(banana);
+
+    const cube = createOneMeterScaleCube();
+    const cubeBounds = new Box3().setFromObject(cube);
+    cube.position.set(
+      banana.position.x + bananaReferenceLength * 0.62 + oneMeterCubeSize * 0.62,
+      groundY - cubeBounds.min.y + 0.009,
+      modelBounds.max.z + gap - cubeBounds.min.z,
+    );
+    this.scaleReferenceGroup.add(cube);
+  }
+
+  private updateModelFocus(modelBounds: Box3): void {
+    const previewBounds = modelBounds.clone();
+    if (this.scaleReferenceGroup.children.length > 0) {
+      previewBounds.union(new Box3().setFromObject(this.scaleReferenceGroup));
+    }
+    previewBounds.getCenter(this.modelFocus);
+  }
+
   private rebuildCorsiRosenthalModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const fanAppearance = settings.fan.productSelection.product.appearance;
@@ -314,6 +875,9 @@ export class PurifierThreePreview {
 
     if (settings.preview.showFilterFrame) {
       this.addCorsiStructuralFrame(metrics, frameMaterial, edgeMaterial);
+      for (const face of metrics.sealedFaces) {
+        this.addCorsiSealedFace(metrics, face.side, frameMaterial, edgeMaterial);
+      }
     }
 
     for (const face of metrics.filterFaces) {
@@ -329,7 +893,15 @@ export class PurifierThreePreview {
     }
     if (settings.preview.showFilterFrame || settings.preview.showFans) {
       for (const fanPanel of metrics.fanPanels) {
-        this.addCorsiFanPanel(metrics, fanPanel, settings.preview.showFans, fanAppearance, frameMaterial, edgeMaterial);
+        this.addCorsiFanPanel(
+          metrics,
+          fanPanel,
+          settings.preview.showFans,
+          settings.preview.showFilterFrame,
+          fanAppearance,
+          frameMaterial,
+          edgeMaterial,
+        );
       }
     }
 
@@ -338,7 +910,10 @@ export class PurifierThreePreview {
     this.modelGroup.position.sub(center);
     const centeredOutline = new Box3().setFromObject(this.modelGroup);
     this.modelGroup.position.y += groundY - centeredOutline.min.y;
-    new Box3().setFromObject(this.modelGroup).getCenter(this.modelFocus);
+    const settledOutline = new Box3().setFromObject(this.modelGroup);
+    this.addScaleReference(layout, settledOutline);
+    this.updateModelFocus(settledOutline);
+    this.addCorsiAirflowCues(metrics, settings.preview.showFilterMedia, settings.preview.showFans);
   }
 
   private rebuildDonutFilterModel(layout: LayoutResult): void {
@@ -426,7 +1001,9 @@ export class PurifierThreePreview {
     this.modelGroup.position.sub(center);
     const centeredOutline = new Box3().setFromObject(this.modelGroup);
     this.modelGroup.position.y += groundY - centeredOutline.min.y;
-    new Box3().setFromObject(this.modelGroup).getCenter(this.modelFocus);
+    const settledOutline = new Box3().setFromObject(this.modelGroup);
+    this.addScaleReference(layout, settledOutline);
+    this.updateModelFocus(settledOutline);
   }
 
   private addDonutFanFlange(
@@ -800,6 +1377,43 @@ export class PurifierThreePreview {
     );
   }
 
+  private addCorsiSealedFace(
+    metrics: CorsiPreviewMetrics,
+    side: CorsiFaceSide,
+    material: Material,
+    edgeMaterial: Material,
+  ): void {
+    if (side === "front" || side === "back") {
+      this.addCorsiBox(
+        "corsi-sealed-face",
+        [metrics.boxWidth, metrics.boxHeight, metrics.printLayerDepth],
+        [0, metrics.boxHeight / 2, side === "front" ? metrics.boxDepth / 2 : -metrics.boxDepth / 2],
+        material,
+        edgeMaterial,
+      );
+      return;
+    }
+
+    if (side === "left" || side === "right") {
+      this.addCorsiBox(
+        "corsi-sealed-side-face",
+        [metrics.printLayerDepth, metrics.boxHeight, metrics.boxDepth],
+        [side === "right" ? metrics.boxWidth / 2 : -metrics.boxWidth / 2, metrics.boxHeight / 2, 0],
+        material,
+        edgeMaterial,
+      );
+      return;
+    }
+
+    this.addCorsiBox(
+      "corsi-sealed-horizontal-face",
+      [metrics.boxWidth, metrics.printLayerDepth, metrics.boxDepth],
+      [0, side === "top" ? metrics.boxHeight : 0, 0],
+      material,
+      edgeMaterial,
+    );
+  }
+
   private addCorsiFrontBackFilterFace(
     metrics: CorsiPreviewMetrics,
     z: number,
@@ -972,6 +1586,7 @@ export class PurifierThreePreview {
     metrics: CorsiPreviewMetrics,
     panel: CorsiFanPanel,
     showFans: boolean,
+    showFilterFrame: boolean,
     fanAppearance: FanAppearance,
     frameMaterial: Material,
     edgeMaterial: Material,
@@ -979,6 +1594,9 @@ export class PurifierThreePreview {
     const panelPlacement = corsiFanPanelPlacement(metrics, panel.side);
     const firstX = -((panel.grid.columns - 1) * (panel.grid.cell + panel.grid.gap)) / 2;
     const firstZ = ((panel.grid.rows - 1) * (panel.grid.cell + panel.grid.gap)) / 2;
+    if (showFilterFrame) {
+      this.addCorsiFanPanelFiller(metrics, panel, panelPlacement, firstX, firstZ, frameMaterial, edgeMaterial);
+    }
     for (let index = 0; index < panel.fanCount; index += 1) {
       const column = index % panel.grid.columns;
       const row = Math.floor(index / panel.grid.columns);
@@ -996,6 +1614,83 @@ export class PurifierThreePreview {
       });
       collectFanRotors(fan, this.fanRotors);
       this.modelGroup.add(fan);
+    }
+  }
+
+  private addCorsiFanPanelFiller(
+    metrics: CorsiPreviewMetrics,
+    panel: CorsiFanPanel,
+    placement: CorsiFanPanelPlacement,
+    firstU: number,
+    firstV: number,
+    material: Material,
+    edgeMaterial: Material,
+  ): void {
+    const { sizeU, sizeV } = corsiFanPanelSize(metrics, placement);
+    const halfU = sizeU / 2;
+    const halfV = sizeV / 2;
+    const outer = metrics.fanCassetteOuter;
+    const centerSpacing = panel.grid.cell + panel.grid.gap;
+    const lastColumn = Math.max(0, Math.min(panel.fanCount, panel.grid.columns) - 1);
+    const lastRow = Math.max(0, Math.ceil(panel.fanCount / panel.grid.columns) - 1);
+    const gridLeft = firstU - outer / 2;
+    const gridRight = firstU + lastColumn * centerSpacing + outer / 2;
+    const gridTop = firstV + outer / 2;
+    const gridBottom = firstV - lastRow * centerSpacing - outer / 2;
+    const addPiece = (id: string, minU: number, maxU: number, minV: number, maxV: number): void => {
+      const clippedMinU = clamp(minU, -halfU, halfU);
+      const clippedMaxU = clamp(maxU, -halfU, halfU);
+      const clippedMinV = clamp(minV, -halfV, halfV);
+      const clippedMaxV = clamp(maxV, -halfV, halfV);
+      if (clippedMaxU - clippedMinU <= 0.002 || clippedMaxV - clippedMinV <= 0.002) {
+        return;
+      }
+      this.addCorsiPlaneBox(
+        id,
+        placement,
+        (clippedMinU + clippedMaxU) / 2,
+        (clippedMinV + clippedMaxV) / 2,
+        clippedMaxU - clippedMinU,
+        clippedMaxV - clippedMinV,
+        material,
+        edgeMaterial,
+      );
+    };
+
+    addPiece("corsi-fan-panel-top-fill", -halfU, halfU, gridTop, halfV);
+    addPiece("corsi-fan-panel-bottom-fill", -halfU, halfU, -halfV, gridBottom);
+    addPiece("corsi-fan-panel-left-fill", -halfU, gridLeft, gridBottom, gridTop);
+    addPiece("corsi-fan-panel-right-fill", gridRight, halfU, gridBottom, gridTop);
+
+    for (let row = 0; row < lastRow; row += 1) {
+      const upperCenter = firstV - row * centerSpacing;
+      const lowerCenter = firstV - (row + 1) * centerSpacing;
+      addPiece(
+        "corsi-fan-panel-row-gap-fill",
+        gridLeft,
+        gridRight,
+        lowerCenter + outer / 2,
+        upperCenter - outer / 2,
+      );
+    }
+
+    for (let index = 0; index < panel.fanCount; index += 1) {
+      const column = index % panel.grid.columns;
+      const nextIndex = index + 1;
+      if (column >= panel.grid.columns - 1 || nextIndex >= panel.fanCount) {
+        continue;
+      }
+      const row = Math.floor(index / panel.grid.columns);
+      const leftCenter = firstU + column * centerSpacing;
+      const rightCenter = firstU + (column + 1) * centerSpacing;
+      const rowCenter = firstV - row * centerSpacing;
+      addPiece(
+        "corsi-fan-panel-column-gap-fill",
+        leftCenter + outer / 2,
+        rightCenter - outer / 2,
+        rowCenter - outer / 2,
+        rowCenter + outer / 2,
+      );
     }
   }
 
@@ -1044,13 +1739,58 @@ export class PurifierThreePreview {
     );
   }
 
+  private addCorsiAirflowCues(metrics: CorsiPreviewMetrics, showFilterMedia: boolean, showFans: boolean): void {
+    if (showFilterMedia) {
+      for (const face of metrics.filterFaces) {
+        this.addCorsiAirflowCue(metrics, face.side, "intake");
+      }
+    }
+
+    if (showFans) {
+      for (const panel of metrics.fanPanels) {
+        this.addCorsiAirflowCue(metrics, panel.side, "exhaust");
+      }
+    }
+  }
+
+  private addCorsiAirflowCue(
+    metrics: CorsiPreviewMetrics,
+    side: CorsiFaceSide,
+    direction: "intake" | "exhaust",
+  ): void {
+    if (side === "bottom") {
+      return;
+    }
+    const outward = corsiFaceNormal(side);
+    const arrowDirection = direction === "exhaust" ? outward : outward.clone().multiplyScalar(-1);
+    const faceCenter = corsiFaceCenter(metrics, side);
+    const arrowLength = Math.max(0.11, Math.min(metrics.boxWidth, metrics.boxHeight, metrics.boxDepth) * 0.14);
+    const surfaceOffset = metrics.printLayerDepth * 1.4 + 0.018;
+    const origin =
+      direction === "exhaust"
+        ? faceCenter.clone().addScaledVector(outward, surfaceOffset)
+        : faceCenter.clone().addScaledVector(outward, surfaceOffset + arrowLength);
+    const cue = new ArrowHelper(
+      arrowDirection,
+      origin,
+      arrowLength,
+      direction === "exhaust" ? 0xf0a63a : 0x2cae86,
+      arrowLength * 0.32,
+      arrowLength * 0.17,
+    );
+    cue.name = `corsi-airflow-${direction}-${side}`;
+    styleCorsiAirflowCue(cue);
+    this.modelGroup.add(cue);
+  }
+
   private frameModel(layout: LayoutResult): void {
     const settings = layout.configuration;
-    const maxDimension = modelViewScale(layout);
+    const maxDimension = cameraViewScale(layout);
+    const target = this.cameraTarget(layout, maxDimension);
     const position = cameraPosition(settings.preview.cameraPreset, maxDimension);
     this.latestViewScale = maxDimension;
-    this.camera.position.copy(this.modelFocus).add(position);
-    this.controls.target.copy(this.modelFocus);
+    this.camera.position.copy(target).add(position);
+    this.controls.target.copy(target);
     this.applyCameraSettings(layout);
   }
 
@@ -1067,7 +1807,7 @@ export class PurifierThreePreview {
       return;
     }
 
-    const nextViewScale = modelViewScale(layout);
+    const nextViewScale = cameraViewScale(layout);
     const scale = nextViewScale / Math.max(previousPose.viewScale, 0.001);
     const nextDistance = clamp(
       previousPose.offsetFromTarget.length() * scale,
@@ -1075,10 +1815,19 @@ export class PurifierThreePreview {
       this.controls.maxDistance,
     );
     const nextOffset = previousPose.offsetFromTarget.clone().normalize().multiplyScalar(nextDistance);
+    const target = this.cameraTarget(layout, nextViewScale);
     this.latestViewScale = nextViewScale;
-    this.camera.position.copy(this.modelFocus).add(nextOffset);
-    this.controls.target.copy(this.modelFocus);
+    this.camera.position.copy(target).add(nextOffset);
+    this.controls.target.copy(target);
     this.applyCameraSettings(layout);
+  }
+
+  private cameraTarget(layout: LayoutResult, viewScale: number): Vector3 {
+    const target = this.modelFocus.clone();
+    if (layout.configuration.preview.cameraPreset !== "top") {
+      target.y += viewScale * previewControlClearanceTargetOffset;
+    }
+    return target;
   }
 
   private applyCameraSettings(layout: LayoutResult): void {
@@ -1086,8 +1835,7 @@ export class PurifierThreePreview {
     this.camera.near = 0.01;
     this.camera.far = 100;
     this.camera.updateProjectionMatrix();
-    this.controls.autoRotate =
-      settings.preview.autoRotate && !(settings.preview.showDimensions && !isCorsiRosenthalPrintDesignId(settings.printDesign.id));
+    this.controls.autoRotate = settings.preview.autoRotate;
     this.controls.update();
   }
 
@@ -1147,7 +1895,9 @@ export class PurifierThreePreview {
     const seenMaterials = new Set<Material>();
     object.traverse((child) => {
       if (child instanceof Mesh || child instanceof LineSegments || child instanceof Line) {
-        child.geometry.dispose();
+        if (child.userData["sharedCadGeometry"] !== true) {
+          child.geometry.dispose();
+        }
         disposeMaterial(child.material, seenMaterials);
       }
       if (child instanceof Sprite) {
@@ -1155,6 +1905,210 @@ export class PurifierThreePreview {
       }
     });
   }
+}
+
+function createBananaScaleReference(): Group {
+  const group = new Group();
+  group.name = "banana-for-scale";
+
+  const placeholder = createBananaScaleBoundsPlaceholder();
+  group.add(placeholder);
+
+  void loadBananaScaleAsset()
+    .then((asset) => {
+      group.remove(placeholder);
+      disposeMeshResources(placeholder);
+      group.add(createNormalizedBananaScaleAsset(asset));
+    })
+    .catch(() => {
+      placeholder.material.opacity = 0.16;
+      placeholder.material.color.set(0xf5c84b);
+    });
+
+  return group;
+}
+
+function createBananaScaleBoundsPlaceholder(): Mesh<BoxGeometry, MeshBasicMaterial> {
+  const placeholder = new Mesh(
+    new BoxGeometry(bananaReferenceLength, bananaReferenceRadius * 1.8, bananaReferenceRadius * 2.6),
+    new MeshBasicMaterial({
+      color: 0xf5c84b,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  );
+  placeholder.name = "banana-scale-bounds-placeholder";
+  placeholder.position.y = (bananaReferenceRadius * 1.8) / 2;
+  return placeholder;
+}
+
+let bananaScaleAssetPromise: Promise<Object3D> | null = null;
+
+function loadBananaScaleAsset(): Promise<Object3D> {
+  bananaScaleAssetPromise ??= new GLTFLoader().loadAsync(bananaScaleAssetUrl).then((gltf) => gltf.scene);
+  return bananaScaleAssetPromise;
+}
+
+function createNormalizedBananaScaleAsset(asset: Object3D): Object3D {
+  const clone = cloneObjectWithOwnMeshResources(asset);
+  const rawSize = new Box3().setFromObject(clone).getSize(new Vector3());
+  if (rawSize.z >= rawSize.x && rawSize.z >= rawSize.y) {
+    clone.rotation.y = Math.PI / 2;
+  } else if (rawSize.y >= rawSize.x && rawSize.y >= rawSize.z) {
+    clone.rotation.z = -Math.PI / 2;
+  }
+  clone.rotation.x += 0.04;
+  clone.updateWorldMatrix(true, true);
+
+  const initialBounds = new Box3().setFromObject(clone);
+  const initialSize = initialBounds.getSize(new Vector3());
+  const scale = bananaReferenceLength / Math.max(initialSize.x, 0.001);
+  clone.scale.setScalar(scale);
+  clone.updateWorldMatrix(true, true);
+
+  const scaledBounds = new Box3().setFromObject(clone);
+  const scaledCenter = scaledBounds.getCenter(new Vector3());
+  clone.position.sub(new Vector3(scaledCenter.x, scaledBounds.min.y, scaledCenter.z));
+  clone.traverse((child) => {
+    if (child instanceof Mesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  return clone;
+}
+
+function createOneMeterScaleCube(): Group {
+  const group = new Group();
+  group.name = "one-meter-scale-cube";
+
+  const geometry = new BoxGeometry(oneMeterCubeSize, oneMeterCubeSize, oneMeterCubeSize);
+  const material = new MeshStandardMaterial({
+    color: 0xdad3bc,
+    roughness: 0.68,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.16,
+  });
+  const cube = new Mesh(geometry, material);
+  cube.name = "one-meter-scale-cube-body";
+  cube.position.y = oneMeterCubeSize / 2;
+  cube.castShadow = true;
+  cube.receiveShadow = true;
+  group.add(cube);
+
+  const edges = new LineSegments(
+    new EdgesGeometry(geometry),
+    new LineBasicMaterial({ color: 0x4f584e, transparent: true, opacity: 0.82 }),
+  );
+  edges.position.copy(cube.position);
+  group.add(edges);
+  for (const label of createOneMeterCubeFaceLabels()) {
+    group.add(label);
+  }
+
+  return group;
+}
+
+function createOneMeterCubeFaceLabels(): Object3D[] {
+  const label = createScaleLabelTexture("1 m cube");
+  const material = new MeshBasicMaterial({
+    map: label,
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const width = oneMeterCubeSize * 0.88;
+  const height = oneMeterCubeSize * 0.18;
+  const faceInset = 0.006;
+  const frontLabel = new Mesh(new PlaneGeometry(width, height), material.clone());
+  frontLabel.name = "one-meter-scale-cube-front-label";
+  frontLabel.position.set(0, oneMeterCubeSize * 0.62, oneMeterCubeSize / 2 + faceInset);
+
+  const rightLabel = new Mesh(new PlaneGeometry(width, height), material.clone());
+  rightLabel.name = "one-meter-scale-cube-side-label";
+  rightLabel.rotation.y = Math.PI / 2;
+  rightLabel.position.set(oneMeterCubeSize / 2 + faceInset, oneMeterCubeSize * 0.62, 0);
+
+  return [frontLabel, rightLabel];
+}
+
+function createScaleLabelTexture(text: string): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 224;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createScaleLabelTexture: Could not create canvas context");
+  }
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(255, 253, 246, 0.9)";
+  roundRect(context, 28, 28, 968, 168, 44);
+  context.fill();
+  context.strokeStyle = "rgba(31, 111, 86, 0.72)";
+  context.lineWidth = 8;
+  roundRect(context, 28, 28, 968, 168, 44);
+  context.stroke();
+  context.fillStyle = "#111817";
+  context.font = "900 118px Inter, Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
+}
+
+function cloneObjectWithOwnMeshResources(object: Object3D): Object3D {
+  const clone = object.clone(true);
+  clone.traverse((child) => {
+    if (child instanceof Mesh) {
+      child.geometry = child.geometry.clone();
+      child.material = cloneMaterial(child.material);
+    }
+  });
+  return clone;
+}
+
+function cloneMaterial(material: Material | Material[]): Material | Material[] {
+  if (Array.isArray(material)) {
+    return material.map((entry) => entry.clone());
+  }
+  return material.clone();
+}
+
+function disposeMeshResources(mesh: Mesh): void {
+  mesh.geometry.dispose();
+  disposeMaterial(mesh.material, new Set());
+}
+
+function visualAssemblyBoxSize(part: AssemblyBoxPart): MillimeterSize3 {
+  if (part.role !== "filter-media") {
+    return part.size;
+  }
+
+  const [width, height, depth] = part.size;
+  return [
+    visualFilterMediaDimension(width),
+    visualFilterMediaDimension(height),
+    visualFilterMediaDimension(depth),
+  ];
+}
+
+function visualFilterMediaDimension(size: number): number {
+  return Math.max(1, size - filterMediaPreviewClearanceMillimeters * 2, size * 0.72);
 }
 
 function createPanelGroup(
@@ -1167,6 +2121,8 @@ function createPanelGroup(
   edgeMaterial: Material,
   cutMarkMaterial: Material,
   screwMarkMaterial: Material,
+  printSeams: readonly PanelPrintSeam[],
+  printSeamMaterial: Material,
 ): Group {
   const panel = part.panel;
   const group = new Group();
@@ -1181,6 +2137,9 @@ function createPanelGroup(
   group.add(edges);
 
   group.add(createPanelCutMarkGroup(panel, materialThickness, cutMarkMaterial, screwMarkMaterial));
+  if (printSeams.length > 0) {
+    group.add(createPanelPrintSeamGroup(panel, materialThickness, printSeams, printSeamMaterial));
+  }
 
   if (showFans) {
     for (const cut of panel.cuts) {
@@ -1206,6 +2165,91 @@ function createPanelGroup(
   group.rotation.set(rx, ry, rz);
 
   return group;
+}
+
+function createPanelPrintSeams(plan: PrintableSheetPlan | null): Map<string, readonly PanelPrintSeam[]> {
+  const seamMap = new Map<string, PanelPrintSeam[]>();
+  if (plan === null) {
+    return seamMap;
+  }
+
+  const seen = new Set<string>();
+  for (const sheet of plan.sheets) {
+    for (const placement of sheet.placements) {
+      const source = placement.part.sourceTile;
+      if (source === undefined) {
+        continue;
+      }
+      for (const seam of seamsForTile(source)) {
+        const key = `${source.panelId}:${seam.orientation}:${seam.offset.toFixed(4)}:${seam.start.toFixed(4)}:${seam.end.toFixed(4)}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        const panelSeams = seamMap.get(source.panelId) ?? [];
+        panelSeams.push(seam);
+        seamMap.set(source.panelId, panelSeams);
+      }
+    }
+  }
+  return seamMap;
+}
+
+function seamsForTile(tile: PrintableTileSource): readonly PanelPrintSeam[] {
+  const seams: PanelPrintSeam[] = [];
+  if (tile.columnIndex < tile.columnCount - 1) {
+    seams.push({
+      orientation: "vertical",
+      offset: tile.x1,
+      start: tile.y0,
+      end: tile.y1,
+    });
+  }
+  if (tile.rowIndex < tile.rowCount - 1) {
+    seams.push({
+      orientation: "horizontal",
+      offset: tile.y1,
+      start: tile.x0,
+      end: tile.x1,
+    });
+  }
+  return seams;
+}
+
+function createPanelPrintSeamGroup(
+  panel: CutPanel,
+  materialThickness: number,
+  printSeams: readonly PanelPrintSeam[],
+  material: Material,
+): LineSegments {
+  const positions: number[] = [];
+  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelPrintSeamOverlayLift;
+
+  for (const seam of printSeams) {
+    if (seam.orientation === "vertical") {
+      positions.push(
+        (seam.offset - panel.assemblyCenter.x) * sceneScale,
+        (seam.start - panel.assemblyCenter.y) * sceneScale,
+        z,
+        (seam.offset - panel.assemblyCenter.x) * sceneScale,
+        (seam.end - panel.assemblyCenter.y) * sceneScale,
+        z,
+      );
+    } else {
+      positions.push(
+        (seam.start - panel.assemblyCenter.x) * sceneScale,
+        (seam.offset - panel.assemblyCenter.y) * sceneScale,
+        z,
+        (seam.end - panel.assemblyCenter.x) * sceneScale,
+        (seam.offset - panel.assemblyCenter.y) * sceneScale,
+        z,
+      );
+    }
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  return new LineSegments(geometry, material);
 }
 
 function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
@@ -1246,7 +2290,7 @@ function createPanelCutMarkGroup(
   screwMarkMaterial: Material,
 ): Group {
   const group = new Group();
-  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + 0.0015;
+  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelCutOverlayLift;
 
   for (const cut of panel.cuts) {
     if (cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
@@ -1365,6 +2409,91 @@ function createDimensionGroup(dimensions: readonly DimensionGuide[]): Group {
   return group;
 }
 
+function createStaticReferenceDimensionGroup(bounds: Box3): Group {
+  const size = bounds.getSize(new Vector3());
+  const padding = Math.max(28 * sceneScale, Math.max(size.x, size.y, size.z) * 0.045);
+  const group = new Group();
+  group.add(
+    createSceneDimensionGuide({
+      label: "W",
+      from: new Vector3(bounds.min.x, bounds.min.y, bounds.max.z + padding),
+      to: new Vector3(bounds.max.x, bounds.min.y, bounds.max.z + padding),
+      labelOffset: new Vector3(0, -padding * 0.65, padding * 0.35),
+      measurement: {
+        value: size.x / sceneScale,
+        description: "overall width",
+      },
+    }),
+  );
+  group.add(
+    createSceneDimensionGuide({
+      label: "H",
+      from: new Vector3(bounds.max.x + padding, bounds.min.y, bounds.max.z + padding * 0.2),
+      to: new Vector3(bounds.max.x + padding, bounds.max.y, bounds.max.z + padding * 0.2),
+      labelOffset: new Vector3(padding * 0.85, 0, padding * 0.18),
+      measurement: {
+        value: size.y / sceneScale,
+        description: "overall height",
+      },
+      extensionLines: [
+        [
+          new Vector3(bounds.max.x, bounds.min.y, bounds.max.z),
+          new Vector3(bounds.max.x + padding, bounds.min.y, bounds.max.z + padding * 0.2),
+        ],
+        [
+          new Vector3(bounds.max.x, bounds.max.y, bounds.max.z),
+          new Vector3(bounds.max.x + padding, bounds.max.y, bounds.max.z + padding * 0.2),
+        ],
+      ],
+    }),
+  );
+  group.add(
+    createSceneDimensionGuide({
+      label: "D",
+      from: new Vector3(bounds.min.x - padding, bounds.min.y, bounds.min.z),
+      to: new Vector3(bounds.min.x - padding, bounds.min.y, bounds.max.z),
+      labelOffset: new Vector3(-padding * 0.85, -padding * 0.65, 0),
+      measurement: {
+        value: size.z / sceneScale,
+        description: "overall depth",
+      },
+    }),
+  );
+  return group;
+}
+
+function boundsInModelGroupSpace(worldBounds: Box3, modelGroup: Group): Box3 {
+  const localBounds = worldBounds.clone();
+  localBounds.min.sub(modelGroup.position);
+  localBounds.max.sub(modelGroup.position);
+  return localBounds;
+}
+
+function createSceneDimensionGuide(input: {
+  readonly label: string;
+  readonly from: Vector3;
+  readonly to: Vector3;
+  readonly labelOffset: Vector3;
+  readonly measurement: DimensionMeasurement;
+  readonly extensionLines?: readonly [Vector3, Vector3][];
+}): Group {
+  const dimensionId = `dimension-${input.label}`;
+  const guideGroup = new Group();
+  for (const extensionLine of input.extensionLines ?? []) {
+    guideGroup.add(createDimensionLine(extensionLine, dimensionId));
+  }
+  guideGroup.add(createDimensionLine([input.from, input.to], dimensionId));
+  for (const tick of createDimensionTicks(input.from, input.to)) {
+    guideGroup.add(createDimensionLine(tick, dimensionId));
+  }
+
+  const label = createTextSprite(input.label, input.measurement);
+  markDimensionObject(label, dimensionId);
+  label.position.copy(input.from.clone().lerp(input.to, 0.5).add(input.labelOffset));
+  guideGroup.add(label);
+  return guideGroup;
+}
+
 function createDimensionLine(points: [Vector3, Vector3], dimensionId: string): Line {
   const geometry = new BufferGeometry().setFromPoints(points);
   const line = new Line(geometry, createDimensionLineMaterial());
@@ -1395,36 +2524,37 @@ function createDimensionTicks(from: Vector3, to: Vector3): Array<[Vector3, Vecto
 
 function createTextSprite(label: string, measurement: DimensionMeasurement): Sprite {
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 160;
+  canvas.width = 768;
+  canvas.height = 220;
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("createTextSprite: Could not create canvas context");
   }
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "rgba(255, 253, 246, 0.96)";
-  context.fillRect(18, 18, 476, 118);
+  context.fillRect(24, 24, 720, 168);
   context.strokeStyle = "rgba(31, 111, 86, 0.72)";
-  context.lineWidth = 4;
-  context.strokeRect(18, 18, 476, 118);
+  context.lineWidth = 7;
+  context.strokeRect(24, 24, 720, 168);
   context.fillStyle = "#164d3d";
-  context.font = "800 58px Inter, Arial, sans-serif";
+  context.font = "900 96px Inter, Arial, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, 76, 78);
+  context.fillText(label, 112, 108);
   context.textAlign = "left";
   context.fillStyle = "#111817";
-  context.font = "800 30px Inter, Arial, sans-serif";
-  context.fillText(formatDimension(measurement.value), 132, 66);
+  context.font = "900 58px Inter, Arial, sans-serif";
+  context.fillText(formatDimension(measurement.value), 198, 94);
   context.fillStyle = "#667169";
-  context.font = "650 22px Inter, Arial, sans-serif";
-  context.fillText(measurement.description, 132, 100);
+  context.font = "800 36px Inter, Arial, sans-serif";
+  context.fillText(measurement.description, 198, 142);
 
   const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
   const material = new SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
   const sprite = new Sprite(material);
   sprite.renderOrder = 13;
-  sprite.scale.set(0.66, 0.206, 1);
+  sprite.scale.copy(dimensionLabelNormalScale);
   return sprite;
 }
 
@@ -1478,7 +2608,7 @@ function setDimensionLabelState(sprite: Sprite, isHovered: boolean): void {
     sprite.material.opacity = isHovered ? 1 : 0.95;
     sprite.material.needsUpdate = true;
   }
-  sprite.scale.set(isHovered ? 0.96 : 0.66, isHovered ? 0.3 : 0.206, 1);
+  sprite.scale.copy(isHovered ? dimensionLabelHoverScale : dimensionLabelNormalScale);
   sprite.renderOrder = isHovered ? 23 : 13;
 }
 
@@ -1491,21 +2621,26 @@ function createCutMarkMaterial(opacity: number): Material {
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
 }
 
 function createWoodMaterial(transparent: boolean): Material {
   const material = new MeshStandardMaterial({
     color: woodColor,
-    map: createWoodTexture(),
+    map: transparent ? undefined : createWoodTexture(),
     roughness: 0.72,
     metalness: 0.02,
     transparent,
-    opacity: transparent ? 0.48 : 1,
+    opacity: transparent ? 0.28 : 1,
     depthWrite: !transparent,
+    polygonOffset: transparent,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   });
   if (transparent) {
     material.side = DoubleSide;
+    material.forceSinglePass = true;
   }
   return material;
 }
@@ -1606,15 +2741,200 @@ function cameraPosition(preset: LayoutResult["configuration"]["preview"]["camera
   return new Vector3(maxDimension * 1.75, maxDimension * 1.05, maxDimension * 2.05);
 }
 
-function modelViewScale(layout: LayoutResult): number {
+function cameraViewScale(layout: LayoutResult): number {
+  return modelViewScale(layout) / previewZoomForLayout(layout);
+}
+
+function previewZoomForLayout(layout: LayoutResult): number {
+  if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
+    return staticReferencePreviewZoom;
+  }
+
+  const largestPhysicalDimension = previewLargestPhysicalDimensionMillimeters(layout);
+  const sizeRatio = Math.max(1, largestPhysicalDimension / generatedPreviewZoomReferenceMillimeters);
+  return clamp(generatedPreviewZoom / sizeRatio, minimumLargeModelPreviewZoom, generatedPreviewZoom);
+}
+
+function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): number {
   const settings = layout.configuration;
   if (isDonutFilterPrintDesignId(settings.printDesign.id)) {
     const model = createDonutFilterModel(layout);
-    return Math.max(model.filter.length + donutAdapterTotalHeight(model) + donutCapTotalHeight(model), model.filter.outerDiameter, model.fanSize) * sceneScale * 1.25;
+    return Math.max(
+      model.filter.length + donutAdapterTotalHeight(model) + donutCapTotalHeight(model),
+      model.filter.outerDiameter,
+      model.fanSize,
+    );
+  }
+
+  if (isCorsiRosenthalPrintDesignId(settings.printDesign.id)) {
+    const model = createCorsiRosenthalModel(layout);
+    return Math.max(model.filterWidth, model.filterHeight, model.filterThickness);
+  }
+
+  return Math.max(
+    filterSelectionDimensions(settings.filter).width,
+    layout.summary.workingDepth,
+    layout.summary.chamberHeight,
+  );
+}
+
+function staticReferenceBoardExplodeOffset(
+  geometry: BufferGeometry,
+  assembly: LoadedStaticPrintAssembly,
+  exploded: boolean,
+): Vector3 {
+  if (!exploded) {
+    return new Vector3(0, 0, 0);
+  }
+
+  const bounds = staticReferenceGeometryBounds(geometry);
+  const direction = staticReferenceBoardExplodeDirection(bounds, assembly);
+  return direction.multiplyScalar(staticReferenceExplodeDistance);
+}
+
+function staticReferenceBoardExplodeDirection(bounds: Box3, assembly: LoadedStaticPrintAssembly): Vector3 {
+  const center = bounds.getCenter(new Vector3());
+  const halfFootprintWidth = assembly.footprintWidth / 2;
+  const halfFootprintDepth = assembly.footprintDepth / 2;
+  const halfHeight = assembly.height / 2;
+  const locationDirection = new Vector3(
+    normalizedStaticReferenceDistance(center.x, halfFootprintWidth),
+    normalizedStaticReferenceDistance(center.y, halfFootprintDepth),
+    normalizedStaticReferenceDistance(center.z - halfHeight, halfHeight),
+  );
+
+  if (locationDirection.lengthSq() > 0.01) {
+    return locationDirection.normalize();
+  }
+
+  const verticalDirection = center.z >= halfHeight ? 1 : -1;
+  return new Vector3(0, 0, verticalDirection);
+}
+
+function normalizedStaticReferenceDistance(value: number, halfExtent: number): number {
+  if (halfExtent <= 0.001) {
+    return 0;
+  }
+  return value / halfExtent;
+}
+
+function staticReferencePurchasedPartPosition(
+  position: Vector3,
+  explosion: StaticReferencePurchasedPartExplosion,
+): Vector3 {
+  if (!explosion.exploded || explosion.assembly === undefined) {
+    return position;
+  }
+  return position.add(staticReferenceNearestBoardExplodeOffset(position, explosion.assembly));
+}
+
+function staticReferenceNearestBoardExplodeOffset(position: Vector3, assembly: LoadedStaticPrintAssembly): Vector3 {
+  const sourcePoint = position.clone().multiplyScalar(1 / sceneScale);
+  let nearestOffset = new Vector3(0, 0, 0);
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const asset of assembly.assets) {
+    const bounds = staticReferenceGeometryBounds(asset.geometry);
+    const distance = squaredDistanceToBox(sourcePoint, bounds);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestOffset = staticReferenceBoardExplodeOffset(asset.geometry, assembly, true);
+    }
+  }
+
+  return nearestOffset;
+}
+
+function squaredDistanceToBox(point: Vector3, bounds: Box3): number {
+  const dx = distanceOutsideRange(point.x, bounds.min.x, bounds.max.x);
+  const dy = distanceOutsideRange(point.y, bounds.min.y, bounds.max.y);
+  const dz = distanceOutsideRange(point.z, bounds.min.z, bounds.max.z);
+  return dx * dx + dy * dy + dz * dz;
+}
+
+function distanceOutsideRange(value: number, min: number, max: number): number {
+  if (value < min) {
+    return min - value;
+  }
+  if (value > max) {
+    return value - max;
+  }
+  return 0;
+}
+
+function staticReferenceGeometryBounds(geometry: BufferGeometry): Box3 {
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (bounds === null) {
+    return new Box3();
+  }
+  return bounds.clone();
+}
+
+function staticReferenceAssembledPreviewPose(layout: LayoutResult): StaticReferenceAssembledPreviewPose {
+  const orientation = staticPrintReferenceForPreset(layout.configuration.printDesign)?.assembledPreviewOrientation ?? "source";
+  if (orientation === "fan-panel-up") {
+    return {
+      meshRotationX: Math.PI,
+      rotateWholePreview: false,
+      installedPartLayout: "fan-panel-up",
+    };
+  }
+  if (orientation === "source-fans-up") {
+    return {
+      meshRotationX: Math.PI / 2,
+      rotateWholePreview: true,
+      installedPartLayout: "source-side-fans",
+    };
+  }
+  if (orientation === "source-side-fans") {
+    return {
+      meshRotationX: 0,
+      rotateWholePreview: false,
+      installedPartLayout: "source-side-fans",
+    };
+  }
+  return {
+    meshRotationX: -Math.PI / 2,
+    rotateWholePreview: false,
+    installedPartLayout: "source-front",
+  };
+}
+
+function modelViewScale(layout: LayoutResult): number {
+  const settings = layout.configuration;
+  const scalePadding = settings.preview.showBananaScale ? oneMeterCubeSize * 0.72 : 0;
+  if (isStaticReferencePrintDesignId(settings.printDesign.id)) {
+    const reference = staticPrintReferenceForPreset(settings.printDesign);
+    if (reference !== undefined && staticReferenceHasAssembledPreview(reference)) {
+      return (reference.previewMaxDimensionMm ?? 540) * sceneScale * 1.35 + scalePadding;
+    }
+    const assetCount = reference?.previewAssets.length ?? 1;
+    const columns = Math.max(1, Math.ceil(Math.sqrt(assetCount * 0.8)));
+    const rows = Math.max(1, Math.ceil(assetCount / columns));
+    const gridSpan = Math.max(columns, rows);
+    return (
+      (reference?.previewMaxDimensionMm ?? 560) *
+        Math.max(1.35, gridSpan * 0.55) *
+        staticReferenceSceneScale +
+      scalePadding
+    );
+  }
+  if (isDonutFilterPrintDesignId(settings.printDesign.id)) {
+    const model = createDonutFilterModel(layout);
+    const baseScale =
+      Math.max(
+        model.filter.length + donutAdapterTotalHeight(model) + donutCapTotalHeight(model),
+        model.filter.outerDiameter,
+        model.fanSize,
+      ) *
+      sceneScale *
+      1.25;
+    return baseScale + scalePadding;
   }
   if (isCorsiRosenthalPrintDesignId(settings.printDesign.id)) {
     const metrics = createCorsiPreviewMetrics(layout);
-    return Math.max(metrics.boxWidth, metrics.boxHeight, metrics.boxDepth) * 1.16;
+    return Math.max(metrics.boxWidth, metrics.boxHeight, metrics.boxDepth) * 1.16 + scalePadding;
   }
   return (
     Math.max(
@@ -1622,7 +2942,21 @@ function modelViewScale(layout: LayoutResult): number {
       layout.summary.workingDepth,
       layout.summary.chamberHeight,
     ) * sceneScale
-  );
+  ) + scalePadding;
+}
+
+function staticReferenceHasAssembledPreview(reference: StaticPrintReference): boolean {
+  return reference.assembledPreview !== undefined;
+}
+
+function staticReferencePreviewAssets(reference: StaticPrintReference): readonly StaticPrintPreviewAsset[] {
+  if (reference.assembledPreview?.type === "single-source-asset") {
+    return [reference.assembledPreview.asset];
+  }
+  if (reference.assembledPreview?.type === "source-part-set") {
+    return reference.assembledPreview.assets;
+  }
+  return reference.previewAssets;
 }
 
 function createCorsiPreviewMetrics(layout: LayoutResult): CorsiPreviewMetrics {
@@ -1639,6 +2973,7 @@ function createCorsiPreviewMetrics(layout: LayoutResult): CorsiPreviewMetrics {
     mode: model.mode,
     filterFaces: model.filterFaces,
     fanPanels: model.fanPanels.map(scaleCorsiFanPanel),
+    sealedFaces: model.sealedFaces,
     filterWidth,
     filterHeight,
     filterThickness,
@@ -1710,6 +3045,54 @@ function corsiFanPanelPlacement(metrics: CorsiPreviewMetrics, side: CorsiFaceSid
   };
 }
 
+function corsiFanPanelSize(
+  metrics: CorsiPreviewMetrics,
+  placement: CorsiFanPanelPlacement,
+): { readonly sizeU: number; readonly sizeV: number } {
+  if (placement.axis === "x") {
+    return { sizeU: metrics.boxDepth, sizeV: metrics.boxHeight };
+  }
+  return { sizeU: metrics.boxWidth, sizeV: metrics.boxDepth };
+}
+
+function corsiFaceNormal(side: CorsiFaceSide): Vector3 {
+  if (side === "front") {
+    return new Vector3(0, 0, 1);
+  }
+  if (side === "back") {
+    return new Vector3(0, 0, -1);
+  }
+  if (side === "left") {
+    return new Vector3(-1, 0, 0);
+  }
+  if (side === "right") {
+    return new Vector3(1, 0, 0);
+  }
+  if (side === "top") {
+    return new Vector3(0, 1, 0);
+  }
+  return new Vector3(0, -1, 0);
+}
+
+function corsiFaceCenter(metrics: CorsiPreviewMetrics, side: CorsiFaceSide): Vector3 {
+  if (side === "front") {
+    return new Vector3(0, metrics.boxHeight / 2, metrics.boxDepth / 2);
+  }
+  if (side === "back") {
+    return new Vector3(0, metrics.boxHeight / 2, -metrics.boxDepth / 2);
+  }
+  if (side === "left") {
+    return new Vector3(-metrics.boxWidth / 2, metrics.boxHeight / 2, 0);
+  }
+  if (side === "right") {
+    return new Vector3(metrics.boxWidth / 2, metrics.boxHeight / 2, 0);
+  }
+  if (side === "top") {
+    return new Vector3(0, metrics.boxHeight, 0);
+  }
+  return new Vector3(0, 0, 0);
+}
+
 function corsiFanPosition(placement: CorsiFanPanelPlacement, localU: number, localV: number): Vector3 {
   const position = new Vector3(placement.position[0], placement.position[1], placement.position[2]);
   if (placement.u === "x") {
@@ -1732,6 +3115,23 @@ function corsiFanPosition(placement: CorsiFanPanelPlacement, localU: number, loc
   return position;
 }
 
+function styleCorsiAirflowCue(cue: ArrowHelper): void {
+  cue.traverse((child) => {
+    if (child instanceof Line && child.material instanceof LineBasicMaterial) {
+      child.material.transparent = true;
+      child.material.opacity = 0.74;
+      child.material.depthWrite = false;
+      child.renderOrder = 8;
+    }
+    if (child instanceof Mesh && child.material instanceof MeshBasicMaterial) {
+      child.material.transparent = true;
+      child.material.opacity = 0.78;
+      child.material.depthWrite = false;
+      child.renderOrder = 8;
+    }
+  });
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -1745,6 +3145,11 @@ function createFan({ axis, position, radius, appearance }: FanPlacement & { appe
     fan.rotation.x = Math.PI / 2;
   }
 
+  if (appearance.previewCadModel?.type === "noctua-nf-a14-public-cad") {
+    fan.add(createNoctuaCadFanCore(radius, appearance));
+    return fan;
+  }
+
   fan.add(createFanFrame(radius, appearance));
   fan.add(createFanShroud(radius, appearance));
   fan.add(createRearFanSupport(radius, appearance));
@@ -1752,6 +3157,13 @@ function createFan({ axis, position, radius, appearance }: FanPlacement & { appe
   const rotor = new Group();
   rotor.name = "fan-rotor";
   rotor.userData["fanRotor"] = true;
+  addProceduralFanRotor(rotor, radius, appearance);
+  fan.add(rotor);
+
+  return fan;
+}
+
+function addProceduralFanRotor(rotor: Group, radius: number, appearance: FanAppearance): void {
   const hub = new Mesh(
     new CylinderGeometry(radius * 0.28, radius * 0.28, 0.047, 48),
     new MeshStandardMaterial({ color: appearance.hubColor, roughness: 0.45, metalness: 0.08 }),
@@ -1772,9 +3184,134 @@ function createFan({ axis, position, radius, appearance }: FanPlacement & { appe
     blade.castShadow = true;
     rotor.add(blade);
   }
-  fan.add(rotor);
+}
 
-  return fan;
+const fanCadModelCache = new Map<string, Promise<LoadedFanCadModel>>();
+
+function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Group {
+  const core = new Group();
+  core.name = "noctua-nf-a14-preview-cad";
+
+  const fallbackStatic = new Group();
+  fallbackStatic.add(createFanFrame(radius, appearance));
+  fallbackStatic.add(createFanShroud(radius, appearance));
+  fallbackStatic.add(createRearFanSupport(radius, appearance));
+
+  const rotor = new Group();
+  rotor.name = "fan-rotor";
+  rotor.userData["fanRotor"] = true;
+  const fallbackRotor = new Group();
+  addProceduralFanRotor(fallbackRotor, radius, appearance);
+  rotor.add(fallbackRotor);
+
+  core.add(fallbackStatic, rotor);
+
+  const cadModel = appearance.previewCadModel;
+  if (cadModel === undefined) {
+    return core;
+  }
+
+  void loadFanCadModel(cadModel.assetUrl, appearance)
+    .then((model) => {
+      fallbackStatic.visible = false;
+      fallbackRotor.visible = false;
+      const scale = (radius * 2) / model.nominalDiameter;
+
+      for (const part of model.meshes) {
+        const mesh = new Mesh(
+          part.geometry,
+          new MeshStandardMaterial({
+            color: part.color,
+            roughness: part.isRotor ? 0.5 : 0.62,
+            metalness: part.isRotor ? 0.05 : 0.08,
+          }),
+        );
+        mesh.name = part.name;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData["sharedCadGeometry"] = true;
+        mesh.scale.setScalar(scale);
+        if (part.isRotor) {
+          rotor.add(mesh);
+        } else {
+          core.add(mesh);
+        }
+      }
+    })
+    .catch(() => {
+      fallbackStatic.visible = true;
+      fallbackRotor.visible = true;
+    });
+
+  return core;
+}
+
+async function loadFanCadModel(assetUrl: string, appearance: FanAppearance): Promise<LoadedFanCadModel> {
+  const cached = fanCadModelCache.get(assetUrl);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const promise = fetch(assetUrl)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`loadFanCadModel: Failed to load ${assetUrl}: ${response.status}`);
+      }
+      return (await response.json()) as FanCadPreviewAsset;
+    })
+    .then((asset) => createLoadedFanCadModel(asset, appearance))
+    .catch((error) => {
+      fanCadModelCache.delete(assetUrl);
+      throw error;
+    });
+  fanCadModelCache.set(assetUrl, promise);
+  return promise;
+}
+
+function createLoadedFanCadModel(asset: FanCadPreviewAsset, appearance: FanAppearance): LoadedFanCadModel {
+  if (asset.schema !== "filterboxbuilder-fan-cad-preview-v1" || asset.usage !== "preview-only-purchased-part-visual") {
+    throw new Error("createLoadedFanCadModel: Unsupported fan CAD preview asset");
+  }
+
+  return {
+    nominalDiameter: asset.nominalDiameter,
+    meshes: asset.meshes.map((mesh) => createLoadedFanCadMesh(mesh, asset.bounds.center, appearance)),
+  };
+}
+
+function createLoadedFanCadMesh(
+  mesh: FanCadPreviewMesh,
+  center: readonly [number, number, number],
+  appearance: FanAppearance,
+): LoadedFanCadMesh {
+  const positions: number[] = [];
+  for (let index = 0; index < mesh.position.length; index += 3) {
+    const sourceX = mesh.position[index] ?? 0;
+    const sourceY = mesh.position[index + 1] ?? 0;
+    const sourceZ = mesh.position[index + 2] ?? 0;
+    positions.push(sourceX - center[0], sourceZ - center[2], sourceY - center[1]);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setIndex([...mesh.index]);
+  geometry.computeVertexNormals();
+
+  const isRotor = mesh.name.toLowerCase().includes("impeller");
+  return {
+    name: mesh.name,
+    geometry,
+    color: meshColor(mesh, isRotor, appearance),
+    isRotor,
+  };
+}
+
+function meshColor(mesh: FanCadPreviewMesh, isRotor: boolean, appearance: FanAppearance): number {
+  if (mesh.color !== undefined) {
+    const [red, green, blue] = mesh.color;
+    return ((Math.round(red * 255) << 16) | (Math.round(green * 255) << 8) | Math.round(blue * 255)) >>> 0;
+  }
+  return isRotor ? appearance.bladeColor : appearance.hubColor;
 }
 
 function collectFanRotors(root: Object3D, rotors: Object3D[]): void {

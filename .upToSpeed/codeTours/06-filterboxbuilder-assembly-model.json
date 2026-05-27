@@ -1,0 +1,146 @@
+{
+  "title": "6 FilterBoxBuilder: Assembly Model",
+  "id": "06-filterboxbuilder-assembly-model",
+  "position": 6,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "06-overview",
+      "title": "Overview: Assembly Model",
+      "description": "The laser tour covered flat panels. The assembly model turns those flat panels into positioned physical parts with dimensions, rotations, explode directions, filter rails, seams, and measurement guides for the 3D preview."
+    },
+    {
+      "type": "highlight",
+      "id": "06-panel-part",
+      "title": "Panel Parts",
+      "description": "An assembly panel part keeps the cut panel id, role, size, position, rotation, thickness, and optional explode direction together. The renderer can draw it without re-deciding where it belongs.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 14,
+          "end": 31
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-dimensions",
+      "title": "Dimension Guides",
+      "description": "Dimension guides are model data, not overlay-only UI state. They define axis, endpoints, label, and size so the renderer can draw readable measurements in the scene.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 33,
+          "end": 44
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-model-shape",
+      "title": "Assembly Model Shape",
+      "description": "The model groups all previewable assembly pieces: panels, filter frame parts, filter media boxes, dimension guides, and seam cues. This is the preview contract for generated Nukit layouts.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 54,
+          "end": 60
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-model-factory",
+      "title": "Assembly Factory",
+      "description": "The factory recalculates geometry from the normalized layout and derives a physical bounding box. It then gathers structural panel parts, filter frame parts, and guides.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 63,
+          "end": 76
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-panel-placement",
+      "title": "Placed Panels",
+      "description": "Panel placement is copied from cut panel assembly metadata into a renderer-friendly part. This keeps the flat cut sheet and 3D assembly tied to the same source.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 120,
+          "end": 131
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-filter-frames",
+      "title": "Filter Frame Parts",
+      "description": "Filter frame parts are calculated per filter layer. Their explode direction follows the layer, which lets exploded view move filter-related parts away from the enclosure in the right direction.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 190,
+          "end": 204
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-dimension-guide-factory",
+      "title": "Dimension Guide Factory",
+      "description": "Dimension guide creation uses the final width, height, and depth. These values are the same physical size users see in the preview summary.",
+      "file": "src/assemblyModel.ts",
+      "highlight": [
+        {
+          "start": 235,
+          "end": 247
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "06-renderer-consumes-model",
+      "title": "Renderer Consumption",
+      "description": "The Three.js preview consumes the assembly model rather than reconstructing the enclosure from scratch. This makes rendering a view of the model, not a second geometry pipeline.",
+      "file": "src/threePreview.ts",
+      "highlight": [
+        {
+          "start": 290,
+          "end": 301
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "06-mcq-assembly-role",
+      "title": "Quick Check",
+      "description": "",
+      "text": "What does the assembly model add on top of flat cut panels?",
+      "answers": [
+        "Physical placement, roles, rotations, explode directions, and dimension guides",
+        "Browser event listeners for every input",
+        "The Vite dev server configuration",
+        "The final ZIP compression for 3MF export"
+      ],
+      "correct": 0,
+      "explanation": "`AssemblyPanelPart` on lines 14-31 carries role, size, position, rotation, and explode direction, while `DimensionGuide` on lines 38-44 carries measurement data."
+    },
+    {
+      "type": "textOnly",
+      "id": "06-summary",
+      "title": "Summary",
+      "description": "The assembly model is the bridge from cut geometry to a physical preview. The next tour switches to printable generation, where the same physical design is split into parts and plates for 3D printing."
+    }
+  ]
+}

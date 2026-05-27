@@ -1,7 +1,13 @@
 import { createAirPurifierCutSheet, resolveFanCount } from "./airPurifierPanels";
 import { clampRimForGeometry, createAirPurifierGeometry } from "./airPurifierGeometry";
 import { renderBoxesDocumentSvg } from "./boxes/svg";
+import { corsiRosenthalGeometry } from "./corsiRosenthalGeometry";
 import type { CutPanel } from "./cutGeometry";
+import {
+  staticPrintReferenceIds,
+  staticPrintReferences,
+  type StaticPrintReference,
+} from "./staticPrintReferences";
 
 export const fanDiameters = [40, 60, 80, 92, 120, 140] as const;
 
@@ -20,7 +26,12 @@ export type FilterCount = 1 | 2;
 
 export type PreviewMode = "enclosure" | "cut-sheet" | "print-sheets";
 
-export const printDesignIds = ["nukit-open-air", "corsi-rosenthal", "donut-hepa-adapter"] as const;
+export const printDesignIds = [
+  "nukit-open-air",
+  "corsi-rosenthal",
+  "donut-hepa-adapter",
+  ...staticPrintReferenceIds,
+] as const;
 
 export type PrintDesignId = (typeof printDesignIds)[number];
 
@@ -39,6 +50,32 @@ export type CorsiRosenthalLayoutSettings = {
   readonly filterCount: number;
   readonly fanCount: number;
 };
+
+export type CorsiFanGridFit =
+  | {
+      readonly type: "invalid";
+      readonly mode: CorsiRosenthalMode;
+      readonly fanCount: number;
+      readonly reason: CorsiFanGridFitInvalidReason;
+    }
+  | ({ readonly type: "fits" } & CorsiFanGridFitFootprint)
+  | ({ readonly type: "does-not-fit" } & CorsiFanGridFitFootprint);
+
+type CorsiFanGridFitFootprint = {
+  readonly mode: CorsiRosenthalMode;
+  readonly fanCount: number;
+  readonly panelFanCount: number;
+  readonly requiredWidth: Millimeters;
+  readonly requiredDepth: Millimeters;
+  readonly availableWidth: Millimeters;
+  readonly availableDepth: Millimeters;
+};
+
+export type CorsiFanGridFitInvalidReason =
+  | "fan-count-not-finite"
+  | "fan-count-not-positive"
+  | "fan-count-not-integer"
+  | "side-exhaust-requires-even-fan-count";
 
 export type DonutFilterSettings = {
   readonly outerDiameter: Millimeters;
@@ -114,7 +151,7 @@ export type FanWall = "left" | "right" | "top" | "bottom";
 
 export type FanBanks<T> = Record<FanWall, T>;
 
-export type PrintDesignPreset = {
+type PrintDesignPresetBase = {
   readonly id: PrintDesignId;
   readonly label: string;
   readonly detail: string;
@@ -126,12 +163,31 @@ export type PrintDesignPreset = {
   readonly recommendedFanPreset: FanProductPresetId;
   readonly recommendedFanCount: number;
   readonly recommendedFilterCount: FilterCount;
-  readonly recommendedDonutFilterPreset?: PresetDonutFilterId;
-  readonly recommendedCorsiMode?: CorsiRosenthalMode;
-  readonly recommendedCorsiFilterCount?: number;
-  readonly corsiFrameStyle?: CorsiRosenthalFrameStyle;
-  readonly donutFilterDefaults?: DonutFilterSettings;
   readonly assemblyNotes: readonly string[];
+};
+
+export type PrintDesignModel =
+  | {
+      readonly type: "laser-derived-printable-kit";
+    }
+  | {
+      readonly type: "corsi-rosenthal";
+      readonly frameStyle: CorsiRosenthalFrameStyle;
+      readonly recommendedMode: CorsiRosenthalMode;
+      readonly recommendedFilterCount: number;
+    }
+  | {
+      readonly type: "donut-filter-adapter";
+      readonly recommendedDonutFilterPreset: PresetDonutFilterId;
+      readonly filterDefaults: DonutFilterSettings;
+    }
+  | {
+      readonly type: "static-reference";
+      readonly reference: StaticPrintReference;
+    };
+
+export type PrintDesignPreset = PrintDesignPresetBase & {
+  readonly model: PrintDesignModel;
 };
 
 export type FanSpec = {
@@ -147,7 +203,16 @@ export type FanAppearance = {
   readonly hubColor: number;
   readonly accentColor: number;
   readonly bladeOpacity: number;
+  readonly previewCadModel?: FanPreviewCadModel;
 };
+
+export type FanPreviewCadModel =
+  | {
+      readonly type: "noctua-nf-a14-public-cad";
+      readonly sourceUrl: "https://www.noctua.at/en/3d-cad-models";
+      readonly assetUrl: "/vendor/noctua/nf-a14-public-cad-preview.json";
+      readonly usage: "preview-only";
+    };
 
 export const fanProductPresetIds = [
   "nukit-arctic-p14",
@@ -251,6 +316,12 @@ export const fanProductPresets: readonly FanProductPreset[] = [
       hubColor: 0xe2cda4,
       accentColor: 0x8f5b35,
       bladeOpacity: 0.92,
+      previewCadModel: {
+        type: "noctua-nf-a14-public-cad",
+        sourceUrl: "https://www.noctua.at/en/3d-cad-models",
+        assetUrl: "/vendor/noctua/nf-a14-public-cad-preview.json",
+        usage: "preview-only",
+      },
     },
   },
   {
@@ -324,6 +395,9 @@ export type PreviewSettings = {
   transparentWalls: boolean;
   explodedView: boolean;
   showDimensions: boolean;
+  showBananaScale: boolean;
+  showPrintSeams: boolean;
+  showPrintPlateLabels: boolean;
   autoRotate: boolean;
   cameraPreset: CameraPreset;
 };
@@ -332,6 +406,7 @@ export const filterPresetIds = [
   "merv13-20x20x2",
   "merv13-20x25x1",
   "merv13-16x16x1",
+  "merv13-14x20x1",
   "merv13-16x20x1",
   "merv13-16x25x1",
   "merv13-20x20x1",
@@ -398,6 +473,15 @@ export const filterPresets: readonly FilterPreset[] = [
     nominalSize: "16 x 16 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 393.7, depth: 393.7, thickness: 19.1 },
+  },
+  {
+    id: "merv13-14x20x1",
+    label: "14x20x1 MERV 13",
+    detail: "14x20x1 MERV 13",
+    examples: ["Static CR 14x20 reference"],
+    nominalSize: "14 x 20 x 1 in",
+    source: "Standard HVAC actual size / Filtrete 14x20x1",
+    dimensions: { width: 495.3, depth: 342.9, thickness: 19.1 },
   },
   {
     id: "merv13-16x20x1",
@@ -556,15 +640,22 @@ export const defaultPrintDesignId: PrintDesignId = "nukit-open-air";
 export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-open-air",
-    label: "Nukit Open Air laser-derived kit",
-    detail: "Printable version of the current Nukit panel generator, split into bed-sized panels and glue keys.",
+    label: "Nukit Open Air printable kit",
+    detail: "3D-printable Nukit enclosure split into bed-sized panels with dovetail lap keys for glued seams.",
     source: "FilterBoxBuilder browser generator",
     license: "Generated from this project",
     recommendedFilterPreset: "merv13-20x25x1",
     recommendedFanPreset: defaultFanProductPresetId,
     recommendedFanCount: automaticFanCount,
     recommendedFilterCount: 2,
-    assemblyNotes: ["Keeps the laser-cut wall layout", "Uses printed glue keys where panels are split for the printer bed"],
+    model: {
+      type: "laser-derived-printable-kit",
+    },
+    assemblyNotes: [
+      "Keeps the proven Nukit airflow layout",
+      "Uses screws for fans because screws ship with the fans and do not wear like snap clips",
+      "Uses printed dovetail lap keys where panels are split for the printer bed",
+    ],
   },
   {
     id: "corsi-rosenthal",
@@ -579,9 +670,12 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     recommendedFanPreset: "arctic-p12-pwm-pst",
     recommendedFanCount: automaticFanCount,
     recommendedFilterCount: 2,
-    recommendedCorsiMode: "top-exhaust",
-    recommendedCorsiFilterCount: 4,
-    corsiFrameStyle: "modular-rail",
+    model: {
+      type: "corsi-rosenthal",
+      frameStyle: "modular-rail",
+      recommendedMode: "top-exhaust",
+      recommendedFilterCount: 4,
+    },
     assemblyNotes: [
       "Uses repeated frame-unit rails and separate corner blocks so the frame can be printed on smaller beds",
       "Automatic fan count keeps the top fan plate rectangular for the selected filter and fan size",
@@ -598,14 +692,17 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     recommendedFanPreset: "arctic-p12-pwm-pst",
     recommendedFanCount: 1,
     recommendedFilterCount: 1,
-    recommendedDonutFilterPreset: defaultDonutFilterPresetId,
-    donutFilterDefaults: {
-      outerDiameter: 125,
-      length: 150,
-      holeDiameter: 92,
-      insertLength: 10,
-      capRim: 10,
-      capEnabled: true,
+    model: {
+      type: "donut-filter-adapter",
+      recommendedDonutFilterPreset: defaultDonutFilterPresetId,
+      filterDefaults: {
+        outerDiameter: 125,
+        length: 150,
+        holeDiameter: 92,
+        insertLength: 10,
+        capRim: 10,
+        capEnabled: true,
+      },
     },
     assemblyNotes: [
       "Fan adaptor tapers from the square fan flange into the measured filter hole",
@@ -613,7 +710,83 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       "Fan guard is generated as a separate printable part so a bare fan is not exposed",
     ],
   },
+  {
+    id: "static-cr-16x20-140",
+    label: "Static CR 16x20 140 mm kit",
+    detail: "Curated fixed Printables design for 16x20x1 filters and five 140 mm PC fans.",
+    source: "Printables static reference",
+    sourceUrl: staticPrintReferences["static-cr-16x20-140"].sourceUrl,
+    license: "CC-BY",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    recommendedFilterPreset: "merv13-16x20x1",
+    recommendedFanPreset: defaultFanProductPresetId,
+    recommendedFanCount: 5,
+    recommendedFilterCount: 1,
+    model: {
+      type: "static-reference",
+      reference: staticPrintReferences["static-cr-16x20-140"],
+    },
+    assemblyNotes: [
+      "Static curated reference, not generated from the current parameters",
+      "Preview shows the mirrored STL file set as print parts",
+      "Export opens the original Printables files page for the authoritative download",
+    ],
+  },
+  {
+    id: "static-cr-14x20-base",
+    label: "Static CR 14x20 reference",
+    detail: "Curated fixed Printables design with STEP source for a Corsi-Rosenthal filter housing.",
+    source: "Printables static reference",
+    sourceUrl: staticPrintReferences["static-cr-14x20-base"].sourceUrl,
+    license: "CC-BY",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    recommendedFilterPreset: "merv13-14x20x1",
+    recommendedFanPreset: "arctic-p12-pwm-pst",
+    recommendedFanCount: 4,
+    recommendedFilterCount: 2,
+    model: {
+      type: "static-reference",
+      reference: staticPrintReferences["static-cr-14x20-base"],
+    },
+    assemblyNotes: [
+      "Static curated reference, not generated from the current parameters",
+      "Assembled preview uses the complete source STL from the Printables project",
+      "Print plates show the individual source STL parts laid out on the selected bed",
+      "Includes a STEP reference in the original Printables project",
+      "Export opens the original Printables files page for the authoritative download",
+    ],
+  },
+  {
+    id: "static-modular-20x20-reference",
+    label: "Static modular 20x20 reference",
+    detail: "External fixed Printables reference for a modular 20x20 air-filter frame.",
+    source: "Printables external reference",
+    sourceUrl: staticPrintReferences["static-modular-20x20-reference"].sourceUrl,
+    license: "CC-BY-NC-SA",
+    licenseUrl: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    recommendedFilterPreset: "merv13-20x20x1",
+    recommendedFanPreset: defaultFanProductPresetId,
+    recommendedFanCount: 4,
+    recommendedFilterCount: 1,
+    model: {
+      type: "static-reference",
+      reference: staticPrintReferences["static-modular-20x20-reference"],
+    },
+    assemblyNotes: [
+      "Static external reference, not generated from the current parameters",
+      "Not mirrored locally because the license is noncommercial/share-alike",
+      "Export opens the original Printables files page",
+    ],
+  },
 ];
+
+export const publicPrintDesignPresets: readonly PrintDesignPreset[] = printDesignPresets.filter(
+  (preset) => preset.id === "nukit-open-air" || preset.id === "static-cr-14x20-base",
+);
+
+export function isPublicPrintDesignId(id: PrintDesignId): boolean {
+  return publicPrintDesignPresets.some((preset) => preset.id === id);
+}
 
 export type RawPurifierSettings = {
   printDesign: PrintDesignId;
@@ -649,6 +822,9 @@ export type RawPurifierSettings = {
   transparentWalls: boolean;
   explodedView: boolean;
   showDimensions: boolean;
+  showBananaScale: boolean;
+  showPrintSeams: boolean;
+  showPrintPlateLabels: boolean;
   autoRotate: boolean;
   cameraPreset: CameraPreset;
   labels: boolean;
@@ -710,7 +886,7 @@ export const defaultSettings: RawPurifierSettings = {
   donutCapRim: 10,
   donutCapEnabled: true,
   screwHoleDiameter: 5,
-  materialThickness: 3,
+  materialThickness: 6,
   kerfFit: 0.1,
   showFilterMedia: true,
   showFans: true,
@@ -718,6 +894,9 @@ export const defaultSettings: RawPurifierSettings = {
   transparentWalls: false,
   explodedView: false,
   showDimensions: false,
+  showBananaScale: false,
+  showPrintSeams: false,
+  showPrintPlateLabels: false,
   autoRotate: true,
   cameraPreset: "official",
   labels: true,
@@ -764,27 +943,29 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
     preview: {
       showFilterMedia: raw.showFilterMedia,
       showFans: raw.showFans,
-      showFilterFrame: raw.showFilterFrame,
+      showFilterFrame: true,
       transparentWalls: raw.transparentWalls,
       explodedView: raw.explodedView,
       showDimensions: raw.showDimensions,
+      showBananaScale: raw.showBananaScale,
+      showPrintSeams: raw.showPrintSeams,
+      showPrintPlateLabels: raw.showPrintPlateLabels,
       autoRotate: raw.autoRotate,
       cameraPreset: cameraPresets.includes(raw.cameraPreset) ? raw.cameraPreset : defaultSettings.cameraPreset,
     },
   };
 }
 
-export function normalizeRawSettings(input: PurifierInput): RawPurifierSettings {
-  const rawInput = isStructuredSettings(input) ? toRawSettings(input) : input;
-  const normalized = toRawSettings(normalizeSettings(rawInput));
-  const corsiMode = canonicalCorsiRosenthalMode(rawInput.corsiMode);
-  const donutFilter = normalizeDonutFilterSettings(rawInput);
-  const donutFilterPreset = findDonutFilterPreset(rawInput.donutFilterPreset);
+export function normalizeRawSettings(input: RawPurifierSettings): RawPurifierSettings {
+  const normalized = toRawSettings(normalizeSettings(input));
+  const corsiMode = canonicalCorsiRosenthalMode(input.corsiMode);
+  const donutFilter = normalizeDonutFilterSettings(input);
+  const donutFilterPreset = findDonutFilterPreset(input.donutFilterPreset);
   return canonicalizePrintDesignRawSettings({
     ...normalized,
     corsiMode,
-    corsiFilterCount: canonicalCorsiFilterCount(rawInput.corsiFilterCount, corsiMode),
-    corsiFanCount: canonicalCorsiFanCount(rawInput.corsiFanCount, normalized.printDesign, corsiMode),
+    corsiFilterCount: canonicalCorsiFilterCount(input.corsiFilterCount, corsiMode),
+    corsiFanCount: canonicalCorsiFanCount(input.corsiFanCount, normalized.printDesign, corsiMode),
     donutFilterPreset: donutFilterPreset.id,
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
@@ -795,7 +976,7 @@ export function normalizeRawSettings(input: PurifierInput): RawPurifierSettings 
   });
 }
 
-export function toRawSettings(input: PurifierInput): RawPurifierSettings {
+function toRawSettings(input: PurifierInput): RawPurifierSettings {
   if (!isStructuredSettings(input)) {
     return input;
   }
@@ -835,6 +1016,9 @@ export function toRawSettings(input: PurifierInput): RawPurifierSettings {
     transparentWalls: input.preview.transparentWalls,
     explodedView: input.preview.explodedView,
     showDimensions: input.preview.showDimensions,
+    showBananaScale: input.preview.showBananaScale,
+    showPrintSeams: input.preview.showPrintSeams,
+    showPrintPlateLabels: input.preview.showPrintPlateLabels,
     autoRotate: input.preview.autoRotate,
     cameraPreset: input.preview.cameraPreset,
     labels: input.cutting.labels,
@@ -847,11 +1031,23 @@ export function findPrintDesignPreset(id: PrintDesignId | string | null): PrintD
 }
 
 export function isCorsiRosenthalPrintDesignId(id: PrintDesignId): boolean {
-  return findPrintDesignPreset(id).corsiFrameStyle !== undefined;
+  return findPrintDesignPreset(id).model.type === "corsi-rosenthal";
 }
 
 export function isDonutFilterPrintDesignId(id: PrintDesignId): boolean {
-  return findPrintDesignPreset(id).donutFilterDefaults !== undefined;
+  return findPrintDesignPreset(id).model.type === "donut-filter-adapter";
+}
+
+export function isStaticReferencePrintDesignId(id: PrintDesignId): boolean {
+  return findPrintDesignPreset(id).model.type === "static-reference";
+}
+
+export function staticPrintReferenceForPreset(preset: PrintDesignPreset): StaticPrintReference | undefined {
+  return preset.model.type === "static-reference" ? preset.model.reference : undefined;
+}
+
+export function corsiFrameStyleForPreset(preset: PrintDesignPreset): CorsiRosenthalFrameStyle | undefined {
+  return preset.model.type === "corsi-rosenthal" ? preset.model.frameStyle : undefined;
 }
 
 function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
@@ -863,10 +1059,10 @@ function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
 }
 
 function requiredDonutFilterDefaults(preset: PrintDesignPreset): DonutFilterSettings {
-  if (preset.donutFilterDefaults === undefined) {
+  if (preset.model.type !== "donut-filter-adapter") {
     throw new Error(`requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`);
   }
-  return preset.donutFilterDefaults;
+  return preset.model.filterDefaults;
 }
 
 export function findFilterPreset(id: FilterPresetId): FilterPreset {
@@ -996,25 +1192,25 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
           filterThickness: filterPreset.dimensions.thickness,
         };
 
-  if (isCorsiRosenthalPrintDesignId(preset.id)) {
+  if (preset.model.type === "corsi-rosenthal") {
     return {
       ...withRecommendedFilter,
       fansLeft: 0,
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      corsiMode: preset.recommendedCorsiMode ?? defaultSettings.corsiMode,
-      corsiFilterCount: preset.recommendedCorsiFilterCount ?? defaultCorsiRosenthalFilterCount(defaultSettings.corsiMode),
+      corsiMode: preset.model.recommendedMode,
+      corsiFilterCount: preset.model.recommendedFilterCount,
       corsiFanCount: preset.recommendedFanCount,
       splitFrames: true,
       rim: 24,
-      materialThickness: 4,
+      materialThickness: 6,
       screwHoleDiameter: 4.5,
     };
   }
 
-  if (isDonutFilterPrintDesignId(preset.id)) {
-    const donutPreset = findDonutFilterPreset(preset.recommendedDonutFilterPreset ?? defaultDonutFilterPresetId);
+  if (preset.model.type === "donut-filter-adapter") {
+    const donutPreset = findDonutFilterPreset(preset.model.recommendedDonutFilterPreset);
     const donutFilter = donutPreset.id === customDonutFilterPresetId ? requiredDonutFilterDefaults(preset) : donutPreset.settings;
     return {
       ...withRecommendedFilter,
@@ -1041,6 +1237,30 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       rim: defaultSettings.rim,
       materialThickness: 1.5,
       screwHoleDiameter: 5,
+    };
+  }
+
+  if (preset.model.type === "static-reference") {
+    return {
+      ...withRecommendedFilter,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: preset.recommendedFanCount,
+      fansBottom: 0,
+      corsiMode: defaultSettings.corsiMode,
+      corsiFilterCount: defaultSettings.corsiFilterCount,
+      corsiFanCount: preset.recommendedFanCount > 0 ? preset.recommendedFanCount : defaultSettings.corsiFanCount,
+      donutFilterPreset: defaultSettings.donutFilterPreset,
+      donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
+      donutFilterLength: defaultSettings.donutFilterLength,
+      donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
+      donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
+      donutCapRim: defaultSettings.donutCapRim,
+      donutCapEnabled: defaultSettings.donutCapEnabled,
+      splitFrames: false,
+      rim: defaultSettings.rim,
+      materialThickness: defaultSettings.materialThickness,
+      screwHoleDiameter: defaultSettings.screwHoleDiameter,
     };
   }
 
@@ -1072,7 +1292,10 @@ export function resolveCorsiRosenthalFanCount(layout: LayoutResult): number {
   }
   const mode = canonicalCorsiRosenthalMode(layout.rawSettings.corsiMode);
   const fanCount = canonicalCorsiFanCount(layout.rawSettings.corsiFanCount, layout.configuration.printDesign.id, mode);
-  return fanCount === automaticFanCount ? resolveAutomaticCorsiFanCount(layout, mode) : fanCount;
+  if (fanCount !== automaticFanCount && corsiFanCountFitsLayout(layout, mode, fanCount)) {
+    return fanCount;
+  }
+  return resolveAutomaticCorsiFanCount(layout, mode);
 }
 
 export function resolveCorsiRosenthalLayout(layout: LayoutResult): CorsiRosenthalLayoutSettings {
@@ -1130,7 +1353,7 @@ export function corsiFanGridColumns(fanCount: number): number {
   return Math.min(3, fanCount);
 }
 
-export function createLayout(input: PurifierInput): LayoutResult {
+export function createLayout(input: RawPurifierSettings): LayoutResult {
   const settings = normalizeRawSettings(input);
   const configuration = normalizeSettings(settings);
   const geometry = createAirPurifierGeometry(configuration);
@@ -1164,8 +1387,7 @@ export function createLaserSvg(layout: LayoutResult): string {
   return renderBoxesDocumentSvg(layout.cutSheet);
 }
 
-export function encodeSettings(input: PurifierInput): string {
-  const settings = toRawSettings(input);
+export function encodeSettings(settings: RawPurifierSettings): string {
   const params = new URLSearchParams();
   params.set("printDesign", settings.printDesign);
   params.set("filterPreset", settings.filterPreset);
@@ -1200,6 +1422,9 @@ export function encodeSettings(input: PurifierInput): string {
   params.set("transparentWalls", String(settings.transparentWalls));
   params.set("explodedView", String(settings.explodedView));
   params.set("showDimensions", String(settings.showDimensions));
+  params.set("showBananaScale", String(settings.showBananaScale));
+  params.set("showPrintSeams", String(settings.showPrintSeams));
+  params.set("showPrintPlateLabels", String(settings.showPrintPlateLabels));
   params.set("autoRotate", String(settings.autoRotate));
   params.set("cameraPreset", settings.cameraPreset);
   params.set("labels", String(settings.labels));
@@ -1249,6 +1474,9 @@ export function decodeSettings(search: string): RawPurifierSettings {
     transparentWalls: readBoolean(params, "transparentWalls", defaultSettings.transparentWalls),
     explodedView: readBoolean(params, "explodedView", defaultSettings.explodedView),
     showDimensions: readBoolean(params, "showDimensions", defaultSettings.showDimensions),
+    showBananaScale: readBoolean(params, "showBananaScale", defaultSettings.showBananaScale),
+    showPrintSeams: readBoolean(params, "showPrintSeams", defaultSettings.showPrintSeams),
+    showPrintPlateLabels: readBoolean(params, "showPrintPlateLabels", defaultSettings.showPrintPlateLabels),
     autoRotate: readBoolean(params, "autoRotate", defaultSettings.autoRotate),
     cameraPreset: readCameraPreset(params, "cameraPreset", defaultSettings.cameraPreset),
     labels: readBoolean(params, "labels", defaultSettings.labels),
@@ -1331,6 +1559,7 @@ function canonicalizePrintDesignRawSettings(settings: RawPurifierSettings): RawP
     return settings;
   }
   const corsiMode = canonicalCorsiRosenthalMode(settings.corsiMode);
+  const corsiFanCount = canonicalCorsiFanCount(settings.corsiFanCount, settings.printDesign, corsiMode);
   return {
     ...settings,
     fansLeft: 0,
@@ -1339,7 +1568,10 @@ function canonicalizePrintDesignRawSettings(settings: RawPurifierSettings): RawP
     fansBottom: 0,
     corsiMode,
     corsiFilterCount: canonicalCorsiFilterCount(settings.corsiFilterCount, corsiMode),
-    corsiFanCount: canonicalCorsiFanCount(settings.corsiFanCount, settings.printDesign, corsiMode),
+    corsiFanCount:
+      corsiFanCount === automaticFanCount || corsiFanCountFitsRawSettings(settings, corsiMode, corsiFanCount)
+        ? corsiFanCount
+        : automaticFanCount,
   };
 }
 
@@ -1374,16 +1606,9 @@ function canonicalCorsiFanCount(value: number, printDesign: PrintDesignId, mode:
 
 function resolveAutomaticCorsiFanCount(layout: LayoutResult, mode: CorsiRosenthalMode): number {
   const candidates = mode === "side-exhaust" ? [6, 4, 2] : [8, 6, 4, 3, 2, 1];
-  const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
-  const fanDiameter = layout.configuration.fan.spec.diameter;
-  const availableWidth = filterDimensions.width + 2 * corsiAutoRailDepth();
-  const availableDepth = filterDimensions.depth + 2 * corsiAutoRailDepth();
-  const fitSlack = 8;
 
   for (const candidate of candidates) {
-    const panelFanCount = mode === "side-exhaust" ? candidate / 2 : candidate;
-    const size = corsiFanGridFootprint(panelFanCount, fanDiameter);
-    if (size.width <= availableWidth + fitSlack && size.depth <= availableDepth + fitSlack) {
+    if (corsiFanCountFitsLayout(layout, mode, candidate)) {
       return candidate;
     }
   }
@@ -1391,19 +1616,106 @@ function resolveAutomaticCorsiFanCount(layout: LayoutResult, mode: CorsiRosentha
   return mode === "side-exhaust" ? 2 : 1;
 }
 
+export function corsiFanGridFit(input: {
+  readonly mode: CorsiRosenthalMode;
+  readonly fanCount: number;
+  readonly filterDimensions: FilterDimensions;
+  readonly fanDiameter: number;
+}): CorsiFanGridFit {
+  const invalidReason = invalidCorsiFanGridFitReason(input.mode, input.fanCount);
+  if (invalidReason !== null) {
+    return {
+      type: "invalid",
+      mode: input.mode,
+      fanCount: input.fanCount,
+      reason: invalidReason,
+    };
+  }
+
+  const panelFanCount = input.mode === "side-exhaust" ? Math.ceil(input.fanCount / 2) : input.fanCount;
+  const required = corsiFanGridFootprint(panelFanCount, input.fanDiameter);
+  const availableWidth = input.filterDimensions.width + 2 * corsiRosenthalGeometry.railDepth;
+  const availableDepth =
+    input.mode === "side-exhaust"
+      ? input.filterDimensions.depth + 2 * corsiRosenthalGeometry.railDepth
+      : input.filterDimensions.width + 2 * corsiRosenthalGeometry.railDepth;
+  const fitSlack = 8;
+  const type =
+    required.width <= availableWidth + fitSlack && required.depth <= availableDepth + fitSlack
+      ? "fits"
+      : "does-not-fit";
+  return {
+    type,
+    mode: input.mode,
+    fanCount: input.fanCount,
+    panelFanCount,
+    requiredWidth: required.width,
+    requiredDepth: required.depth,
+    availableWidth,
+    availableDepth,
+  };
+}
+
+function invalidCorsiFanGridFitReason(
+  mode: CorsiRosenthalMode,
+  fanCount: number,
+): CorsiFanGridFitInvalidReason | null {
+  if (!Number.isFinite(fanCount)) {
+    return "fan-count-not-finite";
+  }
+  if (fanCount <= 0) {
+    return "fan-count-not-positive";
+  }
+  if (!Number.isInteger(fanCount)) {
+    return "fan-count-not-integer";
+  }
+  if (mode === "side-exhaust" && fanCount % 2 !== 0) {
+    return "side-exhaust-requires-even-fan-count";
+  }
+  return null;
+}
+
+export function corsiFanCountFits(input: {
+  readonly mode: CorsiRosenthalMode;
+  readonly fanCount: number;
+  readonly filterDimensions: FilterDimensions;
+  readonly fanDiameter: number;
+}): boolean {
+  return corsiFanGridFit(input).type === "fits";
+}
+
+function corsiFanCountFitsLayout(layout: LayoutResult, mode: CorsiRosenthalMode, fanCount: number): boolean {
+  return corsiFanCountFits({
+    mode,
+    fanCount,
+    filterDimensions: filterSelectionDimensions(layout.configuration.filter),
+    fanDiameter: layout.configuration.fan.spec.diameter,
+  });
+}
+
+function corsiFanCountFitsRawSettings(settings: RawPurifierSettings, mode: CorsiRosenthalMode, fanCount: number): boolean {
+  return corsiFanCountFits({
+    mode,
+    fanCount,
+    filterDimensions: rawFilterDimensions(settings),
+    fanDiameter: settings.fanDiameter,
+  });
+}
+
 function corsiFanGridFootprint(fanCount: number, fanDiameter: number): { readonly width: number; readonly depth: number } {
   const columns = corsiFanGridColumns(fanCount);
   const rows = Math.ceil(fanCount / columns);
   const fanCell = fanDiameter * 1.18;
-  const gap = 12;
   return {
-    width: columns * fanCell + Math.max(0, columns - 1) * gap + corsiAutoRailDepth() * 1.4,
-    depth: rows * fanCell + Math.max(0, rows - 1) * gap + corsiAutoRailDepth() * 2,
+    width:
+      columns * fanCell +
+      Math.max(0, columns - 1) * corsiRosenthalGeometry.fanGap +
+      corsiRosenthalGeometry.railDepth * 1.4,
+    depth:
+      rows * fanCell +
+      Math.max(0, rows - 1) * corsiRosenthalGeometry.fanGap +
+      corsiRosenthalGeometry.railDepth * 2,
   };
-}
-
-function corsiAutoRailDepth(): number {
-  return 32;
 }
 
 function isPresetFilterId(id: FilterPresetId): id is PresetFilterId {

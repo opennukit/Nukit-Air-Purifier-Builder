@@ -30,9 +30,30 @@ describe("Workbench state", () => {
     const encoded = encodeWorkbenchState(state);
 
     expect(encoded.get("fabricationMethod")).toBe("print-3mf");
-    expect(encoded.get("controlsTab")).toBe("fabrication");
+    expect(encoded.get("controlsTab")).toBe("setup");
     expect(encoded.get("printVolume")).toBe("bed-h2-safe");
     expect(encoded.has("exportFormat")).toBe(false);
+  });
+
+  test("keeps new workflow tabs stable in shared URLs", () => {
+    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=parts"));
+    const encoded = encodeWorkbenchState(state);
+
+    expect(encoded.get("controlsTab")).toBe("parts");
+  });
+
+  test("maps old build tab to the new design step", () => {
+    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=build"));
+    const encoded = encodeWorkbenchState(state);
+
+    expect(encoded.get("controlsTab")).toBe("design");
+  });
+
+  test("maps removed export tab to print setup", () => {
+    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=export"));
+    const encoded = encodeWorkbenchState(state);
+
+    expect(encoded.get("controlsTab")).toBe("setup");
   });
 
   test("omits print volume for laser fabrication", () => {

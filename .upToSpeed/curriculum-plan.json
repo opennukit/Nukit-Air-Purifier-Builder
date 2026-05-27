@@ -1,0 +1,194 @@
+[
+  {
+    "id": "01-filterboxbuilder-architecture-overview",
+    "title": "1 FilterBoxBuilder: Architecture Overview",
+    "position": 1,
+    "section": "Architecture",
+    "goal": "Understand the browser-only app shape and main runtime flow.",
+    "targetFiles": [
+      "README.md",
+      "package.json",
+      "index.html",
+      "vite.config.ts",
+      "src/main.ts",
+      "src/airPurifier.ts"
+    ],
+    "prerequisites": []
+  },
+  {
+    "id": "02-filterboxbuilder-settings-vocabulary",
+    "title": "2 FilterBoxBuilder: Settings and Preset Vocabulary",
+    "position": 2,
+    "section": "Data Structures",
+    "goal": "Understand raw settings, normalized settings, presets, and workbench state.",
+    "targetFiles": [
+      "src/airPurifier.ts",
+      "src/workbenchState.ts",
+      "src/printDesignSettingsMemory.ts"
+    ],
+    "prerequisites": [
+      "01-filterboxbuilder-architecture-overview"
+    ]
+  },
+  {
+    "id": "03-filterboxbuilder-variant-models",
+    "title": "3 FilterBoxBuilder: Variant Models and Fabrication Types",
+    "position": 3,
+    "section": "Data Structures",
+    "goal": "Understand the output structures used by geometry, print, preview, and export paths.",
+    "targetFiles": [
+      "src/cutGeometry.ts",
+      "src/printableKit.ts",
+      "src/threeMf.ts",
+      "src/staticPrintReferences.ts"
+    ],
+    "prerequisites": [
+      "02-filterboxbuilder-settings-vocabulary"
+    ]
+  },
+  {
+    "id": "04-filterboxbuilder-layout-pipeline",
+    "title": "4 FilterBoxBuilder: Layout Pipeline",
+    "position": 4,
+    "section": "Core Business Logic",
+    "goal": "Trace raw settings into normalized layout, geometry, cut sheets, and diagnostics.",
+    "targetFiles": [
+      "src/airPurifier.ts",
+      "src/airPurifierGeometry.ts",
+      "src/airPurifierPanels.ts",
+      "src/buildDiagnostics.ts"
+    ],
+    "prerequisites": [
+      "02-filterboxbuilder-settings-vocabulary",
+      "03-filterboxbuilder-variant-models"
+    ]
+  },
+  {
+    "id": "05-filterboxbuilder-laser-geometry-svg",
+    "title": "5 FilterBoxBuilder: Laser Geometry and SVG",
+    "position": 5,
+    "section": "Core Business Logic",
+    "goal": "Understand cut panels, edge profiles, Boxes drawing documents, and SVG rendering.",
+    "targetFiles": [
+      "src/cutGeometry.ts",
+      "src/boxes/kernel.ts",
+      "src/boxes/svg.ts",
+      "scripts/airpurifier-oracle.ts"
+    ],
+    "prerequisites": [
+      "04-filterboxbuilder-layout-pipeline"
+    ]
+  },
+  {
+    "id": "06-filterboxbuilder-assembly-model",
+    "title": "6 FilterBoxBuilder: Assembly Model",
+    "position": 6,
+    "section": "Core Business Logic",
+    "goal": "Understand how flat panels become positioned assembly parts and dimension guides.",
+    "targetFiles": [
+      "src/assemblyModel.ts",
+      "src/threePreview.ts"
+    ],
+    "prerequisites": [
+      "05-filterboxbuilder-laser-geometry-svg"
+    ]
+  },
+  {
+    "id": "07-filterboxbuilder-printable-kit-generation",
+    "title": "7 FilterBoxBuilder: Printable Kit Generation",
+    "position": 7,
+    "section": "Core Business Logic",
+    "goal": "Trace generated print parts, sheet plans, split panels, and 3MF package input.",
+    "targetFiles": [
+      "src/printableKit.ts",
+      "src/printDesignKit.ts",
+      "src/printSheetPreview.ts"
+    ],
+    "prerequisites": [
+      "05-filterboxbuilder-laser-geometry-svg",
+      "06-filterboxbuilder-assembly-model"
+    ]
+  },
+  {
+    "id": "08-filterboxbuilder-specialized-print-designs",
+    "title": "8 FilterBoxBuilder: Specialized Print Designs",
+    "position": 8,
+    "section": "Core Business Logic",
+    "goal": "Understand Corsi, donut, and static print reference extensions.",
+    "targetFiles": [
+      "src/corsiRosenthalKit.ts",
+      "src/donutFilterKit.ts",
+      "src/staticPrintReferences.ts",
+      "src/staticStlAssets.ts"
+    ],
+    "prerequisites": [
+      "03-filterboxbuilder-variant-models",
+      "07-filterboxbuilder-printable-kit-generation"
+    ]
+  },
+  {
+    "id": "09-filterboxbuilder-three-preview-rendering",
+    "title": "9 FilterBoxBuilder: Three.js Preview Rendering",
+    "position": 9,
+    "section": "Interface Rendering",
+    "goal": "Understand generated and static Three.js preview rendering.",
+    "targetFiles": [
+      "src/threePreview.ts",
+      "src/printSheetThreePreview.ts",
+      "src/staticStlAssets.ts"
+    ],
+    "prerequisites": [
+      "06-filterboxbuilder-assembly-model",
+      "08-filterboxbuilder-specialized-print-designs"
+    ]
+  },
+  {
+    "id": "10-filterboxbuilder-browser-workbench",
+    "title": "10 FilterBoxBuilder: Browser Workbench",
+    "position": 10,
+    "section": "Interface and UI",
+    "goal": "Understand the imperative DOM shell, controls, tabs, preview updates, and URL state.",
+    "targetFiles": [
+      "src/main.ts",
+      "src/styles.css",
+      "src/workbenchState.ts"
+    ],
+    "prerequisites": [
+      "02-filterboxbuilder-settings-vocabulary",
+      "09-filterboxbuilder-three-preview-rendering"
+    ]
+  },
+  {
+    "id": "11-filterboxbuilder-user-outputs",
+    "title": "11 FilterBoxBuilder: User Outputs and Readiness",
+    "position": 11,
+    "section": "Interface and Outputs",
+    "goal": "Understand downloads, diagnostics, purchase lists, sheet dialogs, summaries, and share URLs.",
+    "targetFiles": [
+      "src/main.ts",
+      "src/buildDiagnostics.ts",
+      "src/printDesignKit.ts",
+      "src/threeMf.ts"
+    ],
+    "prerequisites": [
+      "07-filterboxbuilder-printable-kit-generation",
+      "10-filterboxbuilder-browser-workbench"
+    ]
+  },
+  {
+    "id": "12-filterboxbuilder-tests-config-scripts",
+    "title": "12 FilterBoxBuilder: Tests, Config, Scripts, and References",
+    "position": 12,
+    "section": "Testing, Config, and Scripts",
+    "goal": "Understand tests, Vite/Bun tooling, oracle scripts, and reference material.",
+    "targetFiles": [
+      "package.json",
+      "vite.config.ts",
+      "test/airPurifierPort.test.ts",
+      "scripts/boxes-port-audit.ts"
+    ],
+    "prerequisites": [
+      "11-filterboxbuilder-user-outputs"
+    ]
+  }
+]

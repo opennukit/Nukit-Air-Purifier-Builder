@@ -1,8 +1,10 @@
 node_modules/
 dist/
+.codex/
 .playwright-cli/
 .playwright-mcp/
 .venv-boxes/
 output/
 *.png
+*.log
 references/external-models/

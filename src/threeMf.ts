@@ -17,8 +17,15 @@ export type MeshObject = {
   readonly position: MeshVertex;
 };
 
+export type MeshPlate = {
+  readonly name: string;
+  readonly objectIndices: readonly number[];
+};
+
 const modelPath = "3D/3dmodel.model";
+const modelSettingsPath = "Metadata/model_settings.config";
 const mimeType = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml";
+const modelSettingsContentType = "application/xml";
 const crcTable = createCrcTable();
 const textEncoder = new TextEncoder();
 
@@ -27,19 +34,63 @@ export type StoredZipFile = {
   readonly content: Uint8Array;
 };
 
-export function createThreeMfPackage(title: string, objects: readonly MeshObject[]): Uint8Array {
+export function createThreeMfPackage(
+  title: string,
+  objects: readonly MeshObject[],
+  plates: readonly MeshPlate[] = [],
+): Uint8Array {
+  assertValidPackageContract(objects, plates);
+
   return createStoredZipPackage([
-    textZipFile("[Content_Types].xml", contentTypesXml()),
+    textZipFile("[Content_Types].xml", contentTypesXml(plates.length > 0)),
     textZipFile("_rels/.rels", relationshipsXml()),
     textZipFile(modelPath, modelXml(title, objects)),
+    ...(plates.length > 0 ? [textZipFile(modelSettingsPath, modelSettingsXml(plates))] : []),
   ]);
 }
 
-function contentTypesXml(): string {
+function assertValidPackageContract(objects: readonly MeshObject[], plates: readonly MeshPlate[]): void {
+  if (plates.length === 0) {
+    return;
+  }
+
+  const assignedObjectIndices = new Set<number>();
+
+  for (const [plateIndex, plate] of plates.entries()) {
+    for (const [entryIndex, objectIndex] of plate.objectIndices.entries()) {
+      if (!Number.isInteger(objectIndex)) {
+        throw new Error(
+          `createThreeMfPackage: MeshPlate.objectIndices[${plateIndex}][${entryIndex}] must be an integer, got ${objectIndex}`,
+        );
+      }
+      if (objectIndex < 0 || objectIndex >= objects.length) {
+        throw new Error(
+          `createThreeMfPackage: MeshPlate.objectIndices[${plateIndex}][${entryIndex}] ${objectIndex} is out of range for ${objects.length} objects`,
+        );
+      }
+      if (assignedObjectIndices.has(objectIndex)) {
+        throw new Error(`createThreeMfPackage: MeshPlate.objectIndices object ${objectIndex} is assigned more than once`);
+      }
+      assignedObjectIndices.add(objectIndex);
+    }
+  }
+
+  for (let objectIndex = 0; objectIndex < objects.length; objectIndex += 1) {
+    if (!assignedObjectIndices.has(objectIndex)) {
+      throw new Error(`createThreeMfPackage: MeshPlate.objectIndices missing object index ${objectIndex}`);
+    }
+  }
+}
+
+function contentTypesXml(includeModelSettings: boolean): string {
+  const modelSettingsOverride = includeModelSettings
+    ? `
+  <Override PartName="/${modelSettingsPath}" ContentType="${modelSettingsContentType}"/>`
+    : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="model" ContentType="${mimeType}"/>
+  <Default Extension="model" ContentType="${mimeType}"/>${modelSettingsOverride}
 </Types>`;
 }
 
@@ -76,6 +127,34 @@ ${resources}
 ${buildItems}
   </build>
 </model>`;
+}
+
+function modelSettingsXml(plates: readonly MeshPlate[]): string {
+  const plateSettings = plates.map(plateXml).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<config>
+${plateSettings}
+</config>`;
+}
+
+function plateXml(plate: MeshPlate, index: number): string {
+  const modelInstances = plate.objectIndices
+    .map((objectIndex) => {
+      const objectId = objectIndex + 1;
+      return `    <model_instance>
+      <metadata key="object_id" value="${objectId}"/>
+      <metadata key="instance_id" value="0"/>
+      <metadata key="identify_id" value="${objectId}"/>
+    </model_instance>`;
+    })
+    .join("\n");
+
+  return `  <plate>
+    <metadata key="plater_id" value="${index + 1}"/>
+    <metadata key="plater_name" value="${escapeXml(plate.name)}"/>
+    <metadata key="locked" value="false"/>
+${modelInstances}
+  </plate>`;
 }
 
 function objectXml(objectId: number, object: MeshObject): string {

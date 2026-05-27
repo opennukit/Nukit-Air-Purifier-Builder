@@ -1,0 +1,146 @@
+{
+  "title": "7 FilterBoxBuilder: Printable Kit Generation",
+  "id": "07-filterboxbuilder-printable-kit-generation",
+  "position": 7,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "07-overview",
+      "title": "Overview: Printable Kit Generation",
+      "description": "The assembly tour showed how flat parts become a previewed enclosure. Printable generation uses the same domain facts to make physical print parts, split oversized panels, create glue keys and connectors, lay parts onto beds, and build 3MF packages."
+    },
+    {
+      "type": "highlight",
+      "id": "07-print-volume",
+      "title": "Print Volume Presets",
+      "description": "Print volume presets model bounded and unbounded beds. The selected preset controls whether parts must be split and how print sheets are arranged.",
+      "file": "src/printableKit.ts",
+      "highlight": [
+        {
+          "start": 171,
+          "end": 179
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-part-type",
+      "title": "Printable Part Type",
+      "description": "A printable part carries kind, dimensions, mesh, source panel id, cut feature count, and optional label. This is more than a display object; it is the export unit.",
+      "file": "src/printableKit.ts",
+      "highlight": [
+        {
+          "start": 47,
+          "end": 62
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-kit-factory",
+      "title": "Base Kit Factory",
+      "description": "The base kit factory receives a layout and bed preset, then creates the generated Nukit print kit. Specialized designs use the same kit contract through their own generators.",
+      "file": "src/printableKit.ts",
+      "highlight": [
+        {
+          "start": 271,
+          "end": 284
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-design-router",
+      "title": "Design Router",
+      "description": "The print design router chooses Corsi, donut, or generated Nukit kit creation from the active layout. This keeps UI export code from knowing every model-specific generator.",
+      "file": "src/printDesignKit.ts",
+      "highlight": [
+        {
+          "start": 17,
+          "end": 28
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-sheet-plan",
+      "title": "Sheet Plan",
+      "description": "Sheet planning groups printable parts onto print beds. The resulting plan is used by SVG previews, Three.js print-sheet previews, and 3MF plate metadata.",
+      "file": "src/printableKit.ts",
+      "highlight": [
+        {
+          "start": 319,
+          "end": 332
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-sheet-svg",
+      "title": "Print Sheet SVG",
+      "description": "The older SVG print-sheet view is a lightweight formatting layer over the same sheet plan. It does not decide part sizes or split strategy.",
+      "file": "src/printSheetPreview.ts",
+      "highlight": [
+        {
+          "start": 18,
+          "end": 30
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-mesh-export",
+      "title": "3MF Export From Kit",
+      "description": "3MF export from a printable kit reuses the part meshes and sheet plan. It packages the generated data without depending on rendered canvas state.",
+      "file": "src/printableKit.ts",
+      "highlight": [
+        {
+          "start": 290,
+          "end": 307
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "07-bed-tests",
+      "title": "Bed Fit Tests",
+      "description": "The Corsi tests assert that generated print parts fit bounded beds and that panel areas remain accounted for. These tests are a useful map of printable geometry assumptions.",
+      "file": "test/corsiRosenthalKit.test.ts",
+      "highlight": [
+        {
+          "start": 34,
+          "end": 45
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "07-mcq-sheet-plan",
+      "title": "Quick Check",
+      "description": "",
+      "text": "Why does the app create a printable sheet plan before rendering print sheets?",
+      "answers": [
+        "The plan is shared by SVG, Three.js preview, and 3MF plate placement",
+        "The plan replaces the need for mesh geometry",
+        "The plan stores user passwords for slicer upload",
+        "The plan is only needed for laser SVG export"
+      ],
+      "correct": 0,
+      "explanation": "`createPrintableSheetPlanFromKit` starts at line 324 in `src/printableKit.ts`, and the plan is then consumed by preview and export paths."
+    },
+    {
+      "type": "textOnly",
+      "id": "07-summary",
+      "title": "Summary",
+      "description": "Printable generation creates typed parts, meshes, sheet placements, and package data from the layout. The next tour covers the specialized print designs that plug into this same contract."
+    }
+  ]
+}

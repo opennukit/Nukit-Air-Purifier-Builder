@@ -6,7 +6,7 @@ import {
   type PrintVolumePresetId,
 } from "./printableKit";
 
-export type ControlsTab = "build" | "fabrication";
+export type ControlsTab = "design" | "parts" | "setup";
 
 export type WorkbenchFabrication =
   | {
@@ -124,8 +124,14 @@ function readPreviewMode(value: string | null): PreviewMode {
   return "enclosure";
 }
 
-function readControlsTab(value: string | null): ControlsTab {
-  return value === "fabrication" || value === "cutting" ? "fabrication" : "build";
+export function readControlsTab(value: string | null): ControlsTab {
+  if (value === "design" || value === "parts" || value === "setup") {
+    return value;
+  }
+  if (value === "fit" || value === "fabrication" || value === "cutting" || value === "export") {
+    return "setup";
+  }
+  return "design";
 }
 
 function fabricationMethodFromPreviewMode(previewMode: PreviewMode): ExportFormat {

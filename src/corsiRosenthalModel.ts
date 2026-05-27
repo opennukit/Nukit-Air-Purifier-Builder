@@ -1,24 +1,14 @@
 import {
   corsiFanGridColumns,
+  corsiFrameStyleForPreset,
   filterSelectionDimensions,
-  findPrintDesignPreset,
   resolveCorsiRosenthalLayout,
   type CorsiRosenthalFrameStyle,
   type CorsiRosenthalMode,
   type LayoutResult,
   type Millimeters,
 } from "./airPurifier";
-
-export const corsiRosenthalGeometry = {
-  railDepth: 32,
-  cornerSize: 58,
-  cornerArm: 28,
-  glueKey: { width: 44, depth: 18, height: 3 },
-  braceWidth: 18,
-  fanFrameMargin: 30,
-  fanClip: { width: 34, depth: 12 },
-  fanGap: 12,
-} as const;
+import { corsiRosenthalGeometry } from "./corsiRosenthalGeometry";
 
 export type CorsiRosenthalModel = {
   readonly mode: CorsiRosenthalMode;
@@ -33,6 +23,8 @@ export type CorsiRosenthalModel = {
   readonly fanCount: number;
   readonly filterFaces: readonly CorsiFilterFace[];
   readonly fanPanels: readonly CorsiFanPanel[];
+  readonly sealedFaces: readonly CorsiSealedFace[];
+  readonly faceRoles: readonly CorsiFaceRoleAssignment[];
   readonly fanCassetteOuter: Millimeters;
   readonly fanOpeningRadius: Millimeters;
   readonly screwRadius: Millimeters;
@@ -49,7 +41,32 @@ export type CorsiRosenthalModel = {
 
 export type CorsiFaceSide = "front" | "right" | "back" | "left" | "top" | "bottom";
 
+export const corsiFaceSides: readonly CorsiFaceSide[] = ["front", "right", "back", "left", "top", "bottom"];
+
+export type CorsiFaceRole = "filter" | "fan" | "sealed";
+
+export type CorsiFaceRoleAssignment =
+  | {
+      readonly side: CorsiFaceSide;
+      readonly role: "filter";
+      readonly fanCount?: never;
+    }
+  | {
+      readonly side: CorsiFaceSide;
+      readonly role: "fan";
+      readonly fanCount: number;
+    }
+  | {
+      readonly side: CorsiFaceSide;
+      readonly role: "sealed";
+      readonly fanCount?: never;
+    };
+
 export type CorsiFilterFace = {
+  readonly side: CorsiFaceSide;
+};
+
+export type CorsiSealedFace = {
   readonly side: CorsiFaceSide;
 };
 
@@ -78,12 +95,14 @@ export function createCorsiRosenthalModel(layout: LayoutResult): CorsiRosenthalM
   const screwRadius = Math.max(1.6, layout.configuration.cutting.screwHoleDiameter / 2);
   const screwInset = (fanCassetteOuter - fanSpec.screwSpacing) / 2;
   const fanCell = fanSpec.diameter * 1.18;
+  const filterFaces = createFilterFaces(corsiLayout.mode, corsiLayout.filterCount);
   const fanPanels = createFanPanels(corsiLayout.mode, fanCount, fanCell);
+  const sealedFaces = createSealedFaces(filterFaces, fanPanels);
   const fanGrid = fanPanels[0]?.grid ?? createFanGrid(1, fanCell);
 
   return {
     mode: corsiLayout.mode,
-    frameStyle: findPrintDesignPreset(layout.configuration.printDesign.id).corsiFrameStyle ?? "scarf-rail",
+    frameStyle: corsiFrameStyleForPreset(layout.configuration.printDesign) ?? "scarf-rail",
     filterCount: corsiLayout.filterCount,
     filterWidth: filter.width,
     filterHeight: filter.depth,
@@ -92,8 +111,10 @@ export function createCorsiRosenthalModel(layout: LayoutResult): CorsiRosenthalM
     frameOuterWidth: filter.width + corsiRosenthalGeometry.railDepth * 2,
     frameOuterHeight: filter.depth + corsiRosenthalGeometry.railDepth * 2,
     fanCount,
-    filterFaces: createFilterFaces(corsiLayout.mode, corsiLayout.filterCount),
+    filterFaces,
     fanPanels,
+    sealedFaces,
+    faceRoles: createFaceRoles(filterFaces, fanPanels, sealedFaces),
     fanCassetteOuter,
     fanOpeningRadius: Math.max(16, fanSpec.diameter / 2 - 5),
     screwRadius,
@@ -111,6 +132,38 @@ function createFilterFaces(mode: CorsiRosenthalMode, filterCount: number): Corsi
   const sides: readonly CorsiFaceSide[] =
     mode === "side-exhaust" ? ["front", "back", "top", "bottom"] : ["front", "right", "back", "left", "bottom"];
   return sides.slice(0, filterCount).map((side) => ({ side }));
+}
+
+function createSealedFaces(
+  filterFaces: readonly CorsiFilterFace[],
+  fanPanels: readonly CorsiFanPanel[],
+): CorsiSealedFace[] {
+  const occupiedSides = new Set<CorsiFaceSide>([
+    ...filterFaces.map((face) => face.side),
+    ...fanPanels.map((panel) => panel.side),
+  ]);
+  return corsiFaceSides.filter((side) => !occupiedSides.has(side)).map((side) => ({ side }));
+}
+
+function createFaceRoles(
+  filterFaces: readonly CorsiFilterFace[],
+  fanPanels: readonly CorsiFanPanel[],
+  sealedFaces: readonly CorsiSealedFace[],
+): CorsiFaceRoleAssignment[] {
+  const fanCountBySide = new Map(fanPanels.map((panel) => [panel.side, panel.fanCount] as const));
+  return corsiFaceSides.map((side) => {
+    if (filterFaces.some((face) => face.side === side)) {
+      return { side, role: "filter" };
+    }
+    const fanCount = fanCountBySide.get(side);
+    if (fanCount !== undefined) {
+      return { side, role: "fan", fanCount };
+    }
+    if (sealedFaces.some((face) => face.side === side)) {
+      return { side, role: "sealed" };
+    }
+    throw new Error(`createFaceRoles: Missing Corsi face role for ${side}`);
+  });
 }
 
 function createFanPanels(mode: CorsiRosenthalMode, fanCount: number, fanCell: Millimeters): CorsiFanPanel[] {

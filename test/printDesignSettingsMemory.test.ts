@@ -16,7 +16,7 @@ describe("Print design settings memory", () => {
     expect(switched.settings.corsiMode).toBe("top-exhaust");
     expect(switched.settings.corsiFilterCount).toBe(4);
     expect(switched.settings.corsiFanCount).toBe(automaticFanCount);
-    expect(switched.settings.materialThickness).toBe(4);
+    expect(switched.settings.materialThickness).toBe(6);
   });
 
   test("restores the last settings used for a design when switching back", () => {

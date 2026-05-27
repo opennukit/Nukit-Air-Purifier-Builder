@@ -1,6 +1,7 @@
 import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
 import { type LayoutResult } from "./airPurifier";
-import { corsiRosenthalGeometry, createCorsiRosenthalModel } from "./corsiRosenthalModel";
+import { corsiRosenthalGeometry } from "./corsiRosenthalGeometry";
+import { createCorsiRosenthalModel, type CorsiFaceSide } from "./corsiRosenthalModel";
 import {
   findPrintVolumePreset,
   partFitsPrintBed,
@@ -33,13 +34,30 @@ type PlateCut =
       readonly radius: number;
     };
 
-type ScarfRailGroup = {
+type SplitRailGroup = {
   readonly groupId: string;
   readonly label: string;
   readonly totalLength: number;
   readonly depth: number;
   readonly height: number;
+  readonly splitJoint: "scarf" | "pocketed-connector";
 };
+
+type FanPanelGridBand =
+  | {
+      readonly kind: "seal";
+      readonly size: number;
+      readonly label: string;
+    }
+  | {
+      readonly kind: "cassette";
+      readonly size: number;
+      readonly label: string;
+      readonly index: number;
+    };
+
+const connectorPocketClearance = 0.4;
+const minimumFanSealTileSize = 0.5;
 
 export function createCorsiRosenthalPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
@@ -47,18 +65,20 @@ export function createCorsiRosenthalPrintableKit(layout: LayoutResult, presetId:
   const railLengthLimit = maxPrintableRailLength(preset);
   const filterFrameWidth = model.frameOuterWidth;
   const filterFrameHeight = model.frameOuterHeight;
-  const railGroups: readonly ScarfRailGroup[] =
+  const railGroups: readonly SplitRailGroup[] =
     model.frameStyle === "modular-rail"
       ? createModularRailGroups(filterFrameWidth, filterFrameHeight, model.partHeight + 2)
       : createFaceRailGroups(model, filterFrameWidth, filterFrameHeight);
 
-  const railParts = railGroups.flatMap((group) => createScarfRailParts(group, railLengthLimit));
+  const railParts = railGroups.flatMap((group) => createSplitRailParts(group, railLengthLimit));
   const parts = [
     ...railParts,
     ...(model.frameStyle === "modular-rail"
       ? createModularCornerBlocks(model.partHeight + 2)
       : createCornerBlocks(model.partHeight + 2, model.filterFaces.length)),
+    ...createSealedFaceParts(model, model.partHeight, preset),
     ...createFanCassetteParts(model, model.partHeight),
+    ...createFanPanelSealParts(model, model.partHeight, preset),
     ...(model.frameStyle === "modular-rail"
       ? createRailConnectors(railParts, model.fanCount)
       : createScarfGlueKeys(railParts, model.fanCount)),
@@ -90,7 +110,7 @@ function createFaceRailGroups(
   model: ReturnType<typeof createCorsiRosenthalModel>,
   filterFrameWidth: number,
   filterFrameHeight: number,
-): readonly ScarfRailGroup[] {
+): readonly SplitRailGroup[] {
   return model.filterFaces.flatMap((face) => {
     const prefix = face.side;
     const labelPrefix = faceLabel(face.side);
@@ -101,6 +121,7 @@ function createFaceRailGroups(
         totalLength: filterFrameWidth,
         depth: corsiRosenthalGeometry.railDepth,
         height: model.partHeight + 2,
+        splitJoint: "scarf",
       },
       {
         groupId: `${prefix}-bottom-filter-rail`,
@@ -108,6 +129,7 @@ function createFaceRailGroups(
         totalLength: filterFrameWidth,
         depth: corsiRosenthalGeometry.railDepth,
         height: model.partHeight + 2,
+        splitJoint: "scarf",
       },
       {
         groupId: `${prefix}-left-filter-rail`,
@@ -115,6 +137,7 @@ function createFaceRailGroups(
         totalLength: filterFrameHeight,
         depth: corsiRosenthalGeometry.railDepth,
         height: model.partHeight + 2,
+        splitJoint: "scarf",
       },
       {
         groupId: `${prefix}-right-filter-rail`,
@@ -122,12 +145,13 @@ function createFaceRailGroups(
         totalLength: filterFrameHeight,
         depth: corsiRosenthalGeometry.railDepth,
         height: model.partHeight + 2,
+        splitJoint: "scarf",
       },
     ];
   });
 }
 
-function createModularRailGroups(frameWidth: number, frameHeight: number, height: number): readonly ScarfRailGroup[] {
+function createModularRailGroups(frameWidth: number, frameHeight: number, height: number): readonly SplitRailGroup[] {
   const horizontalEdges = ["top-front", "top-back", "top-left", "top-right", "bottom-front", "bottom-back", "bottom-left", "bottom-right"];
   const verticalEdges = ["front-left", "front-right", "back-left", "back-right"];
   return [
@@ -137,6 +161,7 @@ function createModularRailGroups(frameWidth: number, frameHeight: number, height
       totalLength: frameWidth,
       depth: corsiRosenthalGeometry.railDepth,
       height,
+      splitJoint: "pocketed-connector" as const,
     })),
     ...verticalEdges.map((edge) => ({
       groupId: `modular-${edge}-upright-frame-unit`,
@@ -144,6 +169,7 @@ function createModularRailGroups(frameWidth: number, frameHeight: number, height
       totalLength: frameHeight,
       depth: corsiRosenthalGeometry.railDepth,
       height,
+      splitJoint: "pocketed-connector" as const,
     })),
   ];
 }
@@ -155,13 +181,16 @@ function maxPrintableRailLength(preset: PrintVolumePreset): number {
   return Math.max(90, Math.min(preset.bed.width, preset.bed.depth) - 12);
 }
 
-function createScarfRailParts(group: ScarfRailGroup, maxLength: number): PrintablePart[] {
+function createSplitRailParts(group: SplitRailGroup, maxLength: number): PrintablePart[] {
   const segmentCount = Number.isFinite(maxLength) ? Math.max(1, Math.ceil(group.totalLength / maxLength)) : 1;
   const segmentLength = group.totalLength / segmentCount;
 
   return Array.from({ length: segmentCount }, (_, index) => {
     const isFirst = index === 0;
     const isLast = index === segmentCount - 1;
+    const hasLeftJoint = !isFirst;
+    const hasRightJoint = !isLast;
+    const isPocketedConnector = group.splitJoint === "pocketed-connector";
     return createPolygonPart({
       id: `corsi-${group.groupId}-${index + 1}`,
       name: `${group.label} ${index + 1}.${segmentCount}`,
@@ -169,8 +198,10 @@ function createScarfRailParts(group: ScarfRailGroup, maxLength: number): Printab
       width: segmentLength,
       depth: group.depth,
       height: group.height,
-      points: scarfStripPoints(segmentLength, group.depth, !isFirst, !isLast),
-      cutFeatureCount: 0,
+      points: isPocketedConnector
+        ? connectorReceiverStripPoints(segmentLength, group.depth, hasLeftJoint, hasRightJoint)
+        : scarfStripPoints(segmentLength, group.depth, hasLeftJoint, hasRightJoint),
+      cutFeatureCount: isPocketedConnector ? Number(hasLeftJoint) + Number(hasRightJoint) : 0,
     });
   });
 }
@@ -248,7 +279,146 @@ function createFanCassetteParts(model: ReturnType<typeof createCorsiRosenthalMod
   return fanFrameParts;
 }
 
-function faceLabel(side: string): string {
+function createSealedFaceParts(
+  model: ReturnType<typeof createCorsiRosenthalModel>,
+  height: number,
+  preset: PrintVolumePreset,
+): PrintablePart[] {
+  return model.sealedFaces.flatMap((face) => {
+    const size = panelOuterSize(model, face.side);
+    return createTiledPlateParts({
+      id: `corsi-${face.side}-sealed-face`,
+      name: `${faceLabel(face.side)} sealed panel`,
+      sourcePanelId: `corsi-${face.side}-sealed-face`,
+      width: size.width,
+      depth: size.depth,
+      height,
+      preset,
+    });
+  });
+}
+
+function createFanPanelSealParts(
+  model: ReturnType<typeof createCorsiRosenthalModel>,
+  height: number,
+  preset: PrintVolumePreset,
+): PrintablePart[] {
+  return model.fanPanels.flatMap((panel) => {
+    const centerSpacing = panel.grid.cell + panel.grid.gap;
+    const panelSize = panelOuterSize(model, panel.side);
+    const xBands = fanPanelGridBands(panel.grid.columns, panelSize.width, model.fanCassetteOuter, centerSpacing);
+    const yBands = fanPanelGridBands(panel.grid.rows, panelSize.depth, model.fanCassetteOuter, centerSpacing);
+
+    return yBands.flatMap((yBand, yIndex) =>
+      xBands.flatMap((xBand, xIndex) => {
+        if (isFanCassetteOpening(panel, xBand, yBand)) {
+          return [];
+        }
+        if (xBand.size < minimumFanSealTileSize || yBand.size < minimumFanSealTileSize) {
+          return [];
+        }
+        return createTiledPlateParts({
+          id: `corsi-${panel.side}-fan-seal-${yIndex + 1}-${xIndex + 1}`,
+          name: `${faceLabel(panel.side)} fan panel sealing ${yBand.label} ${xBand.label}`,
+          sourcePanelId: `corsi-${panel.side}-fan-panel-seal`,
+          width: xBand.size,
+          depth: yBand.size,
+          height,
+          preset,
+        });
+      }),
+    );
+  });
+}
+
+function panelOuterSize(
+  model: ReturnType<typeof createCorsiRosenthalModel>,
+  side: CorsiFaceSide,
+): { readonly width: number; readonly depth: number } {
+  return {
+    width: model.frameOuterWidth,
+    depth: side === "top" || side === "bottom" ? model.frameOuterWidth : model.frameOuterHeight,
+  };
+}
+
+function fanPanelGridBands(
+  cassetteCount: number,
+  panelSize: number,
+  cassetteSize: number,
+  centerSpacing: number,
+): readonly FanPanelGridBand[] {
+  const cassetteSpan = cassetteCount > 0 ? cassetteSize + Math.max(0, cassetteCount - 1) * centerSpacing : 0;
+  const edgeMargin = Math.max(0, (panelSize - cassetteSpan) / 2);
+  const cassetteGap = Math.max(0, centerSpacing - cassetteSize);
+  const bands: FanPanelGridBand[] = [{ kind: "seal", size: edgeMargin, label: "edge-1" }];
+
+  for (let index = 0; index < cassetteCount; index += 1) {
+    bands.push({ kind: "cassette", size: cassetteSize, label: `cassette-${index + 1}`, index });
+    if (index < cassetteCount - 1) {
+      bands.push({ kind: "seal", size: cassetteGap, label: `gap-${index + 1}` });
+    }
+  }
+
+  bands.push({ kind: "seal", size: edgeMargin, label: "edge-2" });
+  return bands;
+}
+
+function isFanCassetteOpening(
+  panel: ReturnType<typeof createCorsiRosenthalModel>["fanPanels"][number],
+  xBand: FanPanelGridBand,
+  yBand: FanPanelGridBand,
+): boolean {
+  if (xBand.kind !== "cassette" || yBand.kind !== "cassette") {
+    return false;
+  }
+  return yBand.index * panel.grid.columns + xBand.index < panel.fanCount;
+}
+
+function createTiledPlateParts(input: {
+  readonly id: string;
+  readonly name: string;
+  readonly sourcePanelId: string;
+  readonly width: number;
+  readonly depth: number;
+  readonly height: number;
+  readonly preset: PrintVolumePreset;
+}): PrintablePart[] {
+  const columnCount = splitDimension(input.width, maxPrintableTileWidth(input.preset));
+  const rowCount = splitDimension(input.depth, maxPrintableTileDepth(input.preset));
+  const tileWidth = input.width / columnCount;
+  const tileDepth = input.depth / rowCount;
+
+  return Array.from({ length: rowCount }, (_, rowIndex) =>
+    Array.from({ length: columnCount }, (_, columnIndex) => {
+      const isSingleTile = columnCount === 1 && rowCount === 1;
+      return createPlatePart({
+        id: isSingleTile ? input.id : `${input.id}-tile-${rowIndex + 1}-${columnIndex + 1}`,
+        name: isSingleTile
+          ? input.name
+          : `${input.name} tile ${rowIndex + 1}.${rowCount} ${columnIndex + 1}.${columnCount}`,
+        sourcePanelId: input.sourcePanelId,
+        width: tileWidth,
+        depth: tileDepth,
+        height: input.height,
+        cuts: [],
+      });
+    }),
+  ).flat();
+}
+
+function splitDimension(size: number, maxSize: number): number {
+  return Number.isFinite(maxSize) ? Math.max(1, Math.ceil(size / maxSize)) : 1;
+}
+
+function maxPrintableTileWidth(preset: PrintVolumePreset): number {
+  return preset.bed.type === "bounded" ? preset.bed.width : Number.POSITIVE_INFINITY;
+}
+
+function maxPrintableTileDepth(preset: PrintVolumePreset): number {
+  return preset.bed.type === "bounded" ? preset.bed.depth : Number.POSITIVE_INFINITY;
+}
+
+function faceLabel(side: CorsiFaceSide): string {
   return `${side[0]?.toUpperCase() ?? ""}${side.slice(1)}`;
 }
 
@@ -279,7 +449,7 @@ function createScarfGlueKeys(railParts: readonly PrintablePart[], fanCount: numb
 }
 
 function createRailConnectors(railParts: readonly PrintablePart[], fanCount: number): PrintablePart[] {
-  const railSeamCount = railParts.filter((part) => !part.name.endsWith("1.1")).length;
+  const railSeamCount = Math.ceil(railParts.reduce((total, part) => total + part.cutFeatureCount, 0) / 2);
   const connectorCount = Math.max(8, railSeamCount + Math.ceil(fanCount / 2));
   return Array.from({ length: connectorCount }, (_, index) =>
     createPolygonPart({
@@ -299,6 +469,53 @@ function createRailConnectors(railParts: readonly PrintablePart[], fanCount: num
       cutFeatureCount: 0,
     }),
   );
+}
+
+function connectorReceiverStripPoints(
+  width: number,
+  depth: number,
+  leftReceiver: boolean,
+  rightReceiver: boolean,
+): readonly Point2[] {
+  const slotLength = Math.min(width / 2 - 1, corsiRosenthalGeometry.glueKey.width / 2 + connectorPocketClearance);
+  const slotDepth = Math.min(depth - 2, corsiRosenthalGeometry.glueKey.depth + connectorPocketClearance);
+  if (slotLength <= 0 || slotDepth <= 0) {
+    return [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: depth },
+      { x: 0, y: depth },
+    ];
+  }
+
+  const slotY0 = (depth - slotDepth) / 2;
+  const slotY1 = slotY0 + slotDepth;
+  const points: Point2[] = [
+    { x: 0, y: 0 },
+    { x: width, y: 0 },
+  ];
+
+  if (rightReceiver) {
+    points.push(
+      { x: width, y: slotY0 },
+      { x: width - slotLength, y: slotY0 },
+      { x: width - slotLength, y: slotY1 },
+      { x: width, y: slotY1 },
+    );
+  }
+
+  points.push({ x: width, y: depth }, { x: 0, y: depth });
+
+  if (leftReceiver) {
+    points.push(
+      { x: 0, y: slotY1 },
+      { x: slotLength, y: slotY1 },
+      { x: slotLength, y: slotY0 },
+      { x: 0, y: slotY0 },
+    );
+  }
+
+  return points;
 }
 
 function scarfStripPoints(width: number, depth: number, leftScarf: boolean, rightScarf: boolean): readonly Point2[] {

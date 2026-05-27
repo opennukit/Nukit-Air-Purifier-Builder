@@ -1,0 +1,146 @@
+{
+  "title": "11 FilterBoxBuilder: User Outputs and Readiness",
+  "id": "11-filterboxbuilder-user-outputs",
+  "position": 11,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "11-overview",
+      "title": "Overview: User Outputs",
+      "description": "The workbench tour showed how state changes. This tour shows what users get from that state: preview summaries, readiness checks, purchase lists, SVG export, 3MF export, static file links, sheet dialogs, and share URLs."
+    },
+    {
+      "type": "highlight",
+      "id": "11-readiness-summary",
+      "title": "Readiness Summary",
+      "description": "Build readiness condenses diagnostics into one export-facing message. It reports warnings when present and otherwise returns a ready state for the current layout.",
+      "file": "src/buildDiagnostics.ts",
+      "highlight": [
+        {
+          "start": 85,
+          "end": 99
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-export-diagnostics",
+      "title": "Export Diagnostics UI",
+      "description": "The workbench renders active diagnostics into the fabrication area. This code reads the active layout and shows the current warnings without mutating the model.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 897,
+          "end": 905
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-export-controls",
+      "title": "Export Controls",
+      "description": "Export controls are synchronized from layout and fabrication mode. The button text, visible print design controls, purchase list, and design-specific controls all update together.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 906,
+          "end": 918
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-purchase-list",
+      "title": "Purchase List",
+      "description": "The purchase list derives required off-the-shelf parts from the active layout. Static references can provide their own source files and license links, while generated designs use chosen fan and filter presets.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1096,
+          "end": 1107
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-svg-export",
+      "title": "SVG Export",
+      "description": "SVG export creates a blob from the layout SVG and triggers a browser download. The drawing content already came from the layout and Boxes renderer.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1418,
+          "end": 1425
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-print-export",
+      "title": "Print Export",
+      "description": "Print export branches between static reference file links and generated 3MF packages. Generated packages come from the print design export path, not the preview scene.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1431,
+          "end": 1447
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-sheet-dialog",
+      "title": "Sheet Dialog",
+      "description": "The sheet dialog uses the same active print sheet plan as the main preview. Opening the dialog changes display scale, not the underlying part data.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1481,
+          "end": 1491
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "11-summary-html",
+      "title": "Preview Summary",
+      "description": "Preview summaries are design-aware. Static references, Corsi, donut, and generated Nukit designs each get the summary fields that make sense for that model.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1868,
+          "end": 1878
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "11-mcq-export-source",
+      "title": "Quick Check",
+      "description": "",
+      "text": "Where does generated print export get its geometry?",
+      "answers": [
+        "From `createPrintDesignThreeMfExport` and the printable kit path",
+        "From reading pixels out of the canvas",
+        "From CSS dimensions in `styles.css`",
+        "From the static README files"
+      ],
+      "correct": 0,
+      "explanation": "`exportPrintKit` starts at line 1431 in `src/main.ts` and calls `createPrintDesignThreeMfExport` for generated print designs."
+    },
+    {
+      "type": "textOnly",
+      "id": "11-summary",
+      "title": "Summary",
+      "description": "User outputs are downstream views of layout and kit data: diagnostics, summaries, downloads, purchase guidance, and print sheets. The final tour covers tests, scripts, config, and reference material that help keep those outputs stable."
+    }
+  ]
+}

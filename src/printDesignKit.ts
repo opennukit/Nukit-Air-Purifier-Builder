@@ -1,6 +1,11 @@
 import { createCorsiRosenthalPrintableKit } from "./corsiRosenthalKit";
 import { createDonutFilterPrintableKit } from "./donutFilterKit";
-import { isCorsiRosenthalPrintDesignId, isDonutFilterPrintDesignId, type LayoutResult } from "./airPurifier";
+import {
+  isCorsiRosenthalPrintDesignId,
+  isDonutFilterPrintDesignId,
+  isStaticReferencePrintDesignId,
+  type LayoutResult,
+} from "./airPurifier";
 import {
   createPrintableKit,
   createPrintableThreeMfExportFromKit,
@@ -10,6 +15,9 @@ import {
 } from "./printableKit";
 
 export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
+  if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
+    throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
+  }
   if (isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id)) {
     return createCorsiRosenthalPrintableKit(layout, presetId);
   }

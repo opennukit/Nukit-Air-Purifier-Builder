@@ -1,0 +1,135 @@
+{
+  "title": "1 FilterBoxBuilder: Architecture Overview",
+  "id": "01-filterboxbuilder-architecture-overview",
+  "position": 1,
+  "steps": [
+    {
+      "type": "textOnly",
+      "id": "01-overview",
+      "title": "Overview: Architecture",
+      "description": "FilterBoxBuilder is a browser-only TypeScript app for designing air purifier enclosures. It has one DOM entry point, a domain layer that turns settings into geometry, preview renderers for Three.js and SVG, and export paths for laser drawings and print kits."
+    },
+    {
+      "type": "revealFiles",
+      "id": "01-project-shape",
+      "title": "Project Shape",
+      "description": "The app is intentionally small at the runtime boundary: Vite serves `index.html`, Bun runs tests and scripts, and the browser loads `src/main.ts`. The README keeps the upstream hardware context next to the generated web app.",
+      "files": [
+        "README.md",
+        "package.json",
+        "index.html",
+        "vite.config.ts"
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-bun-vite-scripts",
+      "title": "Bun and Vite Scripts",
+      "description": "The scripts in this snippet define the normal developer loop: Vite dev server, TypeScript checking, Vite build, Bun tests, and two Boxes.py audit helpers. The app has no backend process in this package.",
+      "file": "package.json",
+      "highlight": [
+        {
+          "start": 6,
+          "end": 13
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-browser-entry",
+      "title": "Browser Entry Point",
+      "description": "The HTML file has one mount node and one module script. That keeps the browser boundary clear: all app state, event handling, rendering, and export behavior starts in `src/main.ts`.",
+      "file": "index.html",
+      "highlight": [
+        {
+          "start": 13,
+          "end": 15
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-workbench-boot",
+      "title": "Workbench Boot State",
+      "description": "The initial settings and workbench state are decoded from the URL before controls or previews render. This is why shared URLs can recreate both fabrication mode and view state.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 90,
+          "end": 99
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-layout-join-point",
+      "title": "Domain Join Point",
+      "description": "The layout function is the main domain handoff. Browser controls give it raw settings, and it returns normalized settings, cut panels, summary numbers, SVG data, and diagnostics used elsewhere.",
+      "file": "src/airPurifier.ts",
+      "highlight": [
+        {
+          "start": 1356,
+          "end": 1364
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-preview-classes",
+      "title": "Preview Classes",
+      "description": "The browser workbench owns two renderer instances. One renders the assembled enclosure; the other renders cut sheets or print sheets. Later tours separate what each renderer receives from how it draws.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 376,
+          "end": 381
+        },
+        {
+          "start": 393,
+          "end": 396
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "highlight",
+      "id": "01-export-route",
+      "title": "Export Route",
+      "description": "Exports stay client-side too. The active settings choose either SVG drawing export or 3MF/static-file export, and the workbench decides which action is visible.",
+      "file": "src/main.ts",
+      "highlight": [
+        {
+          "start": 1418,
+          "end": 1425
+        }
+      ],
+      "hideAreas": []
+    },
+    {
+      "type": "mcq",
+      "id": "01-mcq-runtime-boundary",
+      "title": "Quick Check",
+      "description": "",
+      "text": "Where does this app do its main geometry and export work?",
+      "answers": [
+        "In a local Python server started by Vite",
+        "In browser-loaded TypeScript modules",
+        "In a remote CAD service",
+        "In static SVG files checked into the repo"
+      ],
+      "correct": 1,
+      "explanation": "`index.html` loads `src/main.ts` at line 15, and `package.json` only defines Vite/Bun scripts on lines 6-13. There is no backend runtime in this project."
+    },
+    {
+      "type": "textOnly",
+      "id": "01-summary",
+      "title": "Summary",
+      "description": "The codebase is a single-browser workbench around one domain pipeline. The next tour names the main data structures so the later geometry, print, preview, and export tours have a shared vocabulary."
+    }
+  ]
+}

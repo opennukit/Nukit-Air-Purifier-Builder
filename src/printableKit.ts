@@ -1,7 +1,7 @@
 import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
 import type { LayoutResult } from "./airPurifier";
 import type { CutFeature, CutPanel, CutPoint, RectCut } from "./cutGeometry";
-import { createStoredZipPackage, createThreeMfPackage, type MeshObject, type MeshTriangle, type MeshVertex } from "./threeMf";
+import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "./threeMf";
 
 export const exportFormats = ["print-3mf", "laser-svg"] as const;
 
@@ -51,12 +51,25 @@ export type PrintablePart = {
   readonly name: string;
   readonly kind: PrintablePartKind;
   readonly sourcePanelId?: string;
+  readonly sourceTile?: PrintableTileSource;
   readonly width: number;
   readonly depth: number;
   readonly height: number;
   readonly cutFeatureCount: number;
   readonly printCriticalCutFeatureCount: number;
   readonly mesh: PrintableMesh;
+};
+
+export type PrintableTileSource = {
+  readonly panelId: string;
+  readonly x0: number;
+  readonly x1: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly columnIndex: number;
+  readonly rowIndex: number;
+  readonly columnCount: number;
+  readonly rowCount: number;
 };
 
 export type PrintableMesh = {
@@ -289,17 +302,15 @@ export function createPrintableThreeMfExportFromKit(
   filename: string,
 ): PrintableThreeMfExport {
   const sheetPlan = createPrintableSheetPlanFromKit(kit);
-  const sheetPackages = sheetPlan.sheets.map((sheet) => ({
-    name: `sheet-${String(sheet.index).padStart(2, "0")}.3mf`,
-    content: createThreeMfPackage(`${title} - sheet ${sheet.index}`, createThreeMfObjectsFromSheet(sheet)),
-  }));
-  const isSingleSheet = sheetPackages.length === 1;
-  const bytes = isSingleSheet ? sheetPackages[0]!.content : createStoredZipPackage(sheetPackages);
 
   return {
-    filename: isSingleSheet ? filename : filename.replace(/\.3mf$/u, ".zip"),
-    mimeType: isSingleSheet ? "model/3mf" : "application/zip",
-    bytes,
+    filename,
+    mimeType: "model/3mf",
+    bytes: createThreeMfPackage(
+      title,
+      createThreeMfObjectsFromSheetPlan(sheetPlan),
+      createThreeMfPlatesFromSheetPlan(sheetPlan),
+    ),
     kit,
     sheetPlan,
   };
@@ -317,6 +328,10 @@ export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableShe
   };
 }
 
+function createThreeMfObjectsFromSheetPlan(sheetPlan: PrintableSheetPlan): MeshObject[] {
+  return sheetPlan.sheets.flatMap(createThreeMfObjectsFromSheet);
+}
+
 function createThreeMfObjectsFromSheet(sheet: PrintSheet): MeshObject[] {
   return sheet.placements.map((placement) => ({
     name: placement.part.name,
@@ -324,6 +339,21 @@ function createThreeMfObjectsFromSheet(sheet: PrintSheet): MeshObject[] {
     triangles: placement.part.mesh.triangles,
     position: { x: placement.x, y: placement.y, z: 0 },
   }));
+}
+
+function createThreeMfPlatesFromSheetPlan(sheetPlan: PrintableSheetPlan): MeshPlate[] {
+  let objectIndex = 0;
+  return sheetPlan.sheets.map((sheet) => {
+    const objectIndices = sheet.placements.map(() => {
+      const index = objectIndex;
+      objectIndex += 1;
+      return index;
+    });
+    return {
+      name: `Print plate ${sheet.index}`,
+      objectIndices,
+    };
+  });
 }
 
 function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): PrintSheet[] {
@@ -507,6 +537,17 @@ function createPanelTilePart(tile: PanelTile, materialThickness: number): Printa
     name: tile.name,
     kind: "panel-tile",
     sourcePanelId: tile.panel.id,
+    sourceTile: {
+      panelId: tile.panel.id,
+      x0: tile.x0,
+      x1: tile.x1,
+      y0: tile.y0,
+      y1: tile.y1,
+      columnIndex: tile.columnIndex,
+      rowIndex: tile.rowIndex,
+      columnCount: tile.columnCount,
+      rowCount: tile.rowCount,
+    },
     width,
     depth,
     height: materialThickness,
