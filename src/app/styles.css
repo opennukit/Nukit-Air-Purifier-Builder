@@ -1,3 +1,7 @@
+/* #######################################
+Design Tokens and Base Elements
+####################################### */
+
 :root {
   color-scheme: light;
   font-family:
@@ -53,6 +57,10 @@ select {
 button {
   border: 0;
 }
+
+/* #######################################
+App Shell
+####################################### */
 
 .app-shell {
   min-height: 100svh;
@@ -185,6 +193,10 @@ button {
   transform: translateY(-1px);
 }
 
+/* #######################################
+Workbench Layout
+####################################### */
+
 .method-workbench {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -219,6 +231,10 @@ button {
   border: 1px solid rgb(217 208 191 / 72%);
   background: rgb(248 245 236 / 86%);
 }
+
+/* #######################################
+Preview Pane
+####################################### */
 
 .preview-pane {
   min-width: 0;
@@ -530,6 +546,10 @@ button {
   font-size: 0.92rem;
 }
 
+/* #######################################
+Control Tabs and Panels
+####################################### */
+
 .controls-pane {
   position: sticky;
   top: 24px;
@@ -539,7 +559,7 @@ button {
 
 .controls-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
   gap: 2px;
   margin-bottom: 14px;
@@ -584,7 +604,8 @@ button {
 
 .design-controls,
 .parts-controls,
-.setup-controls {
+.setup-controls,
+.advanced-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
@@ -609,6 +630,16 @@ button {
 
 .setup-controls {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.advanced-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.advanced-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
 }
 
 .tab-panel[hidden] {
@@ -657,6 +688,10 @@ button {
 .section-heading h2 {
   font-size: 1.08rem;
 }
+
+/* #######################################
+Form Controls
+####################################### */
 
 .field,
 .toggle-field {
@@ -1014,12 +1049,17 @@ button {
 [data-generated-layout-controls][hidden],
 [data-generated-part-controls][hidden],
 [data-generated-geometry-controls][hidden],
+[data-generated-advanced-controls][hidden],
 [data-nukit-filter-count][hidden],
 [data-nukit-panel-fit-controls][hidden],
 [data-nukit-print-split-control][hidden],
 [data-laser-output-controls][hidden] {
   display: none;
 }
+
+/* #######################################
+Parts and Purchase Cards
+####################################### */
 
 .custom-dimensions {
   display: grid;
@@ -1063,6 +1103,10 @@ button {
   padding-right: 8px;
   font-size: 0.7rem;
 }
+
+/* #######################################
+Export Status
+####################################### */
 
 .persistent-output-panel {
   display: grid;
@@ -1123,6 +1167,10 @@ button {
   border-left-color: #a06628;
   background: rgb(160 102 40 / 10%);
 }
+
+/* #######################################
+Design-Specific Layout Controls
+####################################### */
 
 .segmented-field {
   margin: 14px 0;
@@ -1278,6 +1326,10 @@ button {
   display: none;
 }
 
+/* #######################################
+Preview Dialog
+####################################### */
+
 .sheet-dialog {
   width: min(96vw, 1600px);
   height: min(92svh, 980px);
@@ -1354,6 +1406,10 @@ button {
     transform: translateY(0) scale(1);
   }
 }
+
+/* #######################################
+Responsive Rules
+####################################### */
 
 @media (min-width: 1241px) {
   html,
@@ -1539,7 +1595,8 @@ button {
 
 @media (max-width: 1240px) {
   .design-controls,
-  .parts-controls {
+  .parts-controls,
+  .advanced-field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1570,7 +1627,9 @@ button {
 @media (max-width: 860px) {
   .design-controls,
   .parts-controls,
-  .setup-controls {
+  .setup-controls,
+  .advanced-controls,
+  .advanced-field-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1645,6 +1704,12 @@ button {
     right: 8px;
     gap: 6px;
     flex-wrap: wrap;
+  }
+
+  .preview-toggle-strip {
+    flex: 1 1 calc(100% - 46px);
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   .preview-camera-field,

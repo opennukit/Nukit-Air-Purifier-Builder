@@ -11,13 +11,23 @@ import {
   type FilterPresetId,
   type FilterSelection,
 } from "@/domain/purifier/filter";
-import type { ReferenceScale } from "@/fabrication/laser/cutSettings";
+import {
+  defaultCutJointSettings,
+  type CutJointSettings,
+  type ReferenceScale,
+} from "@/fabrication/laser/cutSettings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   staticPrintReferenceIds,
+  staticPrintReferenceHasPlatePreview,
   staticPrintReferences,
+  type StaticPrintReferenceCapabilities,
   type StaticPrintReference,
 } from "@/resources/static-print-references/references";
+
+// #######################################
+// Product Vocabulary
+// #######################################
 
 export const fanDiameters = [40, 60, 80, 92, 120, 140] as const;
 
@@ -59,6 +69,12 @@ export type CorsiRosenthalLayoutSettings = {
   readonly fanCount: number;
 };
 
+export type CorsiRosenthalConfiguration = {
+  readonly mode: CorsiRosenthalMode;
+  readonly filterCount: number;
+  readonly fanCount: FanCountRequest;
+};
+
 export type CorsiFanGridFit =
   | {
       readonly type: "invalid";
@@ -90,9 +106,17 @@ export type DonutFilterSettings = {
   readonly length: Millimeters;
   readonly holeDiameter: Millimeters;
   readonly insertLength: Millimeters;
-  readonly capRim: Millimeters;
-  readonly capEnabled: boolean;
+  readonly cap: DonutCap;
 };
+
+export type DonutCap =
+  | {
+      readonly type: "none";
+    }
+  | {
+      readonly type: "printed-cap";
+      readonly rim: Millimeters;
+    };
 
 export const donutFilterPresetIds = [
   "big-clive-silentnight-92",
@@ -151,7 +175,9 @@ export type FanWall = "left" | "right" | "top" | "bottom";
 
 export type FanBanks<T> = Record<FanWall, T>;
 
-type PrintDesignPresetBase = {
+export type ReleaseVisibility = "public" | "internal";
+
+export type PrintDesignPresetBase = {
   readonly id: PrintDesignId;
   readonly label: string;
   readonly detail: string;
@@ -159,35 +185,86 @@ type PrintDesignPresetBase = {
   readonly sourceUrl?: string;
   readonly license: string;
   readonly licenseUrl?: string;
-  readonly recommendedFilterPreset: FilterPresetId;
-  readonly recommendedFanPreset: FanProductPresetId;
-  readonly recommendedFanCount: number;
-  readonly recommendedFilterCount: FilterCount;
+  readonly releaseVisibility: ReleaseVisibility;
   readonly assemblyNotes: readonly string[];
 };
 
 export type PrintDesignModel =
   | {
       readonly type: "laser-derived-printable-kit";
+      readonly defaults: LaserDerivedPrintDesignDefaults;
     }
   | {
       readonly type: "corsi-rosenthal";
       readonly frameStyle: CorsiRosenthalFrameStyle;
-      readonly recommendedMode: CorsiRosenthalMode;
-      readonly recommendedFilterCount: number;
+      readonly defaults: CorsiRosenthalPrintDesignDefaults;
     }
   | {
       readonly type: "donut-filter-adapter";
-      readonly recommendedDonutFilterPreset: PresetDonutFilterId;
-      readonly filterDefaults: DonutFilterSettings;
+      readonly defaults: DonutFilterAdapterPrintDesignDefaults;
     }
   | {
       readonly type: "static-reference";
       readonly reference: StaticPrintReference;
+      readonly defaults: StaticReferencePrintDesignDefaults;
     };
 
-export type PrintDesignPreset = PrintDesignPresetBase & {
-  readonly model: PrintDesignModel;
+export type LaserDerivedPrintDesignPreset = PrintDesignPresetBase & {
+  readonly model: Extract<PrintDesignModel, { readonly type: "laser-derived-printable-kit" }>;
+};
+
+export type CorsiRosenthalPrintDesignPreset = PrintDesignPresetBase & {
+  readonly model: Extract<PrintDesignModel, { readonly type: "corsi-rosenthal" }>;
+};
+
+export type DonutFilterAdapterPrintDesignPreset = PrintDesignPresetBase & {
+  readonly model: Extract<PrintDesignModel, { readonly type: "donut-filter-adapter" }>;
+};
+
+export type StaticReferencePrintDesignPreset = PrintDesignPresetBase & {
+  readonly model: Extract<PrintDesignModel, { readonly type: "static-reference" }>;
+};
+
+export type PrintDesignPreset =
+  | LaserDerivedPrintDesignPreset
+  | CorsiRosenthalPrintDesignPreset
+  | DonutFilterAdapterPrintDesignPreset
+  | StaticReferencePrintDesignPreset;
+
+export type CommonPrintDesignDefaults = {
+  readonly filterPreset: FilterPresetId;
+  readonly fanPreset: FanProductPresetId;
+};
+
+export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly filterCount: FilterCount;
+  readonly fanBanks: FanBanks<FanCountRequest>;
+  readonly splitFrames: boolean;
+};
+
+export type CorsiRosenthalPrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly mode: CorsiRosenthalMode;
+  readonly filterCount: number;
+  readonly fanCount: FanCountRequest;
+  readonly splitFrames: boolean;
+  readonly rim: Millimeters;
+  readonly materialThickness: Millimeters;
+  readonly screwHoleDiameter: Millimeters;
+};
+
+export type DonutFilterAdapterPrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly donutFilterPreset: PresetDonutFilterId;
+  readonly filter: DonutFilterSettings;
+  readonly fanCount: FixedFanCount;
+  readonly splitFrames: boolean;
+  readonly materialThickness: Millimeters;
+  readonly screwHoleDiameter: Millimeters;
+};
+
+export type StaticReferencePrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly filterCount: FilterCount;
+  readonly fanCount: number;
+  readonly splitFrames: boolean;
 };
 
 export type FanSpec = {
@@ -244,6 +321,10 @@ export type PresetFanProduct = FanProductPreset & {
 
 export const customFanProductPresetId: FanProductPresetId = "custom";
 export const defaultFanProductPresetId: PresetFanProductId = "nukit-arctic-p14";
+
+// #######################################
+// Fan Product Presets
+// #######################################
 
 export const fanProductPresets: readonly FanProductPreset[] = [
   {
@@ -360,6 +441,16 @@ export type FanConfiguration = {
   banks: FanBanks<FanCountRequest>;
 };
 
+export type SingleFanConfiguration = {
+  spec: FanSpec;
+  productSelection: FanProductSelection;
+  count: FixedFanCount;
+};
+
+// #######################################
+// Build Configuration
+// #######################################
+
 export type ResolvedFanBanks = FanBanks<number>;
 
 export type FilterFrameConstruction =
@@ -377,24 +468,45 @@ export type CuttingSettings = {
   kerfFit: Millimeters;
   labels: boolean;
   referenceScale: ReferenceScale;
+  joints: JointSettings;
 };
 
+export type JointSettings = CutJointSettings;
+
 export type PreviewSettings = {
-  showFilterMedia: boolean;
-  showFans: boolean;
-  showFilterFrame: boolean;
-  transparentWalls: boolean;
-  explodedView: boolean;
-  showDimensions: boolean;
-  showBananaScale: boolean;
-  showPrintSeams: boolean;
-  showPrintPlateLabels: boolean;
-  autoRotate: boolean;
-  cameraPreset: CameraPreset;
+  readonly enclosure: EnclosurePreviewOptions;
+  readonly printSheets: PrintSheetPreviewOptions;
+  readonly cutSheet: CutSheetPreviewOptions;
+};
+
+export type EnclosurePreviewOptions = {
+  readonly showFilterMedia: boolean;
+  readonly showFans: boolean;
+  readonly showFilterFrame: boolean;
+  readonly transparentWalls: boolean;
+  readonly explodedView: boolean;
+  readonly showDimensions: boolean;
+  readonly showBananaScale: boolean;
+  readonly showPrintSeams: boolean;
+  readonly autoRotate: boolean;
+  readonly cameraPreset: CameraPreset;
+};
+
+export type PrintSheetPreviewOptions = {
+  readonly showPlateLabels: boolean;
+};
+
+export type CutSheetPreviewOptions = {
+  readonly showLabels: boolean;
+  readonly referenceScale: ReferenceScale;
 };
 
 export const customDonutFilterPresetId: DonutFilterPresetId = "custom";
 export const defaultDonutFilterPresetId: PresetDonutFilterId = "big-clive-silentnight-92";
+
+// #######################################
+// Donut Filter Presets
+// #######################################
 
 export const donutFilterPresets: readonly DonutFilterPreset[] = [
   {
@@ -408,8 +520,7 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
       length: 150,
       holeDiameter: 92,
       insertLength: 10,
-      capRim: 10,
-      capEnabled: true,
+      cap: { type: "printed-cap", rim: 10 },
     },
   },
   {
@@ -425,8 +536,7 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
       length: 135,
       holeDiameter: 92,
       insertLength: 10,
-      capRim: 10,
-      capEnabled: true,
+      cap: { type: "printed-cap", rim: 10 },
     },
   },
   {
@@ -442,8 +552,7 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
       length: 145,
       holeDiameter: 110,
       insertLength: 12,
-      capRim: 12,
-      capEnabled: true,
+      cap: { type: "printed-cap", rim: 12 },
     },
   },
   {
@@ -459,8 +568,7 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
       length: 147,
       holeDiameter: 120,
       insertLength: 12,
-      capRim: 12,
-      capEnabled: true,
+      cap: { type: "printed-cap", rim: 12 },
     },
   },
   {
@@ -474,13 +582,16 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
       length: 150,
       holeDiameter: 92,
       insertLength: 10,
-      capRim: 10,
-      capEnabled: true,
+      cap: { type: "printed-cap", rim: 10 },
     },
   },
 ];
 
 export const defaultPrintDesignId: PrintDesignId = "nukit-open-air";
+
+// #######################################
+// Print Design Presets
+// #######################################
 
 export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
@@ -489,12 +600,21 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     detail: "3D-printable Nukit enclosure split into bed-sized panels with dovetail lap keys for glued seams.",
     source: "FilterBoxBuilder browser generator",
     license: "Generated from this project",
-    recommendedFilterPreset: "merv13-20x25x1",
-    recommendedFanPreset: defaultFanProductPresetId,
-    recommendedFanCount: automaticFanCount,
-    recommendedFilterCount: 2,
+    releaseVisibility: "public",
     model: {
       type: "laser-derived-printable-kit",
+      defaults: {
+        filterPreset: "merv13-20x25x1",
+        fanPreset: defaultFanProductPresetId,
+        filterCount: 2,
+        fanBanks: {
+          left: { type: "auto" },
+          right: { type: "auto" },
+          top: { type: "fixed", count: 0 },
+          bottom: { type: "fixed", count: 0 },
+        },
+        splitFrames: true,
+      },
     },
     assemblyNotes: [
       "Keeps the proven Nukit airflow layout",
@@ -511,15 +631,21 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     sourceUrl: "https://www.printables.com/model/1348938-corsi-rosenthal-box-air-filter",
     license: "Inspired by CC BY-NC 4.0 reference; generated geometry is original and parametric in this app",
     licenseUrl: "https://creativecommons.org/licenses/by-nc/4.0/",
-    recommendedFilterPreset: "ikea-starkvind",
-    recommendedFanPreset: "arctic-p12-pwm-pst",
-    recommendedFanCount: automaticFanCount,
-    recommendedFilterCount: 2,
+    releaseVisibility: "internal",
     model: {
       type: "corsi-rosenthal",
       frameStyle: "modular-rail",
-      recommendedMode: "top-exhaust",
-      recommendedFilterCount: 4,
+      defaults: {
+        filterPreset: "ikea-starkvind",
+        fanPreset: "arctic-p12-pwm-pst",
+        mode: "top-exhaust",
+        filterCount: 4,
+        fanCount: { type: "auto" },
+        splitFrames: true,
+        rim: 24,
+        materialThickness: 6,
+        screwHoleDiameter: 4.5,
+      },
     },
     assemblyNotes: [
       "Uses repeated frame-unit rails and separate corner blocks so the frame can be printed on smaller beds",
@@ -533,20 +659,24 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     detail: "Self-scaling round-filter adaptor for a PC fan, with optional press-fit blanking cap and printed fan guard.",
     source: "Big Clive donut HEPA OpenSCAD reference",
     license: "Reference script published in the video description; generated geometry is parametric in this app",
-    recommendedFilterPreset: "custom",
-    recommendedFanPreset: "arctic-p12-pwm-pst",
-    recommendedFanCount: 1,
-    recommendedFilterCount: 1,
+    releaseVisibility: "internal",
     model: {
       type: "donut-filter-adapter",
-      recommendedDonutFilterPreset: defaultDonutFilterPresetId,
-      filterDefaults: {
-        outerDiameter: 125,
-        length: 150,
-        holeDiameter: 92,
-        insertLength: 10,
-        capRim: 10,
-        capEnabled: true,
+      defaults: {
+        filterPreset: "custom",
+        fanPreset: "arctic-p12-pwm-pst",
+        donutFilterPreset: defaultDonutFilterPresetId,
+        fanCount: 1,
+        filter: {
+          outerDiameter: 125,
+          length: 150,
+          holeDiameter: 92,
+          insertLength: 10,
+          cap: { type: "printed-cap", rim: 10 },
+        },
+        splitFrames: false,
+        materialThickness: 1.5,
+        screwHoleDiameter: 5,
       },
     },
     assemblyNotes: [
@@ -563,13 +693,17 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     sourceUrl: staticPrintReferences["static-cr-16x20-140"].sourceUrl,
     license: "CC-BY",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
-    recommendedFilterPreset: "merv13-16x20x1",
-    recommendedFanPreset: defaultFanProductPresetId,
-    recommendedFanCount: 5,
-    recommendedFilterCount: 1,
+    releaseVisibility: "internal",
     model: {
       type: "static-reference",
       reference: staticPrintReferences["static-cr-16x20-140"],
+      defaults: {
+        filterPreset: "merv13-16x20x1",
+        fanPreset: defaultFanProductPresetId,
+        fanCount: 5,
+        filterCount: 1,
+        splitFrames: false,
+      },
     },
     assemblyNotes: [
       "Static curated reference, not generated from the current parameters",
@@ -585,13 +719,17 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     sourceUrl: staticPrintReferences["static-cr-14x20-base"].sourceUrl,
     license: "CC-BY",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
-    recommendedFilterPreset: "merv13-14x20x1",
-    recommendedFanPreset: "arctic-p12-pwm-pst",
-    recommendedFanCount: 4,
-    recommendedFilterCount: 2,
+    releaseVisibility: "public",
     model: {
       type: "static-reference",
       reference: staticPrintReferences["static-cr-14x20-base"],
+      defaults: {
+        filterPreset: "merv13-14x20x1",
+        fanPreset: "arctic-p12-pwm-pst",
+        fanCount: 4,
+        filterCount: 2,
+        splitFrames: false,
+      },
     },
     assemblyNotes: [
       "Static curated reference, not generated from the current parameters",
@@ -609,13 +747,17 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     sourceUrl: staticPrintReferences["static-modular-20x20-reference"].sourceUrl,
     license: "CC-BY-NC-SA",
     licenseUrl: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
-    recommendedFilterPreset: "merv13-20x20x1",
-    recommendedFanPreset: defaultFanProductPresetId,
-    recommendedFanCount: 4,
-    recommendedFilterCount: 1,
+    releaseVisibility: "internal",
     model: {
       type: "static-reference",
       reference: staticPrintReferences["static-modular-20x20-reference"],
+      defaults: {
+        filterPreset: "merv13-20x20x1",
+        fanPreset: defaultFanProductPresetId,
+        fanCount: 4,
+        filterCount: 1,
+        splitFrames: false,
+      },
     },
     assemblyNotes: [
       "Static external reference, not generated from the current parameters",
@@ -625,13 +767,33 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   },
 ];
 
-export const publicPrintDesignPresets: readonly PrintDesignPreset[] = printDesignPresets.filter(
-  (preset) => preset.id === "nukit-open-air" || preset.id === "static-cr-14x20-base",
-);
+export const publicPrintDesignPresets: readonly PrintDesignPreset[] = printDesignPresets.filter(isPublicPrintDesignPreset);
+
+// #######################################
+// Public Release Presets
+// #######################################
 
 export function isPublicPrintDesignId(id: PrintDesignId): boolean {
   return publicPrintDesignPresets.some((preset) => preset.id === id);
 }
+
+function isPublicPrintDesignPreset(preset: PrintDesignPreset): boolean {
+  return preset.releaseVisibility === "public";
+}
+
+function rawFilterCountForPrintDesign(preset: PrintDesignPreset): FilterCount {
+  if (isLaserDerivedPrintDesignPreset(preset) || isStaticReferencePrintDesignPreset(preset)) {
+    return preset.model.defaults.filterCount;
+  }
+  if (isDonutFilterAdapterPrintDesignPreset(preset)) {
+    return 1;
+  }
+  return defaultSettings.filters;
+}
+
+// #######################################
+// Settings Model
+// #######################################
 
 export type RawPurifierSettings = {
   printDesign: PrintDesignId;
@@ -661,6 +823,14 @@ export type RawPurifierSettings = {
   screwHoleDiameter: Millimeters;
   materialThickness: Millimeters;
   kerfFit: Millimeters;
+  fingerWidthMultiplier: number;
+  fingerSpaceMultiplier: number;
+  fingerPlayMultiplier: number;
+  fingerHoleWidthMultiplier: number;
+  fingerHoleOffsetMultiplier: number;
+  dovetailSizeMultiplier: number;
+  dovetailDepthMultiplier: number;
+  dovetailTaper: number;
   showFilterMedia: boolean;
   showFans: boolean;
   showFilterFrame: boolean;
@@ -676,8 +846,42 @@ export type RawPurifierSettings = {
   referenceScale: Millimeters;
 };
 
+export type ConfiguredPrintDesign =
+  | {
+      readonly type: "laser-derived-printable-kit";
+      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly filter: FilterSelection;
+      readonly filterCount: FilterCount;
+      readonly fanBanks: FanBanks<FanCountRequest>;
+      readonly frameConstruction: FilterFrameConstruction;
+    }
+  | {
+      readonly type: "corsi-rosenthal";
+      readonly preset: CorsiRosenthalPrintDesignPreset;
+      readonly filter: FilterSelection;
+      readonly configuration: CorsiRosenthalConfiguration;
+      readonly frameStyle: CorsiRosenthalFrameStyle;
+    }
+  | {
+      readonly type: "donut-filter-adapter";
+      readonly preset: DonutFilterAdapterPrintDesignPreset;
+      readonly donutFilterPreset: DonutFilterPresetId;
+      readonly filter: DonutFilterSettings;
+      readonly fan: SingleFanConfiguration;
+    }
+  | {
+      readonly type: "static-reference";
+      readonly preset: StaticReferencePrintDesignPreset;
+      readonly reference: StaticPrintReference;
+      readonly capabilities: StaticPrintReferenceCapabilities;
+      readonly filter: FilterSelection;
+      readonly filterCount: FilterCount;
+      readonly fanCount: number;
+    };
+
 export type PurifierSettings = {
   printDesign: PrintDesignPreset;
+  design: ConfiguredPrintDesign;
   filter: FilterSelection;
   filterCount: FilterCount;
   fan: FanConfiguration;
@@ -696,6 +900,10 @@ export type BuildSummary = {
 };
 
 export type PurifierInput = RawPurifierSettings | PurifierSettings;
+
+// #######################################
+// Defaults
+// #######################################
 
 export const defaultSettings: RawPurifierSettings = {
   printDesign: defaultPrintDesignId,
@@ -725,6 +933,14 @@ export const defaultSettings: RawPurifierSettings = {
   screwHoleDiameter: 5,
   materialThickness: 6,
   kerfFit: 0.1,
+  fingerWidthMultiplier: defaultCutJointSettings.finger.widthMultiplier,
+  fingerSpaceMultiplier: defaultCutJointSettings.finger.spaceMultiplier,
+  fingerPlayMultiplier: defaultCutJointSettings.finger.playMultiplier,
+  fingerHoleWidthMultiplier: defaultCutJointSettings.finger.holeWidthMultiplier,
+  fingerHoleOffsetMultiplier: defaultCutJointSettings.finger.holeOffsetMultiplier,
+  dovetailSizeMultiplier: defaultCutJointSettings.dovetail.sizeMultiplier,
+  dovetailDepthMultiplier: defaultCutJointSettings.dovetail.depthMultiplier,
+  dovetailTaper: defaultCutJointSettings.dovetail.taper,
   showFilterMedia: true,
   showFans: true,
   showFilterFrame: true,
@@ -740,6 +956,10 @@ export const defaultSettings: RawPurifierSettings = {
   referenceScale: 100,
 };
 
+// #######################################
+// Settings Normalization
+// #######################################
+
 export function normalizeSettings(input: PurifierInput): PurifierSettings {
   const raw = isStructuredSettings(input) ? toRawSettings(input) : input;
   const printDesign = findPrintDesignPreset(raw.printDesign);
@@ -753,43 +973,44 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
   const workingDepth = dimensions.depth - materialThickness;
   const chamberHeight = fanSpec.diameter + 2 + filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(raw.rim, dimensions.width, workingDepth, chamberHeight);
+  const filter = createFilterSelection(preset.id, dimensions);
+  const fan: FanConfiguration = {
+    spec: fanSpec,
+    productSelection: createFanProductSelection(fanProductPreset.id),
+    banks: {
+      left: fanCountRequestFromRawSetting(raw.fansLeft),
+      right: fanCountRequestFromRawSetting(raw.fansRight),
+      top: fanCountRequestFromRawSetting(raw.fansTop),
+      bottom: fanCountRequestFromRawSetting(raw.fansBottom),
+    },
+  };
+  const frameConstruction: FilterFrameConstruction = raw.splitFrames ? { type: "split-rails" } : { type: "full-panels" };
+  const cutting: CuttingSettings = {
+    materialThickness,
+    rim,
+    screwHoleDiameter: clamp(raw.screwHoleDiameter, 2, 10),
+    kerfFit: clamp(raw.kerfFit, 0, 1),
+    labels: raw.labels,
+    referenceScale: referenceScaleFromNumber(raw.referenceScale),
+    joints: normalizeJointSettings(raw),
+  };
 
   return {
     printDesign,
-    filter: createFilterSelection(preset.id, dimensions),
+    design: createConfiguredPrintDesign({
+      raw,
+      printDesign,
+      filter,
+      filterCount,
+      fan,
+      frameConstruction,
+    }),
+    filter,
     filterCount,
-    fan: {
-      spec: fanSpec,
-      productSelection: createFanProductSelection(fanProductPreset.id),
-      banks: {
-        left: fanCountRequestFromNumber(raw.fansLeft),
-        right: fanCountRequestFromNumber(raw.fansRight),
-        top: fanCountRequestFromNumber(raw.fansTop),
-        bottom: fanCountRequestFromNumber(raw.fansBottom),
-      },
-    },
-    frameConstruction: raw.splitFrames ? { type: "split-rails" } : { type: "full-panels" },
-    cutting: {
-      materialThickness,
-      rim,
-      screwHoleDiameter: clamp(raw.screwHoleDiameter, 2, 10),
-      kerfFit: clamp(raw.kerfFit, 0, 1),
-      labels: raw.labels,
-      referenceScale: referenceScaleFromNumber(raw.referenceScale),
-    },
-    preview: {
-      showFilterMedia: raw.showFilterMedia,
-      showFans: raw.showFans,
-      showFilterFrame: true,
-      transparentWalls: raw.transparentWalls,
-      explodedView: raw.explodedView,
-      showDimensions: raw.showDimensions,
-      showBananaScale: raw.showBananaScale,
-      showPrintSeams: raw.showPrintSeams,
-      showPrintPlateLabels: raw.showPrintPlateLabels,
-      autoRotate: raw.autoRotate,
-      cameraPreset: cameraPresets.includes(raw.cameraPreset) ? raw.cameraPreset : defaultSettings.cameraPreset,
-    },
+    fan,
+    frameConstruction,
+    cutting,
+    preview: createPreviewSettings(raw, cutting.referenceScale),
   };
 }
 
@@ -808,8 +1029,8 @@ export function normalizeRawSettings(input: RawPurifierSettings): RawPurifierSet
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
     donutAdapterInsertLength: donutFilter.insertLength,
-    donutCapRim: donutFilter.capRim,
-    donutCapEnabled: donutFilter.capEnabled,
+    donutCapRim: donutCapRawRim(donutFilter.cap),
+    donutCapEnabled: donutFilter.cap.type === "printed-cap",
   });
 }
 
@@ -819,7 +1040,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
   }
 
   const filterDimensions = filterSelectionDimensions(input.filter);
-  return {
+  const base: RawPurifierSettings = {
     printDesign: input.printDesign.id,
     filterPreset: input.filter.type === "preset" ? input.filter.presetId : customFilterPresetId,
     filterWidth: filterDimensions.width,
@@ -830,10 +1051,10 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fanDiameter: input.fan.spec.diameter,
     filters: input.filterCount,
     splitFrames: input.frameConstruction.type === "split-rails",
-    fansLeft: fanCountRequestToNumber(input.fan.banks.left),
-    fansRight: fanCountRequestToNumber(input.fan.banks.right),
-    fansTop: fanCountRequestToNumber(input.fan.banks.top),
-    fansBottom: fanCountRequestToNumber(input.fan.banks.bottom),
+    fansLeft: fanCountRequestToRawSetting(input.fan.banks.left),
+    fansRight: fanCountRequestToRawSetting(input.fan.banks.right),
+    fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
+    fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     corsiMode: defaultSettings.corsiMode,
     corsiFilterCount: defaultSettings.corsiFilterCount,
     corsiFanCount: defaultSettings.corsiFanCount,
@@ -847,21 +1068,93 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     screwHoleDiameter: input.cutting.screwHoleDiameter,
     materialThickness: input.cutting.materialThickness,
     kerfFit: input.cutting.kerfFit,
-    showFilterMedia: input.preview.showFilterMedia,
-    showFans: input.preview.showFans,
-    showFilterFrame: input.preview.showFilterFrame,
-    transparentWalls: input.preview.transparentWalls,
-    explodedView: input.preview.explodedView,
-    showDimensions: input.preview.showDimensions,
-    showBananaScale: input.preview.showBananaScale,
-    showPrintSeams: input.preview.showPrintSeams,
-    showPrintPlateLabels: input.preview.showPrintPlateLabels,
-    autoRotate: input.preview.autoRotate,
-    cameraPreset: input.preview.cameraPreset,
-    labels: input.cutting.labels,
-    referenceScale: input.cutting.referenceScale.type === "enabled" ? input.cutting.referenceScale.length : 0,
+    fingerWidthMultiplier: input.cutting.joints.finger.widthMultiplier,
+    fingerSpaceMultiplier: input.cutting.joints.finger.spaceMultiplier,
+    fingerPlayMultiplier: input.cutting.joints.finger.playMultiplier,
+    fingerHoleWidthMultiplier: input.cutting.joints.finger.holeWidthMultiplier,
+    fingerHoleOffsetMultiplier: input.cutting.joints.finger.holeOffsetMultiplier,
+    dovetailSizeMultiplier: input.cutting.joints.dovetail.sizeMultiplier,
+    dovetailDepthMultiplier: input.cutting.joints.dovetail.depthMultiplier,
+    dovetailTaper: input.cutting.joints.dovetail.taper,
+    showFilterMedia: input.preview.enclosure.showFilterMedia,
+    showFans: input.preview.enclosure.showFans,
+    showFilterFrame: input.preview.enclosure.showFilterFrame,
+    transparentWalls: input.preview.enclosure.transparentWalls,
+    explodedView: input.preview.enclosure.explodedView,
+    showDimensions: input.preview.enclosure.showDimensions,
+    showBananaScale: input.preview.enclosure.showBananaScale,
+    showPrintSeams: input.preview.enclosure.showPrintSeams,
+    showPrintPlateLabels: input.preview.printSheets.showPlateLabels,
+    autoRotate: input.preview.enclosure.autoRotate,
+    cameraPreset: input.preview.enclosure.cameraPreset,
+    labels: input.preview.cutSheet.showLabels,
+    referenceScale: input.preview.cutSheet.referenceScale.type === "enabled" ? input.preview.cutSheet.referenceScale.length : 0,
+  };
+
+  if (input.design.type === "laser-derived-printable-kit") {
+    return {
+      ...base,
+      filters: input.design.filterCount,
+      splitFrames: input.design.frameConstruction.type === "split-rails",
+      fansLeft: fanCountRequestToRawSetting(input.design.fanBanks.left),
+      fansRight: fanCountRequestToRawSetting(input.design.fanBanks.right),
+      fansTop: fanCountRequestToRawSetting(input.design.fanBanks.top),
+      fansBottom: fanCountRequestToRawSetting(input.design.fanBanks.bottom),
+    };
+  }
+
+  if (input.design.type === "corsi-rosenthal") {
+    return {
+      ...base,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: 0,
+      fansBottom: 0,
+      corsiMode: input.design.configuration.mode,
+      corsiFilterCount: input.design.configuration.filterCount,
+      corsiFanCount: fanCountRequestToRawSetting(input.design.configuration.fanCount),
+      splitFrames: input.design.preset.model.defaults.splitFrames,
+    };
+  }
+
+  if (input.design.type === "donut-filter-adapter") {
+    return {
+      ...base,
+      filterPreset: customFilterPresetId,
+      filterWidth: input.design.filter.outerDiameter,
+      filterDepth: input.design.filter.length,
+      filterThickness: input.design.filter.holeDiameter,
+      filters: 1,
+      splitFrames: input.design.preset.model.defaults.splitFrames,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: 0,
+      fansBottom: 0,
+      donutFilterPreset: input.design.donutFilterPreset,
+      donutFilterOuterDiameter: input.design.filter.outerDiameter,
+      donutFilterLength: input.design.filter.length,
+      donutFilterHoleDiameter: input.design.filter.holeDiameter,
+      donutAdapterInsertLength: input.design.filter.insertLength,
+      donutCapRim: donutCapRawRim(input.design.filter.cap),
+      donutCapEnabled: input.design.filter.cap.type === "printed-cap",
+    };
+  }
+
+  return {
+    ...base,
+    filters: input.design.filterCount,
+    splitFrames: input.design.preset.model.defaults.splitFrames,
+    fansLeft: 0,
+    fansRight: 0,
+    fansTop: input.design.fanCount,
+    fansBottom: 0,
+    corsiFanCount: input.design.fanCount > 0 ? input.design.fanCount : defaultSettings.corsiFanCount,
   };
 }
+
+// #######################################
+// Catalog Lookup Helpers
+// #######################################
 
 export function findPrintDesignPreset(id: PrintDesignId | string | null): PrintDesignPreset {
   return printDesignPresets.find((preset) => preset.id === id) ?? requiredPrintDesignPreset(defaultPrintDesignId);
@@ -879,8 +1172,42 @@ export function isStaticReferencePrintDesignId(id: PrintDesignId): boolean {
   return findPrintDesignPreset(id).model.type === "static-reference";
 }
 
+export function isLaserDerivedPrintDesignPreset(preset: PrintDesignPreset): preset is LaserDerivedPrintDesignPreset {
+  return preset.model.type === "laser-derived-printable-kit";
+}
+
+export function isCorsiRosenthalPrintDesignPreset(preset: PrintDesignPreset): preset is CorsiRosenthalPrintDesignPreset {
+  return preset.model.type === "corsi-rosenthal";
+}
+
+export function isDonutFilterAdapterPrintDesignPreset(preset: PrintDesignPreset): preset is DonutFilterAdapterPrintDesignPreset {
+  return preset.model.type === "donut-filter-adapter";
+}
+
+export function isStaticReferencePrintDesignPreset(preset: PrintDesignPreset): preset is StaticReferencePrintDesignPreset {
+  return preset.model.type === "static-reference";
+}
+
 export function staticPrintReferenceForPreset(preset: PrintDesignPreset): StaticPrintReference | undefined {
   return preset.model.type === "static-reference" ? preset.model.reference : undefined;
+}
+
+export function staticReferenceCanPreviewPrintPlates(preset: PrintDesignPreset): boolean {
+  return preset.model.type === "static-reference" && staticPrintReferenceHasPlatePreview(preset.model.reference);
+}
+
+export function defaultFilterPresetForPrintDesign(preset: PrintDesignPreset): FilterPresetId {
+  return preset.model.defaults.filterPreset;
+}
+
+export function defaultFanPresetForPrintDesign(preset: PrintDesignPreset): FanProductPresetId {
+  return preset.model.defaults.fanPreset;
+}
+
+export function staticReferenceDefaultsForPreset(
+  preset: PrintDesignPreset,
+): StaticReferencePrintDesignDefaults | undefined {
+  return preset.model.type === "static-reference" ? preset.model.defaults : undefined;
 }
 
 export function corsiFrameStyleForPreset(preset: PrintDesignPreset): CorsiRosenthalFrameStyle | undefined {
@@ -899,7 +1226,7 @@ function requiredDonutFilterDefaults(preset: PrintDesignPreset): DonutFilterSett
   if (preset.model.type !== "donut-filter-adapter") {
     throw new Error(`requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`);
   }
-  return preset.model.filterDefaults;
+  return preset.model.defaults.filter;
 }
 
 export function findDonutFilterPreset(id: DonutFilterPresetId | string | null): DonutFilterPreset {
@@ -929,6 +1256,10 @@ export function findPresetFanProduct(id: PresetFanProductId): PresetFanProduct {
   }
   return preset;
 }
+
+// #######################################
+// Preset Application
+// #######################################
 
 export function applyFilterPreset(settings: RawPurifierSettings, presetId: FilterPresetId): RawPurifierSettings {
   const preset = findFilterPreset(presetId);
@@ -980,19 +1311,19 @@ export function applyDonutFilterPreset(settings: RawPurifierSettings, presetId: 
     donutFilterLength: preset.settings.length,
     donutFilterHoleDiameter: preset.settings.holeDiameter,
     donutAdapterInsertLength: preset.settings.insertLength,
-    donutCapRim: preset.settings.capRim,
-    donutCapEnabled: preset.settings.capEnabled,
+    donutCapRim: donutCapRawRim(preset.settings.cap),
+    donutCapEnabled: preset.settings.cap.type === "printed-cap",
   };
 }
 
 export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: PrintDesignId): RawPurifierSettings {
   const preset = findPrintDesignPreset(presetId);
-  const filterPreset = findFilterPreset(preset.recommendedFilterPreset);
-  const fanPreset = findFanProductPreset(preset.recommendedFanPreset);
+  const filterPreset = findFilterPreset(defaultFilterPresetForPrintDesign(preset));
+  const fanPreset = findFanProductPreset(defaultFanPresetForPrintDesign(preset));
   const base = {
     ...settings,
     printDesign: preset.id,
-    filters: preset.recommendedFilterCount,
+    filters: rawFilterCountForPrintDesign(preset),
     fanPreset: fanPreset.id,
     fanDiameter: fanPreset.diameter,
   };
@@ -1015,18 +1346,18 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      corsiMode: preset.model.recommendedMode,
-      corsiFilterCount: preset.model.recommendedFilterCount,
-      corsiFanCount: preset.recommendedFanCount,
-      splitFrames: true,
-      rim: 24,
-      materialThickness: 6,
-      screwHoleDiameter: 4.5,
+      corsiMode: preset.model.defaults.mode,
+      corsiFilterCount: preset.model.defaults.filterCount,
+      corsiFanCount: fanCountRequestToRawSetting(preset.model.defaults.fanCount),
+      splitFrames: preset.model.defaults.splitFrames,
+      rim: preset.model.defaults.rim,
+      materialThickness: preset.model.defaults.materialThickness,
+      screwHoleDiameter: preset.model.defaults.screwHoleDiameter,
     };
   }
 
   if (preset.model.type === "donut-filter-adapter") {
-    const donutPreset = findDonutFilterPreset(preset.model.recommendedDonutFilterPreset);
+    const donutPreset = findDonutFilterPreset(preset.model.defaults.donutFilterPreset);
     const donutFilter = donutPreset.id === customDonutFilterPresetId ? requiredDonutFilterDefaults(preset) : donutPreset.settings;
     return {
       ...withRecommendedFilter,
@@ -1047,12 +1378,12 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       donutFilterLength: donutFilter.length,
       donutFilterHoleDiameter: donutFilter.holeDiameter,
       donutAdapterInsertLength: donutFilter.insertLength,
-      donutCapRim: donutFilter.capRim,
-      donutCapEnabled: donutFilter.capEnabled,
-      splitFrames: false,
+      donutCapRim: donutCapRawRim(donutFilter.cap),
+      donutCapEnabled: donutFilter.cap.type === "printed-cap",
+      splitFrames: preset.model.defaults.splitFrames,
       rim: defaultSettings.rim,
-      materialThickness: 1.5,
-      screwHoleDiameter: 5,
+      materialThickness: preset.model.defaults.materialThickness,
+      screwHoleDiameter: preset.model.defaults.screwHoleDiameter,
     };
   }
 
@@ -1061,11 +1392,11 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       ...withRecommendedFilter,
       fansLeft: 0,
       fansRight: 0,
-      fansTop: preset.recommendedFanCount,
+      fansTop: preset.model.defaults.fanCount,
       fansBottom: 0,
       corsiMode: defaultSettings.corsiMode,
       corsiFilterCount: defaultSettings.corsiFilterCount,
-      corsiFanCount: preset.recommendedFanCount > 0 ? preset.recommendedFanCount : defaultSettings.corsiFanCount,
+      corsiFanCount: preset.model.defaults.fanCount > 0 ? preset.model.defaults.fanCount : defaultSettings.corsiFanCount,
       donutFilterPreset: defaultSettings.donutFilterPreset,
       donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
       donutFilterLength: defaultSettings.donutFilterLength,
@@ -1073,7 +1404,7 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
       donutCapRim: defaultSettings.donutCapRim,
       donutCapEnabled: defaultSettings.donutCapEnabled,
-      splitFrames: false,
+      splitFrames: preset.model.defaults.splitFrames,
       rim: defaultSettings.rim,
       materialThickness: defaultSettings.materialThickness,
       screwHoleDiameter: defaultSettings.screwHoleDiameter,
@@ -1082,13 +1413,13 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
 
   return {
     ...withRecommendedFilter,
-    fansLeft: preset.recommendedFanCount,
-    fansRight: preset.recommendedFanCount,
-    fansTop: 0,
-    fansBottom: 0,
+    fansLeft: fanCountRequestToRawSetting(preset.model.defaults.fanBanks.left),
+    fansRight: fanCountRequestToRawSetting(preset.model.defaults.fanBanks.right),
+    fansTop: fanCountRequestToRawSetting(preset.model.defaults.fanBanks.top),
+    fansBottom: fanCountRequestToRawSetting(preset.model.defaults.fanBanks.bottom),
     corsiMode: defaultSettings.corsiMode,
     corsiFilterCount: defaultSettings.corsiFilterCount,
-    corsiFanCount: preset.recommendedFanCount > 0 ? preset.recommendedFanCount : defaultSettings.corsiFanCount,
+    corsiFanCount: defaultSettings.corsiFanCount,
     donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -1096,11 +1427,16 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
     donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
     donutCapRim: defaultSettings.donutCapRim,
     donutCapEnabled: defaultSettings.donutCapEnabled,
+    splitFrames: preset.model.defaults.splitFrames,
     rim: defaultSettings.rim,
     materialThickness: defaultSettings.materialThickness,
     screwHoleDiameter: defaultSettings.screwHoleDiameter,
   };
 }
+
+// #######################################
+// Corsi-Rosenthal Layout Rules
+// #######################################
 
 export function resolveCorsiRosenthalFanCount(layout: LayoutResult): number {
   if (!isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id)) {
@@ -1169,6 +1505,10 @@ export function corsiFanGridColumns(fanCount: number): number {
   return Math.min(3, fanCount);
 }
 
+// #######################################
+// URL Settings
+// #######################################
+
 export function encodeSettings(settings: RawPurifierSettings): string {
   const params = new URLSearchParams();
   params.set("printDesign", settings.printDesign);
@@ -1198,6 +1538,14 @@ export function encodeSettings(settings: RawPurifierSettings): string {
   params.set("screwHoleDiameter", formatNumber(settings.screwHoleDiameter));
   params.set("materialThickness", formatNumber(settings.materialThickness));
   params.set("kerfFit", formatNumber(settings.kerfFit));
+  params.set("fingerWidthMultiplier", formatNumber(settings.fingerWidthMultiplier));
+  params.set("fingerSpaceMultiplier", formatNumber(settings.fingerSpaceMultiplier));
+  params.set("fingerPlayMultiplier", formatNumber(settings.fingerPlayMultiplier));
+  params.set("fingerHoleWidthMultiplier", formatNumber(settings.fingerHoleWidthMultiplier));
+  params.set("fingerHoleOffsetMultiplier", formatNumber(settings.fingerHoleOffsetMultiplier));
+  params.set("dovetailSizeMultiplier", formatNumber(settings.dovetailSizeMultiplier));
+  params.set("dovetailDepthMultiplier", formatNumber(settings.dovetailDepthMultiplier));
+  params.set("dovetailTaper", formatNumber(settings.dovetailTaper));
   params.set("showFilterMedia", String(settings.showFilterMedia));
   params.set("showFans", String(settings.showFans));
   params.set("showFilterFrame", String(settings.showFilterFrame));
@@ -1218,25 +1566,25 @@ export function decodeSettings(search: string): RawPurifierSettings {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const printDesign = readPrintDesign(params);
   const filterPreset = readFilterPreset(params);
-  const fanDiameter = readFanDiameter(params, "fanDiameter", defaultSettings.fanDiameter);
+  const fanDiameter = readFanDiameter(params, ["fanDiameter", "fan_diameter"], defaultSettings.fanDiameter);
   const fanPreset = readFanProductPreset(params, fanDiameter);
   const corsiMode = readCorsiRosenthalMode(params);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
     printDesign,
     filterPreset,
-    filterWidth: readNumber(params, "filterWidth", defaultSettings.filterWidth),
-    filterDepth: readNumber(params, "filterDepth", defaultSettings.filterDepth),
-    filterThickness: readNumber(params, "filterThickness", defaultSettings.filterThickness),
+    filterWidth: readNumber(params, ["filterWidth", "x"], defaultSettings.filterWidth),
+    filterDepth: readNumber(params, ["filterDepth", "y"], defaultSettings.filterDepth),
+    filterThickness: readNumber(params, ["filterThickness", "filter_height"], defaultSettings.filterThickness),
     rim: readNumber(params, "rim", defaultSettings.rim),
     fanPreset,
     fanDiameter,
     filters: readFilterCount(params, "filters", defaultSettings.filters),
-    splitFrames: readBoolean(params, "splitFrames", defaultSettings.splitFrames),
-    fansLeft: readInteger(params, "fansLeft", defaultSettings.fansLeft),
-    fansRight: readInteger(params, "fansRight", defaultSettings.fansRight),
-    fansTop: readInteger(params, "fansTop", defaultSettings.fansTop),
-    fansBottom: readInteger(params, "fansBottom", defaultSettings.fansBottom),
+    splitFrames: readBoolean(params, ["splitFrames", "split_frames"], defaultSettings.splitFrames),
+    fansLeft: readInteger(params, ["fansLeft", "fans_left"], defaultSettings.fansLeft),
+    fansRight: readInteger(params, ["fansRight", "fans_right"], defaultSettings.fansRight),
+    fansTop: readInteger(params, ["fansTop", "fans_top"], defaultSettings.fansTop),
+    fansBottom: readInteger(params, ["fansBottom", "fans_bottom"], defaultSettings.fansBottom),
     corsiMode,
     corsiFilterCount: readCorsiFilterCount(params, corsiMode),
     corsiFanCount: readCorsiFanCount(params, printDesign),
@@ -1247,9 +1595,45 @@ export function decodeSettings(search: string): RawPurifierSettings {
     donutAdapterInsertLength: readNumber(params, "donutAdapterInsertLength", defaultSettings.donutAdapterInsertLength),
     donutCapRim: readNumber(params, "donutCapRim", defaultSettings.donutCapRim),
     donutCapEnabled: readBoolean(params, "donutCapEnabled", defaultSettings.donutCapEnabled),
-    screwHoleDiameter: readNumber(params, "screwHoleDiameter", defaultSettings.screwHoleDiameter),
-    materialThickness: readNumber(params, "materialThickness", defaultSettings.materialThickness),
-    kerfFit: readNumber(params, "kerfFit", defaultSettings.kerfFit),
+    screwHoleDiameter: readNumber(params, ["screwHoleDiameter", "screw_holes"], defaultSettings.screwHoleDiameter),
+    materialThickness: readNumber(params, ["materialThickness", "thickness"], defaultSettings.materialThickness),
+    kerfFit: readNumber(params, ["kerfFit", "burn"], defaultSettings.kerfFit),
+    fingerWidthMultiplier: readNumber(
+      params,
+      ["fingerWidthMultiplier", "FingerJoint_finger"],
+      defaultSettings.fingerWidthMultiplier,
+    ),
+    fingerSpaceMultiplier: readNumber(
+      params,
+      ["fingerSpaceMultiplier", "FingerJoint_space"],
+      defaultSettings.fingerSpaceMultiplier,
+    ),
+    fingerPlayMultiplier: readNumber(
+      params,
+      ["fingerPlayMultiplier", "FingerJoint_play"],
+      defaultSettings.fingerPlayMultiplier,
+    ),
+    fingerHoleWidthMultiplier: readNumber(
+      params,
+      ["fingerHoleWidthMultiplier", "FingerJoint_width"],
+      defaultSettings.fingerHoleWidthMultiplier,
+    ),
+    fingerHoleOffsetMultiplier: readNumber(
+      params,
+      ["fingerHoleOffsetMultiplier", "FingerJoint_edge_width"],
+      defaultSettings.fingerHoleOffsetMultiplier,
+    ),
+    dovetailSizeMultiplier: readNumber(
+      params,
+      ["dovetailSizeMultiplier", "DoveTail_size"],
+      defaultSettings.dovetailSizeMultiplier,
+    ),
+    dovetailDepthMultiplier: readNumber(
+      params,
+      ["dovetailDepthMultiplier", "DoveTail_depth"],
+      defaultSettings.dovetailDepthMultiplier,
+    ),
+    dovetailTaper: readNumber(params, ["dovetailTaper", "DoveTail_angle"], defaultSettings.dovetailTaper),
     showFilterMedia: readBoolean(params, "showFilterMedia", defaultSettings.showFilterMedia),
     showFans: readBoolean(params, "showFans", defaultSettings.showFans),
     showFilterFrame: readBoolean(params, "showFilterFrame", defaultSettings.showFilterFrame),
@@ -1262,7 +1646,7 @@ export function decodeSettings(search: string): RawPurifierSettings {
     autoRotate: readBoolean(params, "autoRotate", defaultSettings.autoRotate),
     cameraPreset: readCameraPreset(params, "cameraPreset", defaultSettings.cameraPreset),
     labels: readBoolean(params, "labels", defaultSettings.labels),
-    referenceScale: readNumber(params, "referenceScale", defaultSettings.referenceScale),
+    referenceScale: readNumber(params, ["referenceScale", "reference"], defaultSettings.referenceScale),
   };
   const parsedWithDonutPreset =
     params.has("donutFilterPreset") && !hasDonutFilterMeasurementParams(params)
@@ -1273,6 +1657,99 @@ export function decodeSettings(search: string): RawPurifierSettings {
 
 export function formatMillimeters(value: number): string {
   return `${formatNumber(value)} mm`;
+}
+
+// #######################################
+// Settings Helpers
+// #######################################
+
+function createConfiguredPrintDesign(input: {
+  readonly raw: RawPurifierSettings;
+  readonly printDesign: PrintDesignPreset;
+  readonly filter: FilterSelection;
+  readonly filterCount: FilterCount;
+  readonly fan: FanConfiguration;
+  readonly frameConstruction: FilterFrameConstruction;
+}): ConfiguredPrintDesign {
+  const { printDesign } = input;
+  if (isLaserDerivedPrintDesignPreset(printDesign)) {
+    return {
+      type: "laser-derived-printable-kit",
+      preset: printDesign,
+      filter: input.filter,
+      filterCount: input.filterCount,
+      fanBanks: input.fan.banks,
+      frameConstruction: input.frameConstruction,
+    };
+  }
+
+  if (isCorsiRosenthalPrintDesignPreset(printDesign)) {
+    const mode = canonicalCorsiRosenthalMode(input.raw.corsiMode);
+    return {
+      type: "corsi-rosenthal",
+      preset: printDesign,
+      filter: input.filter,
+      configuration: {
+        mode,
+        filterCount: canonicalCorsiFilterCount(input.raw.corsiFilterCount, mode),
+        fanCount: fanCountRequestFromRawSetting(canonicalCorsiFanCount(input.raw.corsiFanCount, printDesign.id, mode)),
+      },
+      frameStyle: printDesign.model.frameStyle,
+    };
+  }
+
+  if (isDonutFilterAdapterPrintDesignPreset(printDesign)) {
+    return {
+      type: "donut-filter-adapter",
+      preset: printDesign,
+      donutFilterPreset: findDonutFilterPreset(input.raw.donutFilterPreset).id,
+      filter: normalizeDonutFilterSettings(input.raw),
+      fan: {
+        spec: input.fan.spec,
+        productSelection: input.fan.productSelection,
+        count: printDesign.model.defaults.fanCount,
+      },
+    };
+  }
+
+  return {
+    type: "static-reference",
+    preset: printDesign,
+    reference: printDesign.model.reference,
+    capabilities: printDesign.model.reference.capabilities,
+    filter: input.filter,
+    filterCount: printDesign.model.defaults.filterCount,
+    fanCount: printDesign.model.defaults.fanCount,
+  };
+}
+
+function createPreviewSettings(raw: RawPurifierSettings, referenceScale: ReferenceScale): PreviewSettings {
+  const cameraPreset = cameraPresets.includes(raw.cameraPreset) ? raw.cameraPreset : defaultSettings.cameraPreset;
+  const enclosure: EnclosurePreviewOptions = {
+    showFilterMedia: raw.showFilterMedia,
+    showFans: raw.showFans,
+    showFilterFrame: raw.showFilterFrame,
+    transparentWalls: raw.transparentWalls,
+    explodedView: raw.explodedView,
+    showDimensions: raw.showDimensions,
+    showBananaScale: raw.showBananaScale,
+    showPrintSeams: raw.showPrintSeams,
+    autoRotate: raw.autoRotate,
+    cameraPreset,
+  };
+  const printSheets: PrintSheetPreviewOptions = {
+    showPlateLabels: raw.showPrintPlateLabels,
+  };
+  const cutSheet: CutSheetPreviewOptions = {
+    showLabels: raw.labels,
+    referenceScale,
+  };
+
+  return {
+    enclosure,
+    printSheets,
+    cutSheet,
+  };
 }
 
 function isStructuredSettings(input: PurifierInput): input is PurifierSettings {
@@ -1304,8 +1781,29 @@ function normalizeDonutFilterSettings(settings: RawPurifierSettings): DonutFilte
     length,
     holeDiameter,
     insertLength: clamp(settings.donutAdapterInsertLength, 2, 60),
-    capRim: clamp(settings.donutCapRim, 0, 40),
-    capEnabled: settings.donutCapEnabled,
+    cap: settings.donutCapEnabled
+      ? {
+          type: "printed-cap",
+          rim: clamp(settings.donutCapRim, 0, 40),
+        }
+      : { type: "none" },
+  };
+}
+
+function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
+  return {
+    finger: {
+      widthMultiplier: clamp(settings.fingerWidthMultiplier, 0.5, 8),
+      spaceMultiplier: clamp(settings.fingerSpaceMultiplier, 0.5, 8),
+      playMultiplier: clamp(settings.fingerPlayMultiplier, 0, 1),
+      holeWidthMultiplier: clamp(settings.fingerHoleWidthMultiplier, 0.5, 2),
+      holeOffsetMultiplier: clamp(settings.fingerHoleOffsetMultiplier, 0.75, 4),
+    },
+    dovetail: {
+      sizeMultiplier: clamp(settings.dovetailSizeMultiplier, 0.75, 8),
+      depthMultiplier: clamp(settings.dovetailDepthMultiplier, 0.5, 2),
+      taper: clamp(settings.dovetailTaper, 0, 80),
+    },
   };
 }
 
@@ -1335,6 +1833,10 @@ function createFanProductSelection(presetId: FanProductPresetId): FanProductSele
     product: findFanProductPreset(customFanProductPresetId),
   };
 }
+
+// #######################################
+// Corsi-Rosenthal Canonicalization
+// #######################################
 
 function canonicalizePrintDesignRawSettings(settings: RawPurifierSettings): RawPurifierSettings {
   if (!isCorsiRosenthalPrintDesignId(settings.printDesign)) {
@@ -1376,7 +1878,7 @@ function canonicalCorsiFanCount(value: number, printDesign: PrintDesignId, mode:
     return defaultSettings.corsiFanCount;
   }
 
-  const fallback = findPrintDesignPreset(printDesign).recommendedFanCount;
+  const fallback = defaultCorsiFanCountForPrintDesign(printDesign);
   const parsed = Number.isFinite(value) ? Math.trunc(value) : fallback;
   if (parsed === automaticFanCount) {
     return automaticFanCount;
@@ -1384,6 +1886,13 @@ function canonicalCorsiFanCount(value: number, printDesign: PrintDesignId, mode:
 
   const allowedCounts = corsiRosenthalFixedFanCountOptions(mode);
   return allowedCounts.includes(parsed) ? parsed : automaticFanCount;
+}
+
+function defaultCorsiFanCountForPrintDesign(printDesign: PrintDesignId): number {
+  const preset = findPrintDesignPreset(printDesign);
+  return isCorsiRosenthalPrintDesignPreset(preset)
+    ? fanCountRequestToRawSetting(preset.model.defaults.fanCount)
+    : defaultSettings.corsiFanCount;
 }
 
 function resolveAutomaticCorsiFanCount(layout: LayoutResult, mode: CorsiRosenthalMode): number {
@@ -1508,7 +2017,7 @@ function isPresetFanProductId(id: FanProductPresetId): id is PresetFanProductId 
   return id !== customFanProductPresetId;
 }
 
-function fanCountRequestFromNumber(value: number): FanCountRequest {
+export function fanCountRequestFromRawSetting(value: number): FanCountRequest {
   const clamped = clampInteger(value, automaticFanCount, fixedFanCountOptions[fixedFanCountOptions.length - 1]);
   if (clamped === automaticFanCount) {
     return { type: "auto" };
@@ -1517,8 +2026,12 @@ function fanCountRequestFromNumber(value: number): FanCountRequest {
   return { type: "fixed", count: fixedCount };
 }
 
-function fanCountRequestToNumber(request: FanCountRequest): number {
+export function fanCountRequestToRawSetting(request: FanCountRequest): number {
   return request.type === "auto" ? automaticFanCount : request.count;
+}
+
+function donutCapRawRim(cap: DonutCap): Millimeters {
+  return cap.type === "printed-cap" ? cap.rim : defaultSettings.donutCapRim;
 }
 
 function referenceScaleFromNumber(value: number): ReferenceScale {
@@ -1526,8 +2039,12 @@ function referenceScaleFromNumber(value: number): ReferenceScale {
   return length > 0 ? { type: "enabled", length } : { type: "disabled" };
 }
 
-function readNumber(params: URLSearchParams, key: string, fallback: number): number {
-  const value = params.get(key);
+// #######################################
+// URL Parsing Helpers
+// #######################################
+
+function readNumber(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
+  const value = readParam(params, key);
   if (value === null) {
     return fallback;
   }
@@ -1535,12 +2052,12 @@ function readNumber(params: URLSearchParams, key: string, fallback: number): num
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function readInteger(params: URLSearchParams, key: string, fallback: number): number {
+function readInteger(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
   return Math.trunc(readNumber(params, key, fallback));
 }
 
-function readBoolean(params: URLSearchParams, key: string, fallback: boolean): boolean {
-  const value = params.get(key);
+function readBoolean(params: URLSearchParams, key: string | readonly string[], fallback: boolean): boolean {
+  const value = readParam(params, key);
   if (value === null) {
     return fallback;
   }
@@ -1553,8 +2070,8 @@ function readBoolean(params: URLSearchParams, key: string, fallback: boolean): b
   return fallback;
 }
 
-function readFanDiameter(params: URLSearchParams, key: string, fallback: FanDiameter): FanDiameter {
-  const parsed = Number(params.get(key));
+function readFanDiameter(params: URLSearchParams, key: string | readonly string[], fallback: FanDiameter): FanDiameter {
+  const parsed = Number(readParam(params, key));
   const found = fanDiameters.find((diameter) => diameter === parsed);
   return found ?? fallback;
 }
@@ -1576,7 +2093,11 @@ function readFilterPreset(params: URLSearchParams): FilterPresetId {
   if (found !== undefined) {
     return found;
   }
-  if (params.has("filterWidth") || params.has("filterDepth") || params.has("filterThickness")) {
+  if (
+    hasAnyParam(params, ["filterWidth", "x"]) ||
+    hasAnyParam(params, ["filterDepth", "y"]) ||
+    hasAnyParam(params, ["filterThickness", "filter_height"])
+  ) {
     return customFilterPresetId;
   }
   return defaultSettings.filterPreset;
@@ -1622,12 +2143,12 @@ function readCorsiFilterCount(params: URLSearchParams, mode: CorsiRosenthalMode)
 }
 
 function readCorsiFanCount(params: URLSearchParams, printDesign: PrintDesignId): number {
-  const recommended = findPrintDesignPreset(printDesign).recommendedFanCount;
+  const recommended = defaultCorsiFanCountForPrintDesign(printDesign);
   if (params.has("corsiFanCount")) {
     return readAutomaticInteger(params, "corsiFanCount", recommended);
   }
-  if (isCorsiRosenthalPrintDesignId(printDesign) && params.has("fansLeft")) {
-    return readInteger(params, "fansLeft", recommended);
+  if (isCorsiRosenthalPrintDesignId(printDesign) && hasAnyParam(params, ["fansLeft", "fans_left"])) {
+    return readInteger(params, ["fansLeft", "fans_left"], recommended);
   }
   return defaultSettings.corsiFanCount;
 }
@@ -1643,10 +2164,13 @@ function applyPrintDesignUrlDefaults(
 
   const defaults = applyPrintDesignPreset(defaultSettings, printDesign);
   const hasFilterInputs =
-    params.has("filterPreset") || params.has("filterWidth") || params.has("filterDepth") || params.has("filterThickness");
-  const hasFanInputs = params.has("fanPreset") || params.has("fanDiameter");
+    params.has("filterPreset") ||
+    hasAnyParam(params, ["filterWidth", "x"]) ||
+    hasAnyParam(params, ["filterDepth", "y"]) ||
+    hasAnyParam(params, ["filterThickness", "filter_height"]);
+  const hasFanInputs = params.has("fanPreset") || hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
   const hasDonutFilterInputs = params.has("donutFilterPreset") || hasDonutFilterMeasurementParams(params);
-  const hasLegacyCorsiFanCount = isCorsiRosenthalPrintDesignId(printDesign) && params.has("fansLeft");
+  const hasLegacyCorsiFanCount = isCorsiRosenthalPrintDesignId(printDesign) && hasAnyParam(params, ["fansLeft", "fans_left"]);
 
   return {
     ...parsed,
@@ -1657,11 +2181,11 @@ function applyPrintDesignUrlDefaults(
     fanPreset: hasFanInputs ? parsed.fanPreset : defaults.fanPreset,
     fanDiameter: hasFanInputs ? parsed.fanDiameter : defaults.fanDiameter,
     filters: params.has("filters") ? parsed.filters : defaults.filters,
-    splitFrames: params.has("splitFrames") ? parsed.splitFrames : defaults.splitFrames,
-    fansLeft: params.has("fansLeft") ? parsed.fansLeft : defaults.fansLeft,
-    fansRight: params.has("fansRight") ? parsed.fansRight : defaults.fansRight,
-    fansTop: params.has("fansTop") ? parsed.fansTop : defaults.fansTop,
-    fansBottom: params.has("fansBottom") ? parsed.fansBottom : defaults.fansBottom,
+    splitFrames: hasAnyParam(params, ["splitFrames", "split_frames"]) ? parsed.splitFrames : defaults.splitFrames,
+    fansLeft: hasAnyParam(params, ["fansLeft", "fans_left"]) ? parsed.fansLeft : defaults.fansLeft,
+    fansRight: hasAnyParam(params, ["fansRight", "fans_right"]) ? parsed.fansRight : defaults.fansRight,
+    fansTop: hasAnyParam(params, ["fansTop", "fans_top"]) ? parsed.fansTop : defaults.fansTop,
+    fansBottom: hasAnyParam(params, ["fansBottom", "fans_bottom"]) ? parsed.fansBottom : defaults.fansBottom,
     corsiMode: params.has("corsiMode") ? parsed.corsiMode : defaults.corsiMode,
     corsiFilterCount: params.has("corsiFilterCount") ? parsed.corsiFilterCount : defaults.corsiFilterCount,
     corsiFanCount: params.has("corsiFanCount") || hasLegacyCorsiFanCount ? parsed.corsiFanCount : defaults.corsiFanCount,
@@ -1679,13 +2203,17 @@ function applyPrintDesignUrlDefaults(
     donutCapRim: hasDonutFilterInputs || params.has("donutCapRim") ? parsed.donutCapRim : defaults.donutCapRim,
     donutCapEnabled: hasDonutFilterInputs || params.has("donutCapEnabled") ? parsed.donutCapEnabled : defaults.donutCapEnabled,
     rim: params.has("rim") ? parsed.rim : defaults.rim,
-    materialThickness: params.has("materialThickness") ? parsed.materialThickness : defaults.materialThickness,
-    screwHoleDiameter: params.has("screwHoleDiameter") ? parsed.screwHoleDiameter : defaults.screwHoleDiameter,
+    materialThickness: hasAnyParam(params, ["materialThickness", "thickness"])
+      ? parsed.materialThickness
+      : defaults.materialThickness,
+    screwHoleDiameter: hasAnyParam(params, ["screwHoleDiameter", "screw_holes"])
+      ? parsed.screwHoleDiameter
+      : defaults.screwHoleDiameter,
   };
 }
 
-function readAutomaticInteger(params: URLSearchParams, key: string, fallback: number): number {
-  return params.get(key) === "auto" ? automaticFanCount : readInteger(params, key, fallback);
+function readAutomaticInteger(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
+  return readParam(params, key) === "auto" ? automaticFanCount : readInteger(params, key, fallback);
 }
 
 function readCameraPreset(params: URLSearchParams, key: string, fallback: CameraPreset): CameraPreset {
@@ -1702,6 +2230,26 @@ function readPrintDesign(params: URLSearchParams): PrintDesignId {
   const found = printDesignIds.find((design) => design === value);
   return found ?? defaultSettings.printDesign;
 }
+
+function readParam(params: URLSearchParams, key: string | readonly string[]): string | null {
+  const keys = Array.isArray(key) ? key : [key];
+  for (const entry of keys) {
+    const values = params.getAll(entry);
+    const value = values[values.length - 1];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function hasAnyParam(params: URLSearchParams, keys: readonly string[]): boolean {
+  return keys.some((key) => params.has(key));
+}
+
+// #######################################
+// Primitive Helpers
+// #######################################
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) {

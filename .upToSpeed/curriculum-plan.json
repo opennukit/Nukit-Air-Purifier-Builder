@@ -1,194 +1,288 @@
 [
   {
-    "id": "01-filterboxbuilder-architecture-overview",
-    "title": "1 FilterBoxBuilder: Architecture Overview",
+    "id": "1-filterboxbuilder-architecture-overview",
     "position": 1,
+    "title": "1 FilterBoxBuilder: Architecture Overview",
+    "unit": "FilterBoxBuilder",
+    "goal": "Understand the browser-only app shape, repository boundaries, and the shared layout object that connects settings, previews, and exports.",
     "section": "Architecture",
-    "goal": "Understand the browser-only app shape and main runtime flow.",
     "targetFiles": [
       "README.md",
+      "src/README.md",
       "package.json",
       "index.html",
-      "vite.config.ts",
-      "src/app/main.ts",
-      "src/domain/purifier/airPurifier.ts"
+      "src/fabrication/purifierLayout.ts",
+      "docs/filterboxbuilder-parity.md"
     ],
-    "prerequisites": []
+    "prerequisites": [],
+    "foreshadows": [
+      {
+        "tourId": "1.1-filterboxbuilder-workbench-state",
+        "concept": "Browser shell and URL state",
+        "suggestedText": "The app shell loaded here owns browser state; the next tour follows that state through the workbench."
+      },
+      {
+        "tourId": "2-filterboxbuilder-fabrication-pipeline",
+        "concept": "LayoutResult",
+        "suggestedText": "The layout facade introduced here becomes the input to laser, print, and preview flows later."
+      }
+    ],
+    "callbacks": []
   },
   {
-    "id": "02-filterboxbuilder-settings-vocabulary",
-    "title": "2 FilterBoxBuilder: Settings and Preset Vocabulary",
+    "id": "1.1-filterboxbuilder-workbench-state",
     "position": 2,
-    "section": "Data Structures",
-    "goal": "Understand raw settings, normalized settings, presets, and workbench state.",
+    "title": "1.1 FilterBoxBuilder: Workbench State and Browser Shell",
+    "unit": "FilterBoxBuilder",
+    "goal": "Trace how the browser workbench owns controls, preview mode, fabrication mode, and per-design memory.",
+    "section": "App",
     "targetFiles": [
-      "src/domain/purifier/airPurifier.ts",
-      "src/workbenchState.ts",
-      "src/printDesignSettingsMemory.ts"
+      "src/app/main.ts",
+      "src/app/workbench/workbenchState.ts",
+      "src/app/state/printDesignSettingsMemory.ts",
+      "src/app/styles.css"
     ],
-    "prerequisites": [
-      "01-filterboxbuilder-architecture-overview"
+    "prerequisites": ["1-filterboxbuilder-architecture-overview"],
+    "foreshadows": [
+      {
+        "tourId": "1.2-filterboxbuilder-domain-settings",
+        "concept": "Raw settings",
+        "suggestedText": "The workbench keeps raw settings; the next tour shows how those become typed domain settings."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "1-filterboxbuilder-architecture-overview",
+        "concept": "Browser-only entrypoint",
+        "suggestedText": "Recall that index.html loads main.ts directly; this tour starts inside that browser module."
+      }
     ]
   },
   {
-    "id": "03-filterboxbuilder-variant-models",
-    "title": "3 FilterBoxBuilder: Variant Models and Fabrication Types",
+    "id": "1.2-filterboxbuilder-domain-settings",
     "position": 3,
-    "section": "Data Structures",
-    "goal": "Understand the output structures used by geometry, print, preview, and export paths.",
+    "title": "1.2 FilterBoxBuilder: Domain Settings and Presets",
+    "unit": "FilterBoxBuilder",
+    "goal": "Understand filter presets, fan product presets, print design presets, raw settings, normalized settings, and URL settings.",
+    "section": "Domain",
     "targetFiles": [
-      "src/fabrication/laser/cutGeometry.ts",
-      "src/printableKit.ts",
-      "src/fabrication/printing/threeMf.ts",
+      "src/domain/purifier/filter.ts",
+      "src/domain/purifier/airPurifier.ts",
       "src/resources/static-print-references/references.ts"
     ],
-    "prerequisites": [
-      "02-filterboxbuilder-settings-vocabulary"
+    "prerequisites": ["1.1-filterboxbuilder-workbench-state"],
+    "foreshadows": [
+      {
+        "tourId": "1.3-filterboxbuilder-design-models",
+        "concept": "Design-specific settings",
+        "suggestedText": "Corsi and donut values stored here get their own model builders in the next tour."
+      },
+      {
+        "tourId": "2-filterboxbuilder-fabrication-pipeline",
+        "concept": "Normalized configuration",
+        "suggestedText": "The normalized settings object here is what fabrication code receives later."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "1.1-filterboxbuilder-workbench-state",
+        "concept": "Shared URL state",
+        "suggestedText": "The URL state from the workbench becomes the raw settings decoded in this tour."
+      }
     ]
   },
   {
-    "id": "04-filterboxbuilder-layout-pipeline",
-    "title": "4 FilterBoxBuilder: Layout Pipeline",
+    "id": "1.3-filterboxbuilder-design-models",
     "position": 4,
-    "section": "Core Business Logic",
-    "goal": "Trace raw settings into normalized layout, geometry, cut sheets, and diagnostics.",
+    "title": "1.3 FilterBoxBuilder: Design Models",
+    "unit": "FilterBoxBuilder",
+    "goal": "Understand the generated Nukit geometry, the Corsi-Rosenthal model, and the donut HEPA adapter model.",
+    "section": "Domain",
     "targetFiles": [
-      "src/domain/purifier/airPurifier.ts",
       "src/domain/purifier/geometry.ts",
+      "src/domain/designs/corsi-rosenthal/model.ts",
+      "src/domain/designs/donut-filter/model.ts"
+    ],
+    "prerequisites": ["1.2-filterboxbuilder-domain-settings"],
+    "foreshadows": [
+      {
+        "tourId": "2-filterboxbuilder-fabrication-pipeline",
+        "concept": "Panel and assembly generation",
+        "suggestedText": "The dimensions and face roles here are the inputs that become panels and assemblies."
+      },
+      {
+        "tourId": "3-filterboxbuilder-three-previews",
+        "concept": "Preview branches",
+        "suggestedText": "The renderer later chooses different builders for Nukit, Corsi, donut, and static designs."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "1.2-filterboxbuilder-domain-settings",
+        "concept": "Normalized settings",
+        "suggestedText": "The normalized settings from the previous tour are the input to these geometry functions."
+      }
+    ]
+  },
+  {
+    "id": "2-filterboxbuilder-fabrication-pipeline",
+    "position": 5,
+    "title": "2 FilterBoxBuilder: Fabrication Pipeline and Laser Panels",
+    "unit": "FilterBoxBuilder",
+    "goal": "Follow normalized settings into layout results, laser panel drafts, sheet documents, assembly parts, and export diagnostics.",
+    "section": "Fabrication",
+    "targetFiles": [
+      "src/fabrication/purifierLayout.ts",
+      "src/fabrication/laser/cutGeometry.ts",
       "src/fabrication/laser/panels.ts",
+      "src/fabrication/assemblyModel.ts",
       "src/fabrication/buildDiagnostics.ts"
     ],
-    "prerequisites": [
-      "02-filterboxbuilder-settings-vocabulary",
-      "03-filterboxbuilder-variant-models"
+    "prerequisites": ["1.3-filterboxbuilder-design-models"],
+    "foreshadows": [
+      {
+        "tourId": "2.1-filterboxbuilder-boxes-port",
+        "concept": "BoxesDocument",
+        "suggestedText": "The cut sheet document is rendered through the Boxes port in the next tour."
+      },
+      {
+        "tourId": "2.2-filterboxbuilder-printable-kits",
+        "concept": "CutPanel to printable parts",
+        "suggestedText": "These panel drafts are also the source for printable kit splitting."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "1.3-filterboxbuilder-design-models",
+        "concept": "Geometry",
+        "suggestedText": "The geometry from the previous tour is where panel dimensions come from."
+      }
     ]
   },
   {
-    "id": "05-filterboxbuilder-laser-geometry-svg",
-    "title": "5 FilterBoxBuilder: Laser Geometry and SVG",
-    "position": 5,
-    "section": "Core Business Logic",
-    "goal": "Understand cut panels, edge profiles, Boxes drawing documents, and SVG rendering.",
+    "id": "2.1-filterboxbuilder-boxes-port",
+    "position": 6,
+    "title": "2.1 FilterBoxBuilder: Boxes.py Port and SVG Output",
+    "unit": "FilterBoxBuilder",
+    "goal": "Understand the small Boxes.py-inspired drawing layer, edge vocabulary, SVG layers, and audit scripts.",
+    "section": "Ports",
     "targetFiles": [
-      "src/fabrication/laser/cutGeometry.ts",
+      "src/ports/boxes/drawing.ts",
       "src/ports/boxes/kernel.ts",
+      "src/ports/boxes/edges.ts",
       "src/ports/boxes/svg.ts",
+      "src/ports/boxes/generators/airPurifier.ts",
+      "scripts/boxes-port/boxes-port-audit.ts",
       "scripts/boxes-port/airpurifier-oracle.ts"
     ],
-    "prerequisites": [
-      "04-filterboxbuilder-layout-pipeline"
-    ]
-  },
-  {
-    "id": "06-filterboxbuilder-assembly-model",
-    "title": "6 FilterBoxBuilder: Assembly Model",
-    "position": 6,
-    "section": "Core Business Logic",
-    "goal": "Understand how flat panels become positioned assembly parts and dimension guides.",
-    "targetFiles": [
-      "src/fabrication/assemblyModel.ts",
-      "src/threePreview.ts"
+    "prerequisites": ["2-filterboxbuilder-fabrication-pipeline"],
+    "foreshadows": [
+      {
+        "tourId": "4-filterboxbuilder-tests-scripts-workflow",
+        "concept": "Port equivalence tests",
+        "suggestedText": "The test tour shows how this port is checked against expected SVG and panel behavior."
+      }
     ],
-    "prerequisites": [
-      "05-filterboxbuilder-laser-geometry-svg"
+    "callbacks": [
+      {
+        "tourId": "2-filterboxbuilder-fabrication-pipeline",
+        "concept": "Cut sheet document",
+        "suggestedText": "The document produced by fabrication is the same document rendered to SVG here."
+      }
     ]
   },
   {
-    "id": "07-filterboxbuilder-printable-kit-generation",
-    "title": "7 FilterBoxBuilder: Printable Kit Generation",
+    "id": "2.2-filterboxbuilder-printable-kits",
     "position": 7,
-    "section": "Core Business Logic",
-    "goal": "Trace generated print parts, sheet plans, split panels, and 3MF package input.",
+    "title": "2.2 FilterBoxBuilder: Printable Kits and 3MF Export",
+    "unit": "FilterBoxBuilder",
+    "goal": "Trace print-volume presets, panel tiling, sheet planning, design routing, and 3MF package creation.",
+    "section": "Fabrication",
     "targetFiles": [
-      "src/printableKit.ts",
+      "src/fabrication/printing/printableKit.ts",
       "src/fabrication/printing/printDesignKit.ts",
-      "src/printSheetPreview.ts"
+      "src/fabrication/printing/threeMf.ts",
+      "src/fabrication/printing/designs/corsi-rosenthal/printableKit.ts",
+      "src/fabrication/printing/designs/donut-filter/printableKit.ts"
     ],
-    "prerequisites": [
-      "05-filterboxbuilder-laser-geometry-svg",
-      "06-filterboxbuilder-assembly-model"
+    "prerequisites": ["2.1-filterboxbuilder-boxes-port"],
+    "foreshadows": [
+      {
+        "tourId": "3-filterboxbuilder-three-previews",
+        "concept": "Print sheet preview",
+        "suggestedText": "The sheet plan created here is rendered as printer plates in the preview tour."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "2-filterboxbuilder-fabrication-pipeline",
+        "concept": "Cut panels",
+        "suggestedText": "The panel list created in the fabrication tour is split into printable parts here."
+      }
     ]
   },
   {
-    "id": "08-filterboxbuilder-specialized-print-designs",
-    "title": "8 FilterBoxBuilder: Specialized Print Designs",
+    "id": "3-filterboxbuilder-three-previews",
     "position": 8,
-    "section": "Core Business Logic",
-    "goal": "Understand Corsi, donut, and static print reference extensions.",
+    "title": "3 FilterBoxBuilder: Three.js Previews and Static Assets",
+    "unit": "FilterBoxBuilder",
+    "goal": "Understand assembled previews, print-sheet previews, static STL loading, vendor asset metadata, and scale references.",
+    "section": "Rendering",
     "targetFiles": [
-      "src/corsiRosenthalKit.ts",
-      "src/donutFilterKit.ts",
+      "src/rendering/three/purifierThreePreview.ts",
+      "src/rendering/three/printSheetThreePreview.ts",
+      "src/rendering/three/staticPrintAssets.ts",
       "src/resources/static-print-references/references.ts",
-      "src/rendering/three/staticPrintAssets.ts"
+      "public/vendor/README.md",
+      "docs/assets-and-licenses.md"
     ],
-    "prerequisites": [
-      "03-filterboxbuilder-variant-models",
-      "07-filterboxbuilder-printable-kit-generation"
+    "prerequisites": ["2.2-filterboxbuilder-printable-kits"],
+    "foreshadows": [
+      {
+        "tourId": "4-filterboxbuilder-tests-scripts-workflow",
+        "concept": "Renderer helper tests",
+        "suggestedText": "The final tour shows the renderer helpers that can be tested without browser screenshots."
+      }
+    ],
+    "callbacks": [
+      {
+        "tourId": "2.2-filterboxbuilder-printable-kits",
+        "concept": "Printable sheet plan",
+        "suggestedText": "The print sheet plan from the previous tour is the main input to PrintSheetThreePreview."
+      }
     ]
   },
   {
-    "id": "09-filterboxbuilder-three-preview-rendering",
-    "title": "9 FilterBoxBuilder: Three.js Preview Rendering",
+    "id": "4-filterboxbuilder-tests-scripts-workflow",
     "position": 9,
-    "section": "Interface Rendering",
-    "goal": "Understand generated and static Three.js preview rendering.",
+    "title": "4 FilterBoxBuilder: Tests, Scripts, and Contributor Workflow",
+    "unit": "FilterBoxBuilder",
+    "goal": "Map tests, scripts, config, and docs to the app boundaries so contributors know where to add coverage.",
+    "section": "Testing",
     "targetFiles": [
-      "src/threePreview.ts",
-      "src/printSheetThreePreview.ts",
-      "src/rendering/three/staticPrintAssets.ts"
-    ],
-    "prerequisites": [
-      "06-filterboxbuilder-assembly-model",
-      "08-filterboxbuilder-specialized-print-designs"
-    ]
-  },
-  {
-    "id": "10-filterboxbuilder-browser-workbench",
-    "title": "10 FilterBoxBuilder: Browser Workbench",
-    "position": 10,
-    "section": "Interface and UI",
-    "goal": "Understand the imperative DOM shell, controls, tabs, preview updates, and URL state.",
-    "targetFiles": [
-      "src/app/main.ts",
-      "src/styles.css",
-      "src/workbenchState.ts"
-    ],
-    "prerequisites": [
-      "02-filterboxbuilder-settings-vocabulary",
-      "09-filterboxbuilder-three-preview-rendering"
-    ]
-  },
-  {
-    "id": "11-filterboxbuilder-user-outputs",
-    "title": "11 FilterBoxBuilder: User Outputs and Readiness",
-    "position": 11,
-    "section": "Interface and Outputs",
-    "goal": "Understand downloads, diagnostics, purchase lists, sheet dialogs, summaries, and share URLs.",
-    "targetFiles": [
-      "src/app/main.ts",
-      "src/fabrication/buildDiagnostics.ts",
-      "src/fabrication/printing/printDesignKit.ts",
-      "src/fabrication/printing/threeMf.ts"
-    ],
-    "prerequisites": [
-      "07-filterboxbuilder-printable-kit-generation",
-      "10-filterboxbuilder-browser-workbench"
-    ]
-  },
-  {
-    "id": "12-filterboxbuilder-tests-config-scripts",
-    "title": "12 FilterBoxBuilder: Tests, Config, Scripts, and References",
-    "position": 12,
-    "section": "Testing, Config, and Scripts",
-    "goal": "Understand tests, Vite/Bun tooling, oracle scripts, and reference material.",
-    "targetFiles": [
-      "package.json",
-      "vite.config.ts",
+      "test/README.md",
+      "test/app/workbenchState.test.ts",
+      "test/domain/designs/corsiRosenthalKit.test.ts",
+      "test/integration/purifierWorkflow.test.ts",
       "test/ports/boxes/airPurifierCutSheetEquivalence.test.ts",
-      "scripts/boxes-port/boxes-port-audit.ts"
+      "test/rendering/three/printSheetThreePreview.test.ts",
+      "scripts/boxes-port/boxes-port-audit.ts",
+      "vite.config.ts",
+      "tsconfig.json"
     ],
-    "prerequisites": [
-      "11-filterboxbuilder-user-outputs"
+    "prerequisites": ["3-filterboxbuilder-three-previews"],
+    "foreshadows": [],
+    "callbacks": [
+      {
+        "tourId": "1.1-filterboxbuilder-workbench-state",
+        "concept": "Workbench state",
+        "suggestedText": "The workbench state from the app tour has direct unit tests here."
+      },
+      {
+        "tourId": "2.1-filterboxbuilder-boxes-port",
+        "concept": "Boxes port",
+        "suggestedText": "The Boxes port from the port tour is checked by equivalence tests and audit scripts here."
+      }
     ]
   }
 ]

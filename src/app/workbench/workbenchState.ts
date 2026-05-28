@@ -6,7 +6,11 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 
-export type ControlsTab = "design" | "parts" | "setup";
+// #######################################
+// Workbench Model
+// #######################################
+
+export type ControlsTab = "design" | "parts" | "setup" | "advanced";
 
 export type WorkbenchFabrication =
   | {
@@ -22,6 +26,10 @@ export type WorkbenchState = {
   readonly controlsTab: ControlsTab;
   readonly fabrication: WorkbenchFabrication;
 };
+
+// #######################################
+// URL Codec
+// #######################################
 
 export function decodeWorkbenchState(params: URLSearchParams): WorkbenchState {
   const explicitMethodValue = params.get("fabricationMethod") ?? params.get("exportFormat");
@@ -45,6 +53,10 @@ export function encodeWorkbenchState(state: WorkbenchState): URLSearchParams {
   return params;
 }
 
+// #######################################
+// Derived State
+// #######################################
+
 export function previewModeForWorkbenchState(state: WorkbenchState): PreviewMode {
   if (state.preview === "enclosure") {
     return "enclosure";
@@ -59,6 +71,10 @@ export function fabricationMethodForWorkbenchState(state: WorkbenchState): Expor
 export function printVolumePresetIdForWorkbenchState(state: WorkbenchState): PrintVolumePresetId {
   return state.fabrication.method === "print-3mf" ? state.fabrication.printVolumePresetId : findPrintVolumePreset(null).id;
 }
+
+// #######################################
+// State Updates
+// #######################################
 
 export function withPreviewMode(state: WorkbenchState, previewMode: PreviewMode): WorkbenchState {
   if (previewMode === "enclosure") {
@@ -107,6 +123,10 @@ export function withPrintVolumePreset(state: WorkbenchState, presetId: PrintVolu
   };
 }
 
+// #######################################
+// Parsing Helpers
+// #######################################
+
 function createFabricationState(method: ExportFormat, printVolume: string | null): WorkbenchFabrication {
   if (method === "print-3mf") {
     return {
@@ -125,10 +145,13 @@ function readPreviewMode(value: string | null): PreviewMode {
 }
 
 export function readControlsTab(value: string | null): ControlsTab {
-  if (value === "design" || value === "parts" || value === "setup") {
+  if (value === "design" || value === "parts" || value === "setup" || value === "advanced") {
     return value;
   }
-  if (value === "fit" || value === "fabrication" || value === "cutting" || value === "export") {
+  if (value === "fit" || value === "cutting") {
+    return "advanced";
+  }
+  if (value === "fabrication" || value === "export") {
     return "setup";
   }
   return "design";

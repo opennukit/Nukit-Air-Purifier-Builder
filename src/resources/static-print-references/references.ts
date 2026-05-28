@@ -16,6 +16,20 @@ export type StaticPrintReferenceUsePolicy =
       readonly note: string;
     };
 
+export type StaticPrintReferenceLocalAvailability =
+  | {
+      readonly type: "available";
+    }
+  | {
+      readonly type: "unavailable";
+      readonly note: string;
+    };
+
+export type StaticPrintReferenceCapabilities = {
+  readonly localPrintPlatePreview: StaticPrintReferenceLocalAvailability;
+  readonly localAssembledPreview: StaticPrintReferenceLocalAvailability;
+};
+
 export type StaticPrintPreviewAsset = {
   readonly name: string;
   readonly assetUrl: string;
@@ -32,7 +46,13 @@ export type StaticPrintPlateOrientation =
       readonly bedSide: StaticPrintSourceBedSide;
     };
 
-export type StaticPrintSourceBedSide = "source-min-z" | "source-max-z";
+export type StaticPrintSourceBedSide =
+  | "source-min-x"
+  | "source-max-x"
+  | "source-min-y"
+  | "source-max-y"
+  | "source-min-z"
+  | "source-max-z";
 
 export type NonEmptyStaticPrintPreviewAssets = readonly [StaticPrintPreviewAsset, ...StaticPrintPreviewAsset[]];
 
@@ -74,6 +94,7 @@ export type StaticPrintReference = {
   readonly fileSummary: string;
   readonly attribution: string;
   readonly usePolicy: StaticPrintReferenceUsePolicy;
+  readonly capabilities: StaticPrintReferenceCapabilities;
   readonly previewMaxDimensionMm: number;
   readonly assembledPreviewOrientation?: "source" | "source-side-fans" | "source-fans-up" | "fan-panel-up";
   readonly assembledPreview?: StaticPrintAssembledPreview;
@@ -131,23 +152,23 @@ const staticCr14x20AssembledAsset = stlAsset(
 const staticCr14x20PlateAssets = [
   stlAsset("955827", "1 filter housing fan mounts top power side.stl", 1113684, "source-min-z"),
   stlAsset("955827", "2 filter housing fan mounts top power side.stl", 1084084, "source-min-z"),
-  stlAsset("955827", "3.1 filter housing power side upper very tight.stl", 950684, "source-max-z"),
-  stlAsset("955827", "3.2 filter housing power side upper less tight.stl", 919684, "source-max-z"),
-  stlAsset("955827", "4.1 filter housing power side lower very tight.stl", 844884, "source-max-z"),
-  stlAsset("955827", "4.2 filter housing power side lower less tight.stl", 844484, "source-max-z"),
-  stlAsset("955827", "5 filter housing bottom power base.stl", 907284, "source-min-z"),
-  stlAsset("955827", "6 filter housing bottom not power base.stl", 844484, "source-min-z"),
-  stlAsset("955827", "7.1 filter housing no power side lower very tight.stl", 940584, "source-max-z"),
-  stlAsset("955827", "7.2 filter housing no power side lower less tight.stl", 916184, "source-max-z"),
-  stlAsset("955827", "8.1 filter housing no power side upper very tight.stl", 844884, "source-max-z"),
-  stlAsset("955827", "8.2 filter housing no power side upper less tight.stl", 844484, "source-max-z"),
-  stlAsset("955827", "90 filter housing corner no power up.stl", 166184, "source-max-z"),
-  stlAsset("955827", "91 filter housing corner guard power up.stl", 166184, "source-max-z"),
-  stlAsset("955827", "92 filter housing corner guard power base.stl", 166184, "source-max-z"),
-  stlAsset("955827", "93 filter housing corner guard no power base.stl", 166184, "source-max-z"),
+  stlAsset("955827", "3.1 filter housing power side upper very tight.stl", 950684, "source-max-x"),
+  stlAsset("955827", "3.2 filter housing power side upper less tight.stl", 919684, "source-max-x"),
+  stlAsset("955827", "4.1 filter housing power side lower very tight.stl", 844884, "source-max-x"),
+  stlAsset("955827", "4.2 filter housing power side lower less tight.stl", 844484, "source-max-x"),
+  stlAsset("955827", "5 filter housing bottom power base.stl", 907284, "source-max-z"),
+  stlAsset("955827", "6 filter housing bottom not power base.stl", 844484, "source-max-z"),
+  stlAsset("955827", "7.1 filter housing no power side lower very tight.stl", 940584, "source-min-x"),
+  stlAsset("955827", "7.2 filter housing no power side lower less tight.stl", 916184, "source-min-x"),
+  stlAsset("955827", "8.1 filter housing no power side upper very tight.stl", 844884, "source-min-x"),
+  stlAsset("955827", "8.2 filter housing no power side upper less tight.stl", 844484, "source-min-x"),
+  stlAsset("955827", "90 filter housing corner no power up.stl", 166184, "source-min-x"),
+  stlAsset("955827", "91 filter housing corner guard power up.stl", 166184, "source-min-z"),
+  stlAsset("955827", "92 filter housing corner guard power base.stl", 166184, "source-max-x"),
+  stlAsset("955827", "93 filter housing corner guard no power base.stl", 166184, "source-min-x"),
   stlAsset("955827", "94 filter housing nut.stl", 355084, "source-max-z"),
-  stlAsset("955827", "95-and-96 filter housing test screw 1 of 2 and 2 of 2.stl", 996784, "source-max-z"),
-  stlAsset("955827", "xxxx 97 filter housing corner guard only if filter fits bad (janky)).stl", 134284, "source-max-z"),
+  stlAsset("955827", "95-and-96 filter housing test screw 1 of 2 and 2 of 2.stl", 996784, "source-min-z"),
+  stlAsset("955827", "xxxx 97 filter housing corner guard only if filter fits bad (janky)).stl", 134284, "source-min-z"),
 ] as const;
 
 const staticCr14x20AssembledPlateAssetNames = new Set([
@@ -170,6 +191,10 @@ const staticCr14x20AssembledPlateAssets = nonEmptyStaticPrintPreviewAssets(
   staticCr14x20PlateAssets.filter((asset) => staticCr14x20AssembledPlateAssetNames.has(asset.name)),
 );
 
+const availableStaticPrintReferencePreview = {
+  type: "available",
+} as const satisfies StaticPrintReferenceLocalAvailability;
+
 export const staticPrintReferences: Record<StaticPrintReferenceId, StaticPrintReference> = {
   "static-cr-16x20-140": {
     printablesId: "1251061",
@@ -180,6 +205,13 @@ export const staticPrintReferences: Record<StaticPrintReferenceId, StaticPrintRe
     usePolicy: {
       type: "redistributable",
       note: "CC-BY files mirrored locally for preview with attribution.",
+    },
+    capabilities: {
+      localPrintPlatePreview: availableStaticPrintReferencePreview,
+      localAssembledPreview: {
+        type: "unavailable",
+        note: "No assembled source asset has been curated for this reference.",
+      },
     },
     previewMaxDimensionMm: 560,
     platePreviewAssets: staticCr16x20Assets,
@@ -193,6 +225,10 @@ export const staticPrintReferences: Record<StaticPrintReferenceId, StaticPrintRe
     usePolicy: {
       type: "redistributable",
       note: "CC-BY files mirrored locally for preview with attribution.",
+    },
+    capabilities: {
+      localPrintPlatePreview: availableStaticPrintReferencePreview,
+      localAssembledPreview: availableStaticPrintReferencePreview,
     },
     previewMaxDimensionMm: 540,
     assembledPreviewOrientation: "source-fans-up",
@@ -233,6 +269,16 @@ export const staticPrintReferences: Record<StaticPrintReferenceId, StaticPrintRe
       type: "external-only",
       note: "CC-BY-NC-SA reference. We link out instead of bundling it because the product may become commercial.",
     },
+    capabilities: {
+      localPrintPlatePreview: {
+        type: "unavailable",
+        note: "Files are not mirrored locally.",
+      },
+      localAssembledPreview: {
+        type: "unavailable",
+        note: "Files are not mirrored locally.",
+      },
+    },
     previewMaxDimensionMm: 620,
     platePreviewAssets: [],
     previewAssets: [],
@@ -240,7 +286,11 @@ export const staticPrintReferences: Record<StaticPrintReferenceId, StaticPrintRe
 };
 
 export function staticPrintReferenceHasPlatePreview(reference: StaticPrintReference | undefined): boolean {
-  return (reference?.platePreviewAssets.length ?? 0) > 0;
+  return reference?.capabilities.localPrintPlatePreview.type === "available" && reference.platePreviewAssets.length > 0;
+}
+
+export function staticPrintReferenceHasAssembledPreview(reference: StaticPrintReference | undefined): boolean {
+  return reference?.capabilities.localAssembledPreview.type === "available" && reference.assembledPreview !== undefined;
 }
 
 function nonEmptyStaticPrintPreviewAssets(

@@ -19,6 +19,16 @@ describe("Print sheet 3D preview", () => {
     expect(orientation.footprintWidth * orientation.footprintDepth).toBe(220 * 160);
   });
 
+  test("honors an explicit static STL bed face before optimizing height", () => {
+    const orientation = chooseStaticPrintOrientationForSize(
+      { x: 220, y: 40, z: 160 },
+      "source-min-z",
+    );
+
+    expect(orientation.height).toBe(160);
+    expect(orientation.footprintWidth * orientation.footprintDepth).toBe(220 * 40);
+  });
+
   test("turns the static 14x20 print plates right-side-up", () => {
     const plateAssets = staticPrintReferences["static-cr-14x20-base"].platePreviewAssets;
     const bedSideByName = new Map(
@@ -31,9 +41,13 @@ describe("Print sheet 3D preview", () => {
     expect(plateAssets).toHaveLength(19);
     expect(bedSideByName.get("1 filter housing fan mounts top power side.stl")).toBe("source-min-z");
     expect(bedSideByName.get("2 filter housing fan mounts top power side.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("5 filter housing bottom power base.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("6 filter housing bottom not power base.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("3.2 filter housing power side upper less tight.stl")).toBe("source-max-z");
-    expect(bedSideByName.get("8.2 filter housing no power side upper less tight.stl")).toBe("source-max-z");
+    expect(bedSideByName.get("91 filter housing corner guard power up.stl")).toBe("source-min-z");
+    expect(bedSideByName.get("3.2 filter housing power side upper less tight.stl")).toBe("source-max-x");
+    expect(bedSideByName.get("5 filter housing bottom power base.stl")).toBe("source-max-z");
+    expect(bedSideByName.get("6 filter housing bottom not power base.stl")).toBe("source-max-z");
+    expect(bedSideByName.get("8.2 filter housing no power side upper less tight.stl")).toBe("source-min-x");
+    expect(bedSideByName.get("xxxx 97 filter housing corner guard only if filter fits bad (janky)).stl")).toBe(
+      "source-min-z",
+    );
   });
 });

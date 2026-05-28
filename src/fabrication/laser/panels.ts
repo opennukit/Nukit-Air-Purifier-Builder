@@ -16,6 +16,10 @@ import {
 } from "@/fabrication/laser/cutGeometry";
 import type { BoxesDocument } from "@/ports/boxes/kernel";
 
+// #######################################
+// Public Cut-Sheet API
+// #######################################
+
 type AirPurifierCutSheet = {
   panels: LaidOutCutPanel[];
   document: BoxesDocument;
@@ -268,6 +272,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         edges: edgeSectionsFor("hhhh"),
         thickness,
         kerfFit: settings.cutting.kerfFit,
+        jointSettings: settings.cutting.joints,
         assembly: {
           type: "placed",
           role: "closed-back",
@@ -282,6 +287,10 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 
   return panels;
 }
+
+// #######################################
+// Fan Wall Panels
+// #######################################
 
 export function resolveFanCount(requestedFans: FanCountRequest, length: number, fanDiameter: FanDiameter): number {
   const maxFans = Math.max(0, Math.floor((length - 20) / (fanDiameter + 10)));
@@ -310,6 +319,7 @@ function createFanWallPanel(input: {
     edges: edgeSectionsFor("ffff"),
     thickness: input.settings.cutting.materialThickness,
     kerfFit: input.settings.cutting.kerfFit,
+    jointSettings: input.settings.cutting.joints,
     cuts: [
       ...createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY),
       ...(input.cuts ?? []),
@@ -317,6 +327,10 @@ function createFanWallPanel(input: {
     assembly: input.assembly,
   });
 }
+
+// #######################################
+// Side Wall Panels
+// #######################################
 
 function createSideWallPanel(input: {
   id: string;
@@ -344,6 +358,7 @@ function createSideWallPanel(input: {
     edges: input.edgeSpec,
     thickness: input.settings.cutting.materialThickness,
     kerfFit: input.settings.cutting.kerfFit,
+    jointSettings: input.settings.cutting.joints,
     cuts: [
       ...createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY),
       ...createFilterFingerHoleCuts(
@@ -355,6 +370,10 @@ function createSideWallPanel(input: {
     assembly: input.assembly,
   });
 }
+
+// #######################################
+// Filter Rails and Frames
+// #######################################
 
 function createRailPanel(
   name: string,
@@ -372,6 +391,7 @@ function createRailPanel(
     edges,
     thickness: settings.cutting.materialThickness,
     kerfFit: settings.cutting.kerfFit,
+    jointSettings: settings.cutting.joints,
     assembly,
   });
 }
@@ -394,6 +414,7 @@ function createFullFilterFramePanel(
     edges: edgeSectionsFor(edges),
     thickness: settings.cutting.materialThickness,
     kerfFit,
+    jointSettings: settings.cutting.joints,
     cuts: [
       {
         type: "rect",
@@ -408,6 +429,10 @@ function createFullFilterFramePanel(
     assembly,
   });
 }
+
+// #######################################
+// Fan Cuts
+// #######################################
 
 function createFanCuts(
   length: number,
@@ -455,16 +480,20 @@ function createFanCuts(
   return cuts;
 }
 
+// #######################################
+// Filter Finger Holes
+// #######################################
+
 function createFilterFingerHoleCuts(
   width: number,
   settings: PurifierSettings,
   holeRows: readonly FilterFingerHoleRow[],
 ): CutFeature[] {
   const cuts: CutFeature[] = [];
-  const { materialThickness, kerfFit } = settings.cutting;
+  const { joints, materialThickness, kerfFit } = settings.cutting;
 
   for (const row of holeRows) {
-    cuts.push(...fingerHoleCutsForAlignedRow(width, row, materialThickness, kerfFit));
+    cuts.push(...fingerHoleCutsForAlignedRow(width, row, materialThickness, kerfFit, joints));
   }
 
   return cuts;
@@ -486,6 +515,7 @@ function fingerHoleCutsForAlignedRow(
   row: FilterFingerHoleRow,
   materialThickness: number,
   kerfFit: number,
+  jointSettings: PurifierSettings["cutting"]["joints"],
 ): CutFeature[] {
   const sections = normalizeAlignmentSections(row.alignment, width);
   const cuts: CutFeature[] = [];
@@ -493,7 +523,7 @@ function fingerHoleCutsForAlignedRow(
 
   for (const section of sections) {
     if (shouldCutFingerHolesForSection(section)) {
-      cuts.push(...fingerHoleCutsAt(cursor, row.y, section.length, 0, materialThickness, kerfFit));
+      cuts.push(...fingerHoleCutsAt(cursor, row.y, section.length, 0, materialThickness, kerfFit, jointSettings));
     }
     cursor += section.length;
   }
@@ -515,6 +545,10 @@ function shouldCutFingerHolesForSection(section: EdgeSection): boolean {
   return section.kind === "finger" || section.kind === "finger-counter" || section.kind === "finger-holes";
 }
 
+// #######################################
+// Edge Patterns
+// #######################################
+
 type RectPanelEdges = readonly [readonly EdgeSection[], readonly EdgeSection[], readonly EdgeSection[], readonly EdgeSection[]];
 
 function edgeSectionsFor(pattern: string): RectPanelEdges {
@@ -532,6 +566,10 @@ function edgeSectionsFor(pattern: string): RectPanelEdges {
 function compound(pattern: string, lengths: readonly number[]): EdgeSection[] {
   return edgeSections(pattern, lengths);
 }
+
+// #######################################
+// Small Geometry Helpers
+// #######################################
 
 function filterRailAssembly(filterIndex: number, railKey: FilterRailKey): CutPanelAssembly {
   return {

@@ -30,6 +30,10 @@ import { loadStaticPrintAssets, type LoadedStaticPrintAsset } from "@/rendering/
 import type { PrintBed } from "@/fabrication/printing/printableKit";
 import type { PrintSheet, PrintSheetPlacement, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
 
+// #######################################
+// Preview Model
+// #######################################
+
 const printPreviewScale = 1 / 260;
 const sheetGapMillimeters = 64;
 const staticPartGapMillimeters = 10;
@@ -85,6 +89,10 @@ type MutableStaticPrintSheet = Omit<StaticPrintSheet, "placements"> & {
 const defaultPrintSheetPreviewSettings: PrintSheetPreviewSettings = {
   showPlateLabels: false,
 };
+
+// #######################################
+// Preview Class
+// #######################################
 
 export class PrintSheetThreePreview {
   private readonly scene = new Scene();
@@ -261,6 +269,10 @@ export class PrintSheetThreePreview {
   }
 }
 
+// #######################################
+// Sheet and Plate Rendering
+// #######################################
+
 function createSheetGroup(
   sheet: PrintSheet,
   sheetOrigin: Vector3,
@@ -413,6 +425,10 @@ function createStaticPlacementMesh(placement: StaticPrintSheetPlacement, materia
   return group;
 }
 
+// #######################################
+// Labels
+// #######################################
+
 function createPlateLabelSprite(title: string, detail: string): Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = 768;
@@ -545,6 +561,10 @@ function plateContentCategory(part: PrintSheetPlacement["part"]): string {
   return compactPartLabel(part.name);
 }
 
+// #######################################
+// Placement Meshes
+// #######################################
+
 function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeometry {
   const positions: number[] = [];
   for (const vertex of placement.part.mesh.vertices) {
@@ -629,6 +649,10 @@ function staticPartMaterial(placement: StaticPrintSheetPlacement, materials: Pri
   }
   return placement.asset.asset.name.toLowerCase().includes("fan") ? materials.staticFanPart : materials.staticPart;
 }
+
+// #######################################
+// Static Reference Packing
+// #######################################
 
 export function printPreviewGridY(): number {
   return bedThickness / 2 + bedGridLift;
@@ -722,6 +746,10 @@ function requiredLastStaticSheet(sheets: readonly MutableStaticPrintSheet[]): Mu
   }
   return sheet;
 }
+
+// #######################################
+// Materials and Disposal
+// #######################################
 
 function createPrintWoodTexture(): CanvasTexture {
   const canvas = document.createElement("canvas");

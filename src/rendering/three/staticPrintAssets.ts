@@ -1,6 +1,9 @@
 import { Box3, BufferGeometry, Vector3 } from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import type { StaticPrintPreviewAsset } from "@/resources/static-print-references/references";
+import type {
+  StaticPrintPreviewAsset,
+  StaticPrintSourceBedSide,
+} from "@/resources/static-print-references/references";
 
 export type StaticStlAssetOrientation = "source" | "print";
 
@@ -48,6 +51,9 @@ export type StaticPrintOrientationChoice = {
 };
 
 const staticStlGeometryCache = new Map<string, Promise<BufferGeometry>>();
+const xAxisVector = new Vector3(1, 0, 0);
+const yAxisVector = new Vector3(0, 1, 0);
+const zAxisVector = new Vector3(0, 0, 1);
 
 const staticPrintOrientationCandidates = [
   {
@@ -117,8 +123,15 @@ export async function loadStaticPrintAssets(
   return loadedAssets.filter((asset): asset is LoadedStaticPrintAsset => asset !== null);
 }
 
-export function chooseStaticPrintOrientationForSize(size: StaticPrintBounds): StaticPrintOrientationChoice {
-  const choices = staticPrintOrientationCandidates.map((candidate) => ({
+export function chooseStaticPrintOrientationForSize(
+  size: StaticPrintBounds,
+  bedSide?: StaticPrintSourceBedSide,
+): StaticPrintOrientationChoice {
+  const requiredHeightAxis = bedSide === undefined ? null : sourceBedSideAxis(bedSide);
+  const candidates = staticPrintOrientationCandidates.filter(
+    (candidate) => requiredHeightAxis === null || candidate.heightAxis === requiredHeightAxis,
+  );
+  const choices = candidates.map((candidate) => ({
     id: candidate.id,
     footprintWidth: axisSize(size, candidate.footprintWidthAxis),
     footprintDepth: axisSize(size, candidate.footprintDepthAxis),
@@ -201,17 +214,27 @@ async function loadStaticPrintAsset(
 }
 
 function orientGeometryForStaticPrintPlate(geometry: BufferGeometry, asset: StaticPrintPreviewAsset): void {
-  const sourceSize = geometryBounds(geometry).getSize(new Vector3());
-  const orientation = chooseStaticPrintOrientationForSize({
-    x: sourceSize.x,
-    y: sourceSize.y,
-    z: sourceSize.z,
-  });
+  const sourceBounds = geometryBounds(geometry).clone();
+  const sourceSize = sourceBounds.getSize(new Vector3());
+  const bedSide =
+    asset.printPlateOrientation.type === "source-bed-side" ? asset.printPlateOrientation.bedSide : undefined;
+  const orientation = chooseStaticPrintOrientationForSize(
+    {
+      x: sourceSize.x,
+      y: sourceSize.y,
+      z: sourceSize.z,
+    },
+    bedSide,
+  );
   const candidate = requiredStaticPrintOrientationCandidate(orientation.id);
+  const bedSidePoint = bedSide === undefined ? null : sourceBedSidePoint(sourceBounds, bedSide);
   for (const rotation of candidate.rotations) {
     rotateGeometry(geometry, rotation);
+    if (bedSidePoint !== null) {
+      rotatePoint(bedSidePoint, rotation);
+    }
   }
-  if (asset.printPlateOrientation.type === "source-bed-side" && asset.printPlateOrientation.bedSide === "source-max-z") {
+  if (bedSidePoint !== null && sourceBedSideFacesUp(bedSidePoint, geometryBounds(geometry))) {
     geometry.rotateX(Math.PI);
   }
 }
@@ -252,6 +275,20 @@ function rotateGeometry(geometry: BufferGeometry, rotation: StaticPrintOrientati
   geometry.rotateZ(rotation.radians);
 }
 
+function rotatePoint(point: Vector3, rotation: StaticPrintOrientationRotation): void {
+  point.applyAxisAngle(axisVector(rotation.axis), rotation.radians);
+}
+
+function axisVector(axis: AxisName): Vector3 {
+  if (axis === "x") {
+    return xAxisVector;
+  }
+  if (axis === "y") {
+    return yAxisVector;
+  }
+  return zAxisVector;
+}
+
 function axisSize(size: StaticPrintBounds, axis: AxisName): number {
   if (axis === "x") {
     return size.x;
@@ -260,6 +297,42 @@ function axisSize(size: StaticPrintBounds, axis: AxisName): number {
     return size.y;
   }
   return size.z;
+}
+
+function sourceBedSideAxis(bedSide: StaticPrintSourceBedSide): AxisName {
+  if (bedSide === "source-min-x" || bedSide === "source-max-x") {
+    return "x";
+  }
+  if (bedSide === "source-min-y" || bedSide === "source-max-y") {
+    return "y";
+  }
+  return "z";
+}
+
+function sourceBedSidePoint(sourceBounds: Box3, bedSide: StaticPrintSourceBedSide): Vector3 {
+  const center = sourceBounds.getCenter(new Vector3());
+  if (bedSide === "source-min-x") {
+    return new Vector3(sourceBounds.min.x, center.y, center.z);
+  }
+  if (bedSide === "source-max-x") {
+    return new Vector3(sourceBounds.max.x, center.y, center.z);
+  }
+  if (bedSide === "source-min-y") {
+    return new Vector3(center.x, sourceBounds.min.y, center.z);
+  }
+  if (bedSide === "source-max-y") {
+    return new Vector3(center.x, sourceBounds.max.y, center.z);
+  }
+  if (bedSide === "source-min-z") {
+    return new Vector3(center.x, center.y, sourceBounds.min.z);
+  }
+  return new Vector3(center.x, center.y, sourceBounds.max.z);
+}
+
+function sourceBedSideFacesUp(bedSidePoint: Vector3, bounds: Box3): boolean {
+  const distanceToTop = Math.abs(bedSidePoint.z - bounds.max.z);
+  const distanceToBed = Math.abs(bedSidePoint.z - bounds.min.z);
+  return distanceToTop < distanceToBed;
 }
 
 function staticPrintOrientationScore(choice: StaticPrintOrientationChoice): number {

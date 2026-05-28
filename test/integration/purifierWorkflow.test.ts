@@ -38,6 +38,14 @@ import { createCorsiRosenthalModel } from "@/domain/designs/corsi-rosenthal/mode
 import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight } from "@/domain/designs/donut-filter/model";
 import { createPrintableSheetPlan } from "@/fabrication/printing/printableKit";
 import { createThreeMfPackage, type MeshObject } from "@/fabrication/printing/threeMf";
+import {
+  staticPrintReferenceHasAssembledPreview,
+  staticPrintReferenceHasPlatePreview,
+} from "@/resources/static-print-references/references";
+
+// #######################################
+// Workflow Tests
+// #######################################
 
 describe("FilterBoxBuilder purifier workflow", () => {
   test("can hide installed filter media without changing the cut sheet", () => {
@@ -140,6 +148,95 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(smallCustomLayout.cutPanels.every((panel) => panel.width > 0 && panel.height > 0)).toBe(true);
   });
 
+  test("imports useful legacy FilterBoxBuilder parameters as canonical settings", () => {
+    const decoded = decodeSettings(
+      [
+        "x=300",
+        "y=240",
+        "filter_height=22",
+        "fan_diameter=120",
+        "filters=1",
+        "split_frames=0",
+        "fans_left=2",
+        "fans_right=1",
+        "fans_top=0",
+        "fans_bottom=0",
+        "thickness=5",
+        "burn=0.2",
+        "screw_holes=4",
+        "reference=50",
+        "FingerJoint_finger=3",
+        "FingerJoint_space=2.5",
+        "FingerJoint_play=0.1",
+        "FingerJoint_width=1.2",
+        "FingerJoint_edge_width=1.8",
+        "DoveTail_size=2.5",
+        "DoveTail_depth=1.3",
+        "DoveTail_angle=40",
+      ].join("&"),
+    );
+    const encoded = encodeSettings(decoded);
+
+    expect(decoded.filterPreset).toBe(customFilterPresetId);
+    expect(decoded.filterWidth).toBe(300);
+    expect(decoded.filterDepth).toBe(240);
+    expect(decoded.filterThickness).toBe(22);
+    expect(decoded.fanPreset).toBe(customFanProductPresetId);
+    expect(decoded.fanDiameter).toBe(120);
+    expect(decoded.filters).toBe(1);
+    expect(decoded.splitFrames).toBe(false);
+    expect(decoded.fansLeft).toBe(2);
+    expect(decoded.fansRight).toBe(1);
+    expect(decoded.materialThickness).toBe(5);
+    expect(decoded.kerfFit).toBe(0.2);
+    expect(decoded.screwHoleDiameter).toBe(4);
+    expect(decoded.referenceScale).toBe(50);
+    expect(decoded.fingerWidthMultiplier).toBe(3);
+    expect(decoded.fingerSpaceMultiplier).toBe(2.5);
+    expect(decoded.fingerPlayMultiplier).toBe(0.1);
+    expect(decoded.fingerHoleWidthMultiplier).toBe(1.2);
+    expect(decoded.fingerHoleOffsetMultiplier).toBe(1.8);
+    expect(decoded.dovetailSizeMultiplier).toBe(2.5);
+    expect(decoded.dovetailDepthMultiplier).toBe(1.3);
+    expect(decoded.dovetailTaper).toBe(40);
+    expect(encoded).toContain("filterWidth=300");
+    expect(encoded).toContain("fingerWidthMultiplier=3");
+    expect(encoded).not.toContain("FingerJoint_finger");
+  });
+
+  test("uses advanced joint tuning for slots and dovetail rail profiles", () => {
+    const baseline = createLayout(defaultSettings);
+    const tuned = createLayout({
+      ...defaultSettings,
+      fingerWidthMultiplier: 3,
+      fingerSpaceMultiplier: 2.5,
+      fingerPlayMultiplier: 0.2,
+      fingerHoleWidthMultiplier: 1.4,
+      fingerHoleOffsetMultiplier: 2,
+      dovetailSizeMultiplier: 1.5,
+      dovetailDepthMultiplier: 1.4,
+      dovetailTaper: 20,
+    });
+    const baselinePanel = requiredPanel(baseline.cutPanels, "left-side-wall");
+    const tunedPanel = requiredPanel(tuned.cutPanels, "left-side-wall");
+    const baselineSlot = requiredRectCut(baselinePanel, "finger-hole");
+    const tunedSlot = requiredRectCut(tunedPanel, "finger-hole");
+    const baselineRail = requiredPanel(baseline.cutPanels, "filter-1-front-long-rail");
+    const tunedRail = requiredPanel(tuned.cutPanels, "filter-1-front-long-rail");
+
+    expect(tuned.configuration.cutting.joints.finger.widthMultiplier).toBe(3);
+    expect(tuned.configuration.cutting.joints.dovetail.depthMultiplier).toBe(1.4);
+    expect(tunedSlot.height).toBeCloseTo(defaultSettings.materialThickness * (1.4 + 0.2) - 2 * defaultSettings.kerfFit);
+    expect(tunedSlot.y).not.toBeCloseTo(baselineSlot.y);
+    expect(tunedPanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length).toBeLessThan(
+      baselinePanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length,
+    );
+    expect(roundedInteriorYValues(tunedRail)).not.toEqual(roundedInteriorYValues(baselineRail));
+    expect(Math.min(...roundedInteriorYValues(tunedRail))).toBeCloseTo(
+      defaultSettings.rim - defaultSettings.materialThickness * 1.4,
+    );
+  });
+
   test("keeps preset dimensions derived from the preset id", () => {
     const normalized = normalizeSettings(defaultSettings);
     const normalizedAgain = normalizeSettings(normalized);
@@ -154,6 +251,16 @@ describe("FilterBoxBuilder purifier workflow", () => {
     Object.assign(dimensions, { width: 1 });
     expect(filterSelectionDimensions(normalized.filter).width).toBe(defaultSettings.filterWidth);
     expect(normalizedAgain).toEqual(normalized);
+  });
+
+  test("keeps structured design variants stable when normalized again", () => {
+    for (const printDesign of ["corsi-rosenthal", "donut-hepa-adapter", "static-cr-14x20-base"] as const) {
+      const normalized = normalizeSettings(applyPrintDesignPreset(defaultSettings, printDesign));
+      const normalizedAgain = normalizeSettings(normalized);
+
+      expect(normalizedAgain.printDesign.id).toBe(printDesign);
+      expect(normalizedAgain.design).toEqual(normalized.design);
+    }
   });
 
   test("builds explicit assembly parts for walls, filter frames, media, and dimensions", () => {
@@ -324,11 +431,18 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(printDesignPresets.map((preset) => preset.id)).toContain("donut-hepa-adapter");
     expect(publicPrintDesignPresets[0]?.detail).toContain("dovetail lap keys");
     expect(publicPrintDesignPresets.filter((preset) => isStaticReferencePrintDesignId(preset.id))).toHaveLength(1);
+    expect(publicPrintDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")).toBeDefined();
     const staticCr16x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-16x20-140");
     const staticCr14x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base");
     const staticCr16x20Reference = staticCr16x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr16x20Preset);
     const staticCr14x20Reference = staticCr14x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr14x20Preset);
 
+    expect(staticCr16x20Preset?.releaseVisibility).toBe("internal");
+    expect(staticCr14x20Preset?.releaseVisibility).toBe("public");
+    expect(staticPrintReferenceHasPlatePreview(staticCr16x20Reference)).toBe(true);
+    expect(staticPrintReferenceHasAssembledPreview(staticCr16x20Reference)).toBe(false);
+    expect(staticPrintReferenceHasPlatePreview(staticCr14x20Reference)).toBe(true);
+    expect(staticPrintReferenceHasAssembledPreview(staticCr14x20Reference)).toBe(true);
     expect(staticCr16x20Reference?.previewAssets).toHaveLength(15);
     expect(staticCr14x20Reference?.assembledPreview).toEqual({
       type: "source-part-set",
@@ -342,9 +456,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     ).toHaveLength(12);
     expect(staticCr14x20Reference?.platePreviewAssets).toHaveLength(19);
     expect(staticCr14x20Reference?.previewAssets).toHaveLength(20);
-    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFanCount).toBe(4);
-    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFilterCount).toBe(2);
-    expect(printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")?.recommendedFilterPreset).toBe(
+    expect(staticCr14x20Preset?.model.type).toBe("static-reference");
+    expect(staticCr14x20Preset?.model.type === "static-reference" ? staticCr14x20Preset.model.defaults.fanCount : undefined).toBe(4);
+    expect(staticCr14x20Preset?.model.type === "static-reference" ? staticCr14x20Preset.model.defaults.filterCount : undefined).toBe(2);
+    expect(staticCr14x20Preset?.model.type === "static-reference" ? staticCr14x20Preset.model.defaults.filterPreset : undefined).toBe(
       "merv13-14x20x1",
     );
     expect(staticCr14x20Reference?.printEstimate?.estimatedFilamentKilograms).toBe(1);
@@ -353,6 +468,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const externalStaticReference =
       externalStaticReferencePreset === undefined ? undefined : staticPrintReferenceForPreset(externalStaticReferencePreset);
     expect(externalStaticReference?.usePolicy.type).toBe("external-only");
+    expect(externalStaticReferencePreset?.releaseVisibility).toBe("internal");
+    expect(staticPrintReferenceHasPlatePreview(externalStaticReference)).toBe(false);
+    expect(staticPrintReferenceHasAssembledPreview(externalStaticReference)).toBe(false);
     expect(defaultSettings.materialThickness).toBe(6);
   });
 
@@ -367,6 +485,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(settings.fansTop).toBe(5);
     expect(settings.splitFrames).toBe(false);
     expect(decoded.printDesign).toBe("static-cr-16x20-140");
+    expect(layout.configuration.design.type).toBe("static-reference");
+    expect(layout.configuration.design.type === "static-reference" ? layout.configuration.design.fanCount : undefined).toBe(5);
+    expect(layout.configuration.design.type === "static-reference" ? layout.configuration.design.capabilities.localPrintPlatePreview.type : undefined).toBe(
+      "available",
+    );
     expect(staticPrintReferenceForPreset(layout.configuration.printDesign)?.printablesId).toBe("1251061");
     expect(() => createPrintDesignKit(layout, "bed-256")).toThrow(/Static reference designs/);
   });
@@ -388,6 +511,14 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(settings.fansTop).toBe(0);
     expect(settings.fansBottom).toBe(0);
     expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
+    expect(layout.configuration.design.type).toBe("corsi-rosenthal");
+    expect(
+      layout.configuration.design.type === "corsi-rosenthal" ? layout.configuration.design.configuration : undefined,
+    ).toEqual({
+      mode: "top-exhaust",
+      filterCount: 4,
+      fanCount: { type: "auto" },
+    });
     expect(layout.configuration.printDesign.label).toContain("Corsi-Rosenthal");
     expect(layout.configuration.printDesign.label).not.toContain("glue");
     expect(decoded.printDesign).toBe("corsi-rosenthal");
@@ -632,6 +763,12 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(settings.donutFilterPreset).toBe("big-clive-silentnight-92");
     expect(settings.donutFilterHoleDiameter).toBe(92);
     expect(settings.donutCapEnabled).toBe(true);
+    expect(layout.configuration.design.type).toBe("donut-filter-adapter");
+    expect(layout.configuration.design.type === "donut-filter-adapter" ? layout.configuration.design.filter.cap : undefined).toEqual({
+      type: "printed-cap",
+      rim: 10,
+    });
+    expect(layout.configuration.design.type === "donut-filter-adapter" ? layout.configuration.design.fan.count : undefined).toBe(1);
     expect(model.filter).toEqual({ outerDiameter: 125, length: 150, holeDiameter: 92 });
     expect(model.adapter.screwCenters).toEqual([
       { x: 7.5, y: 7.5 },
@@ -657,6 +794,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   test("applies donut HEPA defaults for sparse URLs while preserving measured filter edits", () => {
     const defaults = decodeSettings("printDesign=donut-hepa-adapter");
     const measured = decodeSettings("printDesign=donut-hepa-adapter&donutFilterHoleDiameter=86&donutFilterLength=180&donutCapEnabled=false");
+    const measuredLayout = createLayout(measured);
     const preset = decodeSettings("printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini");
     const encoded = encodeSettings(measured);
 
@@ -672,6 +810,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(measured.donutFilterHoleDiameter).toBe(86);
     expect(measured.donutFilterLength).toBe(180);
     expect(measured.donutCapEnabled).toBe(false);
+    expect(
+      measuredLayout.configuration.design.type === "donut-filter-adapter"
+        ? measuredLayout.configuration.design.filter.cap
+        : undefined,
+    ).toEqual({ type: "none" });
     expect(measured.donutFilterPreset).toBe("custom");
     expect(encoded).toContain("donutFilterHoleDiameter=86");
     expect(encoded).toContain("donutFilterPreset=custom");
@@ -841,6 +984,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 });
 
+// #######################################
+// Domain Assertion Helpers
+// #######################################
+
 function requiredFilterPreset(id: string) {
   const preset = filterPresets.find((entry) => entry.id === id);
   if (preset === undefined) {
@@ -882,6 +1029,14 @@ function requiredCircleCut(panel: ReturnType<typeof requiredPanel>, role: "fan" 
   return cut;
 }
 
+function requiredRectCut(panel: ReturnType<typeof requiredPanel>, role: "finger-hole" | "slot" | "window") {
+  const cut = panel.cuts.find((entry) => entry.type === "rect" && entry.role === role);
+  if (cut === undefined || cut.type !== "rect") {
+    throw new Error(`requiredRectCut: Missing ${role} on ${panel.id}`);
+  }
+  return cut;
+}
+
 function requiredAssemblyPanel(assembly: ReturnType<typeof createAssemblyModel>, id: string) {
   const panel = [...assembly.panels, ...assembly.filterRails].find((part) => part.id === id);
   if (panel === undefined) {
@@ -895,9 +1050,22 @@ function panelTopToothY(part: ReturnType<typeof requiredAssemblyPanel>): number 
   return roundCoordinate(part.position[1] + top - part.panel.assemblyCenter.y);
 }
 
+function roundedInteriorYValues(panel: ReturnType<typeof requiredPanel>): number[] {
+  const minY = Math.min(...panel.outline.map((point) => point.y));
+  const maxY = Math.max(...panel.outline.map((point) => point.y));
+  const values = panel.outline
+    .map((point) => roundCoordinate(point.y))
+    .filter((y) => y > minY && y < maxY);
+  return [...new Set(values)].sort((left, right) => left - right);
+}
+
 function roundCoordinate(value: number): number {
   return Number(value.toFixed(6));
 }
+
+// #######################################
+// Parsed 3MF Model
+// #######################################
 
 type ParsedThreeMfModel = {
   readonly unit: string;
@@ -941,6 +1109,10 @@ type Bounds3 = {
   readonly width: number;
   readonly depth: number;
 };
+
+// #######################################
+// 3MF Parsing Helpers
+// #######################################
 
 function parseThreeMfModel(bytes: Uint8Array): ParsedThreeMfModel {
   const modelXml = new TextDecoder().decode(readStoredZipEntry(bytes, "3D/3dmodel.model"));

@@ -1,10 +1,26 @@
+# Dependencies and build output
 node_modules/
 dist/
-.codex/
+
+# Local browser automation output
 .playwright-cli/
 .playwright-mcp/
-.venv-boxes/
 output/
-*.png
+
+# Local helper environments and agent artifacts
+.venv-boxes/
+.codex/
+.upToSpeed/
+
+# Local machine files
+.DS_Store
 *.log
+.env
+.env.*
+!.env.example
+
+# Root-level screenshots captured during UI review
+/*.png
+
+# Large upstream reference downloads kept out of the published source tree
 references/external-models/

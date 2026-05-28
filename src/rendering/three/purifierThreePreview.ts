@@ -45,6 +45,7 @@ import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   staticPrintReferenceForPreset,
+  type CameraPreset,
   type FanAppearance,
 } from "@/domain/purifier/airPurifier";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -55,7 +56,11 @@ import {
   type LoadedStaticPrintAssembly,
   type LoadedStaticPrintAsset,
 } from "@/rendering/three/staticPrintAssets";
-import type { StaticPrintPreviewAsset, StaticPrintReference } from "@/resources/static-print-references/references";
+import {
+  staticPrintReferenceHasAssembledPreview,
+  type StaticPrintPreviewAsset,
+  type StaticPrintReference,
+} from "@/resources/static-print-references/references";
 import {
   createAssemblyModel,
   formatDimension,
@@ -74,6 +79,10 @@ import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight, t
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 import type { PrintableTileSource } from "@/fabrication/printing/printableKit";
 import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+
+// #######################################
+// Preview Model
+// #######################################
 
 type FanAxis = "x" | "y" | "z";
 
@@ -186,6 +195,10 @@ const previewControlClearanceTargetOffset = 0.1;
 // Positive Y rotation reads as slow clockwise motion from that outside view.
 const fanRotorAngularVelocity = 0.9;
 
+// #######################################
+// Preview Class
+// #######################################
+
 export class PurifierThreePreview {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(38, 1, 0.01, 100);
@@ -255,7 +268,7 @@ export class PurifierThreePreview {
     const previousPose = previousLayout === null ? null : this.captureCameraPose();
     const shouldApplyPresetCamera =
       previousLayout === null ||
-      previousLayout.configuration.preview.cameraPreset !== layout.configuration.preview.cameraPreset;
+      previousLayout.configuration.preview.enclosure.cameraPreset !== layout.configuration.preview.enclosure.cameraPreset;
 
     this.latestLayout = layout;
     this.rebuildModel(layout, printSeamPlan);
@@ -314,7 +327,7 @@ export class PurifierThreePreview {
     const assembly = createAssemblyModel(layout);
     const settings = layout.configuration;
 
-    const wood = createWoodMaterial(settings.preview.transparentWalls);
+    const wood = createWoodMaterial(settings.preview.enclosure.transparentWalls);
     const railWood = createWoodMaterial(false);
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
@@ -329,9 +342,9 @@ export class PurifierThreePreview {
       const panelGroup = createPanelGroup(
         panel,
         settings.cutting.materialThickness,
-        settings.preview.showFans,
+        settings.preview.enclosure.showFans,
         fanAppearance,
-        settings.preview.explodedView,
+        settings.preview.enclosure.explodedView,
         wood,
         darkEdge,
         cutMark,
@@ -343,7 +356,7 @@ export class PurifierThreePreview {
       this.modelGroup.add(panelGroup);
     }
 
-    if (settings.preview.showFilterFrame) {
+    if (settings.preview.enclosure.showFilterFrame) {
       if (assembly.filterRails.length > 0) {
         for (const rail of assembly.filterRails) {
           this.modelGroup.add(
@@ -352,7 +365,7 @@ export class PurifierThreePreview {
               settings.cutting.materialThickness,
               false,
               fanAppearance,
-              settings.preview.explodedView,
+              settings.preview.enclosure.explodedView,
               railWood,
               darkEdge,
               cutMark,
@@ -364,16 +377,16 @@ export class PurifierThreePreview {
         }
       } else {
         for (const frame of assembly.filterFrames) {
-          this.addAssemblyBox(frame, settings.preview.explodedView, railWood, darkEdge);
+          this.addAssemblyBox(frame, settings.preview.enclosure.explodedView, railWood, darkEdge);
         }
       }
     }
-    if (settings.preview.showFilterMedia) {
+    if (settings.preview.enclosure.showFilterMedia) {
       for (const media of assembly.filterMedia) {
-        this.addAssemblyBox(media, settings.preview.explodedView, filter, darkEdge);
+        this.addAssemblyBox(media, settings.preview.enclosure.explodedView, filter, darkEdge);
       }
     }
-    if (!settings.preview.explodedView) {
+    if (!settings.preview.enclosure.explodedView) {
       this.modelGroup.add(createSeamGroup(assembly.seams, seamMaterial));
     }
 
@@ -387,7 +400,7 @@ export class PurifierThreePreview {
     this.addScaleReference(layout, settledOutline);
     this.updateModelFocus(settledOutline);
 
-    if (settings.preview.showDimensions) {
+    if (settings.preview.enclosure.showDimensions) {
       const dimensionGroup = createDimensionGroup(assembly.dimensions);
       this.modelGroup.add(dimensionGroup);
       this.dimensionTargets = collectDimensionTargets(dimensionGroup);
@@ -406,9 +419,9 @@ export class PurifierThreePreview {
     }
 
     const assetsPromise =
-      reference.assembledPreview?.type !== "source-part-set"
-        ? loadStaticPrintAssets(previewAssets).then((assets) => ({ type: "assets" as const, assets }))
-        : loadStaticPrintAssemblyAssets(reference.assembledPreview.assets).then((assembly) => ({ type: "assembly" as const, assembly }));
+      staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "source-part-set"
+        ? loadStaticPrintAssemblyAssets(reference.assembledPreview.assets).then((assembly) => ({ type: "assembly" as const, assembly }))
+        : loadStaticPrintAssets(previewAssets).then((assets) => ({ type: "assets" as const, assets }));
 
     void assetsPromise
       .then((loaded) => {
@@ -440,7 +453,7 @@ export class PurifierThreePreview {
         this.disposeObject(this.scaleReferenceGroup);
         this.scaleReferenceGroup.clear();
         this.addScaleReference(layout, outline);
-        if (layout.configuration.preview.showDimensions) {
+        if (layout.configuration.preview.enclosure.showDimensions) {
           const dimensionGroup = createStaticReferenceDimensionGroup(boundsInModelGroupSpace(outline, this.modelGroup));
           this.modelGroup.add(dimensionGroup);
           this.dimensionTargets = collectDimensionTargets(dimensionGroup);
@@ -516,7 +529,7 @@ export class PurifierThreePreview {
     const edgeMaterial = new LineBasicMaterial({ color: 0x53605a, transparent: true, opacity: 0.5 });
     const pose = staticReferenceAssembledPreviewPose(layout);
     const previewGroup = pose.rotateWholePreview ? new Group() : this.modelGroup;
-    const shouldExplode = layout.configuration.preview.explodedView;
+    const shouldExplode = layout.configuration.preview.enclosure.explodedView;
 
     for (const asset of assembly.assets) {
       const explodeOffset = staticReferenceBoardExplodeOffset(asset.geometry, assembly, shouldExplode);
@@ -557,7 +570,7 @@ export class PurifierThreePreview {
     const assetDepth = assembly.footprintDepth * sceneScale;
     const assetHeight = assembly.height * sceneScale;
 
-    if (settings.preview.showFilterMedia) {
+    if (settings.preview.enclosure.showFilterMedia) {
       if (pose.installedPartLayout === "fan-panel-up") {
         this.addStaticReferenceTopFilter(assembly, layout, target);
       } else if (pose.installedPartLayout === "source-side-fans") {
@@ -567,7 +580,7 @@ export class PurifierThreePreview {
       }
     }
 
-    if (!settings.preview.showFans) {
+    if (!settings.preview.enclosure.showFans) {
       return;
     }
 
@@ -832,7 +845,7 @@ export class PurifierThreePreview {
   }
 
   private addScaleReference(layout: LayoutResult, modelBounds: Box3): void {
-    if (!layout.configuration.preview.showBananaScale) {
+    if (!layout.configuration.preview.enclosure.showBananaScale) {
       return;
     }
 
@@ -873,7 +886,7 @@ export class PurifierThreePreview {
     const filterMaterial = createFilterMediaMaterial(0.7);
     const metrics = createCorsiPreviewMetrics(layout);
 
-    if (settings.preview.showFilterFrame) {
+    if (settings.preview.enclosure.showFilterFrame) {
       this.addCorsiStructuralFrame(metrics, frameMaterial, edgeMaterial);
       for (const face of metrics.sealedFaces) {
         this.addCorsiSealedFace(metrics, face.side, frameMaterial, edgeMaterial);
@@ -884,20 +897,20 @@ export class PurifierThreePreview {
       this.addCorsiFilterFace(
         metrics,
         face.side,
-        settings.preview.showFilterMedia,
-        settings.preview.showFilterFrame,
+        settings.preview.enclosure.showFilterMedia,
+        settings.preview.enclosure.showFilterFrame,
         filterMaterial,
         frameMaterial,
         edgeMaterial,
       );
     }
-    if (settings.preview.showFilterFrame || settings.preview.showFans) {
+    if (settings.preview.enclosure.showFilterFrame || settings.preview.enclosure.showFans) {
       for (const fanPanel of metrics.fanPanels) {
         this.addCorsiFanPanel(
           metrics,
           fanPanel,
-          settings.preview.showFans,
-          settings.preview.showFilterFrame,
+          settings.preview.enclosure.showFans,
+          settings.preview.enclosure.showFilterFrame,
           fanAppearance,
           frameMaterial,
           edgeMaterial,
@@ -913,7 +926,7 @@ export class PurifierThreePreview {
     const settledOutline = new Box3().setFromObject(this.modelGroup);
     this.addScaleReference(layout, settledOutline);
     this.updateModelFocus(settledOutline);
-    this.addCorsiAirflowCues(metrics, settings.preview.showFilterMedia, settings.preview.showFans);
+    this.addCorsiAirflowCues(metrics, settings.preview.enclosure.showFilterMedia, settings.preview.enclosure.showFans);
   }
 
   private rebuildDonutFilterModel(layout: LayoutResult): void {
@@ -966,7 +979,7 @@ export class PurifierThreePreview {
       edgeMaterial,
     );
 
-    if (settings.preview.showFilterMedia) {
+    if (settings.preview.enclosure.showFilterMedia) {
       this.addDonutCylinderShell(filterRadius, filterLength, filterStartX + filterLength / 2, filterRadius, filterMaterial, edgeMaterial);
       this.addDonutCylinderShell(filterHoleRadius, filterLength, filterStartX + filterLength / 2, filterRadius, filterMaterial, edgeMaterial);
       this.addDonutFilterEndFace(filterStartX, filterRadius, filterHoleRadius, filterRadius, filterMaterial, edgeMaterial);
@@ -978,11 +991,11 @@ export class PurifierThreePreview {
       this.addDonutGasket(filterEndX, filterHoleRadius, filterRadius, blackMaterial);
     }
 
-    if (model.cap.enabled && settings.preview.showFilterFrame) {
+    if (model.cap.enabled && settings.preview.enclosure.showFilterFrame) {
       this.addDonutCap(model, filterEndX, filterRadius, capMaterial, edgeMaterial);
     }
 
-    if (settings.preview.showFans) {
+    if (settings.preview.enclosure.showFans) {
       const fanVisualDepth = 0.047;
       const fanCenterX = -flangeThickness / 2 - fanVisualDepth / 2;
       const fan = createFan({
@@ -1787,7 +1800,7 @@ export class PurifierThreePreview {
     const settings = layout.configuration;
     const maxDimension = cameraViewScale(layout);
     const target = this.cameraTarget(layout, maxDimension);
-    const position = cameraPosition(settings.preview.cameraPreset, maxDimension);
+    const position = cameraPosition(settings.preview.enclosure.cameraPreset, maxDimension);
     this.latestViewScale = maxDimension;
     this.camera.position.copy(target).add(position);
     this.controls.target.copy(target);
@@ -1824,7 +1837,7 @@ export class PurifierThreePreview {
 
   private cameraTarget(layout: LayoutResult, viewScale: number): Vector3 {
     const target = this.modelFocus.clone();
-    if (layout.configuration.preview.cameraPreset !== "top") {
+    if (layout.configuration.preview.enclosure.cameraPreset !== "top") {
       target.y += viewScale * previewControlClearanceTargetOffset;
     }
     return target;
@@ -1835,7 +1848,7 @@ export class PurifierThreePreview {
     this.camera.near = 0.01;
     this.camera.far = 100;
     this.camera.updateProjectionMatrix();
-    this.controls.autoRotate = settings.preview.autoRotate;
+    this.controls.autoRotate = settings.preview.enclosure.autoRotate;
     this.controls.update();
   }
 
@@ -1906,6 +1919,10 @@ export class PurifierThreePreview {
     });
   }
 }
+
+// #######################################
+// Scale References
+// #######################################
 
 function createBananaScaleReference(): Group {
   const group = new Group();
@@ -2110,6 +2127,10 @@ function visualAssemblyBoxSize(part: AssemblyBoxPart): MillimeterSize3 {
 function visualFilterMediaDimension(size: number): number {
   return Math.max(1, size - filterMediaPreviewClearanceMillimeters * 2, size * 0.72);
 }
+
+// #######################################
+// Generated Panel Meshes
+// #######################################
 
 function createPanelGroup(
   part: AssemblyPanelPart,
@@ -2373,6 +2394,10 @@ function createRectHolePath(cut: RectCut, panel: CutPanel): Path | null {
   return path;
 }
 
+// #######################################
+// Assembly Cues and Dimensions
+// #######################################
+
 function createSeamGroup(seams: readonly AssemblyLineCue[], material: Material): Group {
   const group = new Group();
   for (const seam of seams) {
@@ -2612,6 +2637,10 @@ function setDimensionLabelState(sprite: Sprite, isHovered: boolean): void {
   sprite.renderOrder = isHovered ? 23 : 13;
 }
 
+// #######################################
+// Materials and Textures
+// #######################################
+
 function createCutMarkMaterial(opacity: number): Material {
   return new MeshBasicMaterial({
     color: burnColor,
@@ -2715,6 +2744,10 @@ function createFilterTexture(): CanvasTexture {
   return texture;
 }
 
+// #######################################
+// Camera and Scene Math
+// #######################################
+
 function toScenePosition(position: Vector3Tuple, explodeDirection: Vector3Tuple, exploded: boolean): Vector3 {
   const explodeDistance = exploded ? 72 : 0;
   return new Vector3(
@@ -2728,7 +2761,7 @@ function toSceneOffset(offset: MillimeterVector3): Vector3 {
   return new Vector3(offset[0] * sceneScale, offset[1] * sceneScale, offset[2] * sceneScale);
 }
 
-function cameraPosition(preset: LayoutResult["configuration"]["preview"]["cameraPreset"], maxDimension: number): Vector3 {
+function cameraPosition(preset: CameraPreset, maxDimension: number): Vector3 {
   if (preset === "front") {
     return new Vector3(0, maxDimension * 0.45, -maxDimension * 2.45);
   }
@@ -2777,6 +2810,10 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
     layout.summary.chamberHeight,
   );
 }
+
+// #######################################
+// Static Reference Preview
+// #######################################
 
 function staticReferenceBoardExplodeOffset(
   geometry: BufferGeometry,
@@ -2903,10 +2940,10 @@ function staticReferenceAssembledPreviewPose(layout: LayoutResult): StaticRefere
 
 function modelViewScale(layout: LayoutResult): number {
   const settings = layout.configuration;
-  const scalePadding = settings.preview.showBananaScale ? oneMeterCubeSize * 0.72 : 0;
+  const scalePadding = settings.preview.enclosure.showBananaScale ? oneMeterCubeSize * 0.72 : 0;
   if (isStaticReferencePrintDesignId(settings.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(settings.printDesign);
-    if (reference !== undefined && staticReferenceHasAssembledPreview(reference)) {
+    if (reference !== undefined && staticPrintReferenceHasAssembledPreview(reference)) {
       return (reference.previewMaxDimensionMm ?? 540) * sceneScale * 1.35 + scalePadding;
     }
     const assetCount = reference?.previewAssets.length ?? 1;
@@ -2945,19 +2982,19 @@ function modelViewScale(layout: LayoutResult): number {
   ) + scalePadding;
 }
 
-function staticReferenceHasAssembledPreview(reference: StaticPrintReference): boolean {
-  return reference.assembledPreview !== undefined;
-}
-
 function staticReferencePreviewAssets(reference: StaticPrintReference): readonly StaticPrintPreviewAsset[] {
-  if (reference.assembledPreview?.type === "single-source-asset") {
+  if (staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "single-source-asset") {
     return [reference.assembledPreview.asset];
   }
-  if (reference.assembledPreview?.type === "source-part-set") {
+  if (staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "source-part-set") {
     return reference.assembledPreview.assets;
   }
   return reference.previewAssets;
 }
+
+// #######################################
+// Corsi-Rosenthal Preview
+// #######################################
 
 function createCorsiPreviewMetrics(layout: LayoutResult): CorsiPreviewMetrics {
   const model = createCorsiRosenthalModel(layout);
@@ -3135,6 +3172,10 @@ function styleCorsiAirflowCue(cue: ArrowHelper): void {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+// #######################################
+// Fan Models
+// #######################################
 
 function createFan({ axis, position, radius, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
   const fan = new Group();

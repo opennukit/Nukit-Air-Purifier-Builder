@@ -1,6 +1,16 @@
 import type { BoxesDocument } from "@/ports/boxes/kernel";
 import type { Shape } from "@/ports/boxes/drawing";
-import type { ReferenceScale } from "@/fabrication/laser/cutSettings";
+import {
+  defaultCutJointSettings,
+  type CutJointSettings,
+  type DovetailJointSettings,
+  type FingerJointSettings,
+  type ReferenceScale,
+} from "@/fabrication/laser/cutSettings";
+
+// #######################################
+// Cut Model
+// #######################################
 
 export type CutPoint = {
   x: number;
@@ -103,6 +113,7 @@ export type RectangularPanelInput = {
   edges: readonly [readonly EdgeSection[], readonly EdgeSection[], readonly EdgeSection[], readonly EdgeSection[]];
   thickness: number;
   kerfFit?: number;
+  jointSettings?: CutJointSettings;
   cuts?: CutFeature[];
   assembly?: CutPanelAssembly;
 };
@@ -115,6 +126,10 @@ type EdgeDirection = {
 const sheetGap = 18;
 const sheetMargin = 12;
 const maxSheetRowWidth = 1040;
+
+// #######################################
+// Panel Construction
+// #######################################
 
 export function edgeSections(pattern: string, lengths?: readonly number[]): EdgeSection[] {
   if (lengths !== undefined && pattern.length !== lengths.length) {
@@ -129,9 +144,10 @@ export function edgeSections(pattern: string, lengths?: readonly number[]): Edge
 export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   const outline = buildRectangularOutline(input);
   const kerfFit = input.kerfFit ?? 0;
+  const jointSettings = input.jointSettings ?? defaultCutJointSettings;
   const cuts = [
     ...(input.cuts ?? []),
-    ...createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit),
+    ...createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings),
   ];
   return normalizePanel({
     id: input.id,
@@ -149,6 +165,10 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
     assembly: input.assembly,
   });
 }
+
+// #######################################
+// Sheet Layout
+// #######################################
 
 export function layoutCutPanels(panels: readonly CutPanelDraft[]): LaidOutCutPanel[] {
   let cursorX = sheetMargin;
@@ -192,6 +212,10 @@ export function layoutCutPanelsInColumn(panels: readonly CutPanelDraft[], gap: n
     return laidOut;
   });
 }
+
+// #######################################
+// Drawing Export
+// #######################################
 
 export function cutPanelsToDocument(
   panels: readonly LaidOutCutPanel[],
@@ -253,6 +277,10 @@ export function cutPanelsToDocument(
   return { width, height, shapes };
 }
 
+// #######################################
+// Finger Hole Cuts
+// #######################################
+
 export function fingerHoleCutsAt(
   x: number,
   y: number,
@@ -260,16 +288,17 @@ export function fingerHoleCutsAt(
   angle: 0 | 90,
   thickness: number,
   kerfFit = 0,
+  jointSettings: CutJointSettings = defaultCutJointSettings,
 ): RectCut[] {
-  const { fingers, leftover, finger } = calculateFingerPattern(length, thickness);
+  const { fingers, leftover, finger, space } = calculateFingerPattern(length, thickness, jointSettings.finger);
   if (fingers === 0) {
     return [];
   }
 
   const cuts: RectCut[] = [];
-  const holeWidth = thickness;
+  const holeWidth = thickness * (jointSettings.finger.holeWidthMultiplier + jointSettings.finger.playMultiplier);
   for (let index = 0; index < fingers; index += 1) {
-    const position = leftover / 2 + index * (finger + 2 * thickness);
+    const position = leftover / 2 + index * (finger + space);
     if (angle === 90) {
       cuts.push(
         shrinkRectCut(
@@ -305,7 +334,12 @@ export function fingerHoleCutsAt(
   return cuts;
 }
 
+// #######################################
+// Rectangular Joint Outlines
+// #######################################
+
 function buildRectangularOutline(input: RectangularPanelInput): CutPoint[] {
+  const jointSettings = input.jointSettings ?? defaultCutJointSettings;
   const directions: readonly EdgeDirection[] = [
     { axis: { x: 1, y: 0 }, outward: { x: 0, y: -1 } },
     { axis: { x: 0, y: 1 }, outward: { x: 1, y: 0 } },
@@ -324,7 +358,7 @@ function buildRectangularOutline(input: RectangularPanelInput): CutPoint[] {
         : sections.map((section) => ({ ...section, length: fallbackLengths[edgeIndex] }));
 
     for (const section of normalizedSections) {
-      appendEdgeSection(points, section.kind, section.length, direction, input.thickness);
+      appendEdgeSection(points, section.kind, section.length, direction, input.thickness, jointSettings);
     }
   });
 
@@ -338,21 +372,22 @@ function appendEdgeSection(
   length: number,
   direction: EdgeDirection,
   thickness: number,
+  jointSettings: CutJointSettings,
 ): void {
   if (kind === "finger") {
-    appendFingerProfile(points, length, direction, thickness, 1);
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, 1);
     return;
   }
   if (kind === "finger-counter") {
-    appendFingerProfile(points, length, direction, thickness, -1);
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, -1);
     return;
   }
   if (kind === "dovetail") {
-    appendDovetailProfile(points, length, direction, thickness, 1);
+    appendDovetailProfile(points, length, direction, thickness, jointSettings.dovetail, 1);
     return;
   }
   if (kind === "dovetail-counter") {
-    appendDovetailProfile(points, length, direction, thickness, -1);
+    appendDovetailProfile(points, length, direction, thickness, jointSettings.dovetail, -1);
     return;
   }
   appendLine(points, moveBy(lastPoint(points), direction.axis, length));
@@ -363,9 +398,10 @@ function appendFingerProfile(
   length: number,
   direction: EdgeDirection,
   thickness: number,
+  settings: FingerJointSettings,
   polarity: 1 | -1,
 ): void {
-  const { fingers, leftover, finger, space } = calculateFingerPattern(length, thickness);
+  const { fingers, leftover, finger, space } = calculateFingerPattern(length, thickness, settings);
   const depth = thickness;
   appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
   for (let index = 0; index < fingers; index += 1) {
@@ -384,23 +420,26 @@ function appendDovetailProfile(
   length: number,
   direction: EdgeDirection,
   thickness: number,
+  settings: DovetailJointSettings,
   polarity: 1 | -1,
 ): void {
-  const size = 2 * thickness;
+  const size = settings.sizeMultiplier * thickness;
   const gap = size;
-  const depth = thickness;
+  const depth = settings.depthMultiplier * thickness;
   const sections = Math.floor(length / (size + gap));
   if (sections === 0) {
     appendLine(points, moveBy(lastPoint(points), direction.axis, length));
     return;
   }
 
+  const shoulder = size * dovetailShoulderFraction(settings.taper);
+  const middle = Math.max(size * 0.1, size - 2 * shoulder);
   const leftover = length - sections * (size + gap) + gap;
   appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
   for (let index = 0; index < sections; index += 1) {
-    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, size * 0.18), direction.outward, depth * polarity));
-    appendLine(points, moveBy(lastPoint(points), direction.axis, size * 0.64));
-    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, size * 0.18), direction.outward, -depth * polarity));
+    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, shoulder), direction.outward, depth * polarity));
+    appendLine(points, moveBy(lastPoint(points), direction.axis, middle));
+    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, shoulder), direction.outward, -depth * polarity));
     if (index < sections - 1) {
       appendLine(points, moveBy(lastPoint(points), direction.axis, gap));
     }
@@ -414,9 +453,10 @@ function createFingerHoleCutsForEdges(
   edges: RectangularPanelInput["edges"],
   thickness: number,
   kerfFit: number,
+  jointSettings: CutJointSettings,
 ): CutFeature[] {
   const cuts: RectCut[] = [];
-  const edgeHoleOffset = thickness * 1.5 + kerfFit;
+  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier + kerfFit;
   for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
     const sections = edges[edgeIndex];
     const hasFingerHoleEdge = sections.some((section) => section.kind === "finger-holes");
@@ -425,17 +465,21 @@ function createFingerHoleCutsForEdges(
     }
 
     if (edgeIndex === 0) {
-      cuts.push(...fingerHoleCutsAt(0, edgeHoleOffset, width, 0, thickness, kerfFit));
+      cuts.push(...fingerHoleCutsAt(0, edgeHoleOffset, width, 0, thickness, kerfFit, jointSettings));
     } else if (edgeIndex === 1) {
-      cuts.push(...fingerHoleCutsAt(width - edgeHoleOffset, 0, height, 90, thickness, kerfFit));
+      cuts.push(...fingerHoleCutsAt(width - edgeHoleOffset, 0, height, 90, thickness, kerfFit, jointSettings));
     } else if (edgeIndex === 2) {
-      cuts.push(...fingerHoleCutsAt(0, height - edgeHoleOffset, width, 0, thickness, kerfFit));
+      cuts.push(...fingerHoleCutsAt(0, height - edgeHoleOffset, width, 0, thickness, kerfFit, jointSettings));
     } else {
-      cuts.push(...fingerHoleCutsAt(edgeHoleOffset, 0, height, 90, thickness, kerfFit));
+      cuts.push(...fingerHoleCutsAt(edgeHoleOffset, 0, height, 90, thickness, kerfFit, jointSettings));
     }
   }
   return cuts;
 }
+
+// #######################################
+// Panel Normalization
+// #######################################
 
 function normalizePanel(panel: CutPanelDraft): CutPanelDraft {
   const allPoints = [
@@ -462,9 +506,17 @@ function normalizePanel(panel: CutPanelDraft): CutPanelDraft {
   };
 }
 
-function calculateFingerPattern(length: number, thickness: number): { fingers: number; leftover: number; finger: number; space: number } {
-  const space = 2 * thickness;
-  let finger = 2 * thickness;
+// #######################################
+// Joint Geometry Helpers
+// #######################################
+
+function calculateFingerPattern(
+  length: number,
+  thickness: number,
+  settings: FingerJointSettings,
+): { fingers: number; leftover: number; finger: number; space: number } {
+  const space = settings.spaceMultiplier * thickness;
+  let finger = settings.widthMultiplier * thickness;
   let fingers = Math.floor((length - space) / (space + finger));
   if (fingers <= 0) {
     if (finger > 0 && length > 0.75 * thickness) {
@@ -481,6 +533,17 @@ function calculateFingerPattern(length: number, thickness: number): { fingers: n
   };
 }
 
+function dovetailShoulderFraction(taper: number): number {
+  return 0.05 + (clampNumber(taper, 0, 80) / 80) * 0.208;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
 function shrinkRectCut(cut: RectCut, kerfFit: number): RectCut {
   const maxInset = Math.max(0, Math.min(cut.width, cut.height) / 2 - 0.001);
   const inset = Math.min(Math.max(0, kerfFit), maxInset);
@@ -493,6 +556,10 @@ function shrinkRectCut(cut: RectCut, kerfFit: number): RectCut {
     radius: Math.max(0, cut.radius - inset),
   };
 }
+
+// #######################################
+// Shape Paths and Bounds
+// #######################################
 
 function cutFeaturePath(cut: CutFeature): CutPoint[] {
   if (cut.type === "circle") {
@@ -609,6 +676,10 @@ function shapeMaxY(shape: Shape): number {
   return shape.y + shape.height;
 }
 
+// #######################################
+// Point Helpers
+// #######################################
+
 function translatePoints(points: readonly CutPoint[], offsetX: number, offsetY: number): CutPoint[] {
   return points.map((point) => ({ x: point.x + offsetX, y: point.y + offsetY }));
 }
@@ -650,6 +721,10 @@ function removeClosingDuplicate(points: CutPoint[]): void {
     points.pop();
   }
 }
+
+// #######################################
+// Edge Parsing
+// #######################################
 
 function edgeKindFromChar(char: string): EdgeKind {
   if (char === "e" || char === "E") {

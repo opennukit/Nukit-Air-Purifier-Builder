@@ -3,6 +3,10 @@ import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type { CutFeature, CutPanel, CutPoint, RectCut } from "@/fabrication/laser/cutGeometry";
 import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
+// #######################################
+// Print Volume Model
+// #######################################
+
 export const exportFormats = ["print-3mf", "laser-svg"] as const;
 
 export type ExportFormat = (typeof exportFormats)[number];
@@ -168,6 +172,10 @@ const glueKeyHeight = 3;
 const glueKeySpacing = 95;
 const unboundedPreviewWidth = 1000;
 
+// #######################################
+// Print Volume Presets
+// #######################################
+
 export const printVolumePresets: readonly PrintVolumePreset[] = [
   {
     id: "bed-180",
@@ -268,6 +276,10 @@ export function readExportFormat(value: string | null): ExportFormat {
   return value === "print-3mf" ? "print-3mf" : "laser-svg";
 }
 
+// #######################################
+// Public Kit and Export API
+// #######################################
+
 export function createPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
   const parts = layout.cutPanels.flatMap((panel) =>
@@ -320,6 +332,10 @@ export function createPrintableSheetPlan(layout: LayoutResult, presetId: PrintVo
   const kit = createPrintableKit(layout, presetId);
   return createPrintableSheetPlanFromKit(kit);
 }
+
+// #######################################
+// Sheet Planning and 3MF Objects
+// #######################################
 
 export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableSheetPlan {
   return {
@@ -428,6 +444,10 @@ function requiredLastSheet(sheets: readonly MutablePrintSheet[]): MutablePrintSh
   return sheet;
 }
 
+// #######################################
+// Panel Splitting
+// #######################################
+
 function createPrintablePartsForPanel(panel: CutPanel, materialThickness: number, preset: PrintVolumePreset): PrintablePart[] {
   const panelCuts = panel.cuts.map((cut) => toPanelCut(cut, panel));
   const tiles = splitPanelIntoTiles(panel, panelCuts, preset);
@@ -519,6 +539,10 @@ type Bounds1 = {
   readonly max: number;
 };
 
+// #######################################
+// Printable Parts
+// #######################################
+
 function findSafeSplit(target: number, minimum: number, maximum: number, blockedRanges: readonly Bounds1[]): number {
   for (let candidate = target; candidate >= minimum; candidate -= splitSearchStep) {
     if (!blockedRanges.some((range) => candidate > range.min && candidate < range.max)) {
@@ -600,6 +624,10 @@ function createGlueKeyPart(panel: CutPanel, seam: "vertical" | "horizontal", sea
 function glueKeyCountForLength(length: number): number {
   return Math.max(1, Math.ceil(length / glueKeySpacing));
 }
+
+// #######################################
+// Mesh Generation
+// #######################################
 
 function createPlateMesh(outline: readonly CutPoint[], height: number, cuts: readonly CutFeature[]): PrintableMesh {
   const shape = new Shape();
@@ -716,6 +744,10 @@ function rectCutToHolePath(cut: RectCut): Path | null {
   return path;
 }
 
+// #######################################
+// Panel Coordinate Helpers
+// #######################################
+
 function toPanelCut(cut: CutFeature, panel: CutPanel): PanelCut {
   const translated = translateCut(cut, panel.nominalWidth / 2 - panel.assemblyCenter.x, panel.nominalHeight / 2 - panel.assemblyCenter.y);
   return {
@@ -757,6 +789,10 @@ function translateCut(cut: CutFeature, offsetX: number, offsetY: number): CutFea
 function translateCutToTile(cut: CutFeature, x0: number, y0: number): CutFeature {
   return translateCut(cut, -x0, -y0);
 }
+
+// #######################################
+// Clipping and Bounds
+// #######################################
 
 function clipPolygonToBounds(points: readonly CutPoint[], bounds: Bounds2): CutPoint[] {
   return clipPolygonAgainstEdge(
@@ -893,6 +929,10 @@ function boundsInsideTile(bounds: Bounds2, x0: number, x1: number, y0: number, y
     bounds.maxY <= y1 + tolerance
   );
 }
+
+// #######################################
+// Summary Helpers
+// #######################################
 
 function summarizePrintableKit(
   parts: readonly PrintablePart[],
