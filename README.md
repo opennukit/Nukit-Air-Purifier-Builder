@@ -6,12 +6,8 @@ Browser-based builder for DIY clean-air purifier designs. It creates live 3D pre
 
 ## What It Builds
 
-- Laser-cut Nukit Open Air boxes using HVAC filters, PC fans, finger-jointed panels, kerf fit, and SVG export.
-- 3D-printable Nukit Tempest boxes from a separate OpenSCAD-ported model, including 1-filter, 2-filter, and 4-side-filter layouts.
-- Desktop-printable 3MF kits with print-bed chunking, alignment-pin holes, split plates, and previewed print parts.
-- Generated printable references: modular Corsi-Rosenthal box and donut HEPA fan adaptor.
-- Curated static Printables references where source geometry is intentionally fixed, not pretending to be parametric.
-- Shareable URLs that preserve design, parts, fabrication method, preview mode, and advanced fit settings.
+- Parametric laser-cut and 3D-printed filter boxes.
+- One static reference option for designs that are not parametric.
 
 The laser-cut Nukit model and the 3D-printable Tempest model are intentionally separate. Their shared concepts are filter size, fan size, layout, and export workflow; their construction details can diverge.
 
