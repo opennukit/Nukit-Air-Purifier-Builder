@@ -51,6 +51,14 @@ bun run port:audit
 bun run oracle:airpurifier
 ```
 
+Optional OpenSCAD oracle checks for the Tempest 3D-print port:
+
+```sh
+bun run test:openscad
+```
+
+This requires the `openscad` CLI on `PATH`, or `OPENSCAD_BIN=/path/to/OpenSCAD`. The suite renders the checked-in Tempest `.scad` reference and compares parsed oracle metrics with the TypeScript/JSCAD port.
+
 ## Repository Layout
 
 - `src/app/`: browser workbench, URL state, tabs, controls, and styles.

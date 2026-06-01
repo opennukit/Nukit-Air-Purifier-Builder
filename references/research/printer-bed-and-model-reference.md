@@ -105,7 +105,7 @@ Relevant files:
 - FDM STL outputs targeting `220x220x220`.
 - Resin STL outputs targeting `120x120x120`.
 
-Integration consequence: this is the best source for Naomi's OpenSCAD style and parameterization, but the geometry domain is UVGI rather than filter boxes.
+Integration consequence: this is the best source for the repo's OpenSCAD style and parameterization, but the geometry domain is UVGI rather than filter boxes.
 
 ## Printer Volume Sources
 

@@ -10,7 +10,7 @@ import {
 // Workbench Model
 // #######################################
 
-export type ControlsTab = "design" | "parts" | "setup" | "advanced";
+export type ControlsTab = "design" | "setup" | "advanced";
 
 export type WorkbenchFabrication =
   | {
@@ -145,8 +145,11 @@ function readPreviewMode(value: string | null): PreviewMode {
 }
 
 export function readControlsTab(value: string | null): ControlsTab {
-  if (value === "design" || value === "parts" || value === "setup" || value === "advanced") {
+  if (value === "design" || value === "setup" || value === "advanced") {
     return value;
+  }
+  if (value === "parts") {
+    return "design";
   }
   if (value === "fit" || value === "cutting") {
     return "advanced";

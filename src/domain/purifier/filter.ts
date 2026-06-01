@@ -11,6 +11,7 @@ export const filterPresetIds = [
   "ikea-fornuftig",
   "ikea-starkvind",
   "ikea-uppatvind",
+  "air-fanta-compatible",
   "custom",
 ] as const;
 
@@ -140,6 +141,15 @@ export const filterPresets: readonly FilterPreset[] = [
     nominalSize: "9.875 x 7.875 x 1 in",
     source: "IKEA published replacement filter size",
     dimensions: { width: 250.8, depth: 200, thickness: 25.4 },
+  },
+  {
+    id: "air-fanta-compatible",
+    label: "Air Fanta compatible",
+    detail: "Air Fanta compatible replacement filter",
+    examples: ["Nukit Tempest 4 side filters"],
+    nominalSize: "29 x 29 x 2.5 cm",
+    source: "Supplied Air Fanta compatible filter pack dimensions",
+    dimensions: { width: 290, depth: 290, thickness: 25 },
   },
   {
     id: "custom",

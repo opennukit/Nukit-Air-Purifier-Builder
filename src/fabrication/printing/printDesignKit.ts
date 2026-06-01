@@ -1,9 +1,11 @@
 import { createCorsiRosenthalPrintableKit } from "@/fabrication/printing/designs/corsi-rosenthal/printableKit";
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
+import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import {
   isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
+  isTempestPrintDesignId,
 } from "@/domain/purifier/airPurifier";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
@@ -24,6 +26,9 @@ export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolume
   if (isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
     return createDonutFilterPrintableKit(layout, presetId);
   }
+  if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
+    return createTempestPrintableKitFromLayout(layout, presetId);
+  }
   return createPrintableKit(layout, presetId);
 }
 
@@ -32,7 +37,18 @@ export function createPrintDesignThreeMfExport(
   presetId: PrintVolumePresetId,
 ): PrintableThreeMfExport {
   const kit = createPrintDesignKit(layout, presetId);
-  if (isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id) || isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
+  return createPrintDesignThreeMfExportFromKit(layout, kit);
+}
+
+export function createPrintDesignThreeMfExportFromKit(
+  layout: LayoutResult,
+  kit: PrintableKit,
+): PrintableThreeMfExport {
+  if (
+    isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id) ||
+    isDonutFilterPrintDesignId(layout.configuration.printDesign.id) ||
+    isTempestPrintDesignId(layout.configuration.printDesign.id)
+  ) {
     return createPrintableThreeMfExportFromKit(
       kit,
       `${layout.configuration.printDesign.label} print kit`,

@@ -9,9 +9,19 @@
 
   let host: HTMLDivElement;
   let preview: PurifierThreePreview | null = null;
+  let previousRebuildKey = "";
 
   function updatePreview(): void {
-    preview?.update(layout, printSeamPlan);
+    if (preview === null) {
+      return;
+    }
+    const rebuildKey = previewRebuildKey(layout, printSeamPlan);
+    if (rebuildKey !== previousRebuildKey) {
+      preview.update(layout, printSeamPlan);
+      previousRebuildKey = rebuildKey;
+      return;
+    }
+    preview.setAutoRotate(layout.configuration.preview.enclosure.autoRotate);
   }
 
   onMount(() => {
@@ -25,6 +35,18 @@
     preview?.destroy();
     preview = null;
   });
+
+  function previewRebuildKey(currentLayout: LayoutResult, currentPrintSeamPlan: PrintableSheetPlan | null): string {
+    const rawSettingsThatAffectGeometry = {
+      ...currentLayout.rawSettings,
+      autoRotate: undefined,
+    };
+    return JSON.stringify({
+      rawSettingsThatAffectGeometry,
+      printSeamPreset: currentPrintSeamPlan?.kit.preset.id ?? "none",
+      printSeamParts: currentPrintSeamPlan?.kit.summary.partCount ?? 0,
+    });
+  }
 </script>
 
 <div class="three-preview-host" role="img" aria-label="Interactive 3D enclosure preview" bind:this={host}></div>

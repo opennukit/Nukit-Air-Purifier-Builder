@@ -2,12 +2,10 @@
   import { afterUpdate, onDestroy, onMount } from "svelte";
   import {
     PrintSheetThreePreview,
-    type PrintSheetPreviewSettings,
     type PrintSheetThreePreviewPlan,
   } from "@/rendering/three/printSheetThreePreview";
 
   export let plan: PrintSheetThreePreviewPlan;
-  export let settings: PrintSheetPreviewSettings;
   export let label = "3D print plate preview";
   export let className = "print-sheet-three-host";
 
@@ -15,7 +13,7 @@
   let preview: PrintSheetThreePreview | null = null;
 
   function updatePreview(): void {
-    preview?.update(plan, settings);
+    preview?.update(plan);
   }
 
   onMount(() => {

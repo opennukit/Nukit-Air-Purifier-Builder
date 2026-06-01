@@ -1,4 +1,4 @@
-import type { LayoutResult } from "@/fabrication/purifierLayout";
+import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierGeometry, type FilterLayerGeometry } from "@/domain/purifier/geometry";
 import type { AssemblyPlacement, CutPanel, FilterRailKey, StructuralAssemblyRole } from "@/fabrication/laser/cutGeometry";
@@ -37,7 +37,7 @@ export type DimensionMeasurement = {
 };
 
 export type DimensionGuide = {
-  label: "A" | "B" | "C" | "E" | "G";
+  label: "W" | "H" | "D";
   from: MillimeterVector3;
   to: MillimeterVector3;
   measurement: DimensionMeasurement;
@@ -63,6 +63,7 @@ export type AssemblyModel = {
 
 export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
   const settings = layout.configuration;
+  const cutPanelFabrication = requireCutPanelFabricationPlan(layout, "createAssemblyModel");
   const geometry = createAirPurifierGeometry(settings);
   const width = geometry.filterDimensions.width;
   const filterDepth = geometry.filterDimensions.depth;
@@ -73,7 +74,7 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
   const filterThickness = filterSelectionDimensions(settings.filter).thickness;
 
   return {
-    panels: layout.cutPanels.flatMap((panel) => createStructuralPanelPart(panel)),
+    panels: cutPanelFabrication.cutPanels.flatMap((panel) => createStructuralPanelPart(panel)),
     filterRails: createFilterRailParts(layout),
     filterFrames: geometry.filterLayers.flatMap((layer) => createFilterFrameParts(layer, width, depth, rim, thickness)),
     filterMedia: geometry.filterLayers.map((layer) => ({
@@ -85,7 +86,7 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
       explodeDirection: [0, layer.explodeDirectionY, 0],
     })),
     seams: createPanelSeams(width, height, depth),
-    dimensions: createDimensionGuides(width, height, depth, settings.fan.spec.diameter, rim),
+    dimensions: createDimensionGuides(width, height, depth),
   };
 }
 
@@ -99,7 +100,8 @@ function createStructuralPanelPart(panel: CutPanel): AssemblyPanelPart[] {
 }
 
 function createFilterRailParts(layout: LayoutResult): AssemblyPanelPart[] {
-  return layout.cutPanels.flatMap((panel) => {
+  const cutPanelFabrication = requireCutPanelFabricationPlan(layout, "createFilterRailParts");
+  return cutPanelFabrication.cutPanels.flatMap((panel) => {
     const assembly = panel.assembly;
     if (assembly === undefined) {
       return [];
@@ -233,49 +235,29 @@ function createFilterFrameParts(
   ];
 }
 
-function createDimensionGuides(
-  width: number,
-  height: number,
-  depth: number,
-  fanDiameter: number,
-  rim: number,
-): DimensionGuide[] {
+function createDimensionGuides(width: number, height: number, depth: number): DimensionGuide[] {
   const yTop = height / 2 + 28;
   return [
     {
-      label: "A",
-      measurement: { value: width, description: "filter width" },
+      label: "W",
+      measurement: { value: width, description: "outside width" },
       from: [-width / 2, yTop, depth / 2],
       to: [width / 2, yTop, depth / 2],
       labelOffset: [-26, 52, 0],
     },
     {
-      label: "B",
-      measurement: { value: depth, description: "working depth" },
-      from: [width / 2 + 28, yTop, -depth / 2],
-      to: [width / 2 + 28, yTop, depth / 2],
-      labelOffset: [20.8, 41.6, 0],
-    },
-    {
-      label: "C",
-      measurement: { value: height, description: "chamber height" },
+      label: "H",
+      measurement: { value: height, description: "outside height" },
       from: [width / 2 + 34, -height / 2, -depth / 2],
       to: [width / 2 + 34, height / 2, -depth / 2],
       labelOffset: [-41.6, 0, 0],
     },
     {
-      label: "E",
-      measurement: { value: fanDiameter, description: "fan diameter" },
-      from: [-width / 2 + rim, -fanDiameter / 2, -depth / 2 - 16],
-      to: [-width / 2 + rim, fanDiameter / 2, -depth / 2 - 16],
-      labelOffset: [-117, -83.2, -46.8],
-    },
-    {
-      label: "G",
-      measurement: { value: rim, description: "filter rim" },
-      from: [width / 2 - rim, height / 2 - rim, -depth / 2 - 16],
-      to: [width / 2, height / 2 - rim, -depth / 2 - 16],
-      labelOffset: [-72.8, 41.6, -10.4],
+      label: "D",
+      measurement: { value: depth, description: "outside depth" },
+      from: [width / 2 + 28, yTop, -depth / 2],
+      to: [width / 2 + 28, yTop, depth / 2],
+      labelOffset: [20.8, 41.6, 0],
     },
   ];
 }

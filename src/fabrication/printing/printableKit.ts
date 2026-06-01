@@ -1,5 +1,5 @@
 import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
-import type { LayoutResult } from "@/fabrication/purifierLayout";
+import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication/purifierLayout";
 import type { CutFeature, CutPanel, CutPoint, RectCut } from "@/fabrication/laser/cutGeometry";
 import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
@@ -10,6 +10,10 @@ import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangl
 export const exportFormats = ["print-3mf", "laser-svg"] as const;
 
 export type ExportFormat = (typeof exportFormats)[number];
+
+// ##############################
+// Print Volume Identifiers
+// ##############################
 
 export const printVolumePresetIds = [
   "bed-180",
@@ -28,6 +32,10 @@ export const printVolumePresetIds = [
 export type PrintVolumePresetId = (typeof printVolumePresetIds)[number];
 
 export const defaultPrintVolumePresetId: PrintVolumePresetId = "bed-256";
+
+// ##############################
+// Print Beds
+// ##############################
 
 export type PrintVolumePreset = {
   readonly id: PrintVolumePresetId;
@@ -48,14 +56,28 @@ export type PrintBed =
       readonly type: "unbounded";
     };
 
-export type PrintablePartKind = "panel-tile" | "dovetail-glue-key";
+// ##############################
+// Printable Parts
+// ##############################
 
-export type PrintablePart = {
+export type PrintablePartKind =
+  | "panel-tile"
+  | "dovetail-glue-key"
+  | "scarf-glue-key"
+  | "rail-connector"
+  | "corsi-frame-rail"
+  | "corsi-corner-block"
+  | "corsi-fan-cassette"
+  | "corsi-sealed-face-panel"
+  | "corsi-fan-panel-seal"
+  | "donut-filter-adapter"
+  | "donut-fan-guard"
+  | "donut-filter-cap"
+  | "tempest-print-chunk";
+
+type PrintablePartBase = {
   readonly id: string;
   readonly name: string;
-  readonly kind: PrintablePartKind;
-  readonly sourcePanelId?: string;
-  readonly sourceTile?: PrintableTileSource;
   readonly width: number;
   readonly depth: number;
   readonly height: number;
@@ -63,6 +85,18 @@ export type PrintablePart = {
   readonly printCriticalCutFeatureCount: number;
   readonly mesh: PrintableMesh;
 };
+
+export type PrintablePart =
+  | (PrintablePartBase & {
+      readonly kind: "panel-tile";
+      readonly sourcePanelId: string;
+      readonly sourceTile: PrintableTileSource;
+    })
+  | (PrintablePartBase & {
+      readonly kind: Exclude<PrintablePartKind, "panel-tile">;
+      readonly sourcePanelId?: string;
+      readonly sourceTile?: never;
+    });
 
 export type PrintableTileSource = {
   readonly panelId: string;
@@ -80,6 +114,10 @@ export type PrintableMesh = {
   readonly vertices: readonly MeshVertex[];
   readonly triangles: readonly MeshTriangle[];
 };
+
+// ##############################
+// Kit Summary and Export
+// ##############################
 
 export type PrintableKitSummary = {
   readonly partCount: number;
@@ -107,11 +145,38 @@ export type PrintableThreeMfExport = {
   readonly sheetPlan: PrintableSheetPlan;
 };
 
+// ##############################
+// Print Sheet Planning
+// ##############################
+
+export type PrintBedFitAxis = "width" | "depth" | "height";
+
+export type OversizedPrintBedAxis = {
+  readonly axis: PrintBedFitAxis;
+  readonly required: number;
+  readonly available: number;
+};
+
+export type PrintBedFit =
+  | {
+      readonly type: "fits";
+    }
+  | {
+      readonly type: "oversized";
+      readonly oversizedAxes: readonly [OversizedPrintBedAxis, ...OversizedPrintBedAxis[]];
+    };
+
+export type PrintableFootprint = {
+  readonly width: number;
+  readonly depth: number;
+  readonly height: number;
+};
+
 export type PrintSheetPlacement = {
   readonly part: PrintablePart;
   readonly x: number;
   readonly y: number;
-  readonly fits: boolean;
+  readonly fit: PrintBedFit;
 };
 
 export type PrintSheet = {
@@ -125,6 +190,10 @@ export type PrintableSheetPlan = {
   readonly kit: PrintableKit;
   readonly sheets: readonly PrintSheet[];
 };
+
+// ##############################
+// Panel Splitting Internals
+// ##############################
 
 type PanelCut = {
   readonly cut: CutFeature;
@@ -154,13 +223,22 @@ type Bounds2 = {
   readonly maxY: number;
 };
 
-type SplitAxisResult = {
-  readonly cuts: readonly number[];
+type Bounds1 = {
+  readonly min: number;
+  readonly max: number;
+};
+
+type PanelSplitAxis = {
+  readonly splitPositions: readonly number[];
 };
 
 type MutablePrintSheet = Omit<PrintSheet, "placements"> & {
   readonly placements: PrintSheetPlacement[];
 };
+
+// ##############################
+// Constants
+// ##############################
 
 const sheetGap = 8;
 const splitSearchStep = 0.5;
@@ -282,11 +360,12 @@ export function readExportFormat(value: string | null): ExportFormat {
 
 export function createPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
-  const parts = layout.cutPanels.flatMap((panel) =>
+  const cutPanelFabrication = requireCutPanelFabricationPlan(layout, "createPrintableKit");
+  const parts = cutPanelFabrication.cutPanels.flatMap((panel) =>
     createPrintablePartsForPanel(panel, layout.configuration.cutting.materialThickness, preset),
   );
-  const sourceCutFeatureCount = layout.cutPanels.reduce((total, panel) => total + panel.cuts.length, 0);
-  const sourcePrintCriticalCutFeatureCount = layout.cutPanels.reduce(
+  const sourceCutFeatureCount = cutPanelFabrication.cutPanels.reduce((total, panel) => total + panel.cuts.length, 0);
+  const sourcePrintCriticalCutFeatureCount = cutPanelFabrication.cutPanels.reduce(
     (total, panel) => total + panel.cuts.filter(isPrintCriticalCut).length,
     0,
   );
@@ -344,6 +423,10 @@ export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableShe
   };
 }
 
+// ##############################
+// 3MF Object Conversion
+// ##############################
+
 function createThreeMfObjectsFromSheetPlan(sheetPlan: PrintableSheetPlan): MeshObject[] {
   return sheetPlan.sheets.flatMap(createThreeMfObjectsFromSheet);
 }
@@ -372,6 +455,10 @@ function createThreeMfPlatesFromSheetPlan(sheetPlan: PrintableSheetPlan): MeshPl
   });
 }
 
+// ##############################
+// Shelf Packing
+// ##############################
+
 function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): PrintSheet[] {
   const sheets: MutablePrintSheet[] = [emptyPrintSheet(1, previewSheetWidth(parts, bed), previewSheetDepth(parts, bed))];
   let cursorX = 0;
@@ -380,7 +467,7 @@ function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): Pri
 
   for (const part of parts) {
     let sheet = requiredLastSheet(sheets);
-    const partFits = partFitsPrintBed(part, bed);
+    const fit = printBedFitForPart(part, bed);
 
     if (cursorX > 0 && cursorX + part.width > sheet.width) {
       cursorX = 0;
@@ -400,7 +487,7 @@ function arrangePrintSheets(parts: readonly PrintablePart[], bed: PrintBed): Pri
       part,
       x: cursorX,
       y: cursorY,
-      fits: partFits,
+      fit,
     });
     cursorX += part.width + sheetGap;
     rowDepth = Math.max(rowDepth, part.depth);
@@ -456,8 +543,12 @@ function createPrintablePartsForPanel(panel: CutPanel, materialThickness: number
   return [...panelTileParts, ...glueKeys];
 }
 
-function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset: PrintVolumePreset): PanelTile[] {
-  const printCriticalCuts = cuts.filter((cut) => isPrintCriticalCut(cut.cut));
+// ##############################
+// Tile Layout
+// ##############################
+
+function splitPanelIntoTiles(panel: CutPanel, panelCuts: readonly PanelCut[], preset: PrintVolumePreset): PanelTile[] {
+  const printCriticalCuts = panelCuts.filter((cut) => isPrintCriticalCut(cut.cut));
   const panelOutline = panelOutlineInNominalCoordinates(panel);
   const outlineBounds = pointsBounds(panelOutline);
   const outlineOverhangWidth = Math.max(0, outlineBounds.maxX - outlineBounds.minX - panel.nominalWidth);
@@ -472,28 +563,28 @@ function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset:
     maxPrintableDepth(preset) - outlineOverhangDepth,
     printCriticalCuts.map((cut) => yBlockedRange(cut.bounds)),
   );
-  const xCuts = [0, ...xAxis.cuts, panel.nominalWidth];
-  const yCuts = [0, ...yAxis.cuts, panel.nominalHeight];
+  const xTileBoundaries = [0, ...xAxis.splitPositions, panel.nominalWidth];
+  const yTileBoundaries = [0, ...yAxis.splitPositions, panel.nominalHeight];
   const tiles: PanelTile[] = [];
 
-  for (let rowIndex = 0; rowIndex < yCuts.length - 1; rowIndex += 1) {
-    for (let columnIndex = 0; columnIndex < xCuts.length - 1; columnIndex += 1) {
-      const x0 = requiredArrayValue(xCuts, columnIndex, "splitPanelIntoTiles x0");
-      const x1 = requiredArrayValue(xCuts, columnIndex + 1, "splitPanelIntoTiles x1");
-      const y0 = requiredArrayValue(yCuts, rowIndex, "splitPanelIntoTiles y0");
-      const y1 = requiredArrayValue(yCuts, rowIndex + 1, "splitPanelIntoTiles y1");
+  for (let rowIndex = 0; rowIndex < yTileBoundaries.length - 1; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < xTileBoundaries.length - 1; columnIndex += 1) {
+      const x0 = requiredArrayValue(xTileBoundaries, columnIndex, "splitPanelIntoTiles x0");
+      const x1 = requiredArrayValue(xTileBoundaries, columnIndex + 1, "splitPanelIntoTiles x1");
+      const y0 = requiredArrayValue(yTileBoundaries, rowIndex, "splitPanelIntoTiles y0");
+      const y1 = requiredArrayValue(yTileBoundaries, rowIndex + 1, "splitPanelIntoTiles y1");
       const clipBounds = {
         minX: columnIndex === 0 ? outlineBounds.minX : x0,
-        maxX: columnIndex === xCuts.length - 2 ? outlineBounds.maxX : x1,
+        maxX: columnIndex === xTileBoundaries.length - 2 ? outlineBounds.maxX : x1,
         minY: rowIndex === 0 ? outlineBounds.minY : y0,
-        maxY: rowIndex === yCuts.length - 2 ? outlineBounds.maxY : y1,
+        maxY: rowIndex === yTileBoundaries.length - 2 ? outlineBounds.maxY : y1,
       };
       const clippedOutline = clipPolygonToBounds(panelOutline, clipBounds);
       const tileBounds = pointsBounds(clippedOutline);
       tiles.push({
         panel,
-        id: tileId(panel.id, columnIndex, rowIndex, xCuts.length - 1, yCuts.length - 1),
-        name: tileName(panel.name, columnIndex, rowIndex, xCuts.length - 1, yCuts.length - 1),
+        id: tileId(panel.id, columnIndex, rowIndex, xTileBoundaries.length - 1, yTileBoundaries.length - 1),
+        name: tileName(panel.name, columnIndex, rowIndex, xTileBoundaries.length - 1, yTileBoundaries.length - 1),
         outline: translatePoints(clippedOutline, -tileBounds.minX, -tileBounds.minY),
         x0,
         x1,
@@ -501,9 +592,9 @@ function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset:
         y1,
         columnIndex,
         rowIndex,
-        columnCount: xCuts.length - 1,
-        rowCount: yCuts.length - 1,
-        cuts: cuts
+        columnCount: xTileBoundaries.length - 1,
+        rowCount: yTileBoundaries.length - 1,
+        cuts: panelCuts
           .filter((panelCut) =>
             boundsInsideTile(panelCut.bounds, clipBounds.minX, clipBounds.maxX, clipBounds.minY, clipBounds.maxY),
           )
@@ -515,42 +606,44 @@ function splitPanelIntoTiles(panel: CutPanel, cuts: readonly PanelCut[], preset:
   return tiles;
 }
 
-function splitAxis(length: number, maxLength: number, blockedRanges: readonly Bounds1[]): SplitAxisResult {
+// ##############################
+// Safe Split Search
+// ##############################
+
+function splitAxis(length: number, maxLength: number, blockedRanges: readonly Bounds1[]): PanelSplitAxis {
   if (!Number.isFinite(maxLength) || length <= maxLength) {
-    return { cuts: [] };
+    return { splitPositions: [] };
   }
 
-  const cuts: number[] = [];
+  const splitPositions: number[] = [];
   let cursor = 0;
 
   while (length - cursor > maxLength) {
     const maximumCut = cursor + maxLength;
     const minimumCut = Math.min(cursor + minimumTileSize, length);
-    const split = findSafeSplit(maximumCut, minimumCut, maximumCut, blockedRanges);
-    cuts.push(split);
+    const split = findSafeSplit(maximumCut, minimumCut, blockedRanges);
+    if (split === null) {
+      break;
+    }
+    splitPositions.push(split);
     cursor = split;
   }
 
-  return { cuts };
+  return { splitPositions };
 }
 
-type Bounds1 = {
-  readonly min: number;
-  readonly max: number;
-};
-
-// #######################################
-// Printable Parts
-// #######################################
-
-function findSafeSplit(target: number, minimum: number, maximum: number, blockedRanges: readonly Bounds1[]): number {
+function findSafeSplit(target: number, minimum: number, blockedRanges: readonly Bounds1[]): number | null {
   for (let candidate = target; candidate >= minimum; candidate -= splitSearchStep) {
     if (!blockedRanges.some((range) => candidate > range.min && candidate < range.max)) {
       return roundMillimeters(candidate);
     }
   }
-  return roundMillimeters(maximum);
+  return null;
 }
+
+// #######################################
+// Printable Parts
+// #######################################
 
 function createPanelTilePart(tile: PanelTile, materialThickness: number): PrintablePart {
   const bounds = pointsBounds(tile.outline);
@@ -580,6 +673,10 @@ function createPanelTilePart(tile: PanelTile, materialThickness: number): Printa
     mesh: createPlateMesh(tile.outline, materialThickness, tile.cuts),
   };
 }
+
+// ##############################
+// Glue Keys
+// ##############################
 
 function createGlueKeyParts(panel: CutPanel, tiles: readonly PanelTile[]): PrintablePart[] {
   const splitColumnCount = Math.max(0, ...tiles.map((tile) => tile.columnCount - 1));
@@ -664,6 +761,10 @@ function createDovetailGlueKeyMesh(width: number, depth: number, height: number)
   return extrudeShape(shape, height);
 }
 
+// ##############################
+// Shape Extrusion
+// ##############################
+
 function extrudeShape(shape: Shape, height: number): PrintableMesh {
   const geometry = new ExtrudeGeometry(shape, {
     depth: height,
@@ -706,6 +807,10 @@ function geometryToPrintableMesh(geometry: ExtrudeGeometry): PrintableMesh {
 
   return { vertices, triangles };
 }
+
+// ##############################
+// Cut Paths
+// ##############################
 
 function cutToHolePath(cut: CutFeature): Path | null {
   if (cut.type === "circle") {
@@ -794,6 +899,10 @@ function translateCutToTile(cut: CutFeature, x0: number, y0: number): CutFeature
 // Clipping and Bounds
 // #######################################
 
+// ##############################
+// Polygon Clipping
+// ##############################
+
 function clipPolygonToBounds(points: readonly CutPoint[], bounds: Bounds2): CutPoint[] {
   return clipPolygonAgainstEdge(
     clipPolygonAgainstEdge(
@@ -877,6 +986,10 @@ function removeAdjacentDuplicatePoints(points: readonly CutPoint[]): CutPoint[] 
   return unique;
 }
 
+// ##############################
+// Bounds and Tile Inclusion
+// ##############################
+
 function cutBounds(cut: CutFeature): Bounds2 {
   if (cut.type === "circle") {
     return {
@@ -942,7 +1055,10 @@ function summarizePrintableKit(
 ): PrintableKitSummary {
   const splitSourceIds = new Set<string>();
   for (const part of parts) {
-    if (part.kind === "panel-tile" && part.id.includes("-tile-") && part.sourcePanelId !== undefined) {
+    if (
+      part.kind === "panel-tile" &&
+      (part.sourceTile.columnCount > 1 || part.sourceTile.rowCount > 1)
+    ) {
       splitSourceIds.add(part.sourcePanelId);
     }
   }
@@ -950,9 +1066,9 @@ function summarizePrintableKit(
   return {
     partCount: parts.length,
     panelTileCount: parts.filter((part) => part.kind === "panel-tile").length,
-    glueKeyCount: parts.filter((part) => part.kind === "dovetail-glue-key").length,
+    glueKeyCount: parts.filter(isGlueKeyPart).length,
     splitPanelCount: splitSourceIds.size,
-    oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
+    oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
     sourceCutFeatureCount,
     retainedCutFeatureCount: parts.reduce((total, part) => total + part.cutFeatureCount, 0),
     sourcePrintCriticalCutFeatureCount,
@@ -960,15 +1076,69 @@ function summarizePrintableKit(
   };
 }
 
+// ##############################
+// Feature Preservation Policy
+// ##############################
+
+type PrintableCutPreservation = "must-preserve" | "may-drop-at-split";
+
 function isPrintCriticalCut(cut: CutFeature): boolean {
-  return cut.role !== "finger-hole";
+  return printableCutPreservation(cut) === "must-preserve";
 }
 
+function printableCutPreservation(cut: CutFeature): PrintableCutPreservation {
+  return cut.role === "reference" ? "may-drop-at-split" : "must-preserve";
+}
+
+function isGlueKeyPart(part: PrintablePart): boolean {
+  return part.kind === "dovetail-glue-key" || part.kind === "scarf-glue-key";
+}
+
+// ##############################
+// Fit and Naming Helpers
+// ##############################
+
 export function partFitsPrintBed(part: PrintablePart, bed: PrintBed): boolean {
+  return printBedFitForPart(part, bed).type === "fits";
+}
+
+export function printBedFitForPart(part: PrintablePart, bed: PrintBed): PrintBedFit {
+  return printBedFitForDimensions(part, bed);
+}
+
+export function printBedFitForDimensions(dimensions: PrintableFootprint, bed: PrintBed): PrintBedFit {
   if (bed.type === "unbounded") {
-    return true;
+    return { type: "fits" };
   }
-  return part.width <= bed.width + 0.001 && part.depth <= bed.depth + 0.001 && part.height <= bed.height + 0.001;
+
+  const oversizedAxes: OversizedPrintBedAxis[] = [];
+  appendOversizedAxis(oversizedAxes, "width", dimensions.width, bed.width);
+  appendOversizedAxis(oversizedAxes, "depth", dimensions.depth, bed.depth);
+  appendOversizedAxis(oversizedAxes, "height", dimensions.height, bed.height);
+
+  const [firstAxis, ...remainingAxes] = oversizedAxes;
+  if (firstAxis === undefined) {
+    return { type: "fits" };
+  }
+  return {
+    type: "oversized",
+    oversizedAxes: [firstAxis, ...remainingAxes],
+  };
+}
+
+function appendOversizedAxis(
+  axes: OversizedPrintBedAxis[],
+  axis: PrintBedFitAxis,
+  required: number,
+  available: number,
+): void {
+  if (required > available + 0.001) {
+    axes.push({
+      axis,
+      required,
+      available,
+    });
+  }
 }
 
 function maxPrintableWidth(preset: PrintVolumePreset): number {

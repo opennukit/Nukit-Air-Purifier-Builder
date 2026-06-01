@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { applyPrintDesignPreset, automaticFanCount, defaultSettings } from "@/domain/purifier/airPurifier";
+import {
+  applyPrintDesignPreset,
+  applyTempestArrangement,
+  automaticFanCount,
+  defaultSettings,
+  serializePurifierDraft,
+} from "@/domain/purifier/airPurifier";
 import {
   createPrintDesignSettingsMemory,
   rememberPrintDesignSettings,
@@ -10,13 +16,15 @@ describe("Print design settings memory", () => {
   test("applies recommended settings the first time a design is selected", () => {
     const memory = createPrintDesignSettingsMemory(defaultSettings);
     const switched = switchPrintDesignSettings(memory, defaultSettings, "corsi-rosenthal");
+    const settings = serializePurifierDraft(switched.settings);
 
-    expect(switched.settings.printDesign).toBe("corsi-rosenthal");
-    expect(switched.settings.filterPreset).toBe("ikea-starkvind");
-    expect(switched.settings.corsiMode).toBe("top-exhaust");
-    expect(switched.settings.corsiFilterCount).toBe(4);
-    expect(switched.settings.corsiFanCount).toBe(automaticFanCount);
-    expect(switched.settings.materialThickness).toBe(6);
+    expect(switched.settings.design.type).toBe("corsi-rosenthal");
+    expect(settings.printDesign).toBe("corsi-rosenthal");
+    expect(settings.filterPreset).toBe("ikea-starkvind");
+    expect(settings.corsiMode).toBe("top-exhaust");
+    expect(settings.corsiFilterCount).toBe(4);
+    expect(settings.corsiFanCount).toBe(automaticFanCount);
+    expect(settings.materialThickness).toBe(6);
   });
 
   test("restores the last settings used for a design when switching back", () => {
@@ -38,13 +46,31 @@ describe("Print design settings memory", () => {
     );
 
     const toCorsi = switchPrintDesignSettings(memory, nukitSettings, "corsi-rosenthal");
-    expect(toCorsi.settings.corsiMode).toBe("side-exhaust");
-    expect(toCorsi.settings.corsiFilterCount).toBe(3);
-    expect(toCorsi.settings.corsiFanCount).toBe(4);
-    expect(toCorsi.settings.materialThickness).toBe(5);
+    const toCorsiSerialized = serializePurifierDraft(toCorsi.settings);
+    expect(toCorsi.settings.design.type).toBe("corsi-rosenthal");
+    expect(toCorsiSerialized.corsiMode).toBe("side-exhaust");
+    expect(toCorsiSerialized.corsiFilterCount).toBe(3);
+    expect(toCorsiSerialized.corsiFanCount).toBe(4);
+    expect(toCorsiSerialized.materialThickness).toBe(5);
 
     const toNukit = switchPrintDesignSettings(toCorsi.memory, toCorsi.settings, "nukit-open-air");
-    expect(toNukit.settings.fansTop).toBe(2);
-    expect(toNukit.settings.rim).toBe(34);
+    const toNukitSerialized = serializePurifierDraft(toNukit.settings);
+    expect(toNukit.settings.design.type).toBe("laser-derived-printable-kit");
+    expect(toNukitSerialized.fansTop).toBe(2);
+    expect(toNukitSerialized.rim).toBe(34);
+  });
+
+  test("remembers the Tempest arrangement inside the single Tempest design", () => {
+    const tempestSettings = applyTempestArrangement(
+      applyPrintDesignPreset(defaultSettings, "nukit-tempest"),
+      "four-side-filter-tower",
+    );
+    const memory = rememberPrintDesignSettings(createPrintDesignSettingsMemory(defaultSettings), tempestSettings);
+    const toTempest = switchPrintDesignSettings(memory, defaultSettings, "nukit-tempest");
+    const serialized = serializePurifierDraft(toTempest.settings);
+
+    expect(toTempest.settings.design.type).toBe("tempest");
+    expect(serialized.printDesign).toBe("nukit-tempest");
+    expect(serialized.tempestArrangement).toBe("four-side-filter-tower");
   });
 });

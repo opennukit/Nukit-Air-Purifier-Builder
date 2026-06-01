@@ -1,16 +1,27 @@
 import {
   applyPrintDesignPreset,
+  defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
-  isCorsiRosenthalPrintDesignId,
-  isDonutFilterPrintDesignId,
-  isStaticReferencePrintDesignId,
+  isCorsiRosenthalPrintDesignPreset,
+  isDonutFilterAdapterPrintDesignPreset,
+  isLaserDerivedPrintDesignPreset,
+  isStaticReferencePrintDesignPreset,
+  isPublicThreeDimensionalPrintDesignId,
+  isTempestPrintDesignPreset,
+  normalizePurifierDraft,
   normalizeRawSettings,
-  staticReferenceCanPreviewPrintPlates,
-  staticPrintReferenceForPreset,
+  printDesignIdForPurifierDraft,
+  serializePurifierDraft,
+  type CorsiRosenthalPrintDesignPreset,
+  type DonutFilterAdapterPrintDesignPreset,
+  type LaserDerivedPrintDesignPreset,
+  type PurifierDraft,
   type PrintDesignPreset,
   type RawPurifierSettings,
+  type StaticReferencePrintDesignPreset,
+  type TempestPrintDesignPreset,
 } from "@/domain/purifier/airPurifier";
-import type { StaticPrintReference } from "@/resources/static-print-references/references";
+import { staticPrintReferenceHasPlatePreview, type StaticPrintReference } from "@/resources/static-print-references/references";
 import {
   fabricationMethodForWorkbenchState,
   previewModeForWorkbenchState,
@@ -27,7 +38,81 @@ import type { ExportFormat, PrintVolumePresetId } from "@/fabrication/printing/p
 // Workbench View Model
 // #######################################
 
-export type WorkbenchDesignKind = "nukit" | "corsi-rosenthal" | "donut-filter-adapter" | "static-reference";
+export type StaticReferencePlatePreview =
+  | {
+      readonly type: "available";
+    }
+  | {
+      readonly type: "unavailable";
+      readonly reason: "no-local-print-plate-preview";
+    };
+
+export type WorkbenchDesignContext =
+  | {
+      readonly type: "nukit";
+      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly layoutSectionTitle: "Fan placement";
+      readonly partsSectionTitle: "Filter and fan";
+    }
+  | {
+      readonly type: "corsi-rosenthal";
+      readonly preset: CorsiRosenthalPrintDesignPreset;
+      readonly layoutSectionTitle: "Corsi layout";
+      readonly partsSectionTitle: "Filter and fan";
+    }
+  | {
+      readonly type: "donut-filter-adapter";
+      readonly preset: DonutFilterAdapterPrintDesignPreset;
+      readonly layoutSectionTitle: "Adaptor";
+      readonly partsSectionTitle: "Filter and fan";
+    }
+  | {
+      readonly type: "tempest";
+      readonly preset: TempestPrintDesignPreset;
+      readonly layoutSectionTitle: "Tempest layout";
+      readonly partsSectionTitle: "Filter and fan";
+    }
+  | {
+      readonly type: "static-reference";
+      readonly preset: StaticReferencePrintDesignPreset;
+      readonly reference: StaticPrintReference;
+      readonly platePreview: StaticReferencePlatePreview;
+      readonly layoutSectionTitle: "Source files";
+      readonly partsSectionTitle: "Source and license";
+    };
+
+export type WorkbenchFabricationPreview =
+  | {
+      readonly type: "cut-sheet";
+    }
+  | {
+      readonly type: "print-sheets";
+      readonly source: "generated";
+    }
+  | {
+      readonly type: "print-sheets";
+      readonly source: "static-reference";
+      readonly reference: StaticPrintReference;
+    }
+  | {
+      readonly type: "unavailable";
+      readonly reason: "static-reference-without-plate-preview";
+      readonly reference: StaticPrintReference;
+    };
+
+export type WorkbenchControlPanelAvailability =
+  | {
+      readonly type: "available";
+    }
+  | {
+      readonly type: "hidden";
+      readonly reason: "not-supported-by-design" | "static-reference-without-plate-preview";
+    };
+
+export type WorkbenchControlPanels = {
+  readonly setup: WorkbenchControlPanelAvailability;
+  readonly advanced: WorkbenchControlPanelAvailability;
+};
 
 export type WorkbenchViewModel = {
   readonly previewMode: PreviewMode;
@@ -35,37 +120,35 @@ export type WorkbenchViewModel = {
   readonly fabricationMethod: ExportFormat;
   readonly printVolumePresetId: PrintVolumePresetId;
   readonly printDesignPreset: PrintDesignPreset;
-  readonly staticPrintReference: StaticPrintReference | undefined;
-  readonly designKind: WorkbenchDesignKind;
-  readonly isStaticReferenceControlsActive: boolean;
-  readonly canPreviewStaticPrintPlate: boolean;
-  readonly showCutSheetPreviewMode: boolean;
-  readonly showPrintSheetsPreviewMode: boolean;
-  readonly isCorsiControlsActive: boolean;
-  readonly isDonutControlsActive: boolean;
-  readonly isNukitControlsActive: boolean;
-  readonly showSetupControlTab: boolean;
-  readonly showAdvancedControlTab: boolean;
-  readonly layoutSectionTitle: string;
-  readonly partsSectionTitle: string;
+  readonly design: WorkbenchDesignContext;
+  readonly fabricationPreview: WorkbenchFabricationPreview;
+  readonly controlPanels: WorkbenchControlPanels;
   readonly setupTabLabel: string;
   readonly exportActionLabel: string;
 };
 
 export type WorkbenchSession = {
-  readonly settings: RawPurifierSettings;
+  readonly settings: PurifierDraft;
   readonly workbenchState: WorkbenchState;
 };
 
 export function normalizeWorkbenchSession(
-  settings: RawPurifierSettings,
+  settings: RawPurifierSettings | PurifierDraft,
   workbenchState: WorkbenchState,
 ): WorkbenchSession {
-  let normalizedSettings = settings;
+  let normalizedSettings = normalizePurifierDraft(settings);
   let normalizedState = normalizeWorkbenchStateForSettings(workbenchState, normalizedSettings);
 
-  if (fabricationMethodForWorkbenchState(normalizedState) === "laser-svg" && normalizedSettings.printDesign !== "nukit-open-air") {
-    normalizedSettings = normalizeRawSettings(applyPrintDesignPreset(normalizedSettings, "nukit-open-air"));
+  if (fabricationMethodForWorkbenchState(normalizedState) === "laser-svg" && printDesignIdForPurifierDraft(normalizedSettings) !== "nukit-open-air") {
+    normalizedSettings = normalizePurifierDraft(applyPrintDesignPreset(serializePurifierDraft(normalizedSettings), "nukit-open-air"));
+    normalizedState = normalizeWorkbenchStateForSettings(normalizedState, normalizedSettings);
+  } else if (
+    fabricationMethodForWorkbenchState(normalizedState) === "print-3mf" &&
+    !isPublicThreeDimensionalPrintDesignId(printDesignIdForPurifierDraft(normalizedSettings))
+  ) {
+    normalizedSettings = normalizePurifierDraft(
+      applyPrintDesignPreset(serializePurifierDraft(normalizedSettings), defaultThreeDimensionalPrintDesignId),
+    );
     normalizedState = normalizeWorkbenchStateForSettings(normalizedState, normalizedSettings);
   }
 
@@ -76,70 +159,51 @@ export function normalizeWorkbenchSession(
 }
 
 export function createWorkbenchViewModel(
-  settings: RawPurifierSettings,
+  settings: RawPurifierSettings | PurifierDraft,
   state: WorkbenchState,
 ): WorkbenchViewModel {
+  const rawSettings = isRawPurifierSettings(settings) ? normalizeRawSettings(settings) : serializePurifierDraft(settings);
   const previewMode = previewModeForWorkbenchState(state);
   const controlsTab = state.controlsTab;
   const fabricationMethod = fabricationMethodForWorkbenchState(state);
   const printVolumePresetId = printVolumePresetIdForWorkbenchState(state);
-  const printDesignPreset = findPrintDesignPreset(settings.printDesign);
-  const staticPrintReference = staticPrintReferenceForPreset(printDesignPreset);
-  const isStaticReferenceControlsActive =
-    fabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(settings.printDesign);
-  const canPreviewStaticPrintPlate =
-    isStaticReferenceControlsActive && staticReferenceCanPreviewPrintPlates(printDesignPreset);
-  const showPrintSheetsPreviewMode =
-    fabricationMethod === "print-3mf" && (!isStaticReferenceControlsActive || canPreviewStaticPrintPlate);
-  const isCorsiControlsActive =
-    fabricationMethod === "print-3mf" && isCorsiRosenthalPrintDesignId(settings.printDesign);
-  const isDonutControlsActive =
-    fabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(settings.printDesign);
-  const isNukitControlsActive = !isCorsiControlsActive && !isDonutControlsActive && !isStaticReferenceControlsActive;
+  const printDesignPreset = findPrintDesignPreset(rawSettings.printDesign);
+  const design = createWorkbenchDesignContext(printDesignPreset, fabricationMethod);
+  const fabricationPreview = createWorkbenchFabricationPreview(fabricationMethod, design);
+  const controlPanels = createWorkbenchControlPanels(design);
 
   return {
     previewMode,
     controlsTab,
     fabricationMethod,
     printVolumePresetId,
-    printDesignPreset,
-    staticPrintReference,
-    designKind: designKindForSettings(settings, fabricationMethod),
-    isStaticReferenceControlsActive,
-    canPreviewStaticPrintPlate,
-    showCutSheetPreviewMode: fabricationMethod === "laser-svg",
-    showPrintSheetsPreviewMode,
-    isCorsiControlsActive,
-    isDonutControlsActive,
-    isNukitControlsActive,
-    showSetupControlTab: !isStaticReferenceControlsActive || canPreviewStaticPrintPlate,
-    showAdvancedControlTab: !isStaticReferenceControlsActive,
-    layoutSectionTitle: layoutSectionTitleForDesign(isCorsiControlsActive, isDonutControlsActive, isStaticReferenceControlsActive),
-    partsSectionTitle: isStaticReferenceControlsActive ? "Source and license" : "Filter and fan",
+    printDesignPreset: design.preset,
+    design,
+    fabricationPreview,
+    controlPanels,
     setupTabLabel: fabricationMethod === "print-3mf" ? "Print setup" : "Laser setup",
-    exportActionLabel: exportActionLabelForDesign(fabricationMethod, isStaticReferenceControlsActive),
+    exportActionLabel: exportActionLabelForDesign(fabricationMethod, design),
   };
 }
 
 export function normalizeWorkbenchStateForSettings(
   nextState: WorkbenchState,
-  nextSettings: RawPurifierSettings,
+  nextSettings: RawPurifierSettings | PurifierDraft,
 ): WorkbenchState {
   const viewModel = createWorkbenchViewModel(nextSettings, nextState);
   let normalizedState = nextState;
 
   if (
-    (viewModel.previewMode === "print-sheets" && !viewModel.showPrintSheetsPreviewMode) ||
-    (viewModel.previewMode === "cut-sheet" && viewModel.fabricationMethod !== "laser-svg")
+    (viewModel.previewMode === "print-sheets" && viewModel.fabricationPreview.type !== "print-sheets") ||
+    (viewModel.previewMode === "cut-sheet" && viewModel.fabricationPreview.type !== "cut-sheet")
   ) {
     normalizedState = withPreviewMode(nextState, "enclosure");
   }
 
   const normalizedViewModel = createWorkbenchViewModel(nextSettings, normalizedState);
   if (
-    normalizedViewModel.isStaticReferenceControlsActive &&
-    (normalizedViewModel.controlsTab === "advanced" ||
-      (normalizedViewModel.controlsTab === "setup" && !normalizedViewModel.canPreviewStaticPrintPlate))
+    (normalizedViewModel.controlPanels.advanced.type === "hidden" && normalizedViewModel.controlsTab === "advanced") ||
+    (normalizedViewModel.controlPanels.setup.type === "hidden" && normalizedViewModel.controlsTab === "setup")
   ) {
     return withControlsTab(normalizedState, "design");
   }
@@ -151,45 +215,132 @@ export function normalizeWorkbenchStateForSettings(
 // Labels
 // #######################################
 
-function designKindForSettings(settings: RawPurifierSettings, fabricationMethod: ExportFormat): WorkbenchDesignKind {
+function createWorkbenchDesignContext(
+  preset: PrintDesignPreset,
+  fabricationMethod: ExportFormat,
+): WorkbenchDesignContext {
   if (fabricationMethod !== "print-3mf") {
-    return "nukit";
+    return {
+      type: "nukit",
+      preset: isLaserDerivedPrintDesignPreset(preset) ? preset : findLaserDerivedPrintDesignPreset(),
+      layoutSectionTitle: "Fan placement",
+      partsSectionTitle: "Filter and fan",
+    };
   }
-  if (isCorsiRosenthalPrintDesignId(settings.printDesign)) {
-    return "corsi-rosenthal";
+
+  if (isCorsiRosenthalPrintDesignPreset(preset)) {
+    return {
+      type: "corsi-rosenthal",
+      preset,
+      layoutSectionTitle: "Corsi layout",
+      partsSectionTitle: "Filter and fan",
+    };
   }
-  if (isDonutFilterPrintDesignId(settings.printDesign)) {
-    return "donut-filter-adapter";
+
+  if (isDonutFilterAdapterPrintDesignPreset(preset)) {
+    return {
+      type: "donut-filter-adapter",
+      preset,
+      layoutSectionTitle: "Adaptor",
+      partsSectionTitle: "Filter and fan",
+    };
   }
-  if (isStaticReferencePrintDesignId(settings.printDesign)) {
-    return "static-reference";
+
+  if (isTempestPrintDesignPreset(preset)) {
+    return {
+      type: "tempest",
+      preset,
+      layoutSectionTitle: "Tempest layout",
+      partsSectionTitle: "Filter and fan",
+    };
   }
-  return "nukit";
+
+  if (isStaticReferencePrintDesignPreset(preset)) {
+    const reference = preset.implementation.reference;
+    return {
+      type: "static-reference",
+      preset,
+      reference,
+      platePreview: staticPrintReferenceHasPlatePreview(reference)
+        ? { type: "available" }
+        : { type: "unavailable", reason: "no-local-print-plate-preview" },
+      layoutSectionTitle: "Source files",
+      partsSectionTitle: "Source and license",
+    };
+  }
+
+  return {
+    type: "nukit",
+    preset: findLaserDerivedPrintDesignPreset(),
+    layoutSectionTitle: "Fan placement",
+    partsSectionTitle: "Filter and fan",
+  };
 }
 
-function layoutSectionTitleForDesign(
-  isCorsi: boolean,
-  isDonut: boolean,
-  isStaticReference: boolean,
-): string {
-  if (isCorsi) {
-    return "Corsi layout";
+function isRawPurifierSettings(settings: RawPurifierSettings | PurifierDraft): settings is RawPurifierSettings {
+  return "printDesign" in settings;
+}
+
+function createWorkbenchFabricationPreview(
+  fabricationMethod: ExportFormat,
+  design: WorkbenchDesignContext,
+): WorkbenchFabricationPreview {
+  if (fabricationMethod === "laser-svg") {
+    return { type: "cut-sheet" };
   }
-  if (isDonut) {
-    return "Adaptor";
+  if (design.type !== "static-reference") {
+    return {
+      type: "print-sheets",
+      source: "generated",
+    };
   }
-  if (isStaticReference) {
-    return "Source files";
+  if (design.platePreview.type === "available") {
+    return {
+      type: "print-sheets",
+      source: "static-reference",
+      reference: design.reference,
+    };
   }
-  return "Fan placement";
+  return {
+    type: "unavailable",
+    reason: "static-reference-without-plate-preview",
+    reference: design.reference,
+  };
+}
+
+function createWorkbenchControlPanels(design: WorkbenchDesignContext): WorkbenchControlPanels {
+  if (design.type === "nukit") {
+    return {
+      setup: { type: "available" },
+      advanced: { type: "available" },
+    };
+  }
+  if (design.type === "static-reference" && design.platePreview.type === "unavailable") {
+    return {
+      setup: { type: "hidden", reason: "static-reference-without-plate-preview" },
+      advanced: { type: "hidden", reason: "not-supported-by-design" },
+    };
+  }
+  return {
+    setup: { type: "available" },
+    advanced: { type: "hidden", reason: "not-supported-by-design" },
+  };
 }
 
 function exportActionLabelForDesign(
   fabricationMethod: ExportFormat,
-  isStaticReferenceControlsActive: boolean,
+  design: WorkbenchDesignContext,
 ): string {
-  if (fabricationMethod === "print-3mf" && isStaticReferenceControlsActive) {
+  if (fabricationMethod === "print-3mf" && design.type === "static-reference") {
     return "Open Printables Files";
   }
   return fabricationMethod === "print-3mf" ? "Download 3MF" : "Export Laser Drawing";
+}
+
+function findLaserDerivedPrintDesignPreset(): LaserDerivedPrintDesignPreset {
+  const preset = findPrintDesignPreset("nukit-open-air");
+  if (!isLaserDerivedPrintDesignPreset(preset)) {
+    throw new Error("findLaserDerivedPrintDesignPreset: Nukit Open Air is not a laser-derived design");
+  }
+  return preset;
 }

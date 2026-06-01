@@ -8,10 +8,15 @@ import {
   type PrintableKit,
   type PrintableMesh,
   type PrintablePart,
+  type PrintablePartKind,
   type PrintVolumePreset,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
+
+// #######################################
+// Corsi Printable Model
+// #######################################
 
 type Point2 = {
   readonly x: number;
@@ -43,6 +48,11 @@ type SplitRailGroup = {
   readonly splitJoint: "scarf" | "pocketed-connector";
 };
 
+type ModularHorizontalEdge = {
+  readonly edge: string;
+  readonly span: "width" | "height";
+};
+
 type FanPanelGridBand =
   | {
       readonly kind: "seal";
@@ -58,6 +68,10 @@ type FanPanelGridBand =
 
 const connectorPocketClearance = 0.4;
 const minimumFanSealTileSize = 0.5;
+
+// #######################################
+// Public Kit API
+// #######################################
 
 export function createCorsiRosenthalPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
@@ -95,7 +109,7 @@ export function createCorsiRosenthalPrintableKit(layout: LayoutResult, presetId:
     summary: {
       partCount: parts.length,
       panelTileCount: parts.filter((part) => part.kind === "panel-tile").length,
-      glueKeyCount: parts.filter((part) => part.kind === "dovetail-glue-key").length,
+      glueKeyCount: parts.filter(isGlueKeyPart).length,
       splitPanelCount: railGroups.filter((group) => group.totalLength > railLengthLimit).length,
       oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
       sourceCutFeatureCount: retainedCutFeatureCount,
@@ -105,6 +119,14 @@ export function createCorsiRosenthalPrintableKit(layout: LayoutResult, presetId:
     },
   };
 }
+
+function isGlueKeyPart(part: PrintablePart): boolean {
+  return part.kind === "dovetail-glue-key" || part.kind === "scarf-glue-key";
+}
+
+// #######################################
+// Rail Groups and Split Rails
+// #######################################
 
 function createFaceRailGroups(
   model: ReturnType<typeof createCorsiRosenthalModel>,
@@ -152,13 +174,22 @@ function createFaceRailGroups(
 }
 
 function createModularRailGroups(frameWidth: number, frameHeight: number, height: number): readonly SplitRailGroup[] {
-  const horizontalEdges = ["top-front", "top-back", "top-left", "top-right", "bottom-front", "bottom-back", "bottom-left", "bottom-right"];
+  const horizontalEdges: readonly ModularHorizontalEdge[] = [
+    { edge: "top-front", span: "width" },
+    { edge: "top-back", span: "width" },
+    { edge: "top-left", span: "height" },
+    { edge: "top-right", span: "height" },
+    { edge: "bottom-front", span: "width" },
+    { edge: "bottom-back", span: "width" },
+    { edge: "bottom-left", span: "height" },
+    { edge: "bottom-right", span: "height" },
+  ];
   const verticalEdges = ["front-left", "front-right", "back-left", "back-right"];
   return [
-    ...horizontalEdges.map((edge) => ({
+    ...horizontalEdges.map(({ edge, span }) => ({
       groupId: `modular-${edge}-frame-unit`,
       label: `Modular ${edge.replaceAll("-", " ")} frame unit`,
-      totalLength: frameWidth,
+      totalLength: span === "width" ? frameWidth : frameHeight,
       depth: corsiRosenthalGeometry.railDepth,
       height,
       splitJoint: "pocketed-connector" as const,
@@ -194,6 +225,7 @@ function createSplitRailParts(group: SplitRailGroup, maxLength: number): Printab
     return createPolygonPart({
       id: `corsi-${group.groupId}-${index + 1}`,
       name: `${group.label} ${index + 1}.${segmentCount}`,
+      kind: "corsi-frame-rail",
       sourcePanelId: `corsi-${group.groupId}`,
       width: segmentLength,
       depth: group.depth,
@@ -205,6 +237,10 @@ function createSplitRailParts(group: SplitRailGroup, maxLength: number): Printab
     });
   });
 }
+
+// #######################################
+// Frame Blocks
+// #######################################
 
 function createCornerBlocks(height: number, filterFaceCount: number): PrintablePart[] {
   const cornerPoints: readonly Point2[] = [
@@ -220,6 +256,7 @@ function createCornerBlocks(height: number, filterFaceCount: number): PrintableP
     createPolygonPart({
       id: `corsi-glue-corner-${index + 1}`,
       name: `Glue corner block ${index + 1}`,
+      kind: "corsi-corner-block",
       sourcePanelId: "corsi-filter-frame",
       width: corsiRosenthalGeometry.cornerSize,
       depth: corsiRosenthalGeometry.cornerSize,
@@ -239,12 +276,17 @@ function createModularCornerBlocks(height: number): PrintablePart[] {
   }));
 }
 
+// #######################################
+// Face Panels and Fan Cassettes
+// #######################################
+
 function createFanCassetteParts(model: ReturnType<typeof createCorsiRosenthalModel>, height: number): PrintablePart[] {
   const outer = model.fanCassetteOuter;
   const fanFrameParts = Array.from({ length: model.fanCount }, (_, index) =>
     createPlatePart({
       id: `corsi-fan-cassette-${index + 1}`,
       name: `Snap-in fan cassette ${index + 1}`,
+      kind: "corsi-fan-cassette",
       sourcePanelId: "corsi-fan-wall",
       width: outer,
       depth: outer,
@@ -294,6 +336,7 @@ function createSealedFaceParts(
       depth: size.depth,
       height,
       preset,
+      kind: "corsi-sealed-face-panel",
     });
   });
 }
@@ -325,6 +368,7 @@ function createFanPanelSealParts(
           depth: yBand.size,
           height,
           preset,
+          kind: "corsi-fan-panel-seal",
         });
       }),
     );
@@ -382,6 +426,7 @@ function createTiledPlateParts(input: {
   readonly depth: number;
   readonly height: number;
   readonly preset: PrintVolumePreset;
+  readonly kind: "corsi-sealed-face-panel" | "corsi-fan-panel-seal";
 }): PrintablePart[] {
   const columnCount = splitDimension(input.width, maxPrintableTileWidth(input.preset));
   const rowCount = splitDimension(input.depth, maxPrintableTileDepth(input.preset));
@@ -397,6 +442,7 @@ function createTiledPlateParts(input: {
           ? input.name
           : `${input.name} tile ${rowIndex + 1}.${rowCount} ${columnIndex + 1}.${columnCount}`,
         sourcePanelId: input.sourcePanelId,
+        kind: input.kind,
         width: tileWidth,
         depth: tileDepth,
         height: input.height,
@@ -422,6 +468,10 @@ function faceLabel(side: CorsiFaceSide): string {
   return `${side[0]?.toUpperCase() ?? ""}${side.slice(1)}`;
 }
 
+// #######################################
+// Connectors and Joinery
+// #######################################
+
 function createScarfGlueKeys(railParts: readonly PrintablePart[], fanCount: number): PrintablePart[] {
   const railSeamKeyCount = railParts.filter((part) => part.name.includes(".")).length;
   const keyCount = Math.max(8, railSeamKeyCount + fanCount * 2);
@@ -429,7 +479,7 @@ function createScarfGlueKeys(railParts: readonly PrintablePart[], fanCount: numb
     createPolygonPart({
       id: `corsi-angled-glue-key-${index + 1}`,
       name: `Angled scarf glue key ${index + 1}`,
-      kind: "dovetail-glue-key",
+      kind: "scarf-glue-key",
       sourcePanelId: "corsi-glue-joints",
       width: corsiRosenthalGeometry.glueKey.width,
       depth: corsiRosenthalGeometry.glueKey.depth,
@@ -455,7 +505,7 @@ function createRailConnectors(railParts: readonly PrintablePart[], fanCount: num
     createPolygonPart({
       id: `corsi-modular-rail-connector-${index + 1}`,
       name: `Modular rail connector ${index + 1}`,
-      kind: "dovetail-glue-key",
+      kind: "rail-connector",
       sourcePanelId: "corsi-modular-connectors",
       width: corsiRosenthalGeometry.glueKey.width,
       depth: corsiRosenthalGeometry.glueKey.depth,
@@ -528,9 +578,14 @@ function scarfStripPoints(width: number, depth: number, leftScarf: boolean, righ
   ];
 }
 
+// #######################################
+// Printable Part Factories
+// #######################################
+
 function createPlatePart(input: {
   readonly id: string;
   readonly name: string;
+  readonly kind: Extract<PrintablePartKind, "corsi-fan-cassette" | "corsi-sealed-face-panel" | "corsi-fan-panel-seal">;
   readonly sourcePanelId: string;
   readonly width: number;
   readonly depth: number;
@@ -540,7 +595,7 @@ function createPlatePart(input: {
   return {
     id: input.id,
     name: input.name,
-    kind: "panel-tile",
+    kind: input.kind,
     sourcePanelId: input.sourcePanelId,
     width: input.width,
     depth: input.depth,
@@ -554,7 +609,7 @@ function createPlatePart(input: {
 function createPolygonPart(input: {
   readonly id: string;
   readonly name: string;
-  readonly kind?: PrintablePart["kind"];
+  readonly kind: Exclude<PrintablePartKind, "panel-tile" | "donut-filter-adapter" | "donut-fan-guard" | "donut-filter-cap">;
   readonly sourcePanelId: string;
   readonly width: number;
   readonly depth: number;
@@ -565,7 +620,7 @@ function createPolygonPart(input: {
   return {
     id: input.id,
     name: input.name,
-    kind: input.kind ?? "panel-tile",
+    kind: input.kind,
     sourcePanelId: input.sourcePanelId,
     width: input.width,
     depth: input.depth,
@@ -575,6 +630,10 @@ function createPolygonPart(input: {
     mesh: extrudeShape(createShape(input.points), input.height),
   };
 }
+
+// #######################################
+// Mesh Generation
+// #######################################
 
 function createPlateMesh(width: number, depth: number, height: number, cuts: readonly PlateCut[]): PrintableMesh {
   const shape = createShape([
@@ -683,6 +742,10 @@ function geometryToPrintableMesh(geometry: ExtrudeGeometry): PrintableMesh {
 
   return { vertices, triangles };
 }
+
+// #######################################
+// Primitive Helpers
+// #######################################
 
 function roundMillimeters(value: number): number {
   return Number(value.toFixed(4));

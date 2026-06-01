@@ -19,7 +19,11 @@ const largeSheetDimension = 1500;
 
 export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[] {
   const diagnostics: BuildDiagnostic[] = [];
-  const { resolvedFans } = layout.summary;
+  if (layout.summary.fans.type !== "wall-banks") {
+    return diagnostics;
+  }
+
+  const { resolvedFans } = layout.summary.fans;
   const totalFans = resolvedFans.left + resolvedFans.right + resolvedFans.top + resolvedFans.bottom;
 
   if (totalFans === 0) {
@@ -62,7 +66,10 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (Math.max(layout.summary.sheetWidth, layout.summary.sheetHeight) > largeSheetDimension) {
+  if (
+    layout.summary.fabrication.type === "cut-panel-source" &&
+    Math.max(layout.summary.fabrication.sheetWidth, layout.summary.fabrication.sheetHeight) > largeSheetDimension
+  ) {
     diagnostics.push({
       id: "large-sheet",
       severity: "warning",
@@ -103,9 +110,13 @@ export function summarizeBuildReadiness(layout: LayoutResult): BuildDiagnostic {
 }
 
 function tightFanMarginLabels(layout: LayoutResult): string[] {
+  if (layout.summary.fans.type !== "wall-banks") {
+    return [];
+  }
+
   const fanDiameter = layout.configuration.fan.spec.diameter;
   const filterWidth = filterSelectionDimensions(layout.configuration.filter).width;
-  const { resolvedFans } = layout.summary;
+  const { resolvedFans } = layout.summary.fans;
   return [
     fanMarginLabel("Left", resolvedFans.left, layout.summary.workingDepth, fanDiameter),
     fanMarginLabel("Right", resolvedFans.right, layout.summary.workingDepth, fanDiameter),

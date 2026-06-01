@@ -1,6 +1,11 @@
 import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { createDonutFilterModel, donutCapTotalHeight, type DonutFilterModel } from "@/domain/designs/donut-filter/model";
+import {
+  createDonutFilterModel,
+  donutCapTotalHeight,
+  type DonutFilterCap,
+  type DonutFilterModel,
+} from "@/domain/designs/donut-filter/model";
 import {
   findPrintVolumePreset,
   partFitsPrintBed,
@@ -10,6 +15,10 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
+
+// #######################################
+// Donut Printable Model
+// #######################################
 
 type Point2 = {
   readonly x: number;
@@ -22,13 +31,17 @@ type CircleCut = {
   readonly radius: number;
 };
 
+// #######################################
+// Public Kit API
+// #######################################
+
 export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
   const model = createDonutFilterModel(layout);
   const parts = [
     createAdapterPart(model),
     createFanGuardPart(model),
-    ...(model.cap.enabled ? [createCapPart(model)] : []),
+    ...(model.cap.type === "printed-cap" ? [createCapPart(model, model.cap)] : []),
   ];
   const featureCount = parts.reduce((total, part) => total + part.cutFeatureCount, 0);
 
@@ -48,6 +61,10 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
     },
   };
 }
+
+// #######################################
+// Printable Parts
+// #######################################
 
 function createAdapterPart(model: DonutFilterModel): PrintablePart {
   const height = model.adapter.coneLength + model.adapter.insertLength;
@@ -80,7 +97,7 @@ function createAdapterPart(model: DonutFilterModel): PrintablePart {
   return {
     id: "donut-filter-fan-adapter",
     name: "Donut filter fan adaptor",
-    kind: "panel-tile",
+    kind: "donut-filter-adapter",
     sourcePanelId: "donut-filter-adapter",
     width: model.fanSize,
     depth: model.fanSize,
@@ -118,7 +135,7 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
   return {
     id: "donut-filter-fan-guard",
     name: "Printed fan guard",
-    kind: "panel-tile",
+    kind: "donut-fan-guard",
     sourcePanelId: "donut-filter-adapter",
     width: guard.outerSize,
     depth: guard.outerSize,
@@ -129,8 +146,7 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
   };
 }
 
-function createCapPart(model: DonutFilterModel): PrintablePart {
-  const cap = model.cap;
+function createCapPart(model: DonutFilterModel, cap: Extract<DonutFilterCap, { readonly type: "printed-cap" }>): PrintablePart {
   const center = cap.outerDiameter / 2;
   const mesh = combineMeshes([
     createDiskMesh(center, center, cap.outerDiameter / 2, cap.thickness, 96),
@@ -150,7 +166,7 @@ function createCapPart(model: DonutFilterModel): PrintablePart {
   return {
     id: "donut-filter-blanking-cap",
     name: "Press-fit filter blanking cap",
-    kind: "panel-tile",
+    kind: "donut-filter-cap",
     sourcePanelId: "donut-filter-cap",
     width: cap.outerDiameter,
     depth: cap.outerDiameter,
@@ -160,6 +176,10 @@ function createCapPart(model: DonutFilterModel): PrintablePart {
     mesh,
   };
 }
+
+// #######################################
+// Cut Geometry
+// #######################################
 
 function adapterFlangeCuts(model: DonutFilterModel): readonly CircleCut[] {
   return [
@@ -175,6 +195,10 @@ function adapterFlangeCuts(model: DonutFilterModel): readonly CircleCut[] {
     })),
   ];
 }
+
+// #######################################
+// Mesh Generation
+// #######################################
 
 function createPlateMesh(width: number, depth: number, height: number, cuts: readonly CircleCut[]): PrintableMesh {
   const shape = createShape([
@@ -344,6 +368,10 @@ function geometryToPrintableMesh(geometry: ExtrudeGeometry): PrintableMesh {
   return { vertices, triangles };
 }
 
+// #######################################
+// Mesh Composition
+// #######################################
+
 function combineMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
   const vertices: MeshVertex[] = [];
   const triangles: MeshTriangle[] = [];
@@ -360,6 +388,10 @@ function combineMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
   }
   return { vertices, triangles };
 }
+
+// #######################################
+// Primitive Helpers
+// #######################################
 
 function roundVertex(vertex: MeshVertex): MeshVertex {
   return {

@@ -1,39 +1,46 @@
 import {
   applyPrintDesignPreset,
-  normalizeRawSettings,
+  normalizePurifierDraft,
+  printDesignIdForPurifierDraft,
+  serializePurifierDraft,
+  type PurifierDraft,
   type PrintDesignId,
   type RawPurifierSettings,
 } from "@/domain/purifier/airPurifier";
 
-export type PrintDesignSettingsMemory = Readonly<Partial<Record<PrintDesignId, RawPurifierSettings>>>;
+export type PrintDesignSettingsMemory = Readonly<Partial<Record<PrintDesignId, PurifierDraft>>>;
 
 export type PrintDesignSettingsSwitch = {
-  readonly settings: RawPurifierSettings;
+  readonly settings: PurifierDraft;
   readonly memory: PrintDesignSettingsMemory;
 };
 
-export function createPrintDesignSettingsMemory(settings: RawPurifierSettings): PrintDesignSettingsMemory {
+export function createPrintDesignSettingsMemory(settings: RawPurifierSettings | PurifierDraft): PrintDesignSettingsMemory {
   return rememberPrintDesignSettings({}, settings);
 }
 
 export function rememberPrintDesignSettings(
   memory: PrintDesignSettingsMemory,
-  settings: RawPurifierSettings,
+  settings: RawPurifierSettings | PurifierDraft,
 ): PrintDesignSettingsMemory {
+  const draft = normalizePurifierDraft(settings);
   return {
     ...memory,
-    [settings.printDesign]: settings,
+    [printDesignIdForPurifierDraft(draft)]: draft,
   };
 }
 
 export function switchPrintDesignSettings(
   memory: PrintDesignSettingsMemory,
-  currentSettings: RawPurifierSettings,
+  currentSettings: RawPurifierSettings | PurifierDraft,
   nextPrintDesign: PrintDesignId,
 ): PrintDesignSettingsSwitch {
   const memoryWithCurrentDesign = rememberPrintDesignSettings(memory, currentSettings);
   const rememberedSettings = memoryWithCurrentDesign[nextPrintDesign];
-  const nextSettings = normalizeRawSettings(rememberedSettings ?? applyPrintDesignPreset(currentSettings, nextPrintDesign));
+  const currentDraft = normalizePurifierDraft(currentSettings);
+  const nextSettings = normalizePurifierDraft(
+    rememberedSettings ?? applyPrintDesignPreset(serializePurifierDraft(currentDraft), nextPrintDesign),
+  );
 
   return {
     settings: nextSettings,

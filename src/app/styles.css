@@ -62,10 +62,18 @@ button {
 App Shell
 ####################################### */
 
+/* ##############################
+Shell Container
+############################## */
+
 .app-shell {
   min-height: 100svh;
   padding: 24px clamp(28px, 3vw, 44px);
 }
+
+/* ##############################
+Header Bar
+############################## */
 
 .topbar {
   display: grid;
@@ -103,6 +111,10 @@ App Shell
   align-items: center;
   gap: 10px;
 }
+
+/* ##############################
+Fabrication Method Toggle
+############################## */
 
 .fabrication-method-field {
   min-width: 250px;
@@ -160,6 +172,10 @@ App Shell
   outline-offset: 2px;
 }
 
+/* ##############################
+Shared Buttons
+############################## */
+
 .primary-button,
 .ghost-button,
 .mode-button {
@@ -197,6 +213,10 @@ App Shell
 Workbench Layout
 ####################################### */
 
+/* ##############################
+Workbench Container
+############################## */
+
 .method-workbench {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -215,6 +235,10 @@ Workbench Layout
   justify-self: start;
   min-width: min(420px, 100%);
 }
+
+/* ##############################
+Two Pane Layout
+############################## */
 
 .workspace {
   display: grid;
@@ -236,11 +260,19 @@ Workbench Layout
 Preview Pane
 ####################################### */
 
+/* ##############################
+Preview Shell
+############################## */
+
 .preview-pane {
   min-width: 0;
   height: 100%;
   padding: 14px;
 }
+
+/* ##############################
+Preview Toolbar
+############################## */
 
 .preview-toolbar {
   display: flex;
@@ -298,6 +330,10 @@ Preview Pane
   display: none;
 }
 
+/* ##############################
+Preview Stage
+############################## */
+
 .preview-stage {
   position: relative;
   display: grid;
@@ -332,16 +368,21 @@ Preview Pane
   height: 100%;
 }
 
+/* ##############################
+Three Preview Controls
+############################## */
+
 .preview-view-controls {
   position: absolute;
-  top: 12px;
+  top: 2px;
   left: 12px;
-  right: 12px;
+  right: auto;
   z-index: 3;
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
   pointer-events: none;
 }
 
@@ -349,8 +390,8 @@ Preview Pane
   pointer-events: auto;
 }
 
-.preview-camera-field,
 .preview-toggle-field,
+.preview-color-field,
 .preview-rotation-button {
   display: grid;
   place-items: center;
@@ -364,78 +405,177 @@ Preview Pane
   backdrop-filter: blur(10px);
 }
 
-.preview-camera-field {
-  position: relative;
-  flex: 0 0 36px;
-  width: 36px;
-  min-width: 36px;
-  margin: 0;
-  padding: 0;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.preview-camera-field select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: transparent;
-  opacity: 0;
-  font: inherit;
-  cursor: pointer;
-  appearance: none;
-}
-
-.preview-camera-field select:focus-visible {
-  outline: 0;
-}
-
-.preview-camera-field:focus-within {
-  outline: 2px solid color-mix(in srgb, var(--accent) 76%, white);
-  outline-offset: 2px;
-}
-
-.preview-camera-icon {
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-
-.preview-camera-icon svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
 .preview-toggle-strip {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
 }
 
-.preview-toggle-field {
+.toggle-field.preview-toggle-field {
+  position: relative;
   display: inline-flex;
   grid-template-columns: none;
-  gap: 3px;
+  justify-content: center;
+  gap: 0;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
   min-height: 32px;
   margin: 0;
-  padding: 0 5px;
+  padding: 0;
   color: var(--ink);
   font-size: 0.72rem;
   line-height: 1;
   white-space: nowrap;
 }
 
-.preview-toggle-field input {
+.toggle-field.preview-toggle-field input {
+  position: absolute;
+  display: grid;
+  place-content: center;
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
-  accent-color: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  appearance: none;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  background: #fffdf6;
+  color: var(--accent);
+}
+
+.toggle-field.preview-toggle-field input::before {
+  content: "";
+  width: 4px;
+  height: 8px;
+  margin-top: -1px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) scale(0);
+  transition: transform 120ms ease;
+}
+
+.toggle-field.preview-toggle-field input:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+
+.preview-control-icon {
+  display: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.preview-control-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.preview-control-icon .preview-icon-soft-fill {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+.preview-control-icon .preview-icon-solid-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.preview-control-glyph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.preview-control-glyph-wide {
+  font-size: 0.58rem;
+}
+
+.preview-control-label {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.toggle-field.preview-control-main {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: max-content;
+  gap: 6px;
+  padding: 0 11px 0 8px;
+}
+
+.toggle-field.preview-control-lines {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: max-content;
+  padding: 0 13px;
+}
+
+.preview-control-spatial .preview-control-label,
+.preview-control-technical .preview-control-label {
+  display: none;
+}
+
+.preview-toggle-field:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fffdf6;
+}
+
+.preview-toolbar-primary-break,
+.preview-toolbar-row-break {
+  display: none;
+}
+
+.preview-color-field {
+  display: inline-flex;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 7px;
+}
+
+.preview-color-field button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgb(17 24 23 / 28%);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.preview-color-field button span {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--swatch-color);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
+}
+
+.preview-color-field button.active-color {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(31 111 86 / 16%);
+}
+
+.preview-control-icon {
+  display: grid;
 }
 
 .preview-rotation-button {
@@ -494,6 +634,10 @@ Preview Pane
   white-space: nowrap;
 }
 
+/* ##############################
+Sheet Preview
+############################## */
+
 .sheet-preview {
   display: grid;
   place-items: start center;
@@ -514,6 +658,10 @@ Preview Pane
   max-height: none;
   height: auto;
 }
+
+/* ##############################
+Summary Metrics
+############################## */
 
 .summary-grid {
   display: grid;
@@ -550,12 +698,20 @@ Preview Pane
 Control Tabs and Panels
 ####################################### */
 
+/* ##############################
+Control Pane
+############################## */
+
 .controls-pane {
   position: sticky;
   top: 24px;
   align-self: stretch;
   padding: 14px;
 }
+
+/* ##############################
+Tab Rail
+############################## */
 
 .controls-tabs {
   display: grid;
@@ -602,18 +758,17 @@ Control Tabs and Panels
   min-width: 0;
 }
 
+/* ##############################
+Panel Grids
+############################## */
+
 .design-controls,
-.parts-controls,
 .setup-controls,
 .advanced-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-}
-
-.parts-controls {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .parts-section {
@@ -660,6 +815,10 @@ Control Tabs and Panels
   border-left: 0;
 }
 
+/* ##############################
+Section Layout Overrides
+############################## */
+
 .layout-section {
   margin-top: 0;
   padding-top: 0;
@@ -681,6 +840,10 @@ Control Tabs and Panels
   display: contents;
 }
 
+/* ##############################
+Section Headings
+############################## */
+
 .section-heading {
   margin-bottom: 10px;
 }
@@ -692,6 +855,10 @@ Control Tabs and Panels
 /* #######################################
 Form Controls
 ####################################### */
+
+/* ##############################
+Fields
+############################## */
 
 .field,
 .toggle-field {
@@ -718,6 +885,10 @@ Form Controls
   color: rgb(102 113 105 / 54%);
 }
 
+/* ##############################
+Unit Inputs
+############################## */
+
 .input-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -735,6 +906,10 @@ Form Controls
   color: var(--muted);
   font-weight: 700;
 }
+
+/* ##############################
+Selector Details
+############################## */
 
 .field-with-info {
   display: grid;
@@ -815,6 +990,10 @@ Form Controls
 .selector-info[open] .selector-info-panel {
   display: block;
 }
+
+/* ##############################
+Preset Cards
+############################## */
 
 .filter-preset-card,
 .fan-preset-card,
@@ -914,6 +1093,10 @@ Form Controls
   margin-top: 4px;
   line-height: 1.28;
 }
+
+/* ##############################
+Purchase List
+############################## */
 
 .purchase-list-card {
   display: grid;
@@ -1030,6 +1213,10 @@ Form Controls
   text-decoration: underline;
 }
 
+/* ##############################
+Conditional Visibility
+############################## */
+
 .custom-dimensions[hidden] {
   display: none;
 }
@@ -1060,6 +1247,10 @@ Form Controls
 /* #######################################
 Parts and Purchase Cards
 ####################################### */
+
+/* ##############################
+Dimension Grids
+############################## */
 
 .custom-dimensions {
   display: grid;
@@ -1108,6 +1299,10 @@ Parts and Purchase Cards
 Export Status
 ####################################### */
 
+/* ##############################
+Export Action Bar
+############################## */
+
 .persistent-output-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1147,6 +1342,10 @@ Export Status
   padding-inline: 22px;
 }
 
+/* ##############################
+Diagnostics
+############################## */
+
 .diagnostic-item {
   display: grid;
   gap: 3px;
@@ -1172,6 +1371,10 @@ Export Status
 Design-Specific Layout Controls
 ####################################### */
 
+/* ##############################
+Segmented Controls
+############################## */
+
 .segmented-field {
   margin: 14px 0;
   padding: 0;
@@ -1191,6 +1394,10 @@ Design-Specific Layout Controls
   gap: 6px;
 }
 
+.segmented-field-three div {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .segmented-field label {
   position: relative;
 }
@@ -1205,9 +1412,13 @@ Design-Specific Layout Controls
   display: grid;
   place-items: center;
   min-height: 42px;
+  min-width: 0;
+  padding: 0 8px;
   border: 1px solid var(--line);
   background: var(--surface-strong);
   font-weight: 800;
+  line-height: 1.08;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -1217,9 +1428,24 @@ Design-Specific Layout Controls
   color: var(--accent-strong);
 }
 
+/* ##############################
+Layout Grids
+############################## */
+
 .fan-grid {
   display: grid;
   gap: 10px;
+}
+
+.fan-selection {
+  display: grid;
+  gap: 2px;
+  margin: 9px 0 12px;
+}
+
+.fan-selection .segmented-field,
+.fan-selection .field-with-info {
+  margin: 0;
 }
 
 .fan-grid > [data-nukit-fan-placement] {
@@ -1297,6 +1523,11 @@ Design-Specific Layout Controls
   gap: 8px;
 }
 
+.fan-grid > [data-tempest-layout] {
+  display: grid;
+  gap: 8px;
+}
+
 .fan-grid > [data-corsi-layout] .field:first-child {
   grid-column: 1 / -1;
 }
@@ -1308,6 +1539,10 @@ Design-Specific Layout Controls
 .compact-field {
   margin: 0;
 }
+
+/* ##############################
+Toggle Fields
+############################## */
 
 .toggle-field {
   grid-template-columns: auto 1fr;
@@ -1322,6 +1557,10 @@ Design-Specific Layout Controls
   accent-color: var(--accent);
 }
 
+/* ##############################
+Mobile Action Bar
+############################## */
+
 .mobile-action-bar {
   display: none;
 }
@@ -1329,6 +1568,10 @@ Design-Specific Layout Controls
 /* #######################################
 Preview Dialog
 ####################################### */
+
+/* ##############################
+Dialog Frame
+############################## */
 
 .sheet-dialog {
   width: min(96vw, 1600px);
@@ -1395,6 +1638,10 @@ Preview Dialog
   min-height: 680px;
 }
 
+/* ##############################
+Preview Animation
+############################## */
+
 @keyframes settle-in {
   from {
     opacity: 0;
@@ -1410,6 +1657,10 @@ Preview Dialog
 /* #######################################
 Responsive Rules
 ####################################### */
+
+/* ##############################
+Desktop Fixed View
+############################## */
 
 @media (min-width: 1241px) {
   html,
@@ -1567,6 +1818,10 @@ Responsive Rules
 
 }
 
+/* ##############################
+Tablet Stack
+############################## */
+
 @media (max-width: 1240px) {
   .app-shell {
     padding: 16px;
@@ -1593,9 +1848,12 @@ Responsive Rules
   }
 }
 
+/* ##############################
+Tablet Control Grids
+############################## */
+
 @media (max-width: 1240px) {
   .design-controls,
-  .parts-controls,
   .advanced-field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1624,9 +1882,12 @@ Responsive Rules
   }
 }
 
+/* ##############################
+Narrow Control Stack
+############################## */
+
 @media (max-width: 860px) {
   .design-controls,
-  .parts-controls,
   .setup-controls,
   .advanced-controls,
   .advanced-field-grid {
@@ -1648,6 +1909,10 @@ Responsive Rules
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ##############################
+Mobile Layout
+############################## */
 
 @media (max-width: 720px) {
   .app-shell {
@@ -1699,7 +1964,7 @@ Responsive Rules
   }
 
   .preview-view-controls {
-    top: 8px;
+    top: 2px;
     left: 8px;
     right: 8px;
     gap: 6px;
@@ -1707,22 +1972,16 @@ Responsive Rules
   }
 
   .preview-toggle-strip {
-    flex: 1 1 calc(100% - 46px);
+    flex: 1 1 auto;
     flex-wrap: wrap;
     min-width: 0;
   }
 
-  .preview-camera-field,
-  .preview-toggle-field {
+  .preview-toggle-field,
+  .preview-color-field {
     min-height: 34px;
     padding: 0 10px;
     font-size: 0.82rem;
-  }
-
-  .preview-camera-field {
-    width: 34px;
-    min-width: 34px;
-    padding: 0;
   }
 
   .preview-rotation-button {
@@ -1747,4 +2006,9 @@ Responsive Rules
   .fan-grid > [data-nukit-fan-placement] {
     grid-template-columns: 1fr;
   }
+
+  .segmented-field-three div {
+    grid-template-columns: 1fr;
+  }
+
 }

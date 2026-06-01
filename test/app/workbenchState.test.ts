@@ -6,7 +6,11 @@ import {
   previewModeForWorkbenchState,
   printVolumePresetIdForWorkbenchState,
 } from "@/app/workbench/workbenchState";
-import { normalizeWorkbenchSession } from "@/app/workbench/workbenchViewModel";
+import {
+  createWorkbenchViewModel,
+  normalizeWorkbenchSession,
+  normalizeWorkbenchStateForSettings,
+} from "@/app/workbench/workbenchViewModel";
 import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/airPurifier";
 
 describe("Workbench state", () => {
@@ -37,11 +41,18 @@ describe("Workbench state", () => {
     expect(encoded.has("exportFormat")).toBe(false);
   });
 
-  test("keeps new workflow tabs stable in shared URLs", () => {
+  test("keeps design workflow tab stable in shared URLs", () => {
+    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=design"));
+    const encoded = encodeWorkbenchState(state);
+
+    expect(encoded.get("controlsTab")).toBe("design");
+  });
+
+  test("maps removed parts tab to the design step", () => {
     const state = decodeWorkbenchState(new URLSearchParams("controlsTab=parts"));
     const encoded = encodeWorkbenchState(state);
 
-    expect(encoded.get("controlsTab")).toBe("parts");
+    expect(encoded.get("controlsTab")).toBe("design");
   });
 
   test("keeps advanced workflow tab stable in shared URLs", () => {
@@ -79,8 +90,92 @@ describe("Workbench state", () => {
       decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg&previewMode=print-sheets&printDesign=static-cr-14x20-base")),
     );
 
-    expect(session.settings.printDesign).toBe("nukit-open-air");
+    expect(session.settings.design.printDesign).toBe("nukit-open-air");
     expect(fabricationMethodForWorkbenchState(session.workbenchState)).toBe("laser-svg");
     expect(previewModeForWorkbenchState(session.workbenchState)).toBe("cut-sheet");
+  });
+
+  test("keeps the active preset aligned with the laser design context before session normalization", () => {
+    const viewModel = createWorkbenchViewModel(
+      applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg")),
+    );
+
+    expect(viewModel.design.type).toBe("nukit");
+    expect(viewModel.printDesignPreset.id).toBe("nukit-open-air");
+    expect(viewModel.printDesignPreset.id).toBe(viewModel.design.preset.id);
+  });
+
+  test("normalizes 3D print sessions away from the laser-derived Nukit design", () => {
+    const session = normalizeWorkbenchSession(
+      applyPrintDesignPreset(defaultSettings, "nukit-open-air"),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&printDesign=nukit-open-air")),
+    );
+
+    expect(session.settings.design.printDesign).toBe("nukit-tempest");
+    expect(session.settings.design.type).toBe("tempest");
+    expect(fabricationMethodForWorkbenchState(session.workbenchState)).toBe("print-3mf");
+  });
+
+  test("models generated 3D print designs as generated print-sheet previews", () => {
+    const viewModel = createWorkbenchViewModel(
+      applyPrintDesignPreset(defaultSettings, "nukit-tempest"),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets")),
+    );
+
+    expect(viewModel.design.type).toBe("tempest");
+    expect(viewModel.fabricationPreview).toEqual({ type: "print-sheets", source: "generated" });
+    expect(viewModel.controlPanels.setup).toEqual({ type: "available" });
+    expect(viewModel.controlPanels.advanced).toEqual({ type: "hidden", reason: "not-supported-by-design" });
+  });
+
+  test("models static references with local plates as static print-sheet previews", () => {
+    const viewModel = createWorkbenchViewModel(
+      applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets")),
+    );
+
+    expect(viewModel.design.type).toBe("static-reference");
+    if (viewModel.design.type !== "static-reference" || viewModel.fabricationPreview.type !== "print-sheets") {
+      throw new Error("expected a static reference with print-sheet preview");
+    }
+
+    expect(viewModel.design.preset.id).toBe("static-cr-14x20-base");
+    expect(viewModel.design.reference.printablesId).toBe("955827");
+    expect(viewModel.design.platePreview).toEqual({ type: "available" });
+    expect(viewModel.fabricationPreview.source).toBe("static-reference");
+    if (viewModel.fabricationPreview.source !== "static-reference") {
+      throw new Error("expected a static reference print-sheet source");
+    }
+    expect(viewModel.fabricationPreview.reference.printablesId).toBe("955827");
+    expect(viewModel.controlPanels.setup).toEqual({ type: "available" });
+  });
+
+  test("models static references without local plates as source-only", () => {
+    const settings = applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference");
+    const state = decodeWorkbenchState(
+      new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets&controlsTab=setup"),
+    );
+    const viewModel = createWorkbenchViewModel(settings, state);
+    const normalizedState = normalizeWorkbenchStateForSettings(state, settings);
+
+    expect(viewModel.design.type).toBe("static-reference");
+    if (viewModel.design.type !== "static-reference" || viewModel.fabricationPreview.type !== "unavailable") {
+      throw new Error("expected a source-only static reference");
+    }
+
+    expect(viewModel.design.preset.id).toBe("static-modular-20x20-reference");
+    expect(viewModel.design.reference.printablesId).toBe("610219");
+    expect(viewModel.design.platePreview).toEqual({
+      type: "unavailable",
+      reason: "no-local-print-plate-preview",
+    });
+    expect(viewModel.fabricationPreview.reason).toBe("static-reference-without-plate-preview");
+    expect(viewModel.controlPanels.setup).toEqual({
+      type: "hidden",
+      reason: "static-reference-without-plate-preview",
+    });
+    expect(previewModeForWorkbenchState(normalizedState)).toBe("enclosure");
+    expect(normalizedState.controlsTab).toBe("design");
   });
 });

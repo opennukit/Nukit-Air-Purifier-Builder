@@ -29,14 +29,18 @@ export type DonutFanAdapter = {
   readonly screwCenters: readonly DonutPoint[];
 };
 
-export type DonutFilterCap = {
-  readonly enabled: boolean;
-  readonly outerDiameter: Millimeters;
-  readonly holeDiameter: Millimeters;
-  readonly rim: Millimeters;
-  readonly insertLength: Millimeters;
-  readonly thickness: Millimeters;
-};
+export type DonutFilterCap =
+  | {
+      readonly type: "none";
+    }
+  | {
+      readonly type: "printed-cap";
+      readonly outerDiameter: Millimeters;
+      readonly holeDiameter: Millimeters;
+      readonly rim: Millimeters;
+      readonly insertLength: Millimeters;
+      readonly thickness: Millimeters;
+    };
 
 export type DonutFanGuard = {
   readonly outerSize: Millimeters;
@@ -85,14 +89,16 @@ export function createDonutFilterModel(layout: LayoutResult): DonutFilterModel {
       wallThickness,
       screwCenters,
     },
-    cap: {
-      enabled: layout.rawSettings.donutCapEnabled,
-      outerDiameter: filter.holeDiameter + layout.rawSettings.donutCapRim * 2,
-      holeDiameter: filter.holeDiameter,
-      rim: layout.rawSettings.donutCapRim,
-      insertLength: layout.rawSettings.donutAdapterInsertLength,
-      thickness: wallThickness,
-    },
+    cap: layout.rawSettings.donutCapEnabled
+      ? {
+          type: "printed-cap",
+          outerDiameter: filter.holeDiameter + layout.rawSettings.donutCapRim * 2,
+          holeDiameter: filter.holeDiameter,
+          rim: layout.rawSettings.donutCapRim,
+          insertLength: layout.rawSettings.donutAdapterInsertLength,
+          thickness: wallThickness,
+        }
+      : { type: "none" },
     fanGuard: {
       outerSize: fanSpec.diameter,
       thickness: Math.max(1.6, wallThickness),
@@ -109,5 +115,5 @@ export function donutAdapterTotalHeight(model: DonutFilterModel): Millimeters {
 }
 
 export function donutCapTotalHeight(model: DonutFilterModel): Millimeters {
-  return model.cap.thickness + model.cap.insertLength;
+  return model.cap.type === "printed-cap" ? model.cap.thickness + model.cap.insertLength : 0;
 }

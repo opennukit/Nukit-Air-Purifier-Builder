@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { defaultSettings, encodeSettings } from "@/domain/purifier/airPurifier";
-import { createLaserSvg, createLayout } from "@/fabrication/purifierLayout";
+import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 
 const upstreamRoot = process.env.BOXES_PY_PATH ?? "/tmp/boxes.py";
 const python = resolvePythonInterpreter();
@@ -13,12 +13,13 @@ const upstreamOutput = join(outputDir, "upstream.svg");
 try {
   const localLayout = createLayout(defaultSettings);
   const localSvg = createLaserSvg(localLayout);
+  const localCutPanels = requireCutPanelFabricationPlan(localLayout, "airpurifier-oracle");
   const upstream = renderUpstreamSvg(upstreamRoot, upstreamOutput);
 
   console.log("AirPurifier upstream oracle");
   console.log("==========================");
   console.log(`Settings: ${encodeSettings(localLayout.rawSettings)}`);
-  console.log(`Local sheet: ${formatMillimeters(localLayout.cutSheet.width)} x ${formatMillimeters(localLayout.cutSheet.height)}`);
+  console.log(`Local sheet: ${formatMillimeters(localCutPanels.cutSheet.width)} x ${formatMillimeters(localCutPanels.cutSheet.height)}`);
   console.log(`Local paths: ${count(localSvg, /<path\b/g)}`);
   console.log(`Local circles: ${count(localSvg, /<circle\b/g)}`);
   console.log(`Local rects: ${count(localSvg, /<rect\b/g)}`);

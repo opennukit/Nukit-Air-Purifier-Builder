@@ -29,7 +29,22 @@ describe("Corsi-Rosenthal printable kit geometry", () => {
 
     const receiverSlotCount = splitRailParts.reduce((total, part) => total + part.cutFeatureCount, 0);
     const connectorCount = kit.parts.filter((part) => part.name.startsWith("Modular rail connector")).length;
+    expect(connector.kind).toBe("rail-connector");
     expect(connectorCount).toBeGreaterThanOrEqual(receiverSlotCount / 2);
+  });
+
+  test("uses the short frame side for modular left and right edge rails", () => {
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
+    const model = createCorsiRosenthalModel(layout);
+    const kit = createPrintDesignKit(layout, "unsplit");
+    const topFrontRail = requiredPart(kit, (part) => part.name === "Modular top front frame unit 1.1");
+    const topLeftRail = requiredPart(kit, (part) => part.name === "Modular top left frame unit 1.1");
+
+    expect(topFrontRail.kind).toBe("corsi-frame-rail");
+    expect(topLeftRail.kind).toBe("corsi-frame-rail");
+    expect(topFrontRail.width).toBeCloseTo(model.frameOuterWidth);
+    expect(topLeftRail.width).toBeCloseTo(model.frameOuterHeight);
+    expect(model.frameOuterWidth).not.toBeCloseTo(model.frameOuterHeight);
   });
 
   test("tiles fan-panel seals around cassette openings and keeps bounded beds safe", () => {
@@ -56,10 +71,10 @@ describe("Corsi-Rosenthal printable kit geometry", () => {
     const sealedPartArea = sealedFaceParts.reduce((total, part) => total + part.width * part.depth, 0);
 
     expect(sealParts.length).toBeGreaterThan(0);
-    expect(sealParts.every((part) => part.kind === "panel-tile")).toBe(true);
+    expect(sealParts.every((part) => part.kind === "corsi-fan-panel-seal")).toBe(true);
     expect(Math.abs(sealArea - (fanFaceArea - cassetteArea))).toBeLessThan(0.001);
     expect(sealedFaceParts.length).toBeGreaterThan(0);
-    expect(sealedFaceParts.every((part) => part.kind === "panel-tile")).toBe(true);
+    expect(sealedFaceParts.every((part) => part.kind === "corsi-sealed-face-panel")).toBe(true);
     expect(Math.abs(sealedPartArea - sealedFaceArea)).toBeLessThan(0.001);
   });
 

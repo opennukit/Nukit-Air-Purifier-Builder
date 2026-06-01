@@ -4,21 +4,20 @@
     applyDonutFilterPreset,
     applyFanProductPreset,
     applyFilterPreset,
-    applyPrintDesignPreset,
+    applyTempestArrangementDefaults,
     automaticFanCount,
-    cameraPresets,
     corsiFanCountFits,
     corsiRosenthalFanCountOptions,
     corsiRosenthalFilterCountRange,
     corsiRosenthalModes,
     customDonutFilterPresetId,
     customFanProductPresetId,
-    decodeSettings,
+    decodePurifierDraftSettings,
     defaultCorsiRosenthalFilterCount,
     defaultSettings,
+    defaultThreeDimensionalPrintDesignId,
     donutFilterPresets,
     encodeSettings,
-    fanDiameters,
     fanProductPresets,
     findDonutFilterPreset,
     findFanProductPreset,
@@ -26,19 +25,29 @@
     formatMillimeters,
     isCorsiRosenthalPrintDesignId,
     isDonutFilterPrintDesignId,
-    isPublicPrintDesignId,
+    isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
-    normalizeRawSettings,
-    publicPrintDesignPresets,
+    isTempestPrintDesignId,
+    normalizePurifierDraft,
+    printDesignIdForPurifierDraft,
+    previewMaterialColorPresets,
+    publicThreeDimensionalPrintDesignPresets,
     resolveCorsiRosenthalFanCount,
     resolveCorsiRosenthalLayout,
+    serializePurifierDraft,
     staticReferenceDefaultsForPreset,
     staticPrintReferenceForPreset,
     type CorsiRosenthalMode,
     type DonutFilterPresetId,
+    type FanDiameter,
     type FanProductPresetId,
+    type PresetFanProduct,
+    type PreviewMaterialColorId,
+    type PreviewMaterialColorPreset,
     type PrintDesignId,
+    type PurifierDraft,
     type RawPurifierSettings,
+    type TempestArrangementPreset,
   } from "@/domain/purifier/airPurifier";
   import {
     customFilterPresetId,
@@ -48,10 +57,11 @@
     type FilterPresetId,
   } from "@/domain/purifier/filter";
   import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
+  import { createTempestModel } from "@/domain/designs/tempest/model";
   import {
     corsiFaceSides,
     createCorsiRosenthalModel,
-    type CorsiFaceRole,
+    type CorsiFaceRoleAssignment,
     type CorsiFaceSide,
   } from "@/domain/designs/corsi-rosenthal/model";
   import type { PreviewMode } from "@/app/workbench/previewMode";
@@ -75,6 +85,9 @@
     createWorkbenchViewModel,
     normalizeWorkbenchSession,
     normalizeWorkbenchStateForSettings,
+    type WorkbenchControlPanels,
+    type WorkbenchDesignContext,
+    type WorkbenchFabricationPreview,
     type WorkbenchViewModel,
   } from "@/app/workbench/workbenchViewModel";
   import { evaluateBuildDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
@@ -88,12 +101,10 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignKit, createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
+  import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
   import type { StaticPrintEstimate } from "@/resources/static-print-references/references";
-  import type {
-    PrintSheetPreviewSettings,
-    PrintSheetThreePreviewPlan,
-  } from "@/rendering/three/printSheetThreePreview";
+  import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
 
@@ -110,6 +121,11 @@
   }[keyof RawPurifierSettings];
   type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom" | "corsiFanCount";
   type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
+  type RecommendedFanDiameter = Extract<FanDiameter, 120 | 140>;
+  type FanDiameterSelection = RecommendedFanDiameter | "custom";
+  type RecommendedFanProductPreset = PresetFanProduct & {
+    readonly diameter: RecommendedFanDiameter;
+  };
   type DonutNumberSettingName =
     | "donutFilterOuterDiameter"
     | "donutFilterLength"
@@ -132,23 +148,22 @@
     readonly detail: string;
     readonly url?: string;
   };
-  type CorsiFaceAssignment = {
-    readonly side: CorsiFaceSide;
-    readonly role: CorsiFaceRole;
-    readonly fanCount: number;
-  };
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
+  type GeneratedPrintSheetPlanCacheEntry = {
+    readonly key: string;
+    readonly plan: PrintableSheetPlan;
+  };
 
   // #######################################
   // Control Metadata
   // #######################################
 
   const initialUrlParams = new URLSearchParams(window.location.search);
-  const parametricPrintDesignPresets = publicPrintDesignPresets.filter(
+  const parametricPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter(
     (preset) => !isStaticReferencePrintDesignId(preset.id),
   );
-  const staticPrintDesignPresets = publicPrintDesignPresets.filter((preset) =>
+  const staticPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter((preset) =>
     isStaticReferencePrintDesignId(preset.id),
   );
   const fanPlacementControls: readonly { readonly name: FanCountSettingName; readonly label: string }[] = [
@@ -185,38 +200,65 @@
     { name: "dovetailDepthMultiplier", label: "Dovetail depth", suffix: "x", step: "0.05" },
     { name: "dovetailTaper", label: "Dovetail taper", suffix: "0-80", step: "1" },
   ];
+  const tempestArrangementOptions: readonly { readonly id: TempestArrangementPreset; readonly label: string }[] = [
+    { id: "single-horizontal-top-filter", label: "1 top filter" },
+    { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
+    { id: "four-side-filter-tower", label: "4 side filters" },
+  ];
+  const recommendedFanDiameterOptions: readonly RecommendedFanDiameter[] = [120, 140];
+  const defaultRecommendedFanDiameter: RecommendedFanDiameter = 140;
+  const recommendedFanProductPresets: readonly RecommendedFanProductPreset[] = fanProductPresets.filter(
+    isRecommendedFanProductPreset,
+  );
 
   // #######################################
   // Svelte State
   // #######################################
 
-  const initialSettings = normalizePublicPrintDesignSettings(decodeSettings(window.location.search));
-  const initialSession = normalizeWorkbenchSession(initialSettings, decodeWorkbenchState(initialUrlParams));
-  let settings = initialSession.settings;
+  // ##############################
+  // Initial Session
+  // ##############################
+
+  const initialSession = normalizeWorkbenchSession(
+    decodePurifierDraftSettings(window.location.search),
+    decodeWorkbenchState(initialUrlParams),
+  );
+  let draft: PurifierDraft = initialSession.settings;
+  let settings: RawPurifierSettings = serializePurifierDraft(draft);
   let workbenchState: WorkbenchState = initialSession.workbenchState;
-  let workbenchView: WorkbenchViewModel = createWorkbenchViewModel(settings, workbenchState);
-  let printDesignSettingsMemory: PrintDesignSettingsMemory = createPrintDesignSettingsMemory(settings);
+  let workbenchView: WorkbenchViewModel = createWorkbenchViewModel(draft, workbenchState);
+  let printDesignSettingsMemory: PrintDesignSettingsMemory = createPrintDesignSettingsMemory(draft);
   let sheetDialog: HTMLDialogElement;
   let isSheetDialogOpen = false;
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
+  let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
+
+  // ##############################
+  // Derived View State
+  // ##############################
 
   let previewMode: PreviewMode = workbenchView.previewMode;
   let controlsTab: ControlsTab = workbenchView.controlsTab;
   let fabricationMethod: FabricationMethod = workbenchView.fabricationMethod;
   let printVolumePresetId: PrintVolumePresetId = workbenchView.printVolumePresetId;
-  let layout: LayoutResult = createLayout(settings);
+  let layout: LayoutResult = createLayout(draft);
   let exportDiagnostics: readonly BuildDiagnostic[] = [];
   let exportReadiness: BuildDiagnostic = summarizeBuildReadiness(layout);
   let previewSummaryItems: readonly SummaryItem[] = [];
   let purchaseItems: readonly PurchaseListItem[] = [];
+  let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
   let activePrintSeamPlan: PrintableSheetPlan | null = null;
-  let printSheetPreviewSettings: PrintSheetPreviewSettings = { showPlateLabels: settings.showPrintPlateLabels };
   let activePrintDesignPreset = workbenchView.printDesignPreset;
-  let activeStaticPrintReference = workbenchView.staticPrintReference;
+  let activeDesignContext: WorkbenchDesignContext = workbenchView.design;
+  let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
+  let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
+  let activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
   let selectedDonutFilterPreset = findDonutFilterPreset(settings.donutFilterPreset);
   let selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
+  let selectedFanDiameterSelection: FanDiameterSelection = defaultRecommendedFanDiameter;
+  let selectedFanProductOptions: readonly PresetFanProduct[] = [];
   let corsiFilterCountMax = corsiRosenthalFilterCountRange(settings.corsiMode).max;
   let allowedCorsiFanCounts: ReadonlySet<number> = new Set(corsiRosenthalFanCountOptions(settings.corsiMode));
   let isStaticReferenceControlsActive = false;
@@ -225,6 +267,7 @@
   let showPrintSheetsPreviewMode = true;
   let isCorsiControlsActive = false;
   let isDonutControlsActive = false;
+  let isTempestControlsActive = false;
   let isNukitControlsActive = true;
   let showSetupControlTab = true;
   let showAdvancedControlTab = true;
@@ -240,38 +283,50 @@
   let selectedFilterDimensionsText = "";
   let selectedDonutFilterDimensionsText = "";
   let selectedFanDetailText = "";
-  let corsiFaceAssignments: readonly CorsiFaceAssignment[] = [];
+  let corsiFaceAssignments: readonly CorsiFaceRoleAssignment[] = [];
 
-  $: workbenchView = createWorkbenchViewModel(settings, workbenchState);
+  // ##############################
+  // Reactive Derivations
+  // ##############################
+
+  $: settings = serializePurifierDraft(draft);
+  $: workbenchView = createWorkbenchViewModel(draft, workbenchState);
   $: previewMode = workbenchView.previewMode;
   $: controlsTab = workbenchView.controlsTab;
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
-  $: layout = createLayout(settings);
-  $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, printVolumePresetId);
+  $: layout = createLayout(draft);
+  $: generatedPrintSheetPlan = createCurrentGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
+  $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
-  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, settings);
+  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, settings, generatedPrintSheetPlan);
   $: purchaseItems = createPurchaseListItems(layout, fabricationMethod, settings);
-  $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId) : null;
-  $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, printVolumePresetId, settings);
-  $: printSheetPreviewSettings = { showPlateLabels: settings.showPrintPlateLabels };
+  $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
+  $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
-  $: activeStaticPrintReference = workbenchView.staticPrintReference;
+  $: activeDesignContext = workbenchView.design;
+  $: activeFabricationPreview = workbenchView.fabricationPreview;
+  $: activeControlPanels = workbenchView.controlPanels;
+  $: activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
   $: selectedDonutFilterPreset = findDonutFilterPreset(settings.donutFilterPreset);
   $: selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
+  $: selectedFanDiameterSelection = fanDiameterSelectionForSettings(settings);
+  $: selectedFanProductOptions = fanProductOptionsForSelection(selectedFanDiameterSelection);
   $: corsiFilterCountMax = corsiRosenthalFilterCountRange(settings.corsiMode).max;
   $: allowedCorsiFanCounts = new Set(corsiRosenthalFanCountOptions(settings.corsiMode));
-  $: isStaticReferenceControlsActive = workbenchView.isStaticReferenceControlsActive;
-  $: activeStaticReferenceCanPreviewPlate = workbenchView.canPreviewStaticPrintPlate;
-  $: showCutSheetPreviewMode = workbenchView.showCutSheetPreviewMode;
-  $: showPrintSheetsPreviewMode = workbenchView.showPrintSheetsPreviewMode;
-  $: isCorsiControlsActive = workbenchView.isCorsiControlsActive;
-  $: isDonutControlsActive = workbenchView.isDonutControlsActive;
-  $: isNukitControlsActive = workbenchView.isNukitControlsActive;
-  $: showSetupControlTab = workbenchView.showSetupControlTab;
-  $: showAdvancedControlTab = workbenchView.showAdvancedControlTab;
-  $: layoutSectionTitleText = workbenchView.layoutSectionTitle;
-  $: partsSectionTitleText = workbenchView.partsSectionTitle;
+  $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
+  $: activeStaticReferenceCanPreviewPlate =
+    activeDesignContext.type === "static-reference" && activeDesignContext.platePreview.type === "available";
+  $: showCutSheetPreviewMode = activeFabricationPreview.type === "cut-sheet";
+  $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
+  $: isCorsiControlsActive = activeDesignContext.type === "corsi-rosenthal";
+  $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
+  $: isTempestControlsActive = activeDesignContext.type === "tempest";
+  $: isNukitControlsActive = activeDesignContext.type === "nukit";
+  $: showSetupControlTab = activeControlPanels.setup.type === "available";
+  $: showAdvancedControlTab = activeControlPanels.advanced.type === "available";
+  $: layoutSectionTitleText = activeDesignContext.layoutSectionTitle;
+  $: partsSectionTitleText = activeDesignContext.partsSectionTitle;
   $: setupTabText = workbenchView.setupTabLabel;
   $: exportActionText = workbenchView.exportActionLabel;
   $: copyTopButtonText = transientButtonLabels["copy-top"] ?? "Copy URL";
@@ -282,7 +337,11 @@
   $: selectedFilterDetailText = createSelectedFilterDetail(settings, layout, fabricationMethod);
   $: selectedDonutFilterDimensionsText = `${formatMillimeters(settings.donutFilterOuterDiameter)} dia x ${formatMillimeters(settings.donutFilterLength)} · ${formatMillimeters(settings.donutFilterHoleDiameter)} hole`;
   $: selectedFanDetailText = createSelectedFanDetail(settings, layout, fabricationMethod);
-  $: corsiFaceAssignments = isCorsiControlsActive ? corsiFaceSides.map((side) => corsiFaceRoleForLayout(side, layout)) : [];
+  $: corsiFaceAssignments = isCorsiControlsActive ? createCorsiFaceAssignments(layout) : [];
+
+  // ##############################
+  // Lifecycle
+  // ##############################
 
   onDestroy(() => {
     for (const timer of transientLabelTimers.values()) {
@@ -290,12 +349,20 @@
     }
   });
 
+  // ##############################
+  // Manual State Sync
+  // ##############################
+
   function syncDerivedWorkbenchState(): void {
-    workbenchView = createWorkbenchViewModel(settings, workbenchState);
+    settings = serializePurifierDraft(draft);
+    workbenchView = createWorkbenchViewModel(draft, workbenchState);
     previewMode = workbenchView.previewMode;
     controlsTab = workbenchView.controlsTab;
     fabricationMethod = workbenchView.fabricationMethod;
     printVolumePresetId = workbenchView.printVolumePresetId;
+    activeDesignContext = workbenchView.design;
+    activeFabricationPreview = workbenchView.fabricationPreview;
+    activeControlPanels = workbenchView.controlPanels;
   }
 
   // #######################################
@@ -303,45 +370,59 @@
   // #######################################
 
   function commitSettings(nextSettings: RawPurifierSettings): void {
-    const normalizedSettings = normalizeRawSettings(nextSettings);
-    settings = normalizedSettings;
-    printDesignSettingsMemory = rememberPrintDesignSettings(printDesignSettingsMemory, normalizedSettings);
-    workbenchState = normalizeWorkbenchStateForSettings(workbenchState, normalizedSettings);
+    const normalizedDraft = normalizePurifierDraft(nextSettings);
+    draft = normalizedDraft;
+    settings = serializePurifierDraft(normalizedDraft);
+    printDesignSettingsMemory = rememberPrintDesignSettings(printDesignSettingsMemory, normalizedDraft);
+    workbenchState = normalizeWorkbenchStateForSettings(workbenchState, normalizedDraft);
     syncDerivedWorkbenchState();
     syncUrl();
   }
 
   function setWorkbenchState(nextState: WorkbenchState): void {
-    workbenchState = normalizeWorkbenchStateForSettings(nextState, settings);
+    workbenchState = normalizeWorkbenchStateForSettings(nextState, draft);
     syncDerivedWorkbenchState();
     syncUrl();
   }
 
   function applyFabricationMethod(nextMethod: FabricationMethod): void {
     const nextState = withFabricationMethod(workbenchState, nextMethod);
-    let nextSettings = settings;
+    let nextDraft = draft;
     let nextMemory = printDesignSettingsMemory;
-    if (nextMethod === "laser-svg" && settings.printDesign !== "nukit-open-air") {
-      const switched = switchPrintDesignSettings(printDesignSettingsMemory, settings, "nukit-open-air");
-      nextSettings = normalizeRawSettings(switched.settings);
+    if (nextMethod === "laser-svg" && printDesignIdForPurifierDraft(draft) !== "nukit-open-air") {
+      const switched = switchPrintDesignSettings(printDesignSettingsMemory, draft, "nukit-open-air");
+      nextDraft = normalizePurifierDraft(switched.settings);
+      nextMemory = switched.memory;
+    } else if (
+      nextMethod === "print-3mf" &&
+      !isPublicThreeDimensionalPrintDesignId(printDesignIdForPurifierDraft(draft))
+    ) {
+      const switched = switchPrintDesignSettings(printDesignSettingsMemory, draft, defaultThreeDimensionalPrintDesignId);
+      nextDraft = normalizePurifierDraft(switched.settings);
       nextMemory = switched.memory;
     }
-    settings = nextSettings;
+    draft = nextDraft;
+    settings = serializePurifierDraft(nextDraft);
     printDesignSettingsMemory = nextMemory;
-    workbenchState = normalizeWorkbenchStateForSettings(nextState, nextSettings);
+    workbenchState = normalizeWorkbenchStateForSettings(nextState, nextDraft);
     syncDerivedWorkbenchState();
     syncUrl();
   }
 
   function applyPrintDesignSelection(printDesign: PrintDesignId): void {
-    const switched = switchPrintDesignSettings(printDesignSettingsMemory, settings, publicPrintDesignId(printDesign));
-    const nextSettings = normalizeRawSettings(switched.settings);
-    settings = nextSettings;
+    const switched = switchPrintDesignSettings(printDesignSettingsMemory, draft, publicThreeDimensionalPrintDesignId(printDesign));
+    const nextDraft = normalizePurifierDraft(switched.settings);
+    draft = nextDraft;
+    settings = serializePurifierDraft(nextDraft);
     printDesignSettingsMemory = switched.memory;
-    workbenchState = normalizeWorkbenchStateForSettings(workbenchState, nextSettings);
+    workbenchState = normalizeWorkbenchStateForSettings(workbenchState, nextDraft);
     syncDerivedWorkbenchState();
     syncUrl();
   }
+
+  // ##############################
+  // Form Control Updates
+  // ##############################
 
   function updateFilterPreset(event: Event): void {
     commitSettings(applyFilterPreset(settings, readFilterPresetControlValue(event)));
@@ -353,6 +434,18 @@
 
   function updateFanPreset(event: Event): void {
     commitSettings(applyFanProductPreset(settings, readFanProductPresetControlValue(event)));
+  }
+
+  function updateRecommendedFanDiameter(diameter: RecommendedFanDiameter): void {
+    if (isRecommendedFanProductPreset(selectedFanProductPreset) && selectedFanProductPreset.diameter === diameter) {
+      commitSettings({
+        ...settings,
+        fanDiameter: diameter,
+      });
+      return;
+    }
+
+    commitSettings(applyFanProductPreset(settings, defaultFanProductPresetForRecommendedDiameter(diameter).id));
   }
 
   function updatePrintDesign(event: Event): void {
@@ -368,12 +461,8 @@
     });
   }
 
-  function updateFanDiameter(event: Event): void {
-    commitSettings({
-      ...settings,
-      fanDiameter: readFanDiameterControlValue(event),
-      fanPreset: customFanProductPresetId,
-    });
+  function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
+    commitSettings(applyTempestArrangementDefaults(settings, arrangement));
   }
 
   function updateFilterDimension(name: FilterDimensionName, event: Event): void {
@@ -411,6 +500,13 @@
     commitSettings(nextSettings);
   }
 
+  function updatePreviewMaterialColor(color: PreviewMaterialColorId): void {
+    commitSettings({
+      ...settings,
+      previewMaterialColor: color,
+    });
+  }
+
   function updateFilterCount(count: 1 | 2): void {
     commitSettings({
       ...settings,
@@ -435,21 +531,16 @@
     });
   }
 
-  function updateCameraPreset(event: Event): void {
-    const select = requireSelect(event, "updateCameraPreset");
-    const preset = cameraPresets.find((entry) => entry === select.value) ?? defaultSettings.cameraPreset;
-    commitSettings({
-      ...settings,
-      cameraPreset: preset,
-    });
-  }
-
   function toggleAutoRotate(): void {
     commitSettings({
       ...settings,
       autoRotate: !settings.autoRotate,
     });
   }
+
+  // ##############################
+  // Workbench Navigation
+  // ##############################
 
   function setPreviewMode(nextMode: PreviewMode): void {
     setWorkbenchState(withPreviewMode(workbenchState, nextMode));
@@ -482,8 +573,8 @@
   }
 
   function readPrintDesignControlValue(event: Event): PrintDesignId {
-    const preset = publicPrintDesignPresets.find((entry) => entry.id === requireSelect(event, "readPrintDesignControlValue").value);
-    return preset?.id ?? defaultSettings.printDesign;
+    const preset = publicThreeDimensionalPrintDesignPresets.find((entry) => entry.id === requireSelect(event, "readPrintDesignControlValue").value);
+    return preset?.id ?? defaultThreeDimensionalPrintDesignId;
   }
 
   function readCorsiModeControlValue(event: Event): CorsiRosenthalMode {
@@ -491,14 +582,50 @@
     return mode ?? defaultSettings.corsiMode;
   }
 
-  function readFanDiameterControlValue(event: Event): RawPurifierSettings["fanDiameter"] {
-    const parsed = Number(requireSelect(event, "readFanDiameterControlValue").value);
-    return fanDiameters.find((diameter) => diameter === parsed) ?? defaultSettings.fanDiameter;
-  }
-
   function readFanCountControlValue(event: Event): number {
     const parsed = Number(requireSelect(event, "readFanCountControlValue").value);
     return Number.isFinite(parsed) ? parsed : automaticFanCount;
+  }
+
+  function isRecommendedFanDiameter(diameter: FanDiameter): diameter is RecommendedFanDiameter {
+    return diameter === 120 || diameter === 140;
+  }
+
+  function isRecommendedFanProductPreset(preset: { readonly id: FanProductPresetId; readonly diameter: FanDiameter }): preset is RecommendedFanProductPreset {
+    return preset.id !== customFanProductPresetId && isRecommendedFanDiameter(preset.diameter);
+  }
+
+  function fanDiameterSelectionForSettings(currentSettings: RawPurifierSettings): FanDiameterSelection {
+    if (currentSettings.fanPreset === customFanProductPresetId && !isRecommendedFanDiameter(currentSettings.fanDiameter)) {
+      return "custom";
+    }
+    const fanProduct = findFanProductPreset(currentSettings.fanPreset);
+    if (isRecommendedFanProductPreset(fanProduct)) {
+      return fanProduct.diameter;
+    }
+    if (isRecommendedFanDiameter(currentSettings.fanDiameter)) {
+      return currentSettings.fanDiameter;
+    }
+    return defaultRecommendedFanDiameter;
+  }
+
+  function recommendedFanProductPresetsForDiameter(diameter: RecommendedFanDiameter): readonly RecommendedFanProductPreset[] {
+    return recommendedFanProductPresets.filter((preset) => preset.diameter === diameter);
+  }
+
+  function fanProductOptionsForSelection(selection: FanDiameterSelection): readonly PresetFanProduct[] {
+    if (selection === "custom") {
+      return [];
+    }
+    return recommendedFanProductPresetsForDiameter(selection);
+  }
+
+  function defaultFanProductPresetForRecommendedDiameter(diameter: RecommendedFanDiameter): RecommendedFanProductPreset {
+    const preset = recommendedFanProductPresetsForDiameter(diameter)[0];
+    if (preset === undefined) {
+      throw new Error(`defaultFanProductPresetForRecommendedDiameter: Missing ${diameter} mm fan preset`);
+    }
+    return preset;
   }
 
   function readNumberInput(event: Event, fallback: number): number {
@@ -539,19 +666,12 @@
     return target;
   }
 
-  function normalizePublicPrintDesignSettings(input: RawPurifierSettings): RawPurifierSettings {
-    if (isPublicPrintDesignId(input.printDesign)) {
-      return input;
-    }
-    return applyPrintDesignPreset(defaultSettings, defaultSettings.printDesign);
-  }
-
   // #######################################
   // View Availability
   // #######################################
 
-  function publicPrintDesignId(printDesign: PrintDesignId): PrintDesignId {
-    return isPublicPrintDesignId(printDesign) ? printDesign : defaultSettings.printDesign;
+  function publicThreeDimensionalPrintDesignId(printDesign: PrintDesignId): PrintDesignId {
+    return isPublicThreeDimensionalPrintDesignId(printDesign) ? printDesign : defaultThreeDimensionalPrintDesignId;
   }
 
   function createSelectedFilterDetail(
@@ -581,10 +701,14 @@
   // Summaries and Diagnostics
   // #######################################
 
+  // ##############################
+  // Export Diagnostics
+  // ##############################
+
   function evaluateActiveExportDiagnostics(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
-    currentPrintVolumePresetId: PrintVolumePresetId,
+    currentGeneratedPlan: PrintableSheetPlan | null,
   ): BuildDiagnostic[] {
     if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return [];
@@ -593,7 +717,8 @@
     const usesGeneratedPrintKit =
       currentFabricationMethod === "print-3mf" &&
       (isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id) ||
-        isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id));
+        isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id) ||
+        isTempestPrintDesignId(currentLayout.configuration.printDesign.id));
     const baseDiagnostics = usesGeneratedPrintKit
       ? evaluateBuildDiagnostics(currentLayout).filter(
           (diagnostic) =>
@@ -612,7 +737,10 @@
       return baseDiagnostics;
     }
 
-    const kit = createPrintDesignKit(currentLayout, currentPrintVolumePresetId);
+    const kit = currentGeneratedPlan?.kit;
+    if (kit === undefined) {
+      return baseDiagnostics;
+    }
     const printDiagnostics: BuildDiagnostic[] = [];
     if (kit.summary.oversizedPartCount > 0) {
       printDiagnostics.push({
@@ -666,12 +794,17 @@
     return summarizeBuildReadiness(currentLayout);
   }
 
+  // ##############################
+  // Preview Summary
+  // ##############################
+
   function createPreviewSummaryItems(
     currentLayout: LayoutResult,
     currentPreviewMode: PreviewMode,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
     currentSettings: RawPurifierSettings,
+    currentGeneratedPlan: PrintableSheetPlan | null,
   ): readonly SummaryItem[] {
     if (currentPreviewMode === "print-sheets") {
       if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
@@ -684,7 +817,15 @@
           { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
         ];
       }
-      const plan = createGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId);
+      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
+      if (isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
+        return [
+          { label: "Print plates", value: String(plan.sheets.length) },
+          { label: "Print chunks", value: String(plan.kit.summary.partCount) },
+          { label: "Split model", value: String(plan.kit.summary.splitPanelCount) },
+          { label: "Bed", value: plan.kit.preset.label },
+        ];
+      }
       return [
         { label: "Print plates", value: String(plan.sheets.length) },
         { label: "Panel tiles", value: String(plan.kit.summary.panelTileCount) },
@@ -706,7 +847,7 @@
     }
 
     if (currentFabricationMethod === "print-3mf" && isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const plan = createGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId);
+      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
       const corsiLayout = resolveCorsiRosenthalLayout(currentLayout);
       return [
         { label: "Design", value: currentLayout.configuration.printDesign.label },
@@ -722,7 +863,7 @@
     }
 
     if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const plan = createGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId);
+      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
       const model = createDonutFilterModel(currentLayout);
       return [
         { label: "Design", value: currentLayout.configuration.printDesign.label },
@@ -737,17 +878,34 @@
       ];
     }
 
+    if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
+      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
+      const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
+      return [
+        { label: "Design", value: currentLayout.configuration.printDesign.label },
+        { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
+        { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
+        { label: "Print chunks", value: String(plan.kit.summary.partCount) },
+        { label: "Bed", value: plan.kit.preset.label },
+      ];
+    }
+
+    const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
     return [
-      { label: "Panels", value: String(currentLayout.summary.panelCount) },
+      { label: "Panels", value: String(cutPanelSummary.panelCount) },
       { label: "Chamber height", value: formatMillimeters(currentLayout.summary.chamberHeight) },
       { label: "Working depth", value: formatMillimeters(currentLayout.summary.workingDepth) },
-      { label: "Fans", value: String(totalResolvedFans(currentLayout.summary.resolvedFans)) },
+      { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       {
         label: "Sheet",
-        value: `${formatMillimeters(currentLayout.summary.sheetWidth)} x ${formatMillimeters(currentLayout.summary.sheetHeight)}`,
+        value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
       },
     ];
   }
+
+  // ##############################
+  // Static Print Estimates
+  // ##############################
 
   function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefined): readonly SummaryItem[] {
     if (estimate === undefined) {
@@ -762,6 +920,10 @@
   // #######################################
   // Purchase List
   // #######################################
+
+  // ##############################
+  // Required Items
+  // ##############################
 
   function createPurchaseListItems(
     currentLayout: LayoutResult,
@@ -866,6 +1028,10 @@
     ];
   }
 
+  // ##############################
+  // Static Reference Items
+  // ##############################
+
   function staticPrintEstimatePurchaseItems(estimate: StaticPrintEstimate | undefined): readonly PurchaseListItem[] {
     if (estimate === undefined) {
       return [];
@@ -912,14 +1078,12 @@
   // Corsi-Rosenthal Controls
   // #######################################
 
-  function corsiFaceRoleForLayout(side: CorsiFaceSide, currentLayout: LayoutResult): CorsiFaceAssignment {
+  function createCorsiFaceAssignments(currentLayout: LayoutResult): readonly CorsiFaceRoleAssignment[] {
     const model = createCorsiRosenthalModel(currentLayout);
-    const assignment = model.faceRoles.find((entry) => entry.side === side);
-    return {
-      side,
-      role: assignment?.role ?? "sealed",
-      fanCount: assignment?.fanCount ?? 0,
-    };
+    return corsiFaceSides.map((side) => {
+      const assignment = model.faceRoles.find((entry) => entry.side === side);
+      return assignment ?? { side, role: "sealed" };
+    });
   }
 
   function corsiFanCountFitsLayout(mode: CorsiRosenthalMode, fanCount: number, currentLayout: LayoutResult): boolean {
@@ -960,11 +1124,11 @@
     return side.charAt(0).toUpperCase() + side.slice(1);
   }
 
-  function corsiFaceRoleLabel(role: CorsiFaceRole, fanCount: number): string {
-    if (role === "fan") {
-      return `${fanCount} fan${fanCount === 1 ? "" : "s"}`;
+  function corsiFaceRoleLabel(assignment: CorsiFaceRoleAssignment): string {
+    if (assignment.role === "fan") {
+      return `${assignment.fanCount} fan${assignment.fanCount === 1 ? "" : "s"}`;
     }
-    return role === "filter" ? "Filter" : "Sealed";
+    return assignment.role === "filter" ? "Filter" : "Sealed";
   }
 
   // #######################################
@@ -978,7 +1142,7 @@
     }
 
     if (fabricationMethod === "print-3mf") {
-      showTransientButtonLabel(buttonKey, exportPrintKit(layout), 1400);
+      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan), 1400);
       return;
     }
 
@@ -999,12 +1163,18 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function exportPrintKit(currentLayout: LayoutResult): string {
+  function exportPrintKit(
+    currentLayout: LayoutResult,
+    currentGeneratedPlan: PrintableSheetPlan | null,
+  ): string {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
       return "Opened source files";
     }
-    const printExport = createPrintDesignThreeMfExport(currentLayout, printVolumePresetId);
+    const printExport = createPrintDesignThreeMfExportFromKit(
+      currentLayout,
+      requireGeneratedPrintSheetPlan(currentGeneratedPlan, "exportPrintKit").kit,
+    );
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1090,6 +1260,10 @@
   // URL and Preview Plans
   // #######################################
 
+  // ##############################
+  // Share URL
+  // ##############################
+
   function syncUrl(): void {
     const url = new URL(window.location.href);
     url.search = encodeShareState();
@@ -1097,16 +1271,21 @@
   }
 
   function encodeShareState(): string {
-    const params = new URLSearchParams(encodeSettings(settings));
+    const params = new URLSearchParams(encodeSettings(draft));
     for (const [key, value] of encodeWorkbenchState(workbenchState)) {
       params.set(key, value);
     }
     return params.toString();
   }
 
+  // ##############################
+  // Print Sheet Plans
+  // ##############################
+
   function createActivePrintSheetPlan(
     currentLayout: LayoutResult,
     currentPrintVolumePresetId: PrintVolumePresetId,
+    currentGeneratedPlan: PrintableSheetPlan | null,
   ): PrintSheetThreePreviewPlan {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
@@ -1121,10 +1300,72 @@
         bedLabel: preset.label,
       };
     }
-    return createGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId);
+    return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActivePrintSheetPlan");
   }
 
-  function createGeneratedPrintSheetPlan(
+  function createCurrentGeneratedPrintSheetPlan(
+    currentLayout: LayoutResult,
+    currentFabricationMethod: FabricationMethod,
+    currentPrintVolumePresetId: PrintVolumePresetId,
+  ): PrintableSheetPlan | null {
+    if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
+      return null;
+    }
+    const cacheKey = generatedPrintSheetPlanCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
+    if (generatedPrintSheetPlanCache?.key === cacheKey) {
+      return generatedPrintSheetPlanCache.plan;
+    }
+    const plan = createGeneratedPrintSheetPlanFromLayout(currentLayout, currentPrintVolumePresetId);
+    generatedPrintSheetPlanCache = { key: cacheKey, plan };
+    return plan;
+  }
+
+  function generatedPrintSheetPlanCacheKey(
+    rawSettings: RawPurifierSettings,
+    currentPrintVolumePresetId: PrintVolumePresetId,
+  ): string {
+    return JSON.stringify({
+      printVolumePresetId: currentPrintVolumePresetId,
+      printDesign: rawSettings.printDesign,
+      filterPreset: rawSettings.filterPreset,
+      filterWidth: rawSettings.filterWidth,
+      filterDepth: rawSettings.filterDepth,
+      filterThickness: rawSettings.filterThickness,
+      rim: rawSettings.rim,
+      fanPreset: rawSettings.fanPreset,
+      fanDiameter: rawSettings.fanDiameter,
+      filters: rawSettings.filters,
+      splitFrames: rawSettings.splitFrames,
+      fansLeft: rawSettings.fansLeft,
+      fansRight: rawSettings.fansRight,
+      fansTop: rawSettings.fansTop,
+      fansBottom: rawSettings.fansBottom,
+      corsiMode: rawSettings.corsiMode,
+      corsiFilterCount: rawSettings.corsiFilterCount,
+      corsiFanCount: rawSettings.corsiFanCount,
+      tempestArrangement: rawSettings.tempestArrangement,
+      donutFilterPreset: rawSettings.donutFilterPreset,
+      donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
+      donutFilterLength: rawSettings.donutFilterLength,
+      donutFilterHoleDiameter: rawSettings.donutFilterHoleDiameter,
+      donutAdapterInsertLength: rawSettings.donutAdapterInsertLength,
+      donutCapRim: rawSettings.donutCapRim,
+      donutCapEnabled: rawSettings.donutCapEnabled,
+      screwHoleDiameter: rawSettings.screwHoleDiameter,
+      materialThickness: rawSettings.materialThickness,
+      kerfFit: rawSettings.kerfFit,
+      fingerWidthMultiplier: rawSettings.fingerWidthMultiplier,
+      fingerSpaceMultiplier: rawSettings.fingerSpaceMultiplier,
+      fingerPlayMultiplier: rawSettings.fingerPlayMultiplier,
+      fingerHoleWidthMultiplier: rawSettings.fingerHoleWidthMultiplier,
+      fingerHoleOffsetMultiplier: rawSettings.fingerHoleOffsetMultiplier,
+      dovetailSizeMultiplier: rawSettings.dovetailSizeMultiplier,
+      dovetailDepthMultiplier: rawSettings.dovetailDepthMultiplier,
+      dovetailTaper: rawSettings.dovetailTaper,
+    });
+  }
+
+  function createGeneratedPrintSheetPlanFromLayout(
     currentLayout: LayoutResult,
     currentPrintVolumePresetId: PrintVolumePresetId,
   ): PrintableSheetPlan {
@@ -1135,18 +1376,26 @@
     currentLayout: LayoutResult,
     currentPreviewMode: PreviewMode,
     currentFabricationMethod: FabricationMethod,
-    currentPrintVolumePresetId: PrintVolumePresetId,
     currentSettings: RawPurifierSettings,
+    currentGeneratedPlan: PrintableSheetPlan | null,
   ): PrintableSheetPlan | null {
     if (
       currentPreviewMode !== "enclosure" ||
       currentFabricationMethod !== "print-3mf" ||
       !currentSettings.showPrintSeams ||
+      isTempestPrintDesignId(currentLayout.configuration.printDesign.id) ||
       isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
     ) {
       return null;
     }
-    return createGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId);
+    return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActiveAssemblyPrintSeamPlan");
+  }
+
+  function requireGeneratedPrintSheetPlan(plan: PrintableSheetPlan | null, context: string): PrintableSheetPlan {
+    if (plan === null) {
+      throw new Error(`${context}: Expected generated print sheet plan`);
+    }
+    return plan;
   }
 
   // #######################################
@@ -1157,25 +1406,33 @@
     return method === "print-3mf" ? "3D print" : "Laser cut";
   }
 
-  function cameraPresetLabel(preset: RawPurifierSettings["cameraPreset"]): string {
-    if (preset === "official") {
-      return "Official angle";
-    }
-    if (preset === "front") {
-      return "Front";
-    }
-    if (preset === "side") {
-      return "Side";
-    }
-    return "Top";
-  }
-
-  function previewCameraPresetLabel(preset: RawPurifierSettings["cameraPreset"]): string {
-    return preset === "official" ? "Official" : cameraPresetLabel(preset);
-  }
-
   function corsiModeLabel(mode: CorsiRosenthalMode): string {
     return mode === "side-exhaust" ? "Flipped side exhaust" : "Classic top exhaust";
+  }
+
+  function filterPresetOptionLabel(preset: (typeof filterPresets)[number]): string {
+    if (preset.id === customFilterPresetId) {
+      return `${preset.label} - enter exact dimensions`;
+    }
+    return `${preset.label} - ${formatFilterDimensions(preset.dimensions)}`;
+  }
+
+  function formatFilterDimensions(dimensions: (typeof filterPresets)[number]["dimensions"]): string {
+    return `${formatMillimeters(dimensions.width)} x ${formatMillimeters(dimensions.depth)} x ${formatMillimeters(dimensions.thickness)}`;
+  }
+
+  function previewMaterialColorLabel(color: PreviewMaterialColorPreset): string {
+    return `${color.label} preview color`;
+  }
+
+  function tempestArrangementLabel(arrangement: string): string {
+    if (arrangement === "single-horizontal-top-filter") {
+      return "Single horizontal filter";
+    }
+    if (arrangement === "four-side-filter-tower") {
+      return "Four-filter tower";
+    }
+    return "Dual horizontal filters";
   }
 
   function configuredFanCountFor(currentLayout: LayoutResult, currentFabricationMethod: FabricationMethod): number {
@@ -1188,11 +1445,24 @@
     if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
       return currentLayout.configuration.design.type === "donut-filter-adapter" ? currentLayout.configuration.design.fan.count : 0;
     }
-    return totalResolvedFans(currentLayout.summary.resolvedFans);
+    return totalConfiguredFans(currentLayout.summary.fans);
   }
 
-  function totalResolvedFans(resolvedFans: LayoutResult["summary"]["resolvedFans"]): number {
-    return resolvedFans.left + resolvedFans.right + resolvedFans.top + resolvedFans.bottom;
+  function totalConfiguredFans(fans: LayoutResult["summary"]["fans"]): number {
+    if (fans.type === "wall-banks") {
+      return fans.resolvedFans.left + fans.resolvedFans.right + fans.resolvedFans.top + fans.resolvedFans.bottom;
+    }
+    return fans.fanCount;
+  }
+
+  function requireCutPanelFabricationSummary(
+    currentLayout: LayoutResult,
+    caller: string,
+  ): Extract<LayoutResult["summary"]["fabrication"], { readonly type: "cut-panel-source" }> {
+    if (currentLayout.summary.fabrication.type !== "cut-panel-source") {
+      throw new Error(`${caller}: ${currentLayout.configuration.printDesign.label} does not have cut-panel fabrication`);
+    }
+    return currentLayout.summary.fabrication;
   }
 
   function formatKilograms(value: number): string {
@@ -1211,11 +1481,15 @@
     return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
   }
 
-  workbenchState = normalizeWorkbenchStateForSettings(workbenchState, settings);
+  workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
   syncDerivedWorkbenchState();
 </script>
 
 <main class="app-shell">
+  <!-- #######################################
+  App Header
+  ####################################### -->
+
   <header class="topbar">
     <div>
       <p class="eyebrow">Browser generator</p>
@@ -1227,6 +1501,10 @@
       </button>
     </div>
   </header>
+
+  <!-- #######################################
+  Workbench
+  ####################################### -->
 
   <section class="method-workbench" aria-label="Manufacturing workspace">
     <fieldset class="fabrication-method-field">
@@ -1248,6 +1526,10 @@
     </fieldset>
 
     <section class="workspace" aria-label="Open air purifier builder">
+      <!-- ##############################
+      Preview Pane
+      ############################## -->
+
       <section class="preview-pane" aria-label="Live preview">
         <div class="preview-toolbar" aria-label="Preview mode">
           <div class="preview-mode-group">
@@ -1303,76 +1585,121 @@
         >
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
-              <label class="preview-camera-field" title="Camera view">
-                <span class="sr-only">Camera</span>
-                <span class="preview-camera-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M8.2 6.4 9.8 4h4.4l1.6 2.4H19c1.1 0 2 .9 2 2v8.3c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V8.4c0-1.1.9-2 2-2h3.2Zm3.8 9.2a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6Zm0-1.6a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" />
-                  </svg>
-                </span>
-                <select name="cameraPreset" aria-label="Camera view" onchange={updateCameraPreset}>
-                  {#each cameraPresets as preset}
-                    <option value={preset} selected={settings.cameraPreset === preset}>{previewCameraPresetLabel(preset)}</option>
-                  {/each}
-                </select>
-              </label>
               <div class="preview-toggle-strip" aria-label="Preview display options">
-                <label class="toggle-field preview-toggle-field" title="Filters">
+                <label class="toggle-field preview-toggle-field preview-control-main" title="Filters">
                   <input
                     type="checkbox"
                     name="showFilterMedia"
                     checked={settings.showFilterMedia}
                     onchange={(event) => updateBooleanSetting("showFilterMedia", event)}
                   />
-                  <span>Filter</span>
+                  <span class="preview-control-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path class="preview-icon-soft-fill" d="M5 5h14v14H5z" />
+                      <path d="M8 5v14M12 5v14M16 5v14" />
+                    </svg>
+                  </span>
+                  <span class="preview-control-label">Filter</span>
                 </label>
-                <label class="toggle-field preview-toggle-field" title="Fans">
+                <label class="toggle-field preview-toggle-field preview-control-main" title="Fans">
                   <input
                     type="checkbox"
                     name="showFans"
                     checked={settings.showFans}
                     onchange={(event) => updateBooleanSetting("showFans", event)}
                   />
-                  <span>Fans</span>
+                  <span class="preview-control-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <circle class="preview-icon-soft-fill" cx="12" cy="12" r="2.4" />
+                      <path d="M12 4c2.7 0 3.9 2.7 2.1 4.5L12 10zM20 12c0 2.7-2.7 3.9-4.5 2.1L14 12zM12 20c-2.7 0-3.9-2.7-2.1-4.5L12 14zM4 12c0-2.7 2.7-3.9 4.5-2.1L10 12z" />
+                    </svg>
+                  </span>
+                  <span class="preview-control-label">Fans</span>
                 </label>
+                {#if isTempestControlsActive}
+                  <label class="toggle-field preview-toggle-field preview-control-lines" title="Model edge lines">
+                    <input
+                      type="checkbox"
+                      name="showPreviewEdges"
+                      checked={settings.showPreviewEdges}
+                      onchange={(event) => updateBooleanSetting("showPreviewEdges", event)}
+                    />
+                    <span class="preview-control-label">Lines</span>
+                  </label>
+                {/if}
+                <span class="preview-toolbar-primary-break" aria-hidden="true"></span>
                 {#if !isCorsiRosenthalPrintDesignId(settings.printDesign)}
-                  <label class="toggle-field preview-toggle-field" title="Exploded view">
+                  <label class="toggle-field preview-toggle-field preview-control-spatial" title="Exploded view">
                     <input
                       type="checkbox"
                       name="explodedView"
                       checked={settings.explodedView}
                       onchange={(event) => updateBooleanSetting("explodedView", event)}
                     />
-                    <span>Exploded view</span>
+                    <span class="preview-control-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M9 9h6v6H9z" />
+                        <path d="M8 8L4 4M4 4h4M4 4v4M16 8l4-4M20 4h-4M20 4v4M8 16l-4 4M4 20h4M4 20v-4M16 16l4 4M20 20h-4M20 20v-4" />
+                      </svg>
+                    </span>
+                    <span class="preview-control-label">Exploded view</span>
                   </label>
-                  <label class="toggle-field preview-toggle-field" title="Show dimensions">
+                  <label class="toggle-field preview-toggle-field preview-control-spatial" title="Show dimensions">
                     <input
                       type="checkbox"
                       name="showDimensions"
                       checked={settings.showDimensions}
                       onchange={(event) => updateBooleanSetting("showDimensions", event)}
                     />
-                    <span>Dims</span>
+                    <span class="preview-control-icon" aria-hidden="true">
+                      <span class="preview-control-glyph">mm</span>
+                    </span>
+                    <span class="preview-control-label">Dims</span>
                   </label>
                 {/if}
-                <label class="toggle-field preview-toggle-field" title="Scale reference">
+                <label class="toggle-field preview-toggle-field preview-control-spatial" title="Scale reference">
                   <input
                     type="checkbox"
                     name="showBananaScale"
                     checked={settings.showBananaScale}
                     onchange={(event) => updateBooleanSetting("showBananaScale", event)}
                   />
-                  <span>Scale</span>
+                  <span class="preview-control-icon" aria-hidden="true">
+                    <span class="preview-control-glyph preview-control-glyph-wide">1:1</span>
+                  </span>
+                  <span class="preview-control-label">Scale</span>
                 </label>
-                {#if fabricationMethod === "print-3mf" && !isCorsiRosenthalPrintDesignId(settings.printDesign) && !isStaticReferenceControlsActive}
-                  <label class="toggle-field preview-toggle-field" title="Print split lines">
+                {#if fabricationMethod === "print-3mf" && !isStaticReferenceControlsActive}
+                  <div class="preview-color-field" aria-label="Preview color">
+                    {#each previewMaterialColorPresets as color}
+                      <button
+                        class:active-color={settings.previewMaterialColor === color.id}
+                        type="button"
+                        aria-label={previewMaterialColorLabel(color)}
+                        aria-pressed={settings.previewMaterialColor === color.id}
+                        title={previewMaterialColorLabel(color)}
+                        onclick={() => updatePreviewMaterialColor(color.id)}
+                      >
+                        <span style:--swatch-color={swatchColor(color.color)}></span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+                {#if fabricationMethod === "print-3mf" && !isCorsiRosenthalPrintDesignId(settings.printDesign) && !isTempestPrintDesignId(settings.printDesign) && !isStaticReferenceControlsActive}
+                  <label class="toggle-field preview-toggle-field preview-control-technical" title="Print split lines">
                     <input
                       type="checkbox"
                       name="showPrintSeams"
                       checked={settings.showPrintSeams}
                       onchange={(event) => updateBooleanSetting("showPrintSeams", event)}
                     />
-                    <span>Splits</span>
+                    <span class="preview-control-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M5 6h14M5 12h14M5 18h14" />
+                        <path d="M9 4v16M15 4v16" />
+                      </svg>
+                    </span>
+                    <span class="preview-control-label">Splits</span>
                   </label>
                 {/if}
               </div>
@@ -1399,21 +1726,8 @@
             </div>
             <PurifierPreview {layout} printSeamPlan={activePrintSeamPlan} />
           {:else if previewMode === "print-sheets"}
-            <div class="preview-view-controls" data-preview-view-controls>
-              <div class="preview-toggle-strip" aria-label="Print plate display options">
-                <label class="toggle-field preview-toggle-field" title="Show plate labels">
-                  <input
-                    type="checkbox"
-                    name="showPrintPlateLabels"
-                    checked={settings.showPrintPlateLabels}
-                    onchange={(event) => updateBooleanSetting("showPrintPlateLabels", event)}
-                  />
-                  <span>Labels</span>
-                </label>
-              </div>
-            </div>
             {#if activePrintSheetPlan !== null}
-              <PrintSheetPreview plan={activePrintSheetPlan} settings={printSheetPreviewSettings} />
+              <PrintSheetPreview plan={activePrintSheetPlan} />
             {/if}
           {:else if previewMode === "cut-sheet" && fabricationMethod === "laser-svg"}
             <div class="sheet-preview laser-sheet-preview">{@html createLaserSvg(layout)}</div>
@@ -1429,6 +1743,10 @@
           {/each}
         </div>
       </section>
+
+      <!-- ##############################
+      Control Sidebar
+      ############################## -->
 
       <aside class="controls-pane" aria-label="Build settings">
         <section class="persistent-output-panel" data-persistent-output-panel aria-label="Build output">
@@ -1464,18 +1782,6 @@
             onclick={() => setControlsTab("design")}
           >
             Design
-          </button>
-          <button
-            class:is-active={controlsTab === "parts"}
-            class="controls-tab"
-            id="parts-controls-tab"
-            type="button"
-            role="tab"
-            aria-selected={controlsTab === "parts"}
-            aria-controls="parts-controls-panel"
-            onclick={() => setControlsTab("parts")}
-          >
-            Parts
           </button>
           {#if showSetupControlTab}
             <button
@@ -1613,9 +1919,9 @@
                       </label>
                       <div class="corsi-topology-summary" id="corsiTopologySummary" aria-label="Corsi-Rosenthal face roles">
                         {#each corsiFaceAssignments as assignment}
-                          <span class={`corsi-face-role is-${assignment.role}`} title={`${corsiFaceLabel(assignment.side)} face: ${corsiFaceRoleLabel(assignment.role, assignment.fanCount)}`}>
+                          <span class={`corsi-face-role is-${assignment.role}`} title={`${corsiFaceLabel(assignment.side)} face: ${corsiFaceRoleLabel(assignment)}`}>
                             <small>{corsiFaceLabel(assignment.side)}</small>
-                            <strong>{corsiFaceRoleLabel(assignment.role, assignment.fanCount)}</strong>
+                            <strong>{corsiFaceRoleLabel(assignment)}</strong>
                           </span>
                         {/each}
                       </div>
@@ -1663,6 +1969,28 @@
                       </label>
                     </div>
                   {/if}
+
+                  {#if isTempestControlsActive}
+                    <div data-tempest-layout>
+                      <fieldset class="segmented-field segmented-field-three">
+                        <legend>Filter layout</legend>
+                        <div>
+                          {#each tempestArrangementOptions as option}
+                            <label>
+                              <input
+                                type="radio"
+                                name="tempestArrangement"
+                                value={option.id}
+                                checked={settings.tempestArrangement === option.id}
+                                onchange={() => updateTempestArrangement(option.id)}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          {/each}
+                        </div>
+                      </fieldset>
+                    </div>
+                  {/if}
                 </div>
                 {#if isNukitControlsActive}
                   <div data-nukit-filter-count>
@@ -1695,15 +2023,13 @@
                 {/if}
               </section>
             {/if}
-          </div>
-        {:else if controlsTab === "parts"}
-          <div class="tab-panel parts-controls" id="parts-controls-panel" role="tabpanel" aria-labelledby="parts-controls-tab">
-            <section class="control-section parts-section">
-              <div class="section-heading">
-                <p class="eyebrow">Parts</p>
-                <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
-              </div>
-              {#if !isStaticReferenceControlsActive}
+
+            {#if !isStaticReferenceControlsActive}
+              <section class="control-section parts-section">
+                <div class="section-heading">
+                  <p class="eyebrow">Parts</p>
+                  <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
+                </div>
                 <div data-generated-part-controls>
                   {#if !isDonutControlsActive}
                     <div data-rectangular-filter-controls>
@@ -1712,7 +2038,7 @@
                           <span>Filter</span>
                           <select name="filterPreset" onchange={updateFilterPreset}>
                             {#each filterPresets as preset}
-                              <option value={preset.id} selected={settings.filterPreset === preset.id}>{preset.label}</option>
+                              <option value={preset.id} selected={settings.filterPreset === preset.id}>{filterPresetOptionLabel(preset)}</option>
                             {/each}
                           </select>
                         </label>
@@ -1801,57 +2127,84 @@
                     </div>
                   {/if}
 
-                  <div class="field-with-info">
-                    <label class="field">
-                      <span>Fan type</span>
-                      <select name="fanPreset" onchange={updateFanPreset}>
-                        {#each fanProductPresets as preset}
-                          <option value={preset.id} selected={settings.fanPreset === preset.id}>{preset.label}</option>
+                  <div class="fan-selection">
+                    <fieldset class="segmented-field">
+                      <legend>Fan size</legend>
+                      <div>
+                        {#each recommendedFanDiameterOptions as diameter}
+                          <label>
+                            <input
+                              type="radio"
+                              name="recommendedFanDiameter"
+                              value={diameter}
+                              checked={selectedFanDiameterSelection === diameter}
+                              onchange={() => updateRecommendedFanDiameter(diameter)}
+                            />
+                            <span>{diameter} mm</span>
+                          </label>
                         {/each}
-                      </select>
-                    </label>
-                    <details class="selector-info">
-                      <summary aria-label="Fan type details" title="Fan type details">
-                        <span>Details</span>
-                      </summary>
-                      <div class="selector-info-panel">
-                        <div class="fan-preset-card" id="fanPresetDetail">
-                          <div class="fan-card-header">
-                            <div>
-                              <strong>{selectedFanProductPreset.label}</strong>
-                              <span>{selectedFanDetailText}</span>
-                            </div>
-                            <div class="fan-color-swatches" aria-label="Fan colors">
-                              <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.frameColor)}></span>
-                              <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.bladeColor)}></span>
-                              <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.hubColor)}></span>
-                            </div>
-                          </div>
-                          <small>
-                            {selectedFanProductPreset.source}
-                            {#if selectedFanProductPreset.productUrl !== undefined}
-                              <a href={selectedFanProductPreset.productUrl} target="_blank" rel="noreferrer">Source</a>
-                            {/if}
-                          </small>
-                        </div>
                       </div>
-                    </details>
-                  </div>
-                  {#if settings.fanPreset === customFanProductPresetId}
-                    <div data-custom-fan-size>
+                    </fieldset>
+
+                    <div class="field-with-info">
                       <label class="field">
-                        <span>Fan size</span>
-                        <select name="fanDiameter" onchange={updateFanDiameter}>
-                          {#each fanDiameters as diameter}
-                            <option value={diameter} selected={settings.fanDiameter === diameter}>{diameter} mm</option>
+                        <span>Fan model</span>
+                        <select name="fanPreset" onchange={updateFanPreset}>
+                          {#each selectedFanProductOptions as preset}
+                            <option value={preset.id} selected={settings.fanPreset === preset.id}>{preset.label}</option>
                           {/each}
+                          <option value={customFanProductPresetId} selected={settings.fanPreset === customFanProductPresetId}>Custom fan</option>
                         </select>
                       </label>
+                      {#if settings.fanPreset === customFanProductPresetId}
+                        <label class="field">
+                          <span>Fan diameter</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name="fanDiameter"
+                              min="40"
+                              max="140"
+                              step="1"
+                              inputmode="decimal"
+                              value={settings.fanDiameter}
+                              onchange={(event) => updateNumberSetting("fanDiameter", event)}
+                            />
+                            <small>mm</small>
+                          </span>
+                        </label>
+                      {/if}
+                      <details class="selector-info">
+                        <summary aria-label="Fan model details" title="Fan model details">
+                          <span>Details</span>
+                        </summary>
+                        <div class="selector-info-panel">
+                          <div class="fan-preset-card" id="fanPresetDetail">
+                            <div class="fan-card-header">
+                              <div>
+                                <strong>{selectedFanProductPreset.label}</strong>
+                                <span>{selectedFanDetailText}</span>
+                              </div>
+                              <div class="fan-color-swatches" aria-label="Fan colors">
+                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.frameColor)}></span>
+                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.bladeColor)}></span>
+                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.hubColor)}></span>
+                              </div>
+                            </div>
+                            <small>
+                              {selectedFanProductPreset.source}
+                              {#if selectedFanProductPreset.productUrl !== undefined}
+                                <a href={selectedFanProductPreset.productUrl} target="_blank" rel="noreferrer">Source</a>
+                              {/if}
+                            </small>
+                          </div>
+                        </div>
+                      </details>
                     </div>
-                  {/if}
+                  </div>
                 </div>
-              {/if}
-            </section>
+              </section>
+            {/if}
 
             {#if !isStaticReferenceControlsActive}
               <section class="control-section geometry-section" data-generated-geometry-controls>
@@ -1987,7 +2340,7 @@
               </section>
             {/if}
           </div>
-        {:else if controlsTab === "advanced" && !isStaticReferenceControlsActive}
+        {:else if controlsTab === "advanced" && isNukitControlsActive}
           <div class="tab-panel advanced-controls" id="advanced-controls-panel" role="tabpanel" aria-labelledby="advanced-controls-tab">
             <section class="control-section joint-tuning-section" data-generated-advanced-controls>
               <div class="section-heading">
@@ -2019,6 +2372,10 @@
     </section>
   </section>
 
+  <!-- #######################################
+  Sheet Dialog
+  ####################################### -->
+
   <dialog
     class="sheet-dialog"
     id="sheetDialog"
@@ -2040,7 +2397,6 @@
           {#if previewMode === "print-sheets" && activePrintSheetPlan !== null}
             <PrintSheetPreview
               plan={activePrintSheetPlan}
-              settings={printSheetPreviewSettings}
               label="3D print plate dialog preview"
               className="print-sheet-dialog-host"
             />
@@ -2051,6 +2407,10 @@
       </div>
     </div>
   </dialog>
+
+  <!-- #######################################
+  Mobile Actions
+  ####################################### -->
 
   <nav class="mobile-action-bar" aria-label="Export actions">
     <button class="ghost-button" type="button" onclick={() => void copyUrl("copy-mobile")}>

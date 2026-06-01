@@ -9,6 +9,7 @@ import {
   DirectionalLight,
   DoubleSide,
   EdgesGeometry,
+  Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
@@ -41,9 +42,11 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
+  findPreviewMaterialColorPreset,
   isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
+  isTempestPrintDesignId,
   staticPrintReferenceForPreset,
   type CameraPreset,
   type FanAppearance,
@@ -75,14 +78,36 @@ import {
 import type { AssemblyLineCue } from "@/fabrication/assemblyModel";
 import { createCorsiRosenthalModel } from "@/domain/designs/corsi-rosenthal/model";
 import type { CorsiFaceSide, CorsiFanGrid, CorsiFanPanel, CorsiFilterFace, CorsiSealedFace } from "@/domain/designs/corsi-rosenthal/model";
-import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight, type DonutFilterModel } from "@/domain/designs/donut-filter/model";
+import {
+  createDonutFilterModel,
+  donutAdapterTotalHeight,
+  donutCapTotalHeight,
+  type DonutFilterCap,
+  type DonutFilterModel,
+} from "@/domain/designs/donut-filter/model";
+import {
+  createTempestModel,
+  type TempestFilterLayout,
+  type TempestModel,
+  type TempestWall,
+  type TempestWallFanLayout,
+} from "@/domain/designs/tempest/model";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
-import type { PrintableTileSource } from "@/fabrication/printing/printableKit";
-import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+import {
+  createTempestPrintableKitFromLayout,
+  createTempestPrintablePose,
+  createTempestSettingsFromLayout,
+  type TempestPrintablePose,
+} from "@/fabrication/printing/designs/tempest/printableKit";
+import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
 
 // #######################################
 // Preview Model
 // #######################################
+
+// ##############################
+// Fan Preview Data
+// ##############################
 
 type FanAxis = "x" | "y" | "z";
 
@@ -90,6 +115,24 @@ type FanPlacement = {
   axis: FanAxis;
   position: Vector3;
   radius: number;
+};
+
+type TempestCsgPoint = {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+};
+
+type TempestCsgBox = {
+  readonly min: TempestCsgPoint;
+  readonly size: TempestCsgPoint;
+};
+
+export type PreviewInteriorPlane = {
+  readonly axis: FanAxis;
+  readonly coordinate: number;
+  readonly insideSign: -1 | 1;
+  readonly inset: number;
 };
 
 type FanCadPreviewAsset = {
@@ -122,6 +165,10 @@ type LoadedFanCadMesh = {
   readonly isRotor: boolean;
 };
 
+// ##############################
+// Camera and Seam Data
+// ##############################
+
 type CameraPose = {
   readonly offsetFromTarget: Vector3;
   readonly viewScale: number;
@@ -133,6 +180,10 @@ type PanelPrintSeam = {
   readonly start: number;
   readonly end: number;
 };
+
+// ##############################
+// Design Preview Metrics
+// ##############################
 
 type CorsiPreviewMetrics = {
   readonly mode: "top-exhaust" | "side-exhaust";
@@ -168,6 +219,10 @@ type StaticReferencePurchasedPartExplosion = {
   readonly assembly?: LoadedStaticPrintAssembly;
 };
 
+// ##############################
+// Scene Constants
+// ##############################
+
 const sceneScale = 1 / 260;
 const staticReferenceSceneScale = sceneScale * 0.72;
 const woodColor = 0xc7965a;
@@ -178,14 +233,24 @@ const groundY = -0.58;
 const homePreviewRotationX = -Math.PI / 2;
 const panelCutOverlayLift = 1.4 * sceneScale;
 const panelPrintSeamOverlayLift = 2.1 * sceneScale;
+const fanPreviewFrontDepth = 0.018;
+const fanPreviewRearDepth = 0.047;
+const fanPreviewFrontDepthMillimeters = fanPreviewFrontDepth / sceneScale;
+const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
+const tempestPreviewFanWallInset = 0.8 * sceneScale;
 const filterMediaPreviewClearanceMillimeters = 3;
+const filterMediaPreviewSurfaceGapMillimeters = 2;
+const filterMediaPreviewSurfaceGap = filterMediaPreviewSurfaceGapMillimeters * sceneScale;
 const bananaReferenceLength = 180 * sceneScale;
 const bananaReferenceRadius = 14 * sceneScale;
 const oneMeterCubeSize = 1000 * sceneScale;
 const staticReferenceExplodeDistance = 46 * sceneScale;
+const generatedPreviewExplodeDistance = 72 * sceneScale;
 const bananaScaleAssetUrl = "/vendor/scale-reference/banana/banana.glb";
-const dimensionLabelNormalScale = new Vector3(1.28, 0.367, 1);
-const dimensionLabelHoverScale = new Vector3(1.78, 0.51, 1);
+const dimensionLabelNormalScale = new Vector3(1.37, 0.367, 1);
+const dimensionLabelHoverScale = new Vector3(1.9, 0.51, 1);
+const dimensionLabelOffsetMultiplier = 1.18;
+const dimensionPreviewFramingMultiplier = 1.2;
 const staticReferencePreviewZoom = 1.52;
 const generatedPreviewZoom = 1.5;
 const generatedPreviewZoomReferenceMillimeters = 360;
@@ -200,6 +265,10 @@ const fanRotorAngularVelocity = 0.9;
 // #######################################
 
 export class PurifierThreePreview {
+  // ##############################
+  // Scene State
+  // ##############################
+
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(38, 1, 0.01, 100);
   private readonly renderer: WebGLRenderer;
@@ -219,6 +288,11 @@ export class PurifierThreePreview {
   private latestViewScale = 1;
   private previousAnimationTime = performance.now();
   private staticReferenceLoadToken = 0;
+  private destroyed = false;
+
+  // ##############################
+  // Initialization
+  // ##############################
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -248,6 +322,12 @@ export class PurifierThreePreview {
     keyLight.position.set(2.5, 3.5, 3.2);
     keyLight.castShadow = true;
     this.scene.add(keyLight);
+    const fillLight = new DirectionalLight(0xd7efe4, 0.65);
+    fillLight.position.set(-3.2, 1.6, 1.8);
+    this.scene.add(fillLight);
+    const rimLight = new DirectionalLight(0xecfff3, 1.15);
+    rimLight.position.set(-2.8, 3.2, -4.4);
+    this.scene.add(rimLight);
 
     const ground = new Mesh(
       new CircleGeometry(1.8, 96),
@@ -263,7 +343,14 @@ export class PurifierThreePreview {
     this.animate();
   }
 
+  // ##############################
+  // Public API
+  // ##############################
+
   update(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null = null): void {
+    if (this.destroyed) {
+      return;
+    }
     const previousLayout = this.latestLayout;
     const previousPose = previousLayout === null ? null : this.captureCameraPose();
     const shouldApplyPresetCamera =
@@ -280,11 +367,19 @@ export class PurifierThreePreview {
   }
 
   setAutoRotate(enabled: boolean): void {
+    if (this.destroyed) {
+      return;
+    }
     this.controls.autoRotate = enabled;
     this.controls.update();
   }
 
   destroy(): void {
+    if (this.destroyed) {
+      return;
+    }
+    this.destroyed = true;
+    this.staticReferenceLoadToken += 1;
     if (this.animationId !== null) {
       window.cancelAnimationFrame(this.animationId);
       this.animationId = null;
@@ -299,6 +394,10 @@ export class PurifierThreePreview {
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
+
+  // ##############################
+  // Model Rebuilds
+  // ##############################
 
   private rebuildModel(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null): void {
     this.staticReferenceLoadToken += 1;
@@ -324,11 +423,15 @@ export class PurifierThreePreview {
       this.rebuildCorsiRosenthalModel(layout);
       return;
     }
+    if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
+      this.rebuildTempestModel(layout);
+      return;
+    }
     const assembly = createAssemblyModel(layout);
     const settings = layout.configuration;
 
-    const wood = createWoodMaterial(settings.preview.enclosure.transparentWalls);
-    const railWood = createWoodMaterial(false);
+    const wood = createWoodMaterial();
+    const railWood = createWoodMaterial();
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
     const printSeamMaterial = new LineBasicMaterial({ color: 0x2b6fd6, transparent: true, opacity: 0.9 });
@@ -391,6 +494,7 @@ export class PurifierThreePreview {
     }
 
     this.modelGroup.rotation.x = homePreviewRotationX;
+
     const outline = new Box3().setFromObject(this.modelGroup);
     const center = outline.getCenter(new Vector3());
     this.modelGroup.position.sub(center);
@@ -406,6 +510,10 @@ export class PurifierThreePreview {
       this.dimensionTargets = collectDimensionTargets(dimensionGroup);
     }
   }
+
+  // ##############################
+  // Static Reference Models
+  // ##############################
 
   private rebuildStaticReferenceModel(layout: LayoutResult, loadToken: number): void {
     const reference = staticPrintReferenceForPreset(layout.configuration.printDesign);
@@ -425,11 +533,9 @@ export class PurifierThreePreview {
 
     void assetsPromise
       .then((loaded) => {
-        if (loadToken !== this.staticReferenceLoadToken) {
+        if (!this.isStaticReferenceLoadCurrent(loadToken)) {
           const disposableAssets = loaded.type === "assets" ? loaded.assets : loaded.assembly.assets;
-          for (const asset of disposableAssets) {
-            asset.geometry.dispose();
-          }
+          disposeLoadedStaticPrintAssets(disposableAssets);
           return;
         }
         this.disposeObject(this.modelGroup);
@@ -462,10 +568,10 @@ export class PurifierThreePreview {
         this.frameModel(layout);
       })
       .catch((error) => {
-        console.warn("rebuildStaticReferenceModel: Failed to load static STL reference", error);
-        if (loadToken !== this.staticReferenceLoadToken) {
+        if (!this.isStaticReferenceLoadCurrent(loadToken)) {
           return;
         }
+        console.warn("rebuildStaticReferenceModel: Failed to load static STL reference", error);
         this.disposeObject(this.modelGroup);
         this.modelGroup.clear();
         this.addStaticReferencePlaceholder();
@@ -829,6 +935,10 @@ export class PurifierThreePreview {
     return new Box3().setFromObject(this.modelGroup);
   }
 
+  // ##############################
+  // Generated Enclosure Helpers
+  // ##############################
+
   private addAssemblyBox(part: AssemblyBoxPart, exploded: boolean, material: Material, edgeMaterial: Material): void {
     const [width, height, depth] = visualAssemblyBoxSize(part);
     const geometry = new BoxGeometry(width * sceneScale, height * sceneScale, depth * sceneScale);
@@ -839,7 +949,7 @@ export class PurifierThreePreview {
     mesh.receiveShadow = true;
     this.modelGroup.add(mesh);
 
-    const edges = new LineSegments(new EdgesGeometry(geometry), edgeMaterial);
+    const edges = createPreviewEdges(geometry, edgeMaterial);
     edges.position.copy(mesh.position);
     this.modelGroup.add(edges);
   }
@@ -878,12 +988,22 @@ export class PurifierThreePreview {
     previewBounds.getCenter(this.modelFocus);
   }
 
+  // ##############################
+  // Generated Design Models
+  // ##############################
+
   private rebuildCorsiRosenthalModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const fanAppearance = settings.fan.productSelection.product.appearance;
-    const frameMaterial = new MeshStandardMaterial({ color: 0x151a1b, roughness: 0.66, metalness: 0.05 });
-    const edgeMaterial = new LineBasicMaterial({ color: 0x070909, transparent: true, opacity: 0.72 });
+    const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
+    const frameMaterial = createPrintedPartMaterial({
+      color: printedPartColor,
+      roughness: 0.66,
+      metalness: 0.05,
+    });
+    const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.76);
     const filterMaterial = createFilterMediaMaterial(0.7);
+    const filterEdgeMaterial = createFilterMediaEdgeMaterial(0.34);
     const metrics = createCorsiPreviewMetrics(layout);
 
     if (settings.preview.enclosure.showFilterFrame) {
@@ -900,6 +1020,7 @@ export class PurifierThreePreview {
         settings.preview.enclosure.showFilterMedia,
         settings.preview.enclosure.showFilterFrame,
         filterMaterial,
+        filterEdgeMaterial,
         frameMaterial,
         edgeMaterial,
       );
@@ -918,6 +1039,8 @@ export class PurifierThreePreview {
       }
     }
 
+    explodeGeneratedPreviewChildrenFromCenter(this.modelGroup, settings.preview.enclosure.explodedView);
+
     const outline = new Box3().setFromObject(this.modelGroup);
     const center = outline.getCenter(new Vector3());
     this.modelGroup.position.sub(center);
@@ -926,16 +1049,27 @@ export class PurifierThreePreview {
     const settledOutline = new Box3().setFromObject(this.modelGroup);
     this.addScaleReference(layout, settledOutline);
     this.updateModelFocus(settledOutline);
-    this.addCorsiAirflowCues(metrics, settings.preview.enclosure.showFilterMedia, settings.preview.enclosure.showFans);
+    if (!settings.preview.enclosure.explodedView) {
+      this.addCorsiAirflowCues(metrics, settings.preview.enclosure.showFilterMedia, settings.preview.enclosure.showFans);
+    }
   }
 
   private rebuildDonutFilterModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const model = createDonutFilterModel(layout);
     const fanAppearance = settings.fan.productSelection.product.appearance;
-    const adapterMaterial = new MeshStandardMaterial({ color: 0xc9f43b, roughness: 0.48, metalness: 0.04 });
+    const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
+    const adapterMaterial = createPrintedPartMaterial({
+      color: printedPartColor,
+      roughness: 0.48,
+      metalness: 0.04,
+    });
     const blackMaterial = new MeshStandardMaterial({ color: 0x0c0f0d, roughness: 0.62, metalness: 0.08 });
-    const capMaterial = new MeshStandardMaterial({ color: 0xc9f43b, roughness: 0.48, metalness: 0.04 });
+    const capMaterial = createPrintedPartMaterial({
+      color: printedPartColor,
+      roughness: 0.48,
+      metalness: 0.04,
+    });
     const filterMaterial = new MeshPhysicalMaterial({
       color: 0xf5f7ef,
       roughness: 0.74,
@@ -991,8 +1125,8 @@ export class PurifierThreePreview {
       this.addDonutGasket(filterEndX, filterHoleRadius, filterRadius, blackMaterial);
     }
 
-    if (model.cap.enabled && settings.preview.enclosure.showFilterFrame) {
-      this.addDonutCap(model, filterEndX, filterRadius, capMaterial, edgeMaterial);
+    if (model.cap.type === "printed-cap" && settings.preview.enclosure.showFilterFrame) {
+      this.addDonutCap(model.cap, filterEndX, filterRadius, capMaterial, edgeMaterial);
     }
 
     if (settings.preview.enclosure.showFans) {
@@ -1009,6 +1143,8 @@ export class PurifierThreePreview {
       this.addDonutFanGuard(model, fanCenterX - fanVisualDepth / 2 - model.fanGuard.thickness * sceneScale / 2, filterRadius, adapterMaterial, edgeMaterial);
     }
 
+    explodeGeneratedPreviewChildrenFromCenter(this.modelGroup, settings.preview.enclosure.explodedView);
+
     const outline = new Box3().setFromObject(this.modelGroup);
     const center = outline.getCenter(new Vector3());
     this.modelGroup.position.sub(center);
@@ -1017,6 +1153,123 @@ export class PurifierThreePreview {
     const settledOutline = new Box3().setFromObject(this.modelGroup);
     this.addScaleReference(layout, settledOutline);
     this.updateModelFocus(settledOutline);
+  }
+
+  private rebuildTempestModel(layout: LayoutResult): void {
+    const settings = layout.configuration;
+    const tempestModel = createTempestModel(createTempestSettingsFromLayout(layout));
+    const pose = createTempestPrintablePose(tempestModel);
+    const kit = createTempestPrintableKitFromLayout(layout, "unsplit");
+    const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
+    const material = createPrintedPartMaterial({
+      color: printedPartColor,
+      roughness: 0.64,
+      metalness: 0.04,
+    });
+    const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.58);
+
+    for (const part of kit.parts) {
+      this.modelGroup.add(
+        createPrintableMeshPreviewGroup(
+          part.mesh,
+          material,
+          edgeMaterial,
+          `tempest-preview-${part.id}`,
+          settings.preview.enclosure.showPreviewEdges,
+        ),
+      );
+    }
+
+    this.addTempestPreviewPurchasedParts(tempestModel, pose, settings.fan.productSelection.product.appearance, {
+      showFilterMedia: settings.preview.enclosure.showFilterMedia,
+      showFans: settings.preview.enclosure.showFans,
+      showPreviewEdges: settings.preview.enclosure.showPreviewEdges,
+    });
+
+    const dimensionBounds = new Box3().setFromObject(this.modelGroup);
+    explodeGeneratedPreviewChildrenFromCenter(this.modelGroup, settings.preview.enclosure.explodedView);
+
+    const outline = this.settleModelOnGround();
+    this.addScaleReference(layout, outline);
+    if (layout.configuration.preview.enclosure.showDimensions) {
+      const dimensionGroup = createStaticReferenceDimensionGroup(dimensionBounds);
+      this.modelGroup.add(dimensionGroup);
+      this.dimensionTargets = collectDimensionTargets(dimensionGroup);
+      this.updateModelFocus(new Box3().setFromObject(this.modelGroup));
+      return;
+    }
+    this.updateModelFocus(outline);
+  }
+
+  private addTempestPreviewPurchasedParts(
+    model: TempestModel,
+    pose: TempestPrintablePose,
+    fanAppearance: FanAppearance,
+    visibility: { readonly showFilterMedia: boolean; readonly showFans: boolean; readonly showPreviewEdges: boolean },
+  ): void {
+    if (visibility.showFilterMedia) {
+      this.addTempestPreviewFilters(model, pose, visibility.showPreviewEdges);
+    }
+    if (visibility.showFans) {
+      this.addTempestPreviewFans(model, pose, fanAppearance);
+    }
+  }
+
+  private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
+    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.56 : 0.64);
+    const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
+    const filterBoxes =
+      model.filterLayout.type === "horizontal-stack"
+        ? tempestHorizontalFilterBoxes(model, model.filterLayout)
+        : tempestTowerFilterBoxes(model, model.filterLayout);
+
+    for (const [index, box] of filterBoxes.entries()) {
+      this.modelGroup.add(
+        createTempestPreviewBox(box, pose, filterMaterial, edgeMaterial, `tempest-filter-${index}`, showPreviewEdges),
+      );
+    }
+  }
+
+  private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
+    if (model.fanLayout.type === "horizontal-wall-fans") {
+      for (const wall of tempestPreviewWalls) {
+        this.addTempestWallFans(model, pose, model.fanLayout.walls[wall], fanAppearance);
+      }
+      return;
+    }
+
+    const topFanCenterZ = tempestTowerTopFanCenterZ(model);
+    for (const x of model.fanLayout.positionsX) {
+      for (const y of model.fanLayout.positionsY) {
+        const fan = createFan({
+          axis: tempestCsgAxisToSceneAxis("z", pose),
+          position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
+          radius: (model.settings.fan.diameter / 2) * sceneScale,
+          appearance: fanAppearance,
+        });
+        collectFanRotors(fan, this.fanRotors);
+        this.modelGroup.add(fan);
+      }
+    }
+  }
+
+  private addTempestWallFans(
+    model: TempestModel,
+    pose: TempestPrintablePose,
+    layout: TempestWallFanLayout,
+    fanAppearance: FanAppearance,
+  ): void {
+    for (const position of layout.positionsAlongWall) {
+      const fan = createFan({
+        axis: tempestCsgAxisToSceneAxis(tempestWallNormalAxis(layout.wall), pose),
+        position: tempestCsgPointToScene(tempestWallInteriorFanCenter(model, layout.wall, position), pose),
+        radius: (model.settings.fan.diameter / 2) * sceneScale,
+        appearance: fanAppearance,
+      });
+      moveTempestFanInsideWall(fan, model, pose, layout.wall);
+      collectFanRotors(fan, this.fanRotors);
+      this.modelGroup.add(fan);
+    }
   }
 
   private addDonutFanFlange(
@@ -1075,7 +1328,7 @@ export class PurifierThreePreview {
     mesh.receiveShadow = true;
     this.modelGroup.add(mesh);
 
-    const edges = new LineSegments(new EdgesGeometry(geometry), edgeMaterial);
+    const edges = createPreviewEdges(geometry, edgeMaterial);
     edges.position.copy(mesh.position);
     this.modelGroup.add(edges);
   }
@@ -1164,13 +1417,19 @@ export class PurifierThreePreview {
     this.modelGroup.add(edges);
   }
 
-  private addDonutCap(model: DonutFilterModel, filterEndX: number, centerY: number, material: Material, edgeMaterial: Material): void {
-    const capRadius = (model.cap.outerDiameter / 2) * sceneScale;
-    const capThickness = model.cap.thickness * sceneScale;
-    const insertLength = model.cap.insertLength * sceneScale;
+  private addDonutCap(
+    cap: Extract<DonutFilterCap, { readonly type: "printed-cap" }>,
+    filterEndX: number,
+    centerY: number,
+    material: Material,
+    edgeMaterial: Material,
+  ): void {
+    const capRadius = (cap.outerDiameter / 2) * sceneScale;
+    const capThickness = cap.thickness * sceneScale;
+    const insertLength = cap.insertLength * sceneScale;
     this.addDonutSolidCylinder(capRadius, capThickness, filterEndX + capThickness / 2, centerY, material, edgeMaterial);
     this.addDonutCylinderShell(
-      (model.cap.holeDiameter / 2) * sceneScale,
+      (cap.holeDiameter / 2) * sceneScale,
       insertLength,
       filterEndX - insertLength / 2,
       centerY,
@@ -1350,6 +1609,7 @@ export class PurifierThreePreview {
     showFilterMedia: boolean,
     showFilterFrame: boolean,
     filterMaterial: Material,
+    filterEdgeMaterial: Material,
     frameMaterial: Material,
     edgeMaterial: Material,
   ): void {
@@ -1360,6 +1620,7 @@ export class PurifierThreePreview {
         showFilterMedia,
         showFilterFrame,
         filterMaterial,
+        filterEdgeMaterial,
         frameMaterial,
         edgeMaterial,
       );
@@ -1373,6 +1634,7 @@ export class PurifierThreePreview {
         showFilterMedia,
         showFilterFrame,
         filterMaterial,
+        filterEdgeMaterial,
         frameMaterial,
         edgeMaterial,
       );
@@ -1385,6 +1647,7 @@ export class PurifierThreePreview {
       showFilterMedia,
       showFilterFrame,
       filterMaterial,
+      filterEdgeMaterial,
       frameMaterial,
       edgeMaterial,
     );
@@ -1433,19 +1696,25 @@ export class PurifierThreePreview {
     showFilterMedia: boolean,
     showFilterFrame: boolean,
     filterMaterial: Material,
+    filterEdgeMaterial: Material,
     frameMaterial: Material,
     edgeMaterial: Material,
   ): void {
+    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
     const filterZ = z > 0
-      ? z - metrics.printLayerDepth / 2 - metrics.filterThickness / 2
-      : z + metrics.printLayerDepth / 2 + metrics.filterThickness / 2;
+      ? z - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
+      : z + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
     if (showFilterMedia) {
       this.addCorsiBox(
         "corsi-filter-media",
-        [metrics.filterWidth, metrics.filterHeight, metrics.filterThickness],
+        [
+          visualSceneFilterMediaDimension(metrics.filterWidth),
+          visualSceneFilterMediaDimension(metrics.filterHeight),
+          filterThickness,
+        ],
         [0, metrics.boxHeight / 2, filterZ],
         filterMaterial,
-        edgeMaterial,
+        filterEdgeMaterial,
       );
     }
 
@@ -1489,19 +1758,25 @@ export class PurifierThreePreview {
     showFilterMedia: boolean,
     showFilterFrame: boolean,
     filterMaterial: Material,
+    filterEdgeMaterial: Material,
     frameMaterial: Material,
     edgeMaterial: Material,
   ): void {
+    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
     const filterX = x > 0
-      ? x - metrics.printLayerDepth / 2 - metrics.filterThickness / 2
-      : x + metrics.printLayerDepth / 2 + metrics.filterThickness / 2;
+      ? x - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
+      : x + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
     if (showFilterMedia) {
       this.addCorsiBox(
         "corsi-side-filter-media",
-        [metrics.filterThickness, metrics.filterHeight, metrics.filterWidth],
+        [
+          filterThickness,
+          visualSceneFilterMediaDimension(metrics.filterHeight),
+          visualSceneFilterMediaDimension(metrics.filterWidth),
+        ],
         [filterX, metrics.boxHeight / 2, 0],
         filterMaterial,
-        edgeMaterial,
+        filterEdgeMaterial,
       );
     }
 
@@ -1545,19 +1820,25 @@ export class PurifierThreePreview {
     showFilterMedia: boolean,
     showFilterFrame: boolean,
     filterMaterial: Material,
+    filterEdgeMaterial: Material,
     frameMaterial: Material,
     edgeMaterial: Material,
   ): void {
+    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
     const filterY = y > metrics.boxHeight / 2
-      ? y - metrics.printLayerDepth / 2 - metrics.filterThickness / 2
-      : y + metrics.printLayerDepth / 2 + metrics.filterThickness / 2;
+      ? y - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
+      : y + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
     if (showFilterMedia) {
       this.addCorsiBox(
         "corsi-horizontal-filter-media",
-        [metrics.filterWidth, metrics.filterThickness, metrics.boxDepth - metrics.rail * 2],
+        [
+          visualSceneFilterMediaDimension(metrics.filterWidth),
+          filterThickness,
+          visualSceneFilterMediaDimension(metrics.boxDepth - metrics.rail * 2),
+        ],
         [0, filterY, 0],
         filterMaterial,
-        edgeMaterial,
+        filterEdgeMaterial,
       );
     }
 
@@ -1796,6 +2077,10 @@ export class PurifierThreePreview {
     this.modelGroup.add(cue);
   }
 
+  // ##############################
+  // Camera and Interaction
+  // ##############################
+
   private frameModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const maxDimension = cameraViewScale(layout);
@@ -1853,6 +2138,9 @@ export class PurifierThreePreview {
   }
 
   private resize(): void {
+    if (this.destroyed) {
+      return;
+    }
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
     this.camera.aspect = width / height;
@@ -1861,6 +2149,9 @@ export class PurifierThreePreview {
   }
 
   private animate = (): void => {
+    if (this.destroyed) {
+      return;
+    }
     this.spinFanRotors();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
@@ -1877,6 +2168,9 @@ export class PurifierThreePreview {
   }
 
   private handlePointerMove = (event: PointerEvent): void => {
+    if (this.destroyed) {
+      return;
+    }
     if (this.dimensionTargets.length === 0) {
       this.setHoveredDimension(null);
       return;
@@ -1892,6 +2186,9 @@ export class PurifierThreePreview {
   };
 
   private clearDimensionHover = (): void => {
+    if (this.destroyed) {
+      return;
+    }
     this.setHoveredDimension(null);
   };
 
@@ -1904,9 +2201,14 @@ export class PurifierThreePreview {
     applyDimensionHover(this.modelGroup, dimensionId);
   }
 
+  // ##############################
+  // Disposal
+  // ##############################
+
   private disposeObject(object: Object3D): void {
     const seenMaterials = new Set<Material>();
     object.traverse((child) => {
+      child.userData["disposedPreviewObject"] = true;
       if (child instanceof Mesh || child instanceof LineSegments || child instanceof Line) {
         if (child.userData["sharedCadGeometry"] !== true) {
           child.geometry.dispose();
@@ -1917,6 +2219,20 @@ export class PurifierThreePreview {
         disposeMaterial(child.material, seenMaterials);
       }
     });
+  }
+
+  private isStaticReferenceLoadCurrent(loadToken: number): boolean {
+    return !this.destroyed && loadToken === this.staticReferenceLoadToken;
+  }
+}
+
+// #######################################
+// Loaded Asset Disposal
+// #######################################
+
+function disposeLoadedStaticPrintAssets(assets: readonly LoadedStaticPrintAsset[]): void {
+  for (const asset of assets) {
+    asset.geometry.dispose();
   }
 }
 
@@ -1933,11 +2249,17 @@ function createBananaScaleReference(): Group {
 
   void loadBananaScaleAsset()
     .then((asset) => {
+      if (group.userData["disposedPreviewObject"] === true) {
+        return;
+      }
       group.remove(placeholder);
       disposeMeshResources(placeholder);
       group.add(createNormalizedBananaScaleAsset(asset));
     })
     .catch(() => {
+      if (group.userData["disposedPreviewObject"] === true) {
+        return;
+      }
       placeholder.material.opacity = 0.16;
       placeholder.material.color.set(0xf5c84b);
     });
@@ -2128,9 +2450,343 @@ function visualFilterMediaDimension(size: number): number {
   return Math.max(1, size - filterMediaPreviewClearanceMillimeters * 2, size * 0.72);
 }
 
+function visualSceneFilterMediaDimension(size: number): number {
+  return visualFilterMediaDimension(size / sceneScale) * sceneScale;
+}
+
+function recessedSceneFilterMediaThickness(size: number): number {
+  return Math.max(sceneScale, size - filterMediaPreviewSurfaceGap * 2);
+}
+
+function recessedMillimeterFilterMediaThickness(size: number): number {
+  return Math.max(1, size - filterMediaPreviewSurfaceGapMillimeters * 2);
+}
+
+// #######################################
+// Tempest Preview Purchased Parts
+// #######################################
+
+function tempestHorizontalFilterBoxes(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+): readonly TempestCsgBox[] {
+  const filter = model.settings.arrangement.type === "four-side-filter-tower" ? null : model.settings.arrangement.filter;
+  if (filter === null) {
+    return [];
+  }
+  const inset = filterMediaPreviewClearanceMillimeters;
+  const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
+  return filterLayout.filters.map((layer) => ({
+    min: {
+      x: model.frame.wallThickness + inset,
+      y: model.frame.wallThickness + inset,
+      z: layer.zBottom + surfaceGap,
+    },
+    size: {
+      x: visualFilterMediaDimension(filter.footprintWidth),
+      y: visualFilterMediaDimension(filter.footprintDepth),
+      z: recessedMillimeterFilterMediaThickness(filter.thickness),
+    },
+  }));
+}
+
+function tempestTowerFilterBoxes(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+): readonly TempestCsgBox[] {
+  const filter = model.settings.arrangement.type === "four-side-filter-tower" ? model.settings.arrangement.filter : null;
+  if (filter === null) {
+    return [];
+  }
+  const inset = filterMediaPreviewClearanceMillimeters;
+  const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
+  const faceWidth = visualFilterMediaDimension(filter.faceWidth);
+  const faceHeight = visualFilterMediaDimension(filter.faceHeight);
+  const filterThickness = recessedMillimeterFilterMediaThickness(filter.thickness);
+  const z = filterLayout.bottomPlateThickness + inset;
+  return [
+    {
+      min: { x: filterLayout.structuralOffset + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
+      size: { x: faceWidth, y: filterThickness, z: faceHeight },
+    },
+    {
+      min: {
+        x: filterLayout.structuralOffset + inset,
+        y: model.box.depth - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
+        z,
+      },
+      size: { x: faceWidth, y: filterThickness, z: faceHeight },
+    },
+    {
+      min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + inset, z },
+      size: { x: filterThickness, y: faceWidth, z: faceHeight },
+    },
+    {
+      min: {
+        x: model.box.width - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
+        y: filterLayout.structuralOffset + inset,
+        z,
+      },
+      size: { x: filterThickness, y: faceWidth, z: faceHeight },
+    },
+  ];
+}
+
+function createTempestPreviewBox(
+  box: TempestCsgBox,
+  pose: TempestPrintablePose,
+  material: Material,
+  edgeMaterial: Material,
+  name: string,
+  showPreviewEdges: boolean,
+): Group {
+  const bounds = new Box3().setFromPoints(tempestCsgBoxCorners(box).map((point) => tempestCsgPointToScene(point, pose)));
+  const size = bounds.getSize(new Vector3());
+  const center = bounds.getCenter(new Vector3());
+  const geometry = new BoxGeometry(size.x, size.y, size.z);
+  const mesh = new Mesh(geometry, material);
+  mesh.name = name;
+  mesh.position.copy(center);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  const group = new Group();
+  group.add(mesh);
+  if (showPreviewEdges) {
+    const edges = createPreviewEdges(geometry, edgeMaterial);
+    edges.position.copy(center);
+    group.add(edges);
+  }
+  return group;
+}
+
+function tempestCsgBoxCorners(box: TempestCsgBox): readonly TempestCsgPoint[] {
+  const x1 = box.min.x + box.size.x;
+  const y1 = box.min.y + box.size.y;
+  const z1 = box.min.z + box.size.z;
+  return [
+    { x: box.min.x, y: box.min.y, z: box.min.z },
+    { x: x1, y: box.min.y, z: box.min.z },
+    { x: box.min.x, y: y1, z: box.min.z },
+    { x: x1, y: y1, z: box.min.z },
+    { x: box.min.x, y: box.min.y, z: z1 },
+    { x: x1, y: box.min.y, z: z1 },
+    { x: box.min.x, y: y1, z: z1 },
+    { x: x1, y: y1, z: z1 },
+  ];
+}
+
+function tempestCsgPointToScene(point: TempestCsgPoint, pose: TempestPrintablePose): Vector3 {
+  const posedPoint =
+    pose.type === "upright-dual-filter"
+      ? {
+          x: point.x,
+          y: pose.envelope.depth - point.z,
+          z: point.y,
+        }
+      : point;
+  return new Vector3(posedPoint.x * sceneScale, posedPoint.z * sceneScale, posedPoint.y * sceneScale);
+}
+
+function tempestCsgAxisToSceneAxis(axis: FanAxis, pose: TempestPrintablePose): FanAxis {
+  if (pose.type === "upright-dual-filter") {
+    return axis;
+  }
+  if (axis === "y") {
+    return "z";
+  }
+  if (axis === "z") {
+    return "y";
+  }
+  return "x";
+}
+
+function tempestWallNormalAxis(wall: TempestWall): FanAxis {
+  return wall === "front" || wall === "back" ? "y" : "x";
+}
+
+function tempestWallInteriorFanCenter(model: TempestModel, wall: TempestWall, positionAlongWall: number): TempestCsgPoint {
+  const z = model.frame.outsideFlangeThickness + horizontalTempestFanLayout(model).localVerticalCenter;
+  if (wall === "front") {
+    return { x: positionAlongWall, y: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, z };
+  }
+  if (wall === "back") {
+    return { x: positionAlongWall, y: model.box.depth - model.frame.wallThickness - fanPreviewRearDepthMillimeters, z };
+  }
+  if (wall === "left") {
+    return { x: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, y: positionAlongWall, z };
+  }
+  return { x: model.box.width - model.frame.wallThickness - fanPreviewRearDepthMillimeters, y: positionAlongWall, z };
+}
+
+function moveTempestFanInsideWall(fan: Group, model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): void {
+  const bounds = new Box3().setFromObject(fan);
+  const plane = tempestWallInteriorPlane(model, pose, wall);
+  fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+function tempestWallInteriorPlane(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): PreviewInteriorPlane {
+  const facePoint = tempestWallInteriorFacePoint(model, wall);
+  const sceneFacePoint = tempestCsgPointToScene(facePoint, pose);
+  const insideDirection = tempestCsgPointToScene(tempestWallInteriorProbePoint(model, wall), pose).sub(sceneFacePoint);
+  const axis = dominantVectorAxis(insideDirection);
+  const insideSign = vectorAxisValue(insideDirection, axis) >= 0 ? 1 : -1;
+  return {
+    axis,
+    coordinate: vectorAxisValue(sceneFacePoint, axis),
+    insideSign,
+    inset: tempestPreviewFanWallInset,
+  };
+}
+
+function tempestWallInteriorFacePoint(model: TempestModel, wall: TempestWall): TempestCsgPoint {
+  if (wall === "front") {
+    return { x: 0, y: model.frame.wallThickness, z: 0 };
+  }
+  if (wall === "back") {
+    return { x: 0, y: model.box.depth - model.frame.wallThickness, z: 0 };
+  }
+  if (wall === "left") {
+    return { x: model.frame.wallThickness, y: 0, z: 0 };
+  }
+  return { x: model.box.width - model.frame.wallThickness, y: 0, z: 0 };
+}
+
+function tempestWallInteriorProbePoint(model: TempestModel, wall: TempestWall): TempestCsgPoint {
+  const point = tempestWallInteriorFacePoint(model, wall);
+  if (wall === "front") {
+    return { ...point, y: point.y + 1 };
+  }
+  if (wall === "back") {
+    return { ...point, y: point.y - 1 };
+  }
+  if (wall === "left") {
+    return { ...point, x: point.x + 1 };
+  }
+  return { ...point, x: point.x - 1 };
+}
+
+export function previewInteriorShiftForBounds(bounds: Box3, plane: PreviewInteriorPlane): number {
+  const target = plane.coordinate + plane.insideSign * plane.inset;
+  const outsideEdge = vectorAxisValue(plane.insideSign > 0 ? bounds.min : bounds.max, plane.axis);
+  const shift = target - outsideEdge;
+  return plane.insideSign > 0 ? Math.max(0, shift) : Math.min(0, shift);
+}
+
+function dominantVectorAxis(vector: Vector3): FanAxis {
+  const x = Math.abs(vector.x);
+  const y = Math.abs(vector.y);
+  const z = Math.abs(vector.z);
+  if (x >= y && x >= z) {
+    return "x";
+  }
+  if (y >= z) {
+    return "y";
+  }
+  return "z";
+}
+
+function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
+  if (axis === "x") {
+    return vector.x;
+  }
+  if (axis === "y") {
+    return vector.y;
+  }
+  return vector.z;
+}
+
+function tempestTowerTopFanCenterZ(model: TempestModel): number {
+  if (model.filterLayout.type !== "side-filter-tower") {
+    return model.box.height - model.frame.outsideFlangeThickness - fanPreviewRearDepthMillimeters;
+  }
+  return model.box.height - model.filterLayout.topPlateThickness - fanPreviewRearDepthMillimeters;
+}
+
+function horizontalTempestFanLayout(model: TempestModel): Extract<TempestModel["fanLayout"], { readonly type: "horizontal-wall-fans" }> {
+  if (model.fanLayout.type !== "horizontal-wall-fans") {
+    throw new Error("horizontalTempestFanLayout: Expected horizontal Tempest fan layout");
+  }
+  return model.fanLayout;
+}
+
+const tempestPreviewWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
+
 // #######################################
 // Generated Panel Meshes
 // #######################################
+
+function createPreviewEdges(geometry: BufferGeometry, material: Material, name?: string): LineSegments {
+  const edges = new LineSegments(new EdgesGeometry(geometry), material);
+  if (name !== undefined) {
+    edges.name = name;
+  }
+  edges.renderOrder = 4;
+  return edges;
+}
+
+function createPreviewContourEdges(geometry: BufferGeometry, material: Material, name?: string): LineSegments {
+  const edges = new LineSegments(createPrintableMeshContourEdgeGeometry(geometry), material);
+  if (name !== undefined) {
+    edges.name = name;
+  }
+  edges.renderOrder = 4;
+  return edges;
+}
+
+export function createPrintableMeshContourEdgeGeometry(source: BufferGeometry): BufferGeometry {
+  source.computeBoundingBox();
+  const bounds = source.boundingBox;
+  if (bounds === null || bounds.isEmpty()) {
+    return new BufferGeometry();
+  }
+
+  const { min, max } = bounds;
+  const corners = [
+    new Vector3(min.x, min.y, min.z),
+    new Vector3(max.x, min.y, min.z),
+    new Vector3(max.x, max.y, min.z),
+    new Vector3(min.x, max.y, min.z),
+    new Vector3(min.x, min.y, max.z),
+    new Vector3(max.x, min.y, max.z),
+    new Vector3(max.x, max.y, max.z),
+    new Vector3(min.x, max.y, max.z),
+  ] as const;
+  const edges = [
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 0],
+    [4, 5],
+    [5, 6],
+    [6, 7],
+    [7, 4],
+    [0, 4],
+    [1, 5],
+    [2, 6],
+    [3, 7],
+  ] as const;
+  const positions: number[] = [];
+  for (const [start, end] of edges) {
+    positions.push(corners[start].x, corners[start].y, corners[start].z);
+    positions.push(corners[end].x, corners[end].y, corners[end].z);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  return geometry;
+}
+
+function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: number): number {
+  const [rx, ry, rz] = part.rotation;
+  const localPositiveNormal = new Vector3(0, 0, 1).applyEuler(new Euler(rx, ry, rz));
+  const assembledPosition = new Vector3(part.position[0], part.position[1], part.position[2]);
+  const localPositiveNormalPointsOutward = localPositiveNormal.dot(assembledPosition) > 0;
+  const panelHalfThickness = (materialThickness * sceneScale) / 2;
+  return localPositiveNormalPointsOutward
+    ? -(panelHalfThickness + fanPreviewRearDepth)
+    : panelHalfThickness + fanPreviewFrontDepth;
+}
 
 function createPanelGroup(
   part: AssemblyPanelPart,
@@ -2154,7 +2810,7 @@ function createPanelGroup(
   mesh.receiveShadow = true;
   group.add(mesh);
 
-  const edges = new LineSegments(new EdgesGeometry(geometry), edgeMaterial);
+  const edges = createPreviewEdges(geometry, edgeMaterial);
   group.add(edges);
 
   group.add(createPanelCutMarkGroup(panel, materialThickness, cutMarkMaterial, screwMarkMaterial));
@@ -2163,6 +2819,7 @@ function createPanelGroup(
   }
 
   if (showFans) {
+    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
     for (const cut of panel.cuts) {
       if (cut.type === "circle" && cut.role === "fan") {
         group.add(
@@ -2171,7 +2828,7 @@ function createPanelGroup(
             position: new Vector3(
               (cut.cx - panel.assemblyCenter.x) * sceneScale,
               (cut.cy - panel.assemblyCenter.y) * sceneScale,
-              materialThickness * sceneScale * 0.5 + 0.014,
+              fanCenterZ,
             ),
             radius: cut.radius * sceneScale,
             appearance: fanAppearance,
@@ -2412,24 +3069,61 @@ function createSeamGroup(seams: readonly AssemblyLineCue[], material: Material):
   return group;
 }
 
+function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
+  const positions: number[] = [];
+  for (const vertex of mesh.vertices) {
+    positions.push(vertex.x * sceneScale, vertex.z * sceneScale, vertex.y * sceneScale);
+  }
+
+  const indices: number[] = [];
+  for (const triangle of mesh.triangles) {
+    indices.push(triangle.v1, triangle.v2, triangle.v3);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createPrintableMeshPreviewGroup(
+  mesh: PrintableMesh,
+  material: Material,
+  edgeMaterial: Material,
+  name: string,
+  showPreviewEdges: boolean,
+): Group {
+  const geometry = createPrintableMeshGeometry(mesh);
+  const group = new Group();
+  group.name = `${name}-group`;
+
+  const body = new Mesh(geometry, material);
+  body.name = name;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  if (showPreviewEdges) {
+    const edges = createPreviewContourEdges(geometry, edgeMaterial, `${name}-edges`);
+    group.add(edges);
+  }
+
+  return group;
+}
+
 function createDimensionGroup(dimensions: readonly DimensionGuide[]): Group {
   const group = new Group();
   for (const guide of dimensions) {
-    const dimensionId = `dimension-${guide.label}`;
-    const from = toScenePosition(guide.from, [0, 0, 0], false);
-    const to = toScenePosition(guide.to, [0, 0, 0], false);
-    const guideGroup = new Group();
-    guideGroup.add(createDimensionLine([from, to], dimensionId));
-    for (const tick of createDimensionTicks(from, to)) {
-      guideGroup.add(createDimensionLine(tick, dimensionId));
-    }
-
-    const midpoint = from.clone().lerp(to, 0.5).add(toSceneOffset(guide.labelOffset));
-    const label = createTextSprite(guide.label, guide.measurement);
-    markDimensionObject(label, dimensionId);
-    label.position.copy(midpoint);
-    guideGroup.add(label);
-    group.add(guideGroup);
+    group.add(
+      createSceneDimensionGuide({
+        label: guide.label,
+        from: toScenePosition(guide.from, [0, 0, 0], false),
+        to: toScenePosition(guide.to, [0, 0, 0], false),
+        labelOffset: toSceneOffset(guide.labelOffset),
+        measurement: guide.measurement,
+      }),
+    );
   }
   return group;
 }
@@ -2446,7 +3140,7 @@ function createStaticReferenceDimensionGroup(bounds: Box3): Group {
       labelOffset: new Vector3(0, -padding * 0.65, padding * 0.35),
       measurement: {
         value: size.x / sceneScale,
-        description: "overall width",
+        description: "outside width",
       },
     }),
   );
@@ -2458,7 +3152,7 @@ function createStaticReferenceDimensionGroup(bounds: Box3): Group {
       labelOffset: new Vector3(padding * 0.85, 0, padding * 0.18),
       measurement: {
         value: size.y / sceneScale,
-        description: "overall height",
+        description: "outside height",
       },
       extensionLines: [
         [
@@ -2480,7 +3174,7 @@ function createStaticReferenceDimensionGroup(bounds: Box3): Group {
       labelOffset: new Vector3(-padding * 0.85, -padding * 0.65, 0),
       measurement: {
         value: size.z / sceneScale,
-        description: "overall depth",
+        description: "outside depth",
       },
     }),
   );
@@ -2512,11 +3206,27 @@ function createSceneDimensionGuide(input: {
     guideGroup.add(createDimensionLine(tick, dimensionId));
   }
 
+  const dimensionMidpoint = input.from.clone().lerp(input.to, 0.5);
+  const labelPosition = dimensionMidpoint.clone().add(input.labelOffset.clone().multiplyScalar(dimensionLabelOffsetMultiplier));
+  if (input.labelOffset.lengthSq() > 0.000001) {
+    guideGroup.add(createDimensionLine([closestPointOnSegment(input.from, input.to, labelPosition), labelPosition], dimensionId));
+  }
+
   const label = createTextSprite(input.label, input.measurement);
   markDimensionObject(label, dimensionId);
-  label.position.copy(input.from.clone().lerp(input.to, 0.5).add(input.labelOffset));
+  label.position.copy(labelPosition);
   guideGroup.add(label);
   return guideGroup;
+}
+
+function closestPointOnSegment(from: Vector3, to: Vector3, point: Vector3): Vector3 {
+  const segment = to.clone().sub(from);
+  const segmentLengthSquared = segment.lengthSq();
+  if (segmentLengthSquared === 0) {
+    return from.clone();
+  }
+  const t = clamp(point.clone().sub(from).dot(segment) / segmentLengthSquared, 0, 1);
+  return from.clone().addScaledVector(segment, t);
 }
 
 function createDimensionLine(points: [Vector3, Vector3], dimensionId: string): Line {
@@ -2549,30 +3259,30 @@ function createDimensionTicks(from: Vector3, to: Vector3): Array<[Vector3, Vecto
 
 function createTextSprite(label: string, measurement: DimensionMeasurement): Sprite {
   const canvas = document.createElement("canvas");
-  canvas.width = 768;
-  canvas.height = 220;
+  canvas.width = 704;
+  canvas.height = 188;
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("createTextSprite: Could not create canvas context");
   }
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "rgba(255, 253, 246, 0.96)";
-  context.fillRect(24, 24, 720, 168);
+  context.fillRect(10, 10, 684, 168);
   context.strokeStyle = "rgba(31, 111, 86, 0.72)";
-  context.lineWidth = 7;
-  context.strokeRect(24, 24, 720, 168);
+  context.lineWidth = 6;
+  context.strokeRect(10, 10, 684, 168);
   context.fillStyle = "#164d3d";
-  context.font = "900 96px Inter, Arial, sans-serif";
+  context.font = "900 104px Inter, Arial, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, 112, 108);
+  context.fillText(label, 88, 94);
   context.textAlign = "left";
   context.fillStyle = "#111817";
-  context.font = "900 58px Inter, Arial, sans-serif";
-  context.fillText(formatDimension(measurement.value), 198, 94);
+  context.font = "900 66px Inter, Arial, sans-serif";
+  context.fillText(formatDimension(measurement.value), 156, 78);
   context.fillStyle = "#667169";
-  context.font = "800 36px Inter, Arial, sans-serif";
-  context.fillText(measurement.description, 198, 142);
+  context.font = "800 40px Inter, Arial, sans-serif";
+  context.fillText(measurement.description, 156, 128);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
@@ -2654,24 +3364,27 @@ function createCutMarkMaterial(opacity: number): Material {
   });
 }
 
-function createWoodMaterial(transparent: boolean): Material {
-  const material = new MeshStandardMaterial({
+function createWoodMaterial(): Material {
+  return new MeshStandardMaterial({
     color: woodColor,
-    map: transparent ? undefined : createWoodTexture(),
+    map: createWoodTexture(),
     roughness: 0.72,
     metalness: 0.02,
-    transparent,
-    opacity: transparent ? 0.28 : 1,
-    depthWrite: !transparent,
-    polygonOffset: transparent,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
   });
-  if (transparent) {
-    material.side = DoubleSide;
-    material.forceSinglePass = true;
-  }
-  return material;
+}
+
+type PrintedPartMaterialOptions = {
+  readonly color: number;
+  readonly roughness: number;
+  readonly metalness: number;
+};
+
+function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshStandardMaterial {
+  return new MeshStandardMaterial({
+    color: options.color,
+    roughness: options.roughness,
+    metalness: options.metalness,
+  });
 }
 
 function createFilterMediaMaterial(opacity: number): Material {
@@ -2682,8 +3395,34 @@ function createFilterMediaMaterial(opacity: number): Material {
     transparent: true,
     opacity,
     transmission: 0.08,
+    side: DoubleSide,
     depthWrite: false,
   });
+}
+
+function createPrintedPartEdgeMaterial(partColor: number, opacity: number): LineBasicMaterial {
+  return new LineBasicMaterial({
+    color: relativeLuminance(partColor) < 0.42 ? 0x9fb6aa : 0x1c2722,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  });
+}
+
+function createFilterMediaEdgeMaterial(opacity: number): LineBasicMaterial {
+  return new LineBasicMaterial({
+    color: 0x6d7d68,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  });
+}
+
+function relativeLuminance(color: number): number {
+  const red = ((color >> 16) & 0xff) / 255;
+  const green = ((color >> 8) & 0xff) / 255;
+  const blue = (color & 0xff) / 255;
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
 function createWoodTexture(): CanvasTexture {
@@ -2761,6 +3500,38 @@ function toSceneOffset(offset: MillimeterVector3): Vector3 {
   return new Vector3(offset[0] * sceneScale, offset[1] * sceneScale, offset[2] * sceneScale);
 }
 
+function explodeGeneratedPreviewChildrenFromCenter(group: Group, exploded: boolean): void {
+  if (!exploded || group.children.length === 0) {
+    return;
+  }
+
+  const modelBounds = new Box3().setFromObject(group);
+  if (modelBounds.isEmpty()) {
+    return;
+  }
+
+  const modelCenter = modelBounds.getCenter(new Vector3());
+  const totalChildren = group.children.length;
+  group.children.forEach((child, index) => {
+    const childBounds = new Box3().setFromObject(child);
+    if (childBounds.isEmpty()) {
+      return;
+    }
+
+    const direction = childBounds.getCenter(new Vector3()).sub(modelCenter);
+    if (direction.lengthSq() < 0.000001) {
+      direction.copy(radialFallbackExplodeDirection(index, totalChildren));
+    }
+
+    child.position.add(direction.normalize().multiplyScalar(generatedPreviewExplodeDistance));
+  });
+}
+
+function radialFallbackExplodeDirection(index: number, total: number): Vector3 {
+  const angle = (Math.PI * 2 * index) / Math.max(1, total);
+  return new Vector3(Math.cos(angle), 0.35, Math.sin(angle));
+}
+
 function cameraPosition(preset: CameraPreset, maxDimension: number): Vector3 {
   if (preset === "front") {
     return new Vector3(0, maxDimension * 0.45, -maxDimension * 2.45);
@@ -2775,7 +3546,8 @@ function cameraPosition(preset: CameraPreset, maxDimension: number): Vector3 {
 }
 
 function cameraViewScale(layout: LayoutResult): number {
-  return modelViewScale(layout) / previewZoomForLayout(layout);
+  const dimensionFraming = layout.configuration.preview.enclosure.showDimensions ? dimensionPreviewFramingMultiplier : 1;
+  return (modelViewScale(layout) / previewZoomForLayout(layout)) * dimensionFraming;
 }
 
 function previewZoomForLayout(layout: LayoutResult): number {
@@ -3177,6 +3949,10 @@ function clamp(value: number, min: number, max: number): number {
 // Fan Models
 // #######################################
 
+// ##############################
+// Fan Assembly
+// ##############################
+
 function createFan({ axis, position, radius, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
   const fan = new Group();
   fan.position.copy(position);
@@ -3229,6 +4005,10 @@ function addProceduralFanRotor(rotor: Group, radius: number, appearance: FanAppe
 
 const fanCadModelCache = new Map<string, Promise<LoadedFanCadModel>>();
 
+// ##############################
+// CAD Fan Loading
+// ##############################
+
 function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Group {
   const core = new Group();
   core.name = "noctua-nf-a14-preview-cad";
@@ -3254,6 +4034,9 @@ function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Grou
 
   void loadFanCadModel(cadModel.assetUrl, appearance)
     .then((model) => {
+      if (core.userData["disposedPreviewObject"] === true) {
+        return;
+      }
       fallbackStatic.visible = false;
       fallbackRotor.visible = false;
       const scale = (radius * 2) / model.nominalDiameter;
@@ -3280,6 +4063,9 @@ function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Grou
       }
     })
     .catch(() => {
+      if (core.userData["disposedPreviewObject"] === true) {
+        return;
+      }
       fallbackStatic.visible = true;
       fallbackRotor.visible = true;
     });
@@ -3298,7 +4084,7 @@ async function loadFanCadModel(assetUrl: string, appearance: FanAppearance): Pro
       if (!response.ok) {
         throw new Error(`loadFanCadModel: Failed to load ${assetUrl}: ${response.status}`);
       }
-      return (await response.json()) as FanCadPreviewAsset;
+      return parseFanCadPreviewAsset(await response.json());
     })
     .then((asset) => createLoadedFanCadModel(asset, appearance))
     .catch((error) => {
@@ -3320,6 +4106,115 @@ function createLoadedFanCadModel(asset: FanCadPreviewAsset, appearance: FanAppea
   };
 }
 
+// ##############################
+// CAD Asset Parsing
+// ##############################
+
+function parseFanCadPreviewAsset(input: unknown): FanCadPreviewAsset {
+  const asset = expectRecord(input, "fan CAD preview asset");
+  const schema = asset["schema"];
+  const usage = asset["usage"];
+  const unit = asset["unit"];
+  if (schema !== "filterboxbuilder-fan-cad-preview-v1" || usage !== "preview-only-purchased-part-visual" || unit !== "millimeter") {
+    throw new Error("parseFanCadPreviewAsset: Unsupported fan CAD preview asset");
+  }
+
+  const bounds = expectRecord(asset["bounds"], "fan CAD preview bounds");
+  const meshes = asset["meshes"];
+  if (!Array.isArray(meshes) || meshes.length === 0) {
+    throw new Error("parseFanCadPreviewAsset: Expected at least one mesh");
+  }
+
+  return {
+    schema,
+    usage,
+    unit,
+    nominalDiameter: expectPositiveNumber(asset["nominalDiameter"], "nominalDiameter"),
+    bounds: {
+      center: expectNumberTuple(bounds["center"], 3, "bounds.center"),
+    },
+    meshes: meshes.map((mesh, index) => parseFanCadPreviewMesh(mesh, index)),
+  };
+}
+
+function parseFanCadPreviewMesh(input: unknown, meshIndex: number): FanCadPreviewMesh {
+  const mesh = expectRecord(input, `mesh ${meshIndex}`);
+  const name = mesh["name"];
+  if (typeof name !== "string" || name.trim() === "") {
+    throw new Error(`parseFanCadPreviewMesh: Mesh ${meshIndex} is missing a name`);
+  }
+
+  const position = expectNumberArray(mesh["position"], `${name}.position`);
+  if (position.length < 9 || position.length % 3 !== 0) {
+    throw new Error(`parseFanCadPreviewMesh: ${name}.position must contain complete x/y/z coordinates`);
+  }
+
+  const index = expectNonNegativeIntegerArray(mesh["index"], `${name}.index`);
+  if (index.length < 3 || index.length % 3 !== 0) {
+    throw new Error(`parseFanCadPreviewMesh: ${name}.index must contain complete triangles`);
+  }
+
+  const vertexCount = position.length / 3;
+  if (index.some((entry) => entry >= vertexCount)) {
+    throw new Error(`parseFanCadPreviewMesh: ${name}.index references a missing vertex`);
+  }
+
+  const color = mesh["color"] === undefined ? undefined : expectUnitColor(mesh["color"], `${name}.color`);
+  return color === undefined ? { name, position, index } : { name, color, position, index };
+}
+
+function expectRecord(input: unknown, label: string): Record<string, unknown> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error(`expectRecord: Expected ${label} to be an object`);
+  }
+  return input as Record<string, unknown>;
+}
+
+function expectPositiveNumber(input: unknown, label: string): number {
+  if (typeof input !== "number" || !Number.isFinite(input) || input <= 0) {
+    throw new Error(`expectPositiveNumber: Expected ${label} to be a positive number`);
+  }
+  return input;
+}
+
+function expectNumberArray(input: unknown, label: string): readonly number[] {
+  if (!Array.isArray(input) || !input.every((entry) => typeof entry === "number" && Number.isFinite(entry))) {
+    throw new Error(`expectNumberArray: Expected ${label} to contain only finite numbers`);
+  }
+  return input;
+}
+
+function expectNonNegativeIntegerArray(input: unknown, label: string): readonly number[] {
+  if (!Array.isArray(input) || !input.every((entry) => Number.isSafeInteger(entry) && entry >= 0)) {
+    throw new Error(`expectNonNegativeIntegerArray: Expected ${label} to contain only non-negative integer indexes`);
+  }
+  return input;
+}
+
+function expectNumberTuple(input: unknown, length: number, label: string): readonly [number, number, number] {
+  const tuple = expectNumberArray(input, label);
+  if (length !== 3 || tuple.length !== 3) {
+    throw new Error(`expectNumberTuple: Expected ${label} to contain exactly three coordinates`);
+  }
+  const [x, y, z] = tuple;
+  if (x === undefined || y === undefined || z === undefined) {
+    throw new Error(`expectNumberTuple: Expected ${label} to contain exactly three coordinates`);
+  }
+  return [x, y, z];
+}
+
+function expectUnitColor(input: unknown, label: string): readonly [number, number, number] {
+  const color = expectNumberTuple(input, 3, label);
+  if (color.some((channel) => channel < 0 || channel > 1)) {
+    throw new Error(`expectUnitColor: Expected ${label} channels to stay between 0 and 1`);
+  }
+  return color;
+}
+
+// ##############################
+// CAD Mesh Conversion
+// ##############################
+
 function createLoadedFanCadMesh(
   mesh: FanCadPreviewMesh,
   center: readonly [number, number, number],
@@ -3327,9 +4222,7 @@ function createLoadedFanCadMesh(
 ): LoadedFanCadMesh {
   const positions: number[] = [];
   for (let index = 0; index < mesh.position.length; index += 3) {
-    const sourceX = mesh.position[index] ?? 0;
-    const sourceY = mesh.position[index + 1] ?? 0;
-    const sourceZ = mesh.position[index + 2] ?? 0;
+    const { x: sourceX, y: sourceY, z: sourceZ } = fanCadVertexAt(mesh, index);
     positions.push(sourceX - center[0], sourceZ - center[2], sourceY - center[1]);
   }
 
@@ -3347,6 +4240,16 @@ function createLoadedFanCadMesh(
   };
 }
 
+function fanCadVertexAt(mesh: FanCadPreviewMesh, index: number): { readonly x: number; readonly y: number; readonly z: number } {
+  const x = mesh.position[index];
+  const y = mesh.position[index + 1];
+  const z = mesh.position[index + 2];
+  if (x === undefined || y === undefined || z === undefined) {
+    throw new Error(`fanCadVertexAt: ${mesh.name} has an incomplete vertex coordinate`);
+  }
+  return { x, y, z };
+}
+
 function meshColor(mesh: FanCadPreviewMesh, isRotor: boolean, appearance: FanAppearance): number {
   if (mesh.color !== undefined) {
     const [red, green, blue] = mesh.color;
@@ -3354,6 +4257,10 @@ function meshColor(mesh: FanCadPreviewMesh, isRotor: boolean, appearance: FanApp
   }
   return isRotor ? appearance.bladeColor : appearance.hubColor;
 }
+
+// ##############################
+// Procedural Fan Geometry
+// ##############################
 
 function collectFanRotors(root: Object3D, rotors: Object3D[]): void {
   root.traverse((child) => {
