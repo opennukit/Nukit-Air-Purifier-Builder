@@ -11,18 +11,6 @@ Browser-based builder for DIY clean-air purifier designs. It creates live 3D pre
 
 The laser-cut Nukit model and the 3D-printable Tempest model are intentionally separate. Their shared concepts are filter size, fan size, layout, and export workflow; their construction details can diverge.
 
-## FilterBoxBuilder Parity
-
-This app keeps the FilterBoxBuilder settings that are useful for safe builds and shareable fabrication output:
-
-- filter dimensions, fan size, filter count, wall fan banks, material thickness, kerf/fit allowance, screw holes, reference scale, and split-frame choice;
-- advanced finger-slot and dovetail tuning for builders who need to match a specific material or cutter;
-- legacy FilterBoxBuilder URL aliases such as `x`, `y`, `filter_height`, `fan_diameter`, `thickness`, `burn`, `screw_holes`, `FingerJoint_*`, and `DoveTail_*`.
-
-Some upstream-style controls are intentionally not first-path UI. The default workflow asks for design, parts, and print/laser setup first; advanced joint tuning is available in the Advanced tab. Fixed external designs stay fixed instead of pretending to be parametric.
-
-See [docs/filterboxbuilder-parity.md](./docs/filterboxbuilder-parity.md) for the kept/advanced/removed story.
-
 ## Requirements
 
 - Bun. The repo uses `bun.lock`, `bun test`, and Bun script execution.
