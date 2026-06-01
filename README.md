@@ -2,7 +2,7 @@
 
 Browser-based builder for DIY clean-air purifier designs. It creates live 3D previews, laser-cut SVG drawings, and printable 3MF kits from explicit parametric models.
 
-![Nukit Open Air Purifier preview](./public/nukit-open-air-purifier.jpg)
+![FilterBoxBuilder UI preview](./public/ui-filterboxbuilder.png)
 
 ## What It Builds
 

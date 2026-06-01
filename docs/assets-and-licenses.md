@@ -2,12 +2,12 @@
 
 The app code is GPL-3.0. Some browser preview assets have their own upstream sources and licenses.
 
-## App Hero Image
+## README Preview Image
 
-- `public/nukit-open-air-purifier.jpg`
-- Source: upstream Nukit Open Air Purifier repository.
-- Purpose: README/app preview image.
-- License: upstream Nukit GPL-3.0 project license.
+- `public/ui-filterboxbuilder.png`
+- Source: project UI screenshot.
+- Purpose: README preview image.
+- License: project GPL-3.0 license.
 
 ## Fan Preview Assets
 
