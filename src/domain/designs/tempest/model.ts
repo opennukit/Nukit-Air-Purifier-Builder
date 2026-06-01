@@ -81,6 +81,8 @@ export type TempestFrameSettings = {
   readonly wallThickness: Millimeters;
   readonly outsideFlangeThickness: Millimeters;
   readonly rim: Millimeters;
+  readonly chamferSize: Millimeters;
+  readonly towerCornerPostChamfer: Millimeters;
 };
 
 export type TempestFilterSlotSettings = {
@@ -99,6 +101,17 @@ export type TempestCordPassThrough =
       readonly wall: TempestWall;
       readonly side: "left" | "center" | "right";
       readonly cornerOffset: Millimeters;
+    };
+
+export type TempestAlignmentPinSettings =
+  | {
+      readonly type: "disabled";
+    }
+  | {
+      readonly type: "enabled";
+      readonly diameter: Millimeters;
+      readonly holeDepth: Millimeters;
+      readonly spacing: Millimeters;
     };
 
 export type TempestPrintBedVolume = {
@@ -129,6 +142,7 @@ export type TempestSettings = {
   readonly frame: TempestFrameSettings;
   readonly filterSlot: TempestFilterSlotSettings;
   readonly cordPassThrough: TempestCordPassThrough;
+  readonly alignmentPins: TempestAlignmentPinSettings;
   readonly printBed: TempestPrintBedVolume;
   readonly renderTarget: TempestRenderTarget;
 };
@@ -336,7 +350,7 @@ export const defaultTempestTowerFilter: TempestTowerFilterSize = {
   thickness: 45,
 };
 
-const defaultTempestHoneycombHexFlatToFlat = 24;
+const defaultTempestHoneycombHexFlatToFlat = 10;
 const defaultTempestHoneycombRibThickness = 1.6;
 
 export const defaultTempestSettings: TempestSettings = {
@@ -363,6 +377,8 @@ export const defaultTempestSettings: TempestSettings = {
     wallThickness: 5,
     outsideFlangeThickness: 10,
     rim: 30,
+    chamferSize: 2,
+    towerCornerPostChamfer: 55,
   },
   filterSlot: {
     wall: "back",
@@ -375,6 +391,12 @@ export const defaultTempestSettings: TempestSettings = {
     wall: "right",
     side: "right",
     cornerOffset: 17,
+  },
+  alignmentPins: {
+    type: "enabled",
+    diameter: 1.8,
+    holeDepth: 10,
+    spacing: 30,
   },
   printBed: {
     width: 256,
@@ -430,6 +452,7 @@ function normalizeTempestSettings(settings: TempestSettings): TempestSettings {
       endMargin: finiteNonNegative(settings.filterSlot.endMargin, defaultTempestSettings.filterSlot.endMargin),
     },
     cordPassThrough: normalizeTempestCordPassThrough(settings.cordPassThrough),
+    alignmentPins: normalizeTempestAlignmentPins(settings.alignmentPins),
     printBed: {
       width: finitePositive(settings.printBed.width, defaultTempestSettings.printBed.width),
       depth: finitePositive(settings.printBed.depth, defaultTempestSettings.printBed.depth),
@@ -498,6 +521,8 @@ function normalizeTempestFrameSettings(frame: TempestFrameSettings): TempestFram
     wallThickness: finitePositive(frame.wallThickness, defaultTempestSettings.frame.wallThickness),
     outsideFlangeThickness: finitePositive(frame.outsideFlangeThickness, defaultTempestSettings.frame.outsideFlangeThickness),
     rim: finiteNonNegative(frame.rim, defaultTempestSettings.frame.rim),
+    chamferSize: finiteNonNegative(frame.chamferSize, defaultTempestSettings.frame.chamferSize),
+    towerCornerPostChamfer: finiteNonNegative(frame.towerCornerPostChamfer, defaultTempestSettings.frame.towerCornerPostChamfer),
   };
 }
 
@@ -510,6 +535,19 @@ function normalizeTempestCordPassThrough(cord: TempestCordPassThrough): TempestC
     ...cord,
     diameter: finitePositive(cord.diameter, fallback.diameter),
     cornerOffset: finiteNonNegative(cord.cornerOffset, fallback.cornerOffset),
+  };
+}
+
+function normalizeTempestAlignmentPins(alignmentPins: TempestAlignmentPinSettings): TempestAlignmentPinSettings {
+  if (alignmentPins.type === "disabled") {
+    return alignmentPins;
+  }
+  const fallback = defaultTempestSettings.alignmentPins.type === "enabled" ? defaultTempestSettings.alignmentPins : alignmentPins;
+  return {
+    type: "enabled",
+    diameter: finiteNonNegative(alignmentPins.diameter, fallback.diameter),
+    holeDepth: finiteNonNegative(alignmentPins.holeDepth, fallback.holeDepth),
+    spacing: finiteNonNegative(alignmentPins.spacing, fallback.spacing),
   };
 }
 

@@ -4272,7 +4272,7 @@ function collectFanRotors(root: Object3D, rotors: Object3D[]): void {
 
 function createFanFrame(radius: number, appearance: FanAppearance): Group {
   const frame = new Group();
-  const size = radius * 2.15;
+  const size = proceduralFanFrameOuterSize(radius);
   const barWidth = radius * 0.26;
   const depth = 0.032;
   const material = new MeshStandardMaterial({ color: appearance.frameColor, roughness: 0.62, metalness: 0.08 });
@@ -4297,6 +4297,10 @@ function createFanFrame(radius: number, appearance: FanAppearance): Group {
     }
   }
   return frame;
+}
+
+export function proceduralFanFrameOuterSize(radius: number): number {
+  return radius * 2;
 }
 
 function createFanShroud(radius: number, appearance: FanAppearance): Group {

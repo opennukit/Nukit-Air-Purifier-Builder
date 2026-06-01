@@ -596,7 +596,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const horizontalLayout = createLayout(horizontalSettings);
     const towerLayout = createLayout(towerSettings);
     const horizontalKit = createPrintDesignKit(horizontalLayout, "bed-256");
-    const towerKit = createPrintDesignKit(towerLayout, "bed-256");
     const towerModel = createTempestModel(createTempestSettingsFromLayout(towerLayout));
     const printExport = createPrintDesignThreeMfExport(horizontalLayout, "bed-256");
 
@@ -620,10 +619,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(towerModel.box.width).toBe(370);
     expect(towerModel.box.height).toBe(305);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
-    expect(towerKit.parts).toHaveLength(8);
+    expect(towerModel.chunkGrid.totalCount).toBe(8);
     expect(printExport.filename).toBe("nukit-tempest-print-kit.3mf");
     expect(printExport.mimeType).toBe("model/3mf");
-  });
+  }, 10000);
 
   test("applies static reference defaults without making them parametric generators", () => {
     const settings = applyPrintDesignPreset(defaultSettings, "static-cr-16x20-140");

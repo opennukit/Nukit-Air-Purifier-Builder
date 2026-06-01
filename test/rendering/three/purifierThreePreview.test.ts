@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Box3, BufferGeometry, Float32BufferAttribute, Vector3 } from "three";
 import {
   createPrintableMeshContourEdgeGeometry,
+  proceduralFanFrameOuterSize,
   previewInteriorShiftForBounds,
 } from "@/rendering/three/purifierThreePreview";
 
@@ -76,5 +77,10 @@ describe("Purifier 3D preview", () => {
         inset: 0.5,
       }),
     ).toBe(0);
+  });
+
+  test("keeps procedural fan frame size on the nominal fan diameter", () => {
+    expect(proceduralFanFrameOuterSize(70)).toBe(140);
+    expect(proceduralFanFrameOuterSize(60)).toBe(120);
   });
 });

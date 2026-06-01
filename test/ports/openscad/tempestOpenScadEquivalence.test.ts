@@ -48,10 +48,19 @@ type Bounds3 = {
   readonly maxZ: number;
 };
 
+type MeshPoint = {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+};
+
+type TriangleVertices = readonly [MeshPoint, MeshPoint, MeshPoint];
+
 type MeshMetrics = {
   readonly bounds: Bounds3;
   readonly vertexCount: number;
   readonly triangleCount: number;
+  readonly triangleVertices: readonly TriangleVertices[];
 };
 
 type OpenScadTempestEcho = {
@@ -95,6 +104,18 @@ const fourFilterTowerCase: OpenScadTempestCase = {
     arrangement: {
       type: "four-side-filter-tower",
       filter: defaultTempestTowerFilter,
+    },
+  },
+};
+
+const customChamferTowerCase: OpenScadTempestCase = {
+  name: "four-filter tower with custom chamfers",
+  settings: {
+    ...fourFilterTowerCase.settings,
+    frame: {
+      ...defaultTempestSettings.frame,
+      chamferSize: 4,
+      towerCornerPostChamfer: 35,
     },
   },
 };
@@ -178,23 +199,85 @@ describe("Tempest OpenSCAD oracle equivalence", () => {
     expect(oracle.fanBodyDepth).toBeCloseTo(model.fanLayout.bodyDepth);
   });
 
-  for (const testCase of [defaultTwoFilterCase, fourFilterTowerCase]) {
-    openScadTest(`keeps the printable mesh inside the same outside envelope as OpenSCAD for ${testCase.name}`, () => {
-      const oracleMesh = renderOpenScadTempestMesh(testCase);
-      const localKit = createTempestPrintableKit(testCase.settings, "unsplit");
-      const localPart = localKit.parts[0];
-      if (localPart === undefined || localKit.parts.length !== 1) {
-        throw new Error("Expected unsplit Tempest kit to produce one printable part");
-      }
+  test("maps non-default frame and alignment-pin settings into OpenSCAD definitions", () => {
+    const definitions = definitionMap(
+      openScadDefinitionsForSettings({
+        ...customChamferTowerCase.settings,
+        alignmentPins: {
+          type: "enabled",
+          diameter: 2.4,
+          holeDepth: 12,
+          spacing: 45,
+        },
+      }),
+    );
 
-      expect(oracleMesh.vertexCount).toBeGreaterThan(0);
-      expect(oracleMesh.triangleCount).toBeGreaterThan(0);
-      expectNumberArrayClose(
-        sortedSize(boundsSize(oracleMesh.bounds)),
-        sortedSize(boundsSize(printableMeshMetrics(localPart.mesh).bounds)),
-        0.01,
-      );
-    });
+    expect(definitions.get("Chamfer_size")).toBe(4);
+    expect(definitions.get("Corner_post_chamfer")).toBe(35);
+    expect(definitions.get("Pin_diameter")).toBe(2.4);
+    expect(definitions.get("Pin_hole_depth")).toBe(12);
+    expect(definitions.get("Pin_spacing")).toBe(45);
+  });
+
+  test("maps disabled alignment pins into OpenSCAD's diameter-zero convention", () => {
+    const definitions = definitionMap(
+      openScadDefinitionsForSettings({
+        ...defaultTempestSettings,
+        alignmentPins: { type: "disabled" },
+      }),
+    );
+
+    expect(definitions.get("Pin_diameter")).toBe(0);
+    expect(definitions.get("Pin_hole_depth")).toBe(0);
+    expect(definitions.get("Pin_spacing")).toBe(0);
+  });
+
+  test("maps the default honeycomb opening to the OpenSCAD reference density", () => {
+    const definitions = definitionMap(openScadDefinitionsForSettings(defaultTempestSettings));
+
+    expect(definitions.get("Hex_grill")).toBe(true);
+    expect(definitions.get("Hex_size")).toBe(10);
+    expect(definitions.get("Hex_spacing")).toBe(1.6);
+  });
+
+  for (const testCase of [defaultTwoFilterCase, fourFilterTowerCase, customChamferTowerCase]) {
+    openScadTest(
+      `matches the printable mesh outside envelope and tower corner shape for ${testCase.name}`,
+      () => {
+        const oracleMesh = renderOpenScadTempestMesh({
+          ...testCase,
+          settings: sourceEnvelopePrintBedSettings(testCase.settings),
+        });
+        const localKit = createTempestPrintableKit(testCase.settings, "unsplit");
+        const localPart = localKit.parts[0];
+        if (localPart === undefined || localKit.parts.length !== 1) {
+          throw new Error("Expected unsplit Tempest kit to produce one printable part");
+        }
+        const localMesh = printableMeshMetrics(localPart.mesh);
+
+        expect(oracleMesh.vertexCount).toBeGreaterThan(0);
+        expect(oracleMesh.triangleCount).toBeGreaterThan(0);
+        expectNumberArrayClose(
+          sortedSize(boundsSize(oracleMesh.bounds)),
+          sortedSize(boundsSize(localMesh.bounds)),
+          0.01,
+        );
+
+        if (testCase.settings.arrangement.type === "four-side-filter-tower") {
+          expectTowerCornerChamferShape(
+            localMesh,
+            oracleMesh,
+            {
+              width: localPart.width,
+              depth: localPart.depth,
+              height: localPart.height,
+            },
+            testCase.settings.frame.towerCornerPostChamfer,
+          );
+        }
+      },
+      20000,
+    );
   }
 });
 
@@ -302,9 +385,12 @@ function openScadDefinitionsForSettings(settings: TempestSettings): readonly Ope
     { name: "Rim", value: settings.frame.rim },
     { name: "Wall_thickness", value: settings.frame.wallThickness },
     { name: "Outside_flange_thickness", value: settings.frame.outsideFlangeThickness },
+    { name: "Chamfer_size", value: settings.frame.chamferSize },
+    { name: "Corner_post_chamfer", value: settings.frame.towerCornerPostChamfer },
     { name: "Slot_wall", value: openScadSlotWall(settings.filterSlot.wall) },
     { name: "Slot_clearance", value: settings.filterSlot.clearance },
     { name: "Slot_end_margin", value: settings.filterSlot.endMargin },
+    ...openScadAlignmentPinDefinitions(settings),
     { name: "Bed_x", value: settings.printBed.width },
     { name: "Bed_y", value: settings.printBed.depth },
     { name: "Bed_z", value: settings.printBed.height },
@@ -325,6 +411,21 @@ function openScadDefinitionsForSettings(settings: TempestSettings): readonly Ope
           { name: "Cord_hole_corner_offset", value: settings.cordPassThrough.cornerOffset },
         ]
       : [{ name: "Cord_hole_wall", value: "none" }]),
+  ];
+}
+
+function openScadAlignmentPinDefinitions(settings: TempestSettings): readonly OpenScadDefine[] {
+  if (settings.alignmentPins.type === "disabled") {
+    return [
+      { name: "Pin_diameter", value: 0 },
+      { name: "Pin_hole_depth", value: 0 },
+      { name: "Pin_spacing", value: 0 },
+    ];
+  }
+  return [
+    { name: "Pin_diameter", value: settings.alignmentPins.diameter },
+    { name: "Pin_hole_depth", value: settings.alignmentPins.holeDepth },
+    { name: "Pin_spacing", value: settings.alignmentPins.spacing },
   ];
 }
 
@@ -365,6 +466,22 @@ function formatOpenScadValue(value: string | number | boolean): string {
     return JSON.stringify(value);
   }
   return typeof value === "boolean" ? String(value) : String(value);
+}
+
+function sourceEnvelopePrintBedSettings(settings: TempestSettings): TempestSettings {
+  const model = createTempestModel(settings);
+  return {
+    ...model.settings,
+    printBed: {
+      width: model.box.width,
+      depth: model.box.depth,
+      height: model.box.height,
+    },
+  };
+}
+
+function definitionMap(definitions: readonly OpenScadDefine[]): ReadonlyMap<string, OpenScadDefine["value"]> {
+  return new Map(definitions.map((definition) => [definition.name, definition.value]));
 }
 
 // #######################################
@@ -451,7 +568,7 @@ function requiredNumberAt(numbers: readonly number[], index: number, label: stri
 // #######################################
 
 function asciiStlMetrics(stl: string): MeshMetrics {
-  const vertices: Array<{ readonly x: number; readonly y: number; readonly z: number }> = [];
+  const vertices: MeshPoint[] = [];
   for (const match of stl.matchAll(/vertex\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)/gi)) {
     vertices.push({
       x: Number(match[1]),
@@ -466,6 +583,7 @@ function asciiStlMetrics(stl: string): MeshMetrics {
     bounds: boundsForVertices(vertices),
     vertexCount: vertices.length,
     triangleCount: vertices.length / 3,
+    triangleVertices: triangleVerticesFromFlatVertices(vertices),
   };
 }
 
@@ -474,10 +592,32 @@ function printableMeshMetrics(mesh: PrintableMesh): MeshMetrics {
     bounds: boundsForVertices(mesh.vertices),
     vertexCount: mesh.vertices.length,
     triangleCount: mesh.triangles.length,
+    triangleVertices: mesh.triangles.map((triangle) => printableTriangleVertices(mesh, triangle)),
   };
 }
 
-function boundsForVertices(vertices: readonly { readonly x: number; readonly y: number; readonly z: number }[]): Bounds3 {
+function triangleVerticesFromFlatVertices(vertices: readonly MeshPoint[]): readonly TriangleVertices[] {
+  if (vertices.length % 3 !== 0) {
+    throw new Error(`triangleVerticesFromFlatVertices: Expected STL vertex count to be divisible by 3, got ${vertices.length}`);
+  }
+  const triangles: TriangleVertices[] = [];
+  for (let index = 0; index < vertices.length; index += 3) {
+    const first = vertices[index];
+    const second = vertices[index + 1];
+    const third = vertices[index + 2];
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error("triangleVerticesFromFlatVertices: Missing triangle vertex");
+    }
+    triangles.push([first, second, third]);
+  }
+  return triangles;
+}
+
+function printableTriangleVertices(mesh: PrintableMesh, triangle: PrintableMesh["triangles"][number]): TriangleVertices {
+  return [mesh.vertices[triangle.v1], mesh.vertices[triangle.v2], mesh.vertices[triangle.v3]];
+}
+
+function boundsForVertices(vertices: readonly MeshPoint[]): Bounds3 {
   return {
     minX: Math.min(...vertices.map((vertex) => vertex.x)),
     minY: Math.min(...vertices.map((vertex) => vertex.y)),
@@ -500,9 +640,117 @@ function sortedSize(size: Size3): readonly number[] {
   return [size.width, size.depth, size.height].sort((left, right) => left - right);
 }
 
+type TowerCornerName = "front-left" | "front-right" | "back-left" | "back-right";
+
+type TowerCornerChamferFaceSpan = {
+  readonly corner: TowerCornerName;
+  readonly triangleCount: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+};
+
+function expectTowerCornerChamferShape(actual: MeshMetrics, expected: MeshMetrics, envelope: Size3, cornerPostChamfer: number): void {
+  expect(rectangularCornerVertexNames(actual, envelope)).toEqual(rectangularCornerVertexNames(expected, envelope));
+  expect(rectangularCornerVertexNames(expected, envelope)).toEqual([]);
+
+  const actualSpans = towerCornerChamferFaceSpans(actual, envelope, cornerPostChamfer);
+  const expectedSpans = towerCornerChamferFaceSpans(expected, envelope, cornerPostChamfer);
+  expect(actualSpans).toHaveLength(expectedSpans.length);
+  actualSpans.forEach((actualSpan, index) => {
+    const expectedSpan = expectedSpans[index];
+    if (expectedSpan === undefined) {
+      throw new Error("expectTowerCornerChamferShape: Expected matching chamfer span counts");
+    }
+
+    expect(actualSpan.corner).toBe(expectedSpan.corner);
+    expect(actualSpan.triangleCount).toBeGreaterThanOrEqual(2);
+    expect(expectedSpan.triangleCount).toBeGreaterThanOrEqual(2);
+    expectNumberClose(expectedSpan.minZ, 0, 0.01);
+    expectNumberClose(expectedSpan.maxZ, envelope.height, 0.01);
+    expectNumberClose(actualSpan.minZ, expectedSpan.minZ, 0.01);
+    expectNumberClose(actualSpan.maxZ, expectedSpan.maxZ, 0.01);
+  });
+}
+
+function rectangularCornerVertexNames(mesh: MeshMetrics, envelope: Size3): readonly TowerCornerName[] {
+  const vertices = mesh.triangleVertices.flat();
+  return towerRectangleCorners(envelope)
+    .filter((corner) => vertices.some((vertex) => closeTo(vertex.x, corner.x) && closeTo(vertex.y, corner.y)))
+    .map((corner) => corner.name);
+}
+
+function towerCornerChamferFaceSpans(mesh: MeshMetrics, envelope: Size3, cornerPostChamfer: number): readonly TowerCornerChamferFaceSpan[] {
+  return towerCornerChamferPlanes(envelope, cornerPostChamfer).map((plane) => {
+    const zValues: number[] = [];
+    let triangleCount = 0;
+    for (const triangle of mesh.triangleVertices) {
+      if (triangle.every((vertex) => plane.contains(vertex))) {
+        triangleCount += 1;
+        zValues.push(...triangle.map((vertex) => vertex.z));
+      }
+    }
+
+    return {
+      corner: plane.corner,
+      triangleCount,
+      minZ: zValues.length === 0 ? Number.NaN : Math.min(...zValues),
+      maxZ: zValues.length === 0 ? Number.NaN : Math.max(...zValues),
+    };
+  });
+}
+
+function towerRectangleCorners(envelope: Size3): readonly { readonly name: TowerCornerName; readonly x: number; readonly y: number }[] {
+  return [
+    { name: "front-left", x: 0, y: 0 },
+    { name: "front-right", x: envelope.width, y: 0 },
+    { name: "back-left", x: 0, y: envelope.depth },
+    { name: "back-right", x: envelope.width, y: envelope.depth },
+  ];
+}
+
+function towerCornerChamferPlanes(
+  envelope: Size3,
+  cornerPostChamfer: number,
+): readonly { readonly corner: TowerCornerName; readonly contains: (vertex: MeshPoint) => boolean }[] {
+  return [
+    {
+      corner: "front-left",
+      contains: (vertex) =>
+        closeTo(vertex.x + vertex.y, cornerPostChamfer) &&
+        vertex.x <= cornerPostChamfer + 0.01 &&
+        vertex.y <= cornerPostChamfer + 0.01,
+    },
+    {
+      corner: "front-right",
+      contains: (vertex) =>
+        closeTo(envelope.width - vertex.x + vertex.y, cornerPostChamfer) &&
+        vertex.x >= envelope.width - cornerPostChamfer - 0.01 &&
+        vertex.y <= cornerPostChamfer + 0.01,
+    },
+    {
+      corner: "back-left",
+      contains: (vertex) =>
+        closeTo(vertex.x + envelope.depth - vertex.y, cornerPostChamfer) &&
+        vertex.x <= cornerPostChamfer + 0.01 &&
+        vertex.y >= envelope.depth - cornerPostChamfer - 0.01,
+    },
+    {
+      corner: "back-right",
+      contains: (vertex) =>
+        closeTo(envelope.width - vertex.x + envelope.depth - vertex.y, cornerPostChamfer) &&
+        vertex.x >= envelope.width - cornerPostChamfer - 0.01 &&
+        vertex.y >= envelope.depth - cornerPostChamfer - 0.01,
+    },
+  ];
+}
+
 // #######################################
 // Assertions
 // #######################################
+
+function expectNumberClose(actual: number, expected: number, tolerance = 0.001): void {
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+}
 
 function expectSizeClose(actual: Size3, expected: Size3, tolerance = 0.001): void {
   expect(Math.abs(actual.width - expected.width)).toBeLessThanOrEqual(tolerance);
@@ -519,4 +767,8 @@ function expectNumberArrayClose(actual: readonly number[], expected: readonly nu
     }
     expect(Math.abs(value - expectedValue)).toBeLessThanOrEqual(tolerance);
   });
+}
+
+function closeTo(actual: number, expected: number, tolerance = 0.01): boolean {
+  return Math.abs(actual - expected) <= tolerance;
 }

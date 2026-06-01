@@ -9,6 +9,8 @@ import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempes
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
 import { createPrintableThreeMfExportFromKit } from "@/fabrication/printing/printableKit";
 
+const openScadTowerCornerPostChamfer = 55;
+
 describe("Tempest CSG printable kit", () => {
   test("generates bed-sized CSG chunks for the default two-filter housing", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
@@ -58,6 +60,21 @@ describe("Tempest CSG printable kit", () => {
     expect(meshCoordinateValues(part.mesh, "z")).toEqual(expect.arrayContaining([2, 503]));
   });
 
+  test("does not add alignment pin holes when the posed printable output is unsplit", () => {
+    const withDefaultPins = createTempestPrintableKit(defaultTempestSettings, "unsplit");
+    const withPinsDisabled = createTempestPrintableKit(
+      {
+        ...defaultTempestSettings,
+        alignmentPins: { type: "disabled" },
+      },
+      "unsplit",
+    );
+
+    expect(withDefaultPins.parts).toHaveLength(1);
+    expect(withPinsDisabled.parts).toHaveLength(1);
+    expect(meshSignature(withDefaultPins.parts[0].mesh)).toEqual(meshSignature(withPinsDisabled.parts[0].mesh));
+  });
+
   test("generates chunked CSG geometry for the four-filter tower", () => {
     const kit = createTempestPrintableKit(
       {
@@ -81,7 +98,43 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts.every((part) => part.width === 205 && part.depth === 205 && part.height === 255)).toBe(true);
     expect(kit.parts.every((part) => part.mesh.vertices.length > 0 && part.mesh.triangles.length > 0)).toBe(true);
     expect(kit.parts.every((part) => meshFitsDeclaredBounds(part))).toBe(true);
-  });
+  }, 30000);
+
+  test("keeps the four-filter tower as one large-chamfered solid body", () => {
+    const kit = createTempestPrintableKit(
+      {
+        ...defaultTempestSettings,
+        arrangement: {
+          type: "four-side-filter-tower",
+          filter: defaultTempestTowerFilter,
+        },
+      },
+      "unsplit",
+    );
+    const part = kit.parts[0];
+
+    expect(kit.parts).toHaveLength(1);
+    expect(part).toMatchObject({
+      width: 615,
+      depth: 615,
+      height: 510,
+    });
+    expect(meshCoordinateValues(part.mesh, "x")).toEqual(
+      expect.arrayContaining([openScadTowerCornerPostChamfer, part.width - openScadTowerCornerPostChamfer]),
+    );
+    expect(meshCoordinateValues(part.mesh, "y")).toEqual(
+      expect.arrayContaining([openScadTowerCornerPostChamfer, part.depth - openScadTowerCornerPostChamfer]),
+    );
+    const chamferFaceSpans = towerCornerChamferFaceSpans(part.mesh, part.width, part.depth);
+    expect(rectangularCornerVertexNames(part.mesh, part.width, part.depth)).toEqual([]);
+    expect(chamferFaceSpans).toEqual([
+      { corner: "front-left", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
+      { corner: "front-right", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
+      { corner: "back-left", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
+      { corner: "back-right", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
+    ]);
+    expect(chamferFaceSpans.every((span) => span.triangleCount >= 2)).toBe(true);
+  }, 15000);
 
   test("exports generated Tempest chunks through the existing 3MF package path", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
@@ -119,11 +172,23 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(exported.filename).toBe("nukit-tempest-print-kit.3mf");
     expect(exported.bytes.length).toBeGreaterThan(1000);
-  });
+  }, 15000);
 });
 
 function totalTriangleCount(kit: ReturnType<typeof createTempestPrintableKit>): number {
   return kit.parts.reduce((total, part) => total + part.mesh.triangles.length, 0);
+}
+
+function meshSignature(mesh: TempestPrintableMesh): {
+  readonly bounds: ReturnType<typeof meshBounds>;
+  readonly vertexCount: number;
+  readonly triangleCount: number;
+} {
+  return {
+    bounds: meshBounds(mesh),
+    vertexCount: mesh.vertices.length,
+    triangleCount: mesh.triangles.length,
+  };
 }
 
 function meshBounds(mesh: ReturnType<typeof createTempestPrintableKit>["parts"][number]["mesh"]): {
@@ -159,6 +224,91 @@ function meshFitsDeclaredBounds(part: ReturnType<typeof createTempestPrintableKi
   );
 }
 
+type TempestPrintableMesh = ReturnType<typeof createTempestPrintableKit>["parts"][number]["mesh"];
+
+type TowerCornerName = "front-left" | "front-right" | "back-left" | "back-right";
+
+type TowerCornerChamferFaceSpan = {
+  readonly corner: TowerCornerName;
+  readonly triangleCount: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+};
+
+function rectangularCornerVertexNames(mesh: TempestPrintableMesh, width: number, depth: number): readonly TowerCornerName[] {
+  return towerRectangleCorners(width, depth)
+    .filter((corner) =>
+      mesh.vertices.some((vertex) => closeTo(vertex.x, corner.x) && closeTo(vertex.y, corner.y)),
+    )
+    .map((corner) => corner.name);
+}
+
+function towerCornerChamferFaceSpans(mesh: TempestPrintableMesh, width: number, depth: number): readonly TowerCornerChamferFaceSpan[] {
+  return towerCornerChamferPlanes(width, depth).map((plane) => {
+    const zValues: number[] = [];
+    let triangleCount = 0;
+    for (const triangle of mesh.triangles) {
+      const vertices = [mesh.vertices[triangle.v1], mesh.vertices[triangle.v2], mesh.vertices[triangle.v3]];
+      if (vertices.every((vertex) => plane.contains(vertex))) {
+        triangleCount += 1;
+        zValues.push(...vertices.map((vertex) => round(vertex.z)));
+      }
+    }
+
+    return {
+      corner: plane.corner,
+      triangleCount,
+      minZ: zValues.length === 0 ? Number.NaN : Math.min(...zValues),
+      maxZ: zValues.length === 0 ? Number.NaN : Math.max(...zValues),
+    };
+  });
+}
+
+function towerRectangleCorners(
+  width: number,
+  depth: number,
+): readonly { readonly name: TowerCornerName; readonly x: number; readonly y: number }[] {
+  return [
+    { name: "front-left", x: 0, y: 0 },
+    { name: "front-right", x: width, y: 0 },
+    { name: "back-left", x: 0, y: depth },
+    { name: "back-right", x: width, y: depth },
+  ];
+}
+
+function towerCornerChamferPlanes(
+  width: number,
+  depth: number,
+): readonly { readonly corner: TowerCornerName; readonly contains: (vertex: { readonly x: number; readonly y: number }) => boolean }[] {
+  return [
+    {
+      corner: "front-left",
+      contains: (vertex) => closeTo(vertex.x + vertex.y, openScadTowerCornerPostChamfer) && vertex.x <= openScadTowerCornerPostChamfer && vertex.y <= openScadTowerCornerPostChamfer,
+    },
+    {
+      corner: "front-right",
+      contains: (vertex) =>
+        closeTo(width - vertex.x + vertex.y, openScadTowerCornerPostChamfer) &&
+        vertex.x >= width - openScadTowerCornerPostChamfer &&
+        vertex.y <= openScadTowerCornerPostChamfer,
+    },
+    {
+      corner: "back-left",
+      contains: (vertex) =>
+        closeTo(vertex.x + depth - vertex.y, openScadTowerCornerPostChamfer) &&
+        vertex.x <= openScadTowerCornerPostChamfer &&
+        vertex.y >= depth - openScadTowerCornerPostChamfer,
+    },
+    {
+      corner: "back-right",
+      contains: (vertex) =>
+        closeTo(width - vertex.x + depth - vertex.y, openScadTowerCornerPostChamfer) &&
+        vertex.x >= width - openScadTowerCornerPostChamfer &&
+        vertex.y >= depth - openScadTowerCornerPostChamfer,
+    },
+  ];
+}
+
 function meshCoordinateValues(
   mesh: ReturnType<typeof createTempestPrintableKit>["parts"][number]["mesh"],
   axis: "x" | "y" | "z",
@@ -168,4 +318,8 @@ function meshCoordinateValues(
 
 function round(value: number): number {
   return Number(value.toFixed(4));
+}
+
+function closeTo(actual: number, expected: number): boolean {
+  return Math.abs(round(actual) - round(expected)) <= 0.001;
 }

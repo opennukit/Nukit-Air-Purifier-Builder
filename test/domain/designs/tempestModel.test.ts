@@ -10,6 +10,11 @@ describe("Tempest OpenSCAD model port", () => {
   test("ports the two-filter OpenSCAD defaults into deterministic dimensions and fan placement", () => {
     const model = createTempestModel();
 
+    expect(model.settings.fan.opening).toEqual({
+      type: "honeycomb",
+      hexFlatToFlat: 10,
+      ribThickness: 1.6,
+    });
     expect(model.box).toEqual({
       width: 505,
       depth: 505,
@@ -211,9 +216,16 @@ describe("Tempest OpenSCAD model port", () => {
         depth: Number.NaN,
         height: Number.POSITIVE_INFINITY,
       },
+      alignmentPins: {
+        type: "enabled",
+        diameter: Number.NaN,
+        holeDepth: Number.NEGATIVE_INFINITY,
+        spacing: -4,
+      },
     });
 
     expect(model.settings.printBed).toEqual(defaultTempestSettings.printBed);
+    expect(model.settings.alignmentPins).toEqual(defaultTempestSettings.alignmentPins);
     expect(model.chunkGrid).toEqual({
       countX: 2,
       countY: 2,
