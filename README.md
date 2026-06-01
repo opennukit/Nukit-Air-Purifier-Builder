@@ -1,15 +1,19 @@
 # Nukit Open Air Purifier Builder
 
-Browser-based generator for Nukit-style open air purifier builds. It creates live 3D previews, laser-cut SVG drawings, and printable 3MF kits from one shared parametric model.
+Browser-based builder for DIY clean-air purifier designs. It creates live 3D previews, laser-cut SVG drawings, and printable 3MF kits from explicit parametric models.
 
 ![Nukit Open Air Purifier preview](./public/nukit-open-air-purifier.jpg)
 
 ## What It Builds
 
-- Parametric Nukit open-air filter boxes using HVAC filters, PC fans, laser-cut panels, and optional printable split-frame parts.
-- Generated printable kits for desktop printer beds, including panel tiling and dovetail glue keys.
-- Specialized printable references: a generated modular Corsi-Rosenthal box, a generated donut HEPA fan adaptor, and curated static Printables references where the source design is intentionally fixed.
+- Laser-cut Nukit Open Air boxes using HVAC filters, PC fans, finger-jointed panels, kerf fit, and SVG export.
+- 3D-printable Nukit Tempest boxes from a separate OpenSCAD-ported model, including 1-filter, 2-filter, and 4-side-filter layouts.
+- Desktop-printable 3MF kits with print-bed chunking, alignment-pin holes, split plates, and previewed print parts.
+- Generated printable references: modular Corsi-Rosenthal box and donut HEPA fan adaptor.
+- Curated static Printables references where source geometry is intentionally fixed, not pretending to be parametric.
 - Shareable URLs that preserve design, parts, fabrication method, preview mode, and advanced fit settings.
+
+The laser-cut Nukit model and the 3D-printable Tempest model are intentionally separate. Their shared concepts are filter size, fan size, layout, and export workflow; their construction details can diverge.
 
 ## FilterBoxBuilder Parity
 
@@ -23,7 +27,13 @@ Some upstream-style controls are intentionally not first-path UI. The default wo
 
 See [docs/filterboxbuilder-parity.md](./docs/filterboxbuilder-parity.md) for the kept/advanced/removed story.
 
-## Local Development
+## Requirements
+
+- Bun. The repo uses `bun.lock`, `bun test`, and Bun script execution.
+- A modern browser with WebGL for the Three.js preview.
+- OpenSCAD is optional. It is only needed for the Tempest equivalence/oracle test suite.
+
+## Quick Start
 
 Install dependencies:
 
@@ -37,7 +47,11 @@ Run the app:
 bun run dev
 ```
 
-Validate before publishing:
+Open the local app at `http://127.0.0.1:5173`.
+
+## Validation
+
+Run core checks:
 
 ```sh
 bun test
@@ -51,13 +65,21 @@ bun run port:audit
 bun run oracle:airpurifier
 ```
 
-Optional OpenSCAD oracle checks for the Tempest 3D-print port:
+Run optional OpenSCAD oracle checks for the Tempest 3D-print port:
 
 ```sh
 bun run test:openscad
 ```
 
 This requires the `openscad` CLI on `PATH`, or `OPENSCAD_BIN=/path/to/OpenSCAD`. The suite renders the checked-in Tempest `.scad` reference and compares parsed oracle metrics with the TypeScript/JSCAD port.
+
+## Model Correctness
+
+- Browser previews use Three.js for display.
+- Generated laser files come from the laser fabrication model.
+- Generated 3MF files come from the TypeScript/JSCAD print model.
+- The Tempest print model is a hand port of the OpenSCAD reference in [references/tempest-openscad-reference](./references/tempest-openscad-reference).
+- OpenSCAD oracle tests compare reference-derived dimensions and layout metrics against the port. They do not replace manual print-fit validation.
 
 ## Repository Layout
 
