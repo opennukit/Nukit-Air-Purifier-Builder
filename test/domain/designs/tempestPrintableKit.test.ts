@@ -15,9 +15,11 @@ describe("Tempest CSG printable kit", () => {
   test("generates bed-sized CSG chunks for the default two-filter housing", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
 
-    expect(kit.parts).toHaveLength(8);
+    // Feature-aware slicing threads seams between the 140 mm fan grills, which
+    // needs a third chunk on the fan-dense axis (2×2×3) rather than a uniform 2×2×2.
+    expect(kit.parts).toHaveLength(12);
     expect(kit.summary).toMatchObject({
-      partCount: 8,
+      partCount: 12,
       splitPanelCount: 1,
       oversizedPartCount: 0,
       sourceCutFeatureCount: 31,
@@ -27,9 +29,8 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);
     expect(kit.parts.every((part) => part.mesh.vertices.length > 0 && part.mesh.triangles.length > 0)).toBe(true);
     expect(kit.parts.every((part) => meshFitsDeclaredBounds(part))).toBe(true);
-    expect(kit.parts.map((part) => [part.width, part.depth, part.height])).toEqual(
-      Array.from({ length: 8 }, () => [252.5, 131, 252.5]),
-    );
+    // Chunks are no longer uniform — the boundaries are snapped off the grills.
+    expect(new Set(kit.parts.map((part) => part.height)).size).toBeGreaterThan(1);
   });
 
   test("orients the default two-filter housing upright for preview and 3MF export", () => {
@@ -95,7 +96,7 @@ describe("Tempest CSG printable kit", () => {
       sourceCutFeatureCount: 54,
       retainedPrintCriticalCutFeatureCount: 54,
     });
-    expect(kit.parts.every((part) => part.width === 205 && part.depth === 205 && part.height === 255)).toBe(true);
+    expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);
     expect(kit.parts.every((part) => part.mesh.vertices.length > 0 && part.mesh.triangles.length > 0)).toBe(true);
     expect(kit.parts.every((part) => meshFitsDeclaredBounds(part))).toBe(true);
   }, 30000);
@@ -168,7 +169,7 @@ describe("Tempest CSG printable kit", () => {
     const exported = createPrintDesignThreeMfExport(layout, "bed-256");
 
     expect(layout.configuration.design.type).toBe("tempest");
-    expect(kit.parts).toHaveLength(8);
+    expect(kit.parts).toHaveLength(12);
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(exported.filename).toBe("nukit-tempest-print-kit.3mf");
     expect(exported.bytes.length).toBeGreaterThan(1000);

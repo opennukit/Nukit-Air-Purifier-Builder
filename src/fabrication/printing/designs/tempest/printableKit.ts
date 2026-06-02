@@ -24,6 +24,7 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
+import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
@@ -80,12 +81,12 @@ export function createTempestPrintableKit(
   const preset = findPrintVolumePreset(presetId);
   const model = createTempestModel(settingsForPresetBed(settings, presetId));
   const pose = createTempestPrintablePose(model);
-  const chunkGrid = createPrintableChunkGrid(pose.envelope, model.settings.printBed);
+  const chunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
   // Every Manifold value the build allocates is freed when this arena exits;
   // the returned parts carry only extracted plain-data meshes.
   const parts = withGeometryArena(() => {
     const assembly = applyTempestPrintablePose(
-      createFinalAssemblyGeometry(model, sourceChunkGridForPrintablePose(pose, chunkGrid)),
+      createFinalAssemblyGeometry(model, sourceChunkGridForPose(pose, chunkGrid)),
       pose,
     );
     return createChunkParts(model, chunkGrid, assembly);
@@ -167,32 +168,37 @@ function createChunkPart(
   featureCount: number,
 ): PrintablePart {
   const origin = {
-    x: address.x * chunkGrid.chunkWidth,
-    y: address.y * chunkGrid.chunkDepth,
-    z: address.z * chunkGrid.chunkHeight,
+    x: chunkGrid.boundariesX[address.x],
+    y: chunkGrid.boundariesY[address.y],
+    z: chunkGrid.boundariesZ[address.z],
+  };
+  const size = {
+    x: chunkGrid.boundariesX[address.x + 1] - origin.x,
+    y: chunkGrid.boundariesY[address.y + 1] - origin.y,
+    z: chunkGrid.boundariesZ[address.z + 1] - origin.z,
   };
   const chunkBox = cuboidFromMinSize(
     origin.x - epsilon,
     origin.y - epsilon,
     origin.z - epsilon,
-    chunkGrid.chunkWidth + 2 * epsilon,
-    chunkGrid.chunkDepth + 2 * epsilon,
-    chunkGrid.chunkHeight + 2 * epsilon,
+    size.x + 2 * epsilon,
+    size.y + 2 * epsilon,
+    size.z + 2 * epsilon,
   );
   const roughChunkGeometry = transforms.translate(
     [-origin.x, -origin.y, -origin.z],
     booleans.intersect(assembly, chunkBox),
   );
-  const exactChunkBox = cuboidFromMinSize(0, 0, 0, chunkGrid.chunkWidth, chunkGrid.chunkDepth, chunkGrid.chunkHeight);
+  const exactChunkBox = cuboidFromMinSize(0, 0, 0, size.x, size.y, size.z);
   const chunkGeometry = booleans.intersect(roughChunkGeometry, exactChunkBox);
   return {
     id: `tempest-chunk-${address.x}-${address.y}-${address.z}`,
     name: `Tempest chunk ${address.x},${address.y},${address.z}`,
     kind: "tempest-print-chunk",
     sourcePanelId: "tempest-parametric-csg",
-    width: roundMillimeters(chunkGrid.chunkWidth),
-    depth: roundMillimeters(chunkGrid.chunkDepth),
-    height: roundMillimeters(chunkGrid.chunkHeight),
+    width: roundMillimeters(size.x),
+    depth: roundMillimeters(size.y),
+    height: roundMillimeters(size.z),
     cutFeatureCount: featureCount,
     printCriticalCutFeatureCount: featureCount,
     mesh: manifoldGeometryToPrintableMesh(chunkGeometry),
@@ -232,36 +238,6 @@ function applyTempestPrintablePose(geometry: Geom3, pose: TempestPrintablePose):
     [0, pose.envelope.depth, 0],
     transforms.rotateX(Math.PI / 2, geometry),
   );
-}
-
-function createPrintableChunkGrid(envelope: TempestPrintableEnvelope, bed: TempestSettings["printBed"]): TempestChunkGrid {
-  const countX = Math.max(1, Math.ceil(envelope.width / bed.width));
-  const countY = Math.max(1, Math.ceil(envelope.depth / bed.depth));
-  const countZ = Math.max(1, Math.ceil(envelope.height / bed.height));
-  return {
-    countX,
-    countY,
-    countZ,
-    totalCount: countX * countY * countZ,
-    chunkWidth: envelope.width / countX,
-    chunkDepth: envelope.depth / countY,
-    chunkHeight: envelope.height / countZ,
-  };
-}
-
-function sourceChunkGridForPrintablePose(pose: TempestPrintablePose, printableGrid: TempestChunkGrid): TempestChunkGrid {
-  if (pose.type === "source") {
-    return printableGrid;
-  }
-  return {
-    countX: printableGrid.countX,
-    countY: printableGrid.countZ,
-    countZ: printableGrid.countY,
-    totalCount: printableGrid.totalCount,
-    chunkWidth: printableGrid.chunkWidth,
-    chunkDepth: printableGrid.chunkHeight,
-    chunkHeight: printableGrid.chunkDepth,
-  };
 }
 
 // #######################################

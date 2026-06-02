@@ -464,7 +464,7 @@ function pinCandidatesHorizontal(
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
-      const seamX = index * chunkGrid.chunkWidth;
+      const seamX = chunkGrid.boundariesX[index];
       for (const wallY of [model.frame.wallThickness / 2, model.box.depth - model.frame.wallThickness / 2]) {
         for (const gridZ of rimPositions(model.frame.outsideFlangeThickness, model.box.height - model.frame.outsideFlangeThickness, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
@@ -488,7 +488,7 @@ function pinCandidatesHorizontal(
 
   if (chunkGrid.countY > 1) {
     for (let index = 1; index < chunkGrid.countY; index += 1) {
-      const seamY = index * chunkGrid.chunkDepth;
+      const seamY = chunkGrid.boundariesY[index];
       for (const wallX of [model.frame.wallThickness / 2, model.box.width - model.frame.wallThickness / 2]) {
         for (const gridZ of rimPositions(model.frame.outsideFlangeThickness, model.box.height - model.frame.outsideFlangeThickness, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
@@ -512,7 +512,7 @@ function pinCandidatesHorizontal(
 
   if (chunkGrid.countZ > 1) {
     for (let index = 1; index < chunkGrid.countZ; index += 1) {
-      const seamZ = index * chunkGrid.chunkHeight;
+      const seamZ = chunkGrid.boundariesZ[index];
       for (const wallY of [model.frame.wallThickness / 2, model.box.depth - model.frame.wallThickness / 2]) {
         for (const gridX of rimPositions(0, model.box.width, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));
@@ -543,7 +543,7 @@ function pinCandidatesTower(
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
-      const seamX = index * chunkGrid.chunkWidth;
+      const seamX = chunkGrid.boundariesX[index];
       for (const wallY of [model.frame.outsideFlangeThickness / 2, model.box.depth - model.frame.outsideFlangeThickness / 2]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
@@ -575,7 +575,7 @@ function pinCandidatesTower(
 
   if (chunkGrid.countY > 1) {
     for (let index = 1; index < chunkGrid.countY; index += 1) {
-      const seamY = index * chunkGrid.chunkDepth;
+      const seamY = chunkGrid.boundariesY[index];
       for (const wallX of [model.frame.outsideFlangeThickness / 2, model.box.width - model.frame.outsideFlangeThickness / 2]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
@@ -607,7 +607,7 @@ function pinCandidatesTower(
 
   if (chunkGrid.countZ > 1) {
     for (let index = 1; index < chunkGrid.countZ; index += 1) {
-      const seamZ = index * chunkGrid.chunkHeight;
+      const seamZ = chunkGrid.boundariesZ[index];
       for (const wallY of [model.frame.outsideFlangeThickness / 2, model.box.depth - model.frame.outsideFlangeThickness / 2]) {
         for (const gridX of rimPositions(0, model.box.width, pin.spacing)) {
           geometries.push(cylinderAlongFromStart("z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));

@@ -612,7 +612,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalLayout.summary.fans.type === "tempest" ? horizontalLayout.summary.fans.arrangement : undefined).toBe(
       "dual-horizontal-sandwich",
     );
-    expect(horizontalKit.parts).toHaveLength(8);
+    // Feature-aware slicing splits the fan-dense axis into 3, so 2×2×3 = 12.
+    expect(horizontalKit.parts).toHaveLength(12);
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");

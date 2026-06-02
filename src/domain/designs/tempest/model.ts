@@ -308,6 +308,12 @@ export type TempestChunkGrid = {
   readonly chunkWidth: Millimeters;
   readonly chunkDepth: Millimeters;
   readonly chunkHeight: Millimeters;
+  // Per-axis cut boundaries, length count+1 (0 … extent). Uniform for the model's
+  // own grid; the printable kit produces feature-aware boundaries that avoid
+  // slicing through fan grills. chunkWidth/Depth/Height report the largest gap.
+  readonly boundariesX: readonly Millimeters[];
+  readonly boundariesY: readonly Millimeters[];
+  readonly boundariesZ: readonly Millimeters[];
 };
 
 export type TempestResolvedRenderTarget =
@@ -965,6 +971,10 @@ function towerCordUsesHighY(cord: Extract<TempestCordPassThrough, { readonly typ
 // Derived Chunking and Pins
 // ##############################
 
+function uniformBoundaries(extent: Millimeters, count: number): Millimeters[] {
+  return Array.from({ length: count + 1 }, (_, index) => (extent * index) / count);
+}
+
 function createChunkGrid(box: TempestBoxEnvelope, bed: TempestPrintBedVolume): TempestChunkGrid {
   const countX = Math.max(1, Math.ceil(box.width / bed.width));
   const countY = Math.max(1, Math.ceil(box.depth / bed.depth));
@@ -977,6 +987,9 @@ function createChunkGrid(box: TempestBoxEnvelope, bed: TempestPrintBedVolume): T
     chunkWidth: box.width / countX,
     chunkDepth: box.depth / countY,
     chunkHeight: box.height / countZ,
+    boundariesX: uniformBoundaries(box.width, countX),
+    boundariesY: uniformBoundaries(box.depth, countY),
+    boundariesZ: uniformBoundaries(box.height, countZ),
   };
 }
 
@@ -993,9 +1006,9 @@ function resolveRenderTarget(renderTarget: TempestRenderTarget, chunkGrid: Tempe
     type: "chunk",
     chunkIndex,
     origin: {
-      x: chunkIndex.x * chunkGrid.chunkWidth,
-      y: chunkIndex.y * chunkGrid.chunkDepth,
-      z: chunkIndex.z * chunkGrid.chunkHeight,
+      x: chunkGrid.boundariesX[chunkIndex.x],
+      y: chunkGrid.boundariesY[chunkIndex.y],
+      z: chunkGrid.boundariesZ[chunkIndex.z],
     },
     moveToOrigin: renderTarget.moveToOrigin,
   };
