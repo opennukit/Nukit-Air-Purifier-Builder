@@ -66,11 +66,17 @@ export type TempestFanOpening =
       readonly ribThickness: Millimeters;
     };
 
+// The 4-filter tower's top exhaust style: the default N×N grid of PC-fan cutouts,
+// or a single large opening for a box/exhaust fan zip-tied through corner holes.
+export type TempestTowerTopExhaust = "fan-grid" | "single-box-fan";
+
 export type TempestFanSettings = {
   readonly diameter: Millimeters;
   readonly screwHoleDiameter: Millimeters;
   readonly wallRequests: TempestWallMap<TempestFanCountRequest>;
   readonly opening: TempestFanOpening;
+  // Tower-only; defaults to "fan-grid" when omitted, and ignored by horizontal layouts.
+  readonly topExhaust?: TempestTowerTopExhaust;
 };
 
 // ##############################

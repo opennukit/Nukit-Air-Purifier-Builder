@@ -68,4 +68,16 @@ describe("Tempest meshes are 2-manifold", () => {
     );
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
   });
+
+  test("four-filter tower with single box-exhaust stays manifold and differs from the fan grid", () => {
+    const tower = { type: "four-side-filter-tower" as const, filter: defaultTempestTowerFilter };
+    const grid = createTempestPrintableKit({ ...defaultTempestSettings, arrangement: tower }, "unsplit");
+    const boxExhaust = createTempestPrintableKit(
+      { ...defaultTempestSettings, arrangement: tower, fan: { ...defaultTempestSettings.fan, topExhaust: "single-box-fan" } },
+      "unsplit",
+    );
+    expect(manifoldReport(boxExhaust.parts[0].mesh)).toEqual(cleanManifold);
+    // A single opening + corner ties is far simpler than the honeycomb fan grid.
+    expect(boxExhaust.parts[0].mesh.triangles.length).toBeLessThan(grid.parts[0].mesh.triangles.length);
+  });
 });

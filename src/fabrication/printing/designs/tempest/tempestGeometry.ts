@@ -307,6 +307,9 @@ function towerFanGrid(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
 ): Solid[] {
+  if ((model.settings.fan.topExhaust ?? "fan-grid") === "single-box-fan") {
+    return towerBoxExhaustCuts(model, filterLayout);
+  }
   if (model.fanLayout.type !== "tower-top-grid") {
     return [];
   }
@@ -322,6 +325,44 @@ function towerFanGrid(
         )
       : [],
   );
+}
+
+// A single large box/exhaust-fan opening over the air chamber, plus paired
+// corner holes for zip-tying a box fan in place (the traditional CR-Box top).
+function towerBoxExhaustCuts(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+): Solid[] {
+  const chamber = filterLayout.airChamber;
+  const cutHeight = filterLayout.topPlateThickness + 2 * epsilon;
+  const seatRim = model.frame.outsideFlangeThickness;
+  const openWidth = Math.max(0.001, chamber.xMax - chamber.xMin - 2 * seatRim);
+  const openDepth = Math.max(0.001, chamber.yMax - chamber.yMin - 2 * seatRim);
+  const centerX = (chamber.xMin + chamber.xMax) / 2;
+  const centerY = (chamber.yMin + chamber.yMax) / 2;
+  const holeCenterZ = model.box.height - filterLayout.topPlateThickness / 2;
+
+  const opening = transforms.translate(
+    [centerX, centerY, model.box.height - filterLayout.topPlateThickness - epsilon],
+    extrusions.extrudeLinear({ height: cutHeight }, towerOpening2d(openWidth, openDepth)),
+  );
+
+  const tieRadius = Math.max(0.001, model.settings.fan.screwHoleDiameter / 2);
+  const tieOutset = seatRim / 2;
+  const tiePairOffset = Math.min(openWidth, openDepth) / 8;
+  const cornerX = openWidth / 2 + tieOutset;
+  const cornerY = openDepth / 2 + tieOutset;
+  const corners: ReadonlyArray<readonly [number, number]> = [
+    [centerX - cornerX, centerY - cornerY],
+    [centerX + cornerX, centerY - cornerY],
+    [centerX - cornerX, centerY + cornerY],
+    [centerX + cornerX, centerY + cornerY],
+  ];
+  const zipTieHoles = corners.flatMap(([cx, cy]) =>
+    [-tiePairOffset, tiePairOffset].map((dy) => cylinderAlong("z", [cx, cy + dy, holeCenterZ], cutHeight, tieRadius, 24)),
+  );
+
+  return [opening, ...zipTieHoles];
 }
 
 function towerFilterSlots(
