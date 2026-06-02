@@ -11,6 +11,12 @@ export default defineConfig({
   plugins: [svelte()],
   build: {
     chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        playground: fileURLToPath(new URL("./playground.html", import.meta.url)),
+      },
+    },
   },
   resolve: {
     alias: {
