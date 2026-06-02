@@ -1,4 +1,13 @@
-import { booleans, geometries, primitives, transforms } from "@jscad/modeling";
+import {
+  booleans,
+  type Geom3,
+  manifoldModeling,
+  meshData,
+  POSITION_PROP_COUNT,
+  primitives,
+  transforms,
+} from "@/fabrication/printing/manifoldOps";
+import { withGeometryArena } from "@/fabrication/printing/manifoldKernel";
 import {
   createTempestModel,
   defaultTempestSettings,
@@ -14,7 +23,7 @@ import {
   type PrintablePart,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import { createTempestScadFinalModel, type TempestScadGeom3 } from "@/fabrication/printing/designs/tempest/scadPort";
+import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
@@ -32,7 +41,8 @@ export {
 // CSG Types and Constants
 // ##############################
 
-type Geom3 = TempestScadGeom3;
+// `Geom3` is the Manifold solid type, imported from manifoldOps — the service
+// always builds the geometry on the Manifold backend.
 
 type ChunkAddress = {
   readonly x: number;
@@ -71,8 +81,15 @@ export function createTempestPrintableKit(
   const model = createTempestModel(settingsForPresetBed(settings, presetId));
   const pose = createTempestPrintablePose(model);
   const chunkGrid = createPrintableChunkGrid(pose.envelope, model.settings.printBed);
-  const assembly = applyTempestPrintablePose(createFinalAssemblyGeometry(model, sourceChunkGridForPrintablePose(pose, chunkGrid)), pose);
-  const parts = createChunkParts(model, chunkGrid, assembly);
+  // Every Manifold value the build allocates is freed when this arena exits;
+  // the returned parts carry only extracted plain-data meshes.
+  const parts = withGeometryArena(() => {
+    const assembly = applyTempestPrintablePose(
+      createFinalAssemblyGeometry(model, sourceChunkGridForPrintablePose(pose, chunkGrid)),
+      pose,
+    );
+    return createChunkParts(model, chunkGrid, assembly);
+  });
   const featureCount = estimateFeatureCount(model);
 
   return {
@@ -178,7 +195,7 @@ function createChunkPart(
     height: roundMillimeters(chunkGrid.chunkHeight),
     cutFeatureCount: featureCount,
     printCriticalCutFeatureCount: featureCount,
-    mesh: jscadGeometryToPrintableMesh(chunkGeometry),
+    mesh: manifoldGeometryToPrintableMesh(chunkGeometry),
   };
 }
 
@@ -252,40 +269,65 @@ function sourceChunkGridForPrintablePose(pose: TempestPrintablePose, printableGr
 // #######################################
 
 function createFinalAssemblyGeometry(model: TempestModel, alignmentPinChunkGrid: TempestChunkGrid): Geom3 {
-  return createTempestScadFinalModel(model, alignmentPinChunkGrid);
+  return buildTempestGeometry(manifoldModeling, model, alignmentPinChunkGrid);
 }
 
 // #######################################
 // Mesh Conversion
 // #######################################
 
-function jscadGeometryToPrintableMesh(geometry: Geom3): PrintableMesh {
+// Manifold guarantees the solid's topology is watertight and T-junction-free,
+// but `getMesh()` may still duplicate a position across its internal face runs.
+// Welding coincident vertices (snapped to export precision) into one index
+// collapses those duplicates, yielding a compact, fully edge-shared mesh.
+function manifoldGeometryToPrintableMesh(geometry: Geom3): PrintableMesh {
+  const mesh = meshData(geometry);
   const vertices: MeshVertex[] = [];
   const triangles: MeshTriangle[] = [];
-  for (const polygon of geometries.geom3.toPolygons(geometry)) {
-    const points = polygon.vertices;
-    if (points.length < 3) {
+  const indexByPosition = new Map<string, number>();
+
+  const weldVertex = (sourceIndex: number): number => {
+    // Position occupies the first POSITION_PROP_COUNT channels of the vertex; the
+    // stride between vertices is the full per-vertex property count (numProp).
+    const positionBase = sourceIndex * mesh.numProp;
+    const vertex = roundVertex(readPosition(mesh.vertProperties, positionBase));
+    const positionKey = `${vertex.x},${vertex.y},${vertex.z}`;
+    const existingIndex = indexByPosition.get(positionKey);
+    if (existingIndex !== undefined) {
+      return existingIndex;
+    }
+    const newIndex = vertices.length;
+    vertices.push(vertex);
+    indexByPosition.set(positionKey, newIndex);
+    return newIndex;
+  };
+
+  for (let cursor = 0; cursor < mesh.triVerts.length; cursor += 3) {
+    const first = weldVertex(mesh.triVerts[cursor]);
+    const second = weldVertex(mesh.triVerts[cursor + 1]);
+    const third = weldVertex(mesh.triVerts[cursor + 2]);
+    if (first === second || second === third || first === third) {
       continue;
     }
-    const offset = vertices.length;
-    vertices.push(
-      ...points.map((point) =>
-        roundVertex({
-          x: point[0],
-          y: point[1],
-          z: point[2],
-        }),
-      ),
-    );
-    for (let index = 1; index < points.length - 1; index += 1) {
-      triangles.push({
-        v1: offset,
-        v2: offset + index,
-        v3: offset + index + 1,
-      });
-    }
+    triangles.push({ v1: first, v2: second, v3: third });
   }
   return { vertices, triangles };
+}
+
+// Reads the x, y, z position from the first POSITION_PROP_COUNT channels of a
+// vertex's interleaved properties. The xyz field names of `MeshVertex` are the
+// canonical naming of that layout, so this maps the channels onto them.
+function readPosition(vertProperties: Float32Array, positionBase: number): MeshVertex {
+  const [xChannel, yChannel, zChannel] = positionChannelsFrom(positionBase);
+  return {
+    x: vertProperties[xChannel],
+    y: vertProperties[yChannel],
+    z: vertProperties[zChannel],
+  };
+}
+
+function positionChannelsFrom(positionBase: number): readonly number[] {
+  return Array.from({ length: POSITION_PROP_COUNT }, (_, channel) => positionBase + channel);
 }
 
 // #######################################

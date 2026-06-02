@@ -8,7 +8,6 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",
     "build": "bun run typecheck && vite build",
     "test": "bun test",
-    "test:openscad": "REQUIRE_OPENSCAD=1 bun test test/ports/openscad",
     "port:audit": "bun scripts/boxes-port/boxes-port-audit.ts",
     "oracle:airpurifier": "bun scripts/boxes-port/airpurifier-oracle.ts",
     "preview": "vite preview --host 127.0.0.1"
@@ -24,7 +23,7 @@
     "vite": "^7.3.0"
   },
   "dependencies": {
-    "@jscad/modeling": "^2.13.0",
+    "manifold-3d": "^3.5.0",
     "three": "^0.184.0"
   }
 }

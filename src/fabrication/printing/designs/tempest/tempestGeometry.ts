@@ -1,4 +1,4 @@
-import { booleans, expansions, extrusions, hulls, primitives, transforms } from "@jscad/modeling";
+import type { ModelingApi } from "@/fabrication/printing/modelingApi";
 import type {
   TempestChunkGrid,
   TempestFilterLayout,
@@ -8,50 +8,48 @@ import type {
 } from "@/domain/designs/tempest/model";
 
 // #######################################
-// OpenSCAD Hand Transpilation Boundary
+// Parametric Tempest Geometry (kernel-agnostic)
 // #######################################
 
-// This module intentionally mirrors `Nukit Tempest Air Purifier Builder.scad`.
-// Keep function names and construction order close to the source so the port can
-// be audited function-by-function instead of becoming another interpretation.
-
-// ##############################
-// JSCAD Types and Constants
-// ##############################
-
-export type TempestScadGeom3 = ReturnType<typeof primitives.cuboid>;
-type TempestScadGeom2 = ReturnType<typeof primitives.circle>;
+// The single source of truth for the Tempest purifier shape. It is written
+// against the abstract `ModelingApi`, never a concrete CSG kernel, so the same
+// code drives both the static Builder's Manifold export and the in-browser
+// design editor's JSCAD preview. Function names and construction order follow
+// the original model so it stays auditable feature-by-feature.
 
 const epsilon = 0.05;
 const scadWallCutOverlap = 0.5;
+// The geometry's own tessellation resolution, passed explicitly to every
+// circular primitive so it does not depend on any backend's global default.
 const csgSegments = 48;
 
-type TempestScadPortOptions = {
+type TempestGeometryOptions = {
   readonly alignmentPinChunkGrid?: TempestChunkGrid;
 };
 
-const fanPatternCache = new Map<string, TempestScadGeom2>();
-
-// #######################################
-// Public Port API
-// #######################################
-
-export function createTempestScadFinalModel(model: TempestModel, alignmentPinChunkGrid?: TempestChunkGrid): TempestScadGeom3 {
-  return finalModel(model, { alignmentPinChunkGrid });
-}
+export function buildTempestGeometry<Solid, Region>(
+  modeling: ModelingApi<Solid, Region>,
+  model: TempestModel,
+  alignmentPinChunkGrid?: TempestChunkGrid,
+): Solid {
+  const { primitives, transforms, transforms2d, extrusions, expansions, hulls, booleans, booleans2d } = modeling;
+  // Per-build memo of fan-pattern cross-sections. Local to the call so it can
+  // never outlive the build: under Manifold the arena wrapping the build owns
+  // and frees the handles it holds, and there is no cross-build state to dangle.
+  const fanPatternCache = new Map<string, Region>();
 
 // #######################################
 // SCAD Top-Level Model
 // #######################################
 
-function finalModel(model: TempestModel, options: TempestScadPortOptions): TempestScadGeom3 {
+function finalModel(model: TempestModel, options: TempestGeometryOptions): Solid {
   return subtractAll(assembly(model), [
     ...cordHoleCylinders(model),
     ...pinHoles(model, options.alignmentPinChunkGrid ?? model.chunkGrid),
   ]);
 }
 
-function assembly(model: TempestModel): TempestScadGeom3 {
+function assembly(model: TempestModel): Solid {
   return model.filterLayout.type === "side-filter-tower"
     ? assemblyTower(model, model.filterLayout)
     : assemblyHorizontal(model, model.filterLayout);
@@ -64,7 +62,7 @@ function assembly(model: TempestModel): TempestScadGeom3 {
 function assemblyHorizontal(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
-): TempestScadGeom3 {
+): Solid {
   const bottomPanel = filterLayout.bottomPanel === "solid-plate" ? platePanel(model) : framePanel(model);
   const topFrame = transforms.translate([0, 0, model.box.height - model.frame.outsideFlangeThickness], framePanel(model));
   const flanges = filterLayout.flanges.map((flange) =>
@@ -95,7 +93,7 @@ function assemblyHorizontal(
   ]);
 }
 
-function framePanel(model: TempestModel): TempestScadGeom3 {
+function framePanel(model: TempestModel): Solid {
   const panel = chamferedPrism(
     0,
     0,
@@ -112,7 +110,7 @@ function framePanel(model: TempestModel): TempestScadGeom3 {
   return subtractAll(panel, [chamferedOpeningCutAlongZ(opening, model.frame.outsideFlangeThickness, model.frame.chamferSize)]);
 }
 
-function platePanel(model: TempestModel): TempestScadGeom3 {
+function platePanel(model: TempestModel): Solid {
   return chamferedPrism(
     0,
     0,
@@ -124,7 +122,7 @@ function platePanel(model: TempestModel): TempestScadGeom3 {
   );
 }
 
-function flangePanel(model: TempestModel, height: number): TempestScadGeom3 {
+function flangePanel(model: TempestModel, height: number): Solid {
   const panel = chamferedPrism(0, 0, 0, model.box.width, model.box.depth, height, model.frame.chamferSize);
   const opening = filterOpening2d(model);
   if (opening === null) {
@@ -143,7 +141,7 @@ function wall(
   length: number,
   fanLayout: TempestWallFanLayout,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
-): TempestScadGeom3 {
+): Solid {
   const body = chamferedPrism(0, 0, 0, length, model.frame.wallThickness, model.box.wallHeight, model.frame.chamferSize);
   const fanHoles = fanLayout.positionsAlongWall.map((position) =>
     fanPatternCut(
@@ -161,7 +159,7 @@ function wall(
   return subtractAll(body, [...fanHoles, ...slotHoles]);
 }
 
-function horizontalFilterSlotHole(model: TempestModel, wallLength: number, localZBottom: number, localZTop: number): TempestScadGeom3[] {
+function horizontalFilterSlotHole(model: TempestModel, wallLength: number, localZBottom: number, localZTop: number): Solid[] {
   if (localZTop <= localZBottom) {
     return [];
   }
@@ -184,7 +182,7 @@ function horizontalFilterSlotHole(model: TempestModel, wallLength: number, local
 function assemblyTower(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
-): TempestScadGeom3 {
+): Solid {
   const solid = chamferedPrism(
     0,
     0,
@@ -213,7 +211,7 @@ function assemblyTower(
   ]);
 }
 
-function towerAirChamber(filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>): TempestScadGeom3 {
+function towerAirChamber(filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>): Solid {
   return cuboidFromMinSize(
     filterLayout.airChamber.xMin,
     filterLayout.airChamber.yMin,
@@ -228,7 +226,7 @@ function towerFilterPocket(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
   wallName: TempestWall,
-): TempestScadGeom3 {
+): Solid {
   const filter = towerFilter(model);
   const z = filterLayout.bottomPlateThickness - epsilon;
   const height = model.box.height - filterLayout.bottomPlateThickness - filterLayout.topPlateThickness + 2 * epsilon;
@@ -267,7 +265,7 @@ function towerSideOpening(
   wallName: TempestWall,
   depthLow: number,
   depthHigh: number,
-): readonly TempestScadGeom3[] {
+): readonly Solid[] {
   const filter = towerFilter(model);
   const width = filter.faceWidth - 2 * model.frame.rim;
   const height = filter.faceHeight - 2 * model.frame.rim;
@@ -308,7 +306,7 @@ function towerSideOpening(
 function towerFanGrid(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
-): TempestScadGeom3[] {
+): Solid[] {
   if (model.fanLayout.type !== "tower-top-grid") {
     return [];
   }
@@ -329,7 +327,7 @@ function towerFanGrid(
 function towerFilterSlots(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
-): TempestScadGeom3[] {
+): Solid[] {
   const filter = towerFilter(model);
   const z = model.box.height - filterLayout.topPlateThickness - epsilon;
   const height = filterLayout.topPlateThickness + 2 * epsilon;
@@ -359,7 +357,7 @@ function towerFilterSlots(
 // Cord Pass-Through
 // #######################################
 
-function cordHoleCylinders(model: TempestModel): TempestScadGeom3[] {
+function cordHoleCylinders(model: TempestModel): Solid[] {
   const cord = model.cordPassThrough;
   if (cord.type === "none") {
     return [];
@@ -387,7 +385,7 @@ function cordHoleCylinders(model: TempestModel): TempestScadGeom3[] {
 // Alignment Pins
 // #######################################
 
-function pinHoles(model: TempestModel, chunkGrid: TempestChunkGrid): TempestScadGeom3[] {
+function pinHoles(model: TempestModel, chunkGrid: TempestChunkGrid): Solid[] {
   if (model.settings.alignmentPins.type === "disabled") {
     return [];
   }
@@ -418,8 +416,8 @@ function pinCandidatesHorizontal(
   filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
   chunkGrid: TempestChunkGrid,
   pin: { readonly diameter: number; readonly holeDepth: number; readonly spacing: number },
-): TempestScadGeom3[] {
-  const geometries: TempestScadGeom3[] = [];
+): Solid[] {
+  const geometries: Solid[] = [];
   const length = 2 * pin.holeDepth;
   const radius = pin.diameter / 2;
 
@@ -495,8 +493,8 @@ function pinCandidatesTower(
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
   chunkGrid: TempestChunkGrid,
   pin: { readonly diameter: number; readonly holeDepth: number; readonly spacing: number },
-): TempestScadGeom3[] {
-  const geometries: TempestScadGeom3[] = [];
+): Solid[] {
+  const geometries: Solid[] = [];
   const length = 2 * pin.holeDepth;
   const radius = pin.diameter / 2;
   const wallZLow = filterLayout.bottomPlateThickness;
@@ -607,7 +605,7 @@ function pinCandidatesTower(
   return geometries;
 }
 
-function fanBodyZones(model: TempestModel): TempestScadGeom3[] {
+function fanBodyZones(model: TempestModel): Solid[] {
   if (model.fanLayout.type !== "horizontal-wall-fans") {
     return [];
   }
@@ -661,7 +659,7 @@ function rimPositions(low: number, high: number, spacing: number): readonly numb
 // 2D Primitives
 // #######################################
 
-function hex2d(flatToFlat: number): TempestScadGeom2 {
+function hex2d(flatToFlat: number): Region {
   const radius = flatToFlat / Math.sqrt(3);
   return primitives.polygon({
     points: Array.from({ length: 6 }, (_, index) => {
@@ -671,7 +669,7 @@ function hex2d(flatToFlat: number): TempestScadGeom2 {
   });
 }
 
-function hexGrill2d(model: TempestModel, outerDiameter: number): TempestScadGeom2 {
+function hexGrill2d(model: TempestModel, outerDiameter: number): Region {
   const opening = model.settings.fan.opening;
   if (opening.type !== "honeycomb") {
     return primitives.circle({ radius: Math.max(0.001, outerDiameter / 2), segments: csgSegments });
@@ -683,7 +681,7 @@ function hexGrill2d(model: TempestModel, outerDiameter: number): TempestScadGeom
   const rowCount = Math.ceil(outerDiameter / pitchY) + 2;
   const clipRadius = Math.max(0, (outerDiameter - 2 * opening.ribThickness) / 2);
   const hexRadius = opening.hexFlatToFlat / Math.sqrt(3);
-  const holes: TempestScadGeom2[] = [];
+  const holes: Region[] = [];
 
   for (let row = -rowCount; row <= rowCount; row += 1) {
     const rowOffset = row % 2 === 0 ? 0 : pitchX / 2;
@@ -693,17 +691,17 @@ function hexGrill2d(model: TempestModel, outerDiameter: number): TempestScadGeom
       if (Math.hypot(x, y) - hexRadius > clipRadius) {
         continue;
       }
-      holes.push(transforms.translate([x, y], hex2d(opening.hexFlatToFlat)));
+      holes.push(transforms2d.translate([x, y], hex2d(opening.hexFlatToFlat)));
     }
   }
 
-  return booleans.intersect(
+  return booleans2d.intersect(
     primitives.circle({ radius: Math.max(0.001, (outerDiameter - 2 * opening.ribThickness) / 2), segments: csgSegments }),
     unionAll2d(holes),
   );
 }
 
-function fanPattern2d(model: TempestModel): TempestScadGeom2 {
+function fanPattern2d(model: TempestModel): Region {
   const cacheKey = fanPatternCacheKey(model);
   const cached = fanPatternCache.get(cacheKey);
   if (cached !== undefined) {
@@ -717,7 +715,7 @@ function fanPattern2d(model: TempestModel): TempestScadGeom2 {
   const screwRadius = model.settings.fan.screwHoleDiameter / 2;
   const screwHoles = [-screwDelta, screwDelta].flatMap((x) =>
     [-screwDelta, screwDelta].map((y) =>
-      transforms.translate([x, y], primitives.circle({ radius: Math.max(0.001, screwRadius), segments: 16 })),
+      transforms2d.translate([x, y], primitives.circle({ radius: Math.max(0.001, screwRadius), segments: 16 })),
     ),
   );
   const pattern = unionAll2d([opening, ...screwHoles]);
@@ -739,7 +737,7 @@ function fanPatternCacheKey(model: TempestModel): string {
     : [model.settings.fan.diameter, model.settings.fan.screwHoleDiameter, opening.type, csgSegments].join(":");
 }
 
-function filterOpening2d(model: TempestModel): TempestScadGeom2 | null {
+function filterOpening2d(model: TempestModel): Region | null {
   const width = model.box.width - 2 * model.frame.rim;
   const depth = model.box.depth - 2 * model.frame.rim;
   if (width <= 0 || depth <= 0) {
@@ -754,7 +752,7 @@ function filterOpening2d(model: TempestModel): TempestScadGeom2 | null {
   });
 }
 
-function towerOpening2d(width: number, height: number, expand = 0): TempestScadGeom2 {
+function towerOpening2d(width: number, height: number, expand = 0): Region {
   const radius = Math.min(10, width / 2, height / 2);
   const opening = primitives.roundedRectangle({
     center: [0, 0],
@@ -777,7 +775,7 @@ function chamferedPrism(
   depth: number,
   height: number,
   chamfer: number,
-): TempestScadGeom3 {
+): Solid {
   return transforms.translate(
     [x, y, z],
     extrusions.extrudeLinear(
@@ -787,7 +785,7 @@ function chamferedPrism(
   );
 }
 
-function chamferedRectangle2d(width: number, depth: number, chamfer: number): TempestScadGeom2 {
+function chamferedRectangle2d(width: number, depth: number, chamfer: number): Region {
   const safeChamfer = Math.max(0, Math.min(chamfer, width / 2 - 0.01, depth / 2 - 0.01));
   if (safeChamfer <= 0) {
     return rectangle2d(0, 0, width, depth);
@@ -806,7 +804,7 @@ function chamferedRectangle2d(width: number, depth: number, chamfer: number): Te
   });
 }
 
-function rectangle2d(x: number, y: number, width: number, depth: number): TempestScadGeom2 {
+function rectangle2d(x: number, y: number, width: number, depth: number): Region {
   return primitives.polygon({
     points: [
       [x, y],
@@ -817,7 +815,7 @@ function rectangle2d(x: number, y: number, width: number, depth: number): Tempes
   });
 }
 
-function towerChamferedOpeningCut(width: number, height: number, depth: number, chamfer: number): TempestScadGeom3 {
+function towerChamferedOpeningCut(width: number, height: number, depth: number, chamfer: number): Solid {
   if (chamfer > 0 && depth > 2 * chamfer) {
     return unionAll([
       hulls.hull(
@@ -837,7 +835,7 @@ function towerChamferedOpeningCut(width: number, height: number, depth: number, 
   return extrusions.extrudeLinear({ height: Math.max(0.001, depth) }, towerOpening2d(width, height));
 }
 
-function chamferedOpeningCutAlongZ(shape: TempestScadGeom2, depth: number, chamfer: number): TempestScadGeom3 {
+function chamferedOpeningCutAlongZ(shape: Region, depth: number, chamfer: number): Solid {
   if (chamfer > 0 && depth > 2 * chamfer) {
     const expanded = expansions.offset({ delta: chamfer, corners: "round", segments: csgSegments }, shape);
     return unionAll([
@@ -855,7 +853,7 @@ function chamferedOpeningCutAlongZ(shape: TempestScadGeom2, depth: number, chamf
   return transforms.translate([0, 0, -epsilon], extrusions.extrudeLinear({ height: depth + 2 * epsilon }, shape));
 }
 
-function thinExtrude(shape: TempestScadGeom2, z: number): TempestScadGeom3 {
+function thinExtrude(shape: Region, z: number): Solid {
   return transforms.translate([0, 0, z], extrusions.extrudeLinear({ height: 0.01 }, shape));
 }
 
@@ -864,15 +862,15 @@ function fanPatternCut(
   axis: "x" | "y" | "z",
   center: readonly [number, number, number],
   length: number,
-): TempestScadGeom3 {
+): Solid {
   const pattern = transforms.translate(
     [0, 0, -length / 2],
     extrusions.extrudeLinear({ height: Math.max(0.001, length) }, fanPattern2d(model)),
   );
-  return transforms.translate([...center], orientZExtrusion(axis, pattern));
+  return transforms.translate(center, orientZExtrusion(axis, pattern));
 }
 
-function orientZExtrusion(axis: "x" | "y" | "z", geometry: TempestScadGeom3): TempestScadGeom3 {
+function orientZExtrusion(axis: "x" | "y" | "z", geometry: Solid): Solid {
   if (axis === "x") {
     return transforms.rotateY(Math.PI / 2, geometry);
   }
@@ -888,13 +886,13 @@ function cylinderAlong(
   length: number,
   radius: number,
   segments: number,
-): TempestScadGeom3 {
+): Solid {
   const cylinder = primitives.cylinder({
     height: Math.max(0.001, length),
     radius: Math.max(0.001, radius),
     segments,
   });
-  return transforms.translate([...center], orientZExtrusion(axis, cylinder));
+  return transforms.translate(center, orientZExtrusion(axis, cylinder));
 }
 
 function cylinderAlongFromStart(
@@ -902,7 +900,7 @@ function cylinderAlongFromStart(
   start: readonly [number, number, number],
   length: number,
   radius: number,
-): TempestScadGeom3 {
+): Solid {
   if (axis === "x") {
     return cylinderAlong(axis, [start[0] + length / 2, start[1], start[2]], length, radius, csgSegments);
   }
@@ -912,7 +910,7 @@ function cylinderAlongFromStart(
   return cylinderAlong(axis, [start[0], start[1], start[2] + length / 2], length, radius, csgSegments);
 }
 
-function cuboidFromMinSize(x: number, y: number, z: number, width: number, depth: number, height: number): TempestScadGeom3 {
+function cuboidFromMinSize(x: number, y: number, z: number, width: number, depth: number, height: number): Solid {
   return primitives.cuboid({
     center: [x + width / 2, y + depth / 2, z + height / 2],
     size: [Math.max(0.001, width), Math.max(0.001, depth), Math.max(0.001, height)],
@@ -953,7 +951,7 @@ function towerFilterThickness(model: TempestModel): number {
 // Boolean Helpers
 // #######################################
 
-function unionAll(geometriesToUnion: readonly TempestScadGeom3[]): TempestScadGeom3 {
+function unionAll(geometriesToUnion: readonly Solid[]): Solid {
   const first = geometriesToUnion[0];
   if (first === undefined) {
     throw new Error("unionAll: Missing geometry");
@@ -961,16 +959,19 @@ function unionAll(geometriesToUnion: readonly TempestScadGeom3[]): TempestScadGe
   return geometriesToUnion.length === 1 ? first : booleans.union(first, ...geometriesToUnion.slice(1));
 }
 
-function unionAll2d(geometriesToUnion: readonly TempestScadGeom2[]): TempestScadGeom2 {
+function unionAll2d(geometriesToUnion: readonly Region[]): Region {
   const first = geometriesToUnion[0];
   if (first === undefined) {
     throw new Error("unionAll2d: Missing geometry");
   }
-  return geometriesToUnion.length === 1 ? first : booleans.union(first, ...geometriesToUnion.slice(1));
+  return geometriesToUnion.length === 1 ? first : booleans2d.union(first, ...geometriesToUnion.slice(1));
 }
 
-function subtractAll(base: TempestScadGeom3, holes: readonly TempestScadGeom3[]): TempestScadGeom3 {
+function subtractAll(base: Solid, holes: readonly Solid[]): Solid {
   return holes.length === 0 ? base : booleans.subtract(base, ...holes);
 }
 
-const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
+  const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
+
+  return finalModel(model, { alignmentPinChunkGrid });
+}
