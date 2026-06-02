@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nukit Air Purifier Builder</title>
+<style>
+  :root { --bg:#11141a; --panel:#1b2029; --line:#2c333f; --txt:#e7ecf3; --muted:#93a0b4; --accent:#5b9dff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  #app { display:flex; height:100vh; }
+  #panel { width:320px; flex:none; background:var(--panel); border-right:1px solid var(--line);
+    overflow-y:auto; padding:14px 16px 40px; }
+  #view { flex:1; position:relative; }
+  canvas { display:block; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .sub { color:var(--muted); font-size:11px; margin:0 0 14px; }
+  fieldset { border:1px solid var(--line); border-radius:8px; margin:0 0 12px; padding:8px 10px 10px; }
+  legend { color:var(--accent); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:0 4px; }
+  label { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0; }
+  label span { color:var(--muted); flex:1; }
+  input[type=number], select { width:96px; background:#0e1117; color:var(--txt);
+    border:1px solid var(--line); border-radius:5px; padding:4px 6px; font:inherit; }
+  input[type=checkbox]{ width:16px; height:16px; accent-color:var(--accent); }
+  .btns { display:flex; gap:8px; margin-top:6px; }
+  button { flex:1; background:var(--accent); color:#06101f; border:0; border-radius:6px;
+    padding:9px; font-weight:600; cursor:pointer; }
+  button.secondary { background:#2c333f; color:var(--txt); }
+  button:disabled { opacity:.5; cursor:default; }
+  #stats { color:var(--muted); font-size:11px; margin-top:10px; white-space:pre-line; }
+  #overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(8,10,14,.6); pointer-events:none; opacity:0; transition:.15s; }
+  #overlay > span { font-size:24px; font-weight:700; color:#fff; letter-spacing:.01em; text-align:center;
+    background:rgba(0,0,0,.65); border:1px solid rgba(255,255,255,.25); border-radius:10px;
+    padding:14px 26px; box-shadow:0 6px 24px rgba(0,0,0,.5); max-width:380px; }
+  #overlay .ol-sub { font-size:13px; font-weight:400; color:#cdd5e0; margin-top:10px; line-height:1.4; }
+  /* opacity-animated dots: the compositor keeps these moving even while the
+     main thread is busy building, so it visibly shows work is in progress */
+  #overlay .ol-dots span { opacity:.2; animation:olPulse 1s infinite; }
+  #overlay .ol-dots span:nth-child(2){ animation-delay:.18s; }
+  #overlay .ol-dots span:nth-child(3){ animation-delay:.36s; }
+  @keyframes olPulse { 0%,70%,100%{opacity:.2} 35%{opacity:1} }
+  #overlay.on { opacity:1; }
+  .hint { color:var(--muted); font-size:10.5px; margin-top:8px; }
+  .info { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px;
+    border-radius:50%; border:1px solid var(--muted); color:var(--muted); font-size:9px; font-style:italic;
+    font-weight:700; cursor:help; flex:none; margin-left:5px; user-select:none; }
+  .info:hover { border-color:var(--accent); color:var(--accent); }
+  #tip { position:fixed; z-index:50; max-width:260px; background:#0b0e14; color:var(--txt);
+    border:1px solid var(--accent); border-radius:7px; padding:8px 10px; font-size:11.5px; line-height:1.4;
+    box-shadow:0 6px 22px rgba(0,0,0,.5); pointer-events:none; opacity:0; transition:opacity .1s; }
+  #tip.on { opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>Nukit Air Purifier Builder</h1>
+    <p class="sub">Free parametric design tool for DIY air purifers</p>
+    <label style="margin-bottom:12px;">
+      <span style="font-weight:600;color:var(--txt);">Build method</span>
+      <select id="mode">
+        <option value="print">3D Printed</option>
+        <option value="laser">Laser Cut</option>
+      </select>
+    </label>
+    <div id="controls"></div>
+    <div class="btns">
+      <button id="render">Render</button>
+      <button id="export" class="secondary">Export STL</button>
+    </div>
+    <div class="btns">
+      <button id="exportAll" class="secondary">Export all chunks (.zip)</button>
+      <button id="svgPreview" class="secondary" style="display:none">SVG preview</button>
+      <button id="exportDXF" class="secondary" style="display:none">Export DXF</button>
+    </div>
+    <div class="btns">
+      <button id="shareLink" class="secondary">Copy sharing link</button>
+    </div>
+    <div id="stats"></div>
+  </div>
+  <div id="view">
+    <div id="svgview" style="position:absolute;inset:0;overflow:auto;display:none;background:#11141a;"></div>
+    <div id="overlay"><span>Rendering…</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@jscad/modeling@2.12.2/dist/jscad-modeling.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+//  GEOMETRY PORT  (see purifier-geometry.js for the standalone module)
+// ---------------------------------------------------------------------------
+function buildPurifier(jscadModeling, P) {
+  const { booleans, primitives, extrusions, transforms, hulls, expansions } = jscadModeling;
+  const { union, subtract, intersect } = booleans;
+  const { cuboid, cylinder, circle, rectangle, polygon } = primitives;
+  const { extrudeLinear } = extrusions;
+  const { translate, rotateX, rotateY, rotateZ } = transforms;
+  const { hull } = hulls;
+  const { offset } = expansions;
+  const FN = P.fn || 48, D2R = Math.PI / 180;
+
+  // ---- parameters ----------------------------------------------------------
+  const X=P.X, Y=P.Y, fh=P.Filter_height, Rim=P.Rim, Filters=P.Filters;
+  const Fan_diameter=P.Fan_diameter, Screw_holes=P.Screw_holes;
+  const Box_exhaust = (Filters===4 && Fan_diameter==="box/exhaust");
+  const Fan_hole_size = P.Fan_hole_size!=null?P.Fan_hole_size:140;
+  const Ring1_screw_holes=P.Ring_one_screw_holes!=null?P.Ring_one_screw_holes:4, Ring1_screw_diameter=P.Ring_one_screw_diameter!=null?P.Ring_one_screw_diameter:4, Ring1_radius=P.Ring_one_radius!=null?P.Ring_one_radius:90;
+  const Ring2_screw_holes=P.Ring_two_screw_holes!=null?P.Ring_two_screw_holes:0, Ring2_screw_diameter=P.Ring_two_screw_diameter!=null?P.Ring_two_screw_diameter:4, Ring2_radius=P.Ring_two_radius!=null?P.Ring_two_radius:120;
+  const Fans={top:P.Fans_top,bottom:P.Fans_bottom,left:P.Fans_left,right:P.Fans_right};
+  const Hex_grill=P.Hex_grill, Hex_size=P.Hex_size, Hex_spacing=P.Hex_spacing;
+  const Slot_wall=P.Slot_wall, sc=P.Slot_clearance, Slot_end_margin=P.Slot_end_margin;
+  const t=P.Wall_thickness, oft=P.Outside_flange_thickness, cf=P.Chamfer_size;
+  // clamp the corner-post bevel to the available corner material (flange + filter depth)
+  // so a thin filter can't let the chamfer cut clean through the posts
+  const Corner_post_chamfer=Math.min(P.Corner_post_chamfer, oft+fh);
+  const Cord_d=P.Cord_hole_diameter, Cord_wall=P.Cord_hole_wall, Cord_side=P.Cord_hole_side, Cord_off=P.Cord_hole_corner_offset;
+  const Pin_d=P.Pin_diameter, Pin_depth=P.Pin_hole_depth, Pin_spacing=P.Pin_spacing;
+  const Bed_x=P.Bed_x, Bed_y=P.Bed_y, Bed_z=P.Bed_z;
+  const Render_part=P.Render_part, Chunk_to_origin=P.Chunk_to_origin;
+  // a chunk selection encodes its indices as "ix,iy,iz"; "assembly" = whole model
+  const _cm=String(Render_part||"").match(/(\d+)-(\d+)-(\d+)/);
+  const Chunk_ix=_cm?+_cm[1]:0, Chunk_iy=_cm?+_cm[2]:0, Chunk_iz=_cm?+_cm[3]:0, _isChunk=!!_cm;
+
+  // ---- derived -------------------------------------------------------------
+  const fl=t, eps=0.05, frame_thickness=oft;
+  const box_x=(Filters===4)?X+2*(oft+fh+t):X+2*t;
+  const box_y=(Filters===4)?X+2*(oft+fh+t):Y+2*t;
+  const h_box=(Filters===4)?(t+Y+oft):(Fan_diameter+2+2*frame_thickness+Filters*(fh+fl));
+  const hw=h_box-2*frame_thickness;
+  const bp_thk=t, tp_thk=oft, ofs=oft+fh+t;
+  const air_x_min=ofs, air_x_max=box_x-ofs, air_y_min=ofs, air_y_max=box_y-ofs;
+
+  const fan_body_depth=d=>d===120?25:d===140?27:d*0.19;
+  const fan_hole_pitch=d=>d===120?105:d===140?125:d*0.85;
+  const sp=fan_hole_pitch(Fan_diameter);
+
+  const filter_z=idx=>(Filters===1)?h_box-frame_thickness-fh:(idx===0)?frame_thickness:h_box-frame_thickness-fh;
+  const fan_corner_safe_min=()=>t+fan_body_depth(Fan_diameter)+Fan_diameter/2;
+  const max_fans=L=>{const mc=fan_corner_safe_min(),s=Fan_diameter+10,span=L-2*mc;return span<0?0:Math.max(0,Math.floor(1+span/s));};
+  const actual_fans=(n,L)=>{const m=max_fans(L);return(n<0||n>m)?m:n;};
+  const fan_posy_local=hwl=>{const nat=(Filters===2)?hwl/2:(hwl-fh-fl)/2;return Math.min(nat,hwl-2*Cord_d-Fan_diameter/2);};
+  const fan_positions=(n,L)=>{const na=actual_fans(n,L),mc=fan_corner_safe_min(),min_sp=Fan_diameter+10;
+    const spread=na<=1?min_sp:(L-2*mc)/(na-1),spacing=Math.max(min_sp,spread);
+    const total=na<=1?0:(na-1)*spacing,first=na===1?L/2:(L-total)/2;
+    return Array.from({length:na},(_,i)=>first+i*spacing);};
+  const top_fan_min_centre=()=>oft+fh+t+Fan_diameter/2;
+  const top_fans_per_side=L=>{const mc=top_fan_min_centre(),s=Fan_diameter+10,span=L-2*mc;return span<0?0:Math.max(0,Math.floor(1+span/s));};
+  const top_fan_positions=(n,L)=>{const mc=top_fan_min_centre(),s=Fan_diameter+10,total=n<=1?0:(n-1)*s,first=n===1?L/2:(L-total)/2;
+    return n<=0?[]:Array.from({length:n},(_,i)=>first+i*s);};
+
+  // ---- chunk grid: every axis is a list of boundaries ----------------------
+  const uniformB=(L,bed)=>{ const n=Math.max(1,Math.ceil(L/bed)); return Array.from({length:n+1},(_,k)=>L*k/n); };
+  // boundaries that keep each chunk <= bed AND keep all seams out of `bands`
+  // (the fan grills), adding chunks as needed and staying as even as possible.
+  function axisCuts(L,bed,bands){
+    bands=bands.filter(b=>b[1]>b[0]).sort((a,b)=>a[0]-b[0]);
+    const merged=[]; for(const b of bands){ const Lst=merged[merged.length-1];
+      if(Lst&&b[0]<=Lst[1])Lst[1]=Math.max(Lst[1],b[1]); else merged.push([...b]); }
+    if(!merged.length) return uniformB(L,bed);
+    const gaps=[]; let p=0; for(const[lo,hi]of merged){ if(lo>p)gaps.push([p,lo]); p=Math.max(p,hi); } if(p<L)gaps.push([p,L]);
+    const snap=z=>{ for(const[a,b]of gaps) if(z>=a-0.01&&z<=b+0.01) return z;
+      let best=z,bd=1e9; for(const[a,b]of gaps)for(const e of[a,b]) if(Math.abs(e-z)<bd){bd=Math.abs(e-z);best=e;} return best; };
+    for(let n=Math.max(1,Math.ceil(L/bed)); n<=16; n++){
+      const seams=[]; let ok=true,prev=0;
+      for(let i=1;i<n;i++){ const s=snap(i*L/n); if(s<=prev+0.5||(s-prev)>bed+0.5){ok=false;break;} seams.push(+s.toFixed(4)); prev=s; }
+      if(ok && (L-prev)<=bed+0.5) return [0,...seams,L];
+    }
+    return uniformB(L,bed);
+  }
+  const grillR=(Fan_diameter-4)/2+2;
+  const bandsFrom=centres=>centres.map(c=>[c-grillR,c+grillR]);
+  // grill positions per axis: Filters 4 fans sit on the TOP plate (an NxN grid);
+  // Filters 1/2 fans sit on the walls (X seams cut front/back, Y seams cut left/right).
+  let xBands=[], yBands=[];
+  if(Hex_grill){
+    if(Filters===4){
+      xBands=bandsFrom(top_fan_positions(top_fans_per_side(box_x),box_x));
+      yBands=bandsFrom(top_fan_positions(top_fans_per_side(box_y),box_y));
+    } else {
+      const fanBands=(n,L)=>bandsFrom(fan_positions(n,L));
+      xBands=[...fanBands(Fans.top,box_x),...fanBands(Fans.bottom,box_x)];
+      yBands=[...fanBands(Fans.left,box_y),...fanBands(Fans.right,box_y)];
+    }
+  }
+  const _xb = Hex_grill ? axisCuts(box_x,Bed_x,xBands) : uniformB(box_x,Bed_x);
+  const _yb = Hex_grill ? axisCuts(box_y,Bed_y,yBands) : uniformB(box_y,Bed_y);
+  const n_chunks_x=()=>_xb.length-1;
+  const n_chunks_y=()=>_yb.length-1;
+  const chunk_size_x=()=>Math.max(..._xb.slice(1).map((v,i)=>v-_xb[i]));
+  const chunk_size_y=()=>Math.max(..._yb.slice(1).map((v,i)=>v-_yb[i]));
+  // Z chunk boundaries. "seam": uniform from z=0 (a seam can fall on the fans).
+  // "chunk": put one chunk around the fan band so the fan cut-outs are not split.
+  function zBoundaries(){
+    const nz=Math.max(1,Math.ceil(h_box/Bed_z));
+    if((P.Chunk_z_align||"seam")!=="chunk" || nz<=1) return uniformB(h_box, Bed_z);  // "seam": slice as-is
+    // "chunk": the fan band + filter flanges stay together in one centred chunk.
+    const m=2, keep=[];
+    if(Filters===4){ keep.push([h_box-tp_thk-(Box_exhaust?tp_thk:Fan_diameter)-m, h_box]); }
+    else {
+      const fanZc=frame_thickness+fan_posy_local(hw);
+      keep.push([fanZc-Fan_diameter/2-m, fanZc+Fan_diameter/2+m]);
+      if(Filters===1) keep.push([filter_z(0)-fl-m, filter_z(0)+m]);
+      else keep.push([filter_z(0)+fh-m, filter_z(0)+fh+fl+m], [filter_z(1)-fl-m, filter_z(1)+m]);
+    }
+    const lo=Math.max(0, Math.min(...keep.map(k=>k[0])));
+    const hi=Math.min(h_box, Math.max(...keep.map(k=>k[1])));
+    if(hi-lo > Bed_z){ const cs=h_box/nz; return Array.from({length:nz+1},(_,k)=>k*cs); }  // too tall for the bed: uniform
+    // one central chunk [lo,hi] holding the fans/flanges; even chunks above & below
+    const out=[0], r4=v=>+v.toFixed(4);
+    if(lo>0.5){ const nb=Math.max(1,Math.ceil(lo/Bed_z)); for(let k=1;k<nb;k++) out.push(r4(lo*k/nb)); out.push(r4(lo)); }
+    out.push(r4(hi));
+    const aL=h_box-hi; if(aL>0.5){ const na=Math.max(1,Math.ceil(aL/Bed_z)); for(let k=1;k<na;k++) out.push(r4(hi+aL*k/na)); }
+    out.push(h_box);
+    return [...new Set(out)].sort((a,b)=>a-b);
+  }
+  const _zb=zBoundaries();
+  const n_chunks_z=()=>_zb.length-1;
+  const chunk_size_z=()=>Math.max(..._zb.slice(1).map((v,i)=>v-_zb[i]));   // largest Z chunk (for reporting)
+
+  // ---- 2D primitives -------------------------------------------------------
+  const sq=(w,h)=>rectangle({size:[w,h],center:[w/2,h/2]});
+  const round2=(g,r)=>offset({delta:r,corners:'round',segments:FN},offset({delta:-r,corners:'round',segments:FN},g));
+  function roundedRect(w,h,r){return round2(sq(w,h),r);}
+  function filter_opening_2d(){const ow=box_x-2*Rim,oh=box_y-2*Rim;if(ow<=0||oh<=0)return null;
+    return translate([Rim,Rim],roundedRect(ow,oh,Math.min(10,ow/2,oh/2)));}
+  const grow=(g,e)=>offset({delta:e,corners:'round',segments:FN},g);
+  // centred rounded rect with optional outward expand (tower openings)
+  function tower_opening_2d(w,h,expand=0){if(w<=0||h<=0)return null;
+    const r=Math.min(10,w/2,h/2);let g=translate([-w/2,-h/2],sq(w,h));g=round2(g,r);
+    return expand?offset({delta:expand,corners:'round',segments:FN},g):g;}
+  function hex_2d(s){const r=s/Math.sqrt(3),pts=[];for(let k=0;k<=5;k++){const a=(60*k+30)*D2R;pts.push([r*Math.cos(a),r*Math.sin(a)]);}return polygon({points:pts});}
+  function hex_grill_2d(d,s,sp2){const px=s+sp2,py=(s+sp2)*Math.sqrt(3)/2,nc=Math.ceil(d/px)+2,nr=Math.ceil(d/py)+2,hx=[];
+    for(let j=-nr;j<=nr;j++)for(let i=-nc;i<=nc;i++){const ox=(j%2===0)?0:px/2;hx.push(translate([i*px+ox,j*py],hex_2d(s)));}
+    return intersect(circle({radius:(d-2*sp2)/2,segments:FN}),union(hx));}
+  function fan_pattern_2d(){const grill=Hex_grill?hex_grill_2d(Fan_diameter-4,Hex_size,Hex_spacing):circle({radius:(Fan_diameter-4)/2,segments:FN});
+    const delta=sp/2,holes=[];for(const dx of[-delta,delta])for(const dy of[-delta,delta])holes.push(translate([dx,dy],circle({radius:Screw_holes/2,segments:FN})));
+    return union(grill,...holes);}
+
+  // ---- 3D primitives -------------------------------------------------------
+  function chamfered_prism(dx,dy,dz,c){if(c<=0)return translate([dx/2,dy/2,dz/2],cuboid({size:[dx,dy,dz]}));
+    const cc=Math.min(c,dx/2-0.01,dy/2-0.01);
+    return extrudeLinear({height:dz},polygon({points:[[cc,0],[dx-cc,0],[dx,cc],[dx,dy-cc],[dx-cc,dy],[cc,dy],[0,dy-cc],[0,cc]]}));}
+  const slab=(g,z,h=0.01)=>translate([0,0,z],extrudeLinear({height:h},g));
+  const box=(x,y,z,dx,dy,dz)=>translate([x,y,z],cuboid({size:[dx,dy,dz],center:[dx/2,dy/2,dz/2]}));
+
+  function frame_panel(){const body=chamfered_prism(box_x,box_y,frame_thickness,cf);const op=filter_opening_2d();if(!op)return body;
+    let cut;if(cf>0){cut=union(hull(slab(grow(op,cf),-0.5),slab(op,cf)),
+      translate([0,0,cf],extrudeLinear({height:frame_thickness-2*cf},op)),
+      hull(slab(op,frame_thickness-cf),slab(grow(op,cf),frame_thickness+0.5)));}
+    else{cut=translate([0,0,-0.5],extrudeLinear({height:frame_thickness+1},op));}
+    return subtract(body,cut);}
+  const plate_panel=()=>chamfered_prism(box_x,box_y,frame_thickness,cf);
+  function flange_panel(){const op=filter_opening_2d();const body=chamfered_prism(box_x,box_y,fl,cf);if(!op)return body;
+    return subtract(body,translate([0,0,-0.5],extrudeLinear({height:fl+1},op)));}
+
+  function wall(L,fans_n,with_slot){let w=chamfered_prism(L,t,hw,cf);const cuts=[];
+    for(const fx of fan_positions(fans_n,L)){const fan=extrudeLinear({height:t+1},fan_pattern_2d());
+      cuts.push(translate([fx,-0.5,fan_posy_local(hw)],rotateX(-90*D2R,fan)));}
+    if(with_slot)for(let idx=0;idx<Filters;idx++){const zb=Math.max(0,filter_z(idx)-sc-frame_thickness);
+      const zt=Math.min(hw,filter_z(idx)+fh+sc-frame_thickness);
+      if(zt>zb)cuts.push(box(Slot_end_margin,-0.5,zb,L-2*Slot_end_margin,t+1,zt-zb));}
+    return cuts.length?subtract(w,union(cuts)):w;}
+
+  // ---- tower (Filters=4) ---------------------------------------------------
+  function tower_chamfered_opening_cut(w,h,depth,chamfer){
+    const O=(e)=>tower_opening_2d(w,h,e);
+    if(chamfer>0&&depth>2*chamfer)return union(
+      hull(slab(O(chamfer),0),slab(O(0),chamfer)),
+      translate([0,0,chamfer],extrudeLinear({height:depth-2*chamfer},O(0))),
+      hull(slab(O(0),depth-chamfer),slab(O(chamfer),depth-0.01)));
+    return extrudeLinear({height:depth},O(0));}
+  function tower_side_opening(side,depth_lo,depth_hi){const w=X-2*Rim,h=Y-2*Rim,depth=depth_hi-depth_lo,cz=bp_thk+Y/2;
+    const cut=(ww,hh)=>tower_chamfered_opening_cut(ww,hh,depth,cf);
+    if(side==='front')return translate([box_x/2,depth_lo+depth,cz],rotateX(90*D2R,cut(w,h)));
+    if(side==='back') return translate([box_x/2,box_y-depth_lo-depth,cz],rotateX(-90*D2R,cut(w,h)));
+    if(side==='left') return translate([depth_lo+depth,box_y/2,cz],rotateY(-90*D2R,cut(h,w)));
+    if(side==='right')return translate([box_x-depth_lo-depth,box_y/2,cz],rotateY(90*D2R,cut(h,w)));}
+  function tower_filter_pocket(side){const z_lo=bp_thk-eps,h=h_box-bp_thk-tp_thk+2*eps;
+    if(side==='front')return box(ofs,oft,z_lo,box_x-2*ofs,fh,h);
+    if(side==='back') return box(ofs,box_y-oft-fh,z_lo,box_x-2*ofs,fh,h);
+    if(side==='left') return box(oft,ofs,z_lo,fh,box_y-2*ofs,h);
+    if(side==='right')return box(box_x-oft-fh,ofs,z_lo,fh,box_y-2*ofs,h);}
+  function tower_fan_grid(){const nx=top_fans_per_side(box_x),ny=top_fans_per_side(box_y);
+    const z0=h_box-tp_thk-eps,h=tp_thk+2*eps,out=[];
+    for(const cx of top_fan_positions(nx,box_x))for(const cy of top_fan_positions(ny,box_y))
+      out.push(translate([cx,cy,z0],extrudeLinear({height:h},fan_pattern_2d())));
+    return out;}
+  function tower_box_exhaust(){
+    // single central fan hole + up to two evenly-spaced rings of screw holes
+    const z0=h_box-tp_thk-eps, h=tp_thk+2*eps, cx=box_x/2, cy=box_y/2, out=[];
+    const drill=(d,x,y)=>out.push(translate([x,y,z0],cylinder({radius:d/2,height:h,segments:FN,center:[0,0,h/2]})));
+    if(Fan_hole_size>0) drill(Fan_hole_size,cx,cy);
+    const ring=(n,d,r)=>{ if(n<=0||d<=0||r<=0)return; const off=Math.PI/n; // off=PI/n puts 4 holes at the corners (45 deg)
+      for(let i=0;i<n;i++){const a=off+i*2*Math.PI/n; drill(d, cx+r*Math.cos(a), cy+r*Math.sin(a));} };
+    ring(Ring1_screw_holes,Ring1_screw_diameter,Ring1_radius);
+    ring(Ring2_screw_holes,Ring2_screw_diameter,Ring2_radius);
+    return out;}
+  function tower_filter_slots(){
+    // loading slots through the top plate ("top") or the bottom plate ("bottom")
+    const bottom = Slot_wall==='bottom';
+    const z0 = bottom ? -eps : h_box-tp_thk, h = (bottom ? bp_thk : tp_thk)+eps;
+    return[box(ofs,oft,z0,X,fh,h),box(ofs,box_y-oft-fh,z0,X,fh,h),
+    box(oft,ofs,z0,fh,X,h),box(box_x-oft-fh,ofs,z0,fh,X,h)];}
+  function assembly_tower(){
+    const cuts=[box(air_x_min,air_y_min,bp_thk-eps,air_x_max-air_x_min,air_y_max-air_y_min,h_box-bp_thk-tp_thk+2*eps)];
+    for(const s of['front','back','left','right'])cuts.push(tower_filter_pocket(s));
+    for(const s of['front','back','left','right'])cuts.push(tower_side_opening(s,-eps,oft+eps));
+    for(const s of['front','back','left','right'])cuts.push(tower_side_opening(s,oft+fh-eps,ofs+eps));
+    cuts.push(...(Box_exhaust?tower_box_exhaust():tower_fan_grid()),...tower_filter_slots());
+    return subtract(chamfered_prism(box_x,box_y,h_box,Corner_post_chamfer),union(cuts));}
+
+  // ---- cord hole -----------------------------------------------------------
+  function cord_hole_cylinder(){if(Cord_d<=0||Cord_wall==='none')return null;
+    if(Filters===4){const off=Math.max(Cord_d/2+2,Cord_off);
+      const cx=((Cord_wall==='right')||((Cord_wall==='front'||Cord_wall==='back')&&Cord_side==='right'))?air_x_max-off:air_x_min+off;
+      const cy=((Cord_wall==='back') ||((Cord_wall==='left' ||Cord_wall==='right')&&Cord_side==='right'))?air_y_max-off:air_y_min+off;
+      return translate([cx,cy,h_box-tp_thk-eps],cylinder({radius:Cord_d/2,height:tp_thk+2*eps,segments:FN,center:[0,0,(tp_thk+2*eps)/2]}));}
+    const cz=h_box/2,off=Math.max(Cord_d/2+t+1,Cord_off);
+    const along=L=>Cord_side==='center'?L/2:Cord_side==='left'?off:L-off;
+    const cyl=()=>cylinder({radius:Cord_d/2,height:t+1,segments:FN,center:[0,0,(t+1)/2]});
+    if(Cord_wall==='front')return translate([along(box_x),-0.5,cz],rotateX(-90*D2R,cyl()));
+    if(Cord_wall==='back') return translate([along(box_x),box_y+0.5,cz],rotateX(90*D2R,cyl()));
+    if(Cord_wall==='left') return translate([-0.5,along(box_y),cz],rotateY(90*D2R,cyl()));
+    if(Cord_wall==='right')return translate([box_x+0.5,along(box_y),cz],rotateY(-90*D2R,cyl()));
+    return null;}
+
+  // ---- alignment pins ------------------------------------------------------
+  const rim_positions=(lo,hi,s)=>{const w=hi-lo,n=(w<=0)?0:Math.max(1,Math.floor(w/s)),step=n>0?w/n:0;
+    return n===0?[]:Array.from({length:n},(_,i)=>lo+(i+0.5)*step);};
+  const pinX=(x,y,z,len)=>translate([x,y,z],rotateY(90*D2R,cylinder({radius:Pin_d/2,height:len,segments:FN,center:[0,0,len/2]})));
+  const pinY=(x,y,z,len)=>translate([x,y,z],rotateX(-90*D2R,cylinder({radius:Pin_d/2,height:len,segments:FN,center:[0,0,len/2]})));
+  const pinZ=(x,y,z,len)=>translate([x,y,z],cylinder({radius:Pin_d/2,height:len,segments:FN,center:[0,0,len/2]}));
+
+  function fan_body_zones(){const out=[];
+    const one=(L,fans_n,xf,yf,rotZ)=>{for(const fx of fan_positions(fans_n,L)){
+      let c=translate([fx,-1,fan_posy_local(hw)],rotateX(-90*D2R,cylinder({radius:Fan_diameter/2,height:t+2,segments:FN,center:[0,0,(t+2)/2]})));
+      c=rotateZ(rotZ*D2R,c);c=translate([xf,yf,frame_thickness],c);out.push(c);}};
+    one(box_x,Fans.top,0,0,0);one(box_x,Fans.bottom,box_x,box_y,180);
+    one(box_y,Fans.left,0,box_y,-90);one(box_y,Fans.right,box_x,0,90);
+    return out.length?union(out):null;}
+
+  function frame_midlines_opening(){const a=[h_box-frame_thickness/2];if(Filters===2)a.push(frame_thickness/2);
+    if(Filters===1)a.push(filter_z(0)-fl+fl/2);else{a.push(filter_z(0)+fh+fl/2,filter_z(1)-fl+fl/2);}return a;}
+  const plate_midlines_solid=()=>(Filters===1)?[frame_thickness/2]:[];
+
+  function pin_candidates_horizontal(){const nx=n_chunks_x(),ny=n_chunks_y(),nz=n_chunks_z();
+    const len=2*Pin_depth,s=Pin_spacing,out=[];
+    if(nx>1)for(let i=1;i<nx;i++){const xs=_xb[i];
+      for(const wy of[t/2,box_y-t/2])for(const gz of rim_positions(frame_thickness,h_box-frame_thickness,s))out.push(pinX(xs-Pin_depth,wy,gz,len));
+      for(const fz of frame_midlines_opening()){
+        for(const gy of rim_positions(t,Rim,s))out.push(pinX(xs-Pin_depth,gy,fz,len));
+        for(const gy of rim_positions(box_y-Rim,box_y-t,s))out.push(pinX(xs-Pin_depth,gy,fz,len));}
+      for(const fz of plate_midlines_solid())for(const gy of rim_positions(t,box_y-t,s))out.push(pinX(xs-Pin_depth,gy,fz,len));}
+    if(ny>1)for(let j=1;j<ny;j++){const ys=_yb[j];
+      for(const wx of[t/2,box_x-t/2])for(const gz of rim_positions(frame_thickness,h_box-frame_thickness,s))out.push(pinY(wx,ys-Pin_depth,gz,len));
+      for(const fz of frame_midlines_opening()){
+        for(const gx of rim_positions(t,Rim,s))out.push(pinY(gx,ys-Pin_depth,fz,len));
+        for(const gx of rim_positions(box_x-Rim,box_x-t,s))out.push(pinY(gx,ys-Pin_depth,fz,len));}
+      for(const fz of plate_midlines_solid())for(const gx of rim_positions(t,box_x-t,s))out.push(pinY(gx,ys-Pin_depth,fz,len));}
+    if(nz>1)for(let k=1;k<nz;k++){const zs=_zb[k];
+      for(const wy of[t/2,box_y-t/2])for(const gx of rim_positions(0,box_x,s))out.push(pinZ(gx,wy,zs-Pin_depth,len));
+      for(const wx of[t/2,box_x-t/2])for(const gy of rim_positions(t,box_y-t,s))out.push(pinZ(wx,gy,zs-Pin_depth,len));}
+    return out;}
+
+  function pin_candidates_tower(){const nx=n_chunks_x(),ny=n_chunks_y(),nz=n_chunks_z();
+    const len=2*Pin_depth,s=Pin_spacing;
+    const wz_lo=bp_thk,wz_hi=h_box-tp_thk,out=[];
+    if(nx>1)for(let i=1;i<nx;i++){const xs=_xb[i];
+      for(const wy of[oft/2,box_y-oft/2])for(const gz of rim_positions(wz_lo,wz_hi,s))out.push(pinX(xs-Pin_depth,wy,gz,len));
+      for(const wy of[oft+fh+t/2,box_y-oft-fh-t/2])for(const gz of rim_positions(wz_lo,wz_hi,s))out.push(pinX(xs-Pin_depth,wy,gz,len));
+      for(const gy of rim_positions(t,box_y-t,s))out.push(pinX(xs-Pin_depth,gy,bp_thk/2,len));
+      for(const gy of rim_positions(oft,ofs,s))out.push(pinX(xs-Pin_depth,gy,h_box-tp_thk/2,len));
+      for(const gy of rim_positions(box_y-ofs,box_y-oft,s))out.push(pinX(xs-Pin_depth,gy,h_box-tp_thk/2,len));}
+    if(ny>1)for(let j=1;j<ny;j++){const ys=_yb[j];
+      for(const wx of[oft/2,box_x-oft/2])for(const gz of rim_positions(wz_lo,wz_hi,s))out.push(pinY(wx,ys-Pin_depth,gz,len));
+      for(const wx of[oft+fh+t/2,box_x-oft-fh-t/2])for(const gz of rim_positions(wz_lo,wz_hi,s))out.push(pinY(wx,ys-Pin_depth,gz,len));
+      for(const gx of rim_positions(t,box_x-t,s))out.push(pinY(gx,ys-Pin_depth,bp_thk/2,len));
+      for(const gx of rim_positions(oft,ofs,s))out.push(pinY(gx,ys-Pin_depth,h_box-tp_thk/2,len));
+      for(const gx of rim_positions(box_x-ofs,box_x-oft,s))out.push(pinY(gx,ys-Pin_depth,h_box-tp_thk/2,len));}
+    if(nz>1)for(let k=1;k<nz;k++){const zs=_zb[k];
+      for(const wy of[oft/2,box_y-oft/2])for(const gx of rim_positions(0,box_x,s))out.push(pinZ(gx,wy,zs-Pin_depth,len));
+      for(const wx of[oft/2,box_x-oft/2])for(const gy of rim_positions(oft,box_y-oft,s))out.push(pinZ(wx,gy,zs-Pin_depth,len));
+      for(const wy of[oft+fh+t/2,box_y-oft-fh-t/2])for(const gx of rim_positions(ofs,box_x-ofs,s))out.push(pinZ(gx,wy,zs-Pin_depth,len));
+      for(const wx of[oft+fh+t/2,box_x-oft-fh-t/2])for(const gy of rim_positions(ofs,box_y-ofs,s))out.push(pinZ(wx,gy,zs-Pin_depth,len));
+      const pin_xy=ofs-t;for(const cx of[pin_xy,box_x-pin_xy])for(const cy of[pin_xy,box_y-pin_xy])out.push(pinZ(cx,cy,zs-Pin_depth,len));}
+    return out;}
+
+  function pin_holes(){const multi=n_chunks_x()>1||n_chunks_y()>1||n_chunks_z()>1;
+    if(!(Pin_d>0&&Pin_depth>0&&Pin_spacing>0&&multi))return null;
+    const cand=(Filters===4)?pin_candidates_tower():pin_candidates_horizontal();
+    if(!cand.length)return null;
+    let pins=union(cand);const zones=fan_body_zones();
+    return zones?subtract(pins,zones):pins;}
+
+  // ---- assembly + final ----------------------------------------------------
+  const parts=[];
+  function assembly_horizontal_parts(){
+    parts.push({geom:Filters===2?frame_panel():plate_panel(),color:[0.86,0.86,0.86]});
+    parts.push({geom:translate([0,0,h_box-frame_thickness],frame_panel()),color:[0.86,0.86,0.86]});
+    if(Filters===1){parts.push({geom:translate([0,0,filter_z(0)-fl],flange_panel()),color:[0.41,0.41,0.41]});}
+    else{parts.push({geom:translate([0,0,filter_z(0)+fh],flange_panel()),color:[0.41,0.41,0.41]});
+         parts.push({geom:translate([0,0,filter_z(1)-fl],flange_panel()),color:[0.41,0.41,0.41]});}
+    const wc=[0.69,0.77,0.87];
+    parts.push({geom:translate([0,0,frame_thickness],wall(box_x,Fans.top,Slot_wall==='top')),color:wc});
+    parts.push({geom:translate([box_x,box_y,frame_thickness],rotateZ(180*D2R,wall(box_x,Fans.bottom,Slot_wall==='bottom'))),color:wc});
+    parts.push({geom:translate([0,box_y,frame_thickness],rotateZ(-90*D2R,wall(box_y,Fans.left,Slot_wall==='left'))),color:wc});
+    parts.push({geom:translate([box_x,0,frame_thickness],rotateZ(90*D2R,wall(box_y,Fans.right,Slot_wall==='right'))),color:wc});
+  }
+  let assembly;
+  if(Filters===4){assembly=assembly_tower();parts.push({geom:assembly,color:[0.86,0.86,0.86]});}
+  else{assembly_horizontal_parts();assembly=union(parts.map(p=>p.geom));}
+
+  // final_model = assembly - (cord + pins)
+  let final_model=assembly;
+  const subs=[];const cord=cord_hole_cylinder();if(cord)subs.push(cord);
+  const pins=pin_holes();if(pins)subs.push(pins);
+  if(subs.length)final_model=subtract(assembly,union(subs));
+  // also cut the cord hole out of the coloured display parts so it shows in 3D
+  if(cord) for(let i=0;i<parts.length;i++) parts[i]={geom:subtract(parts[i].geom,cord),color:parts[i].color};
+
+  // render_dispatcher: assembly or one print chunk
+  let solid=final_model;
+  if(_isChunk){const nx=n_chunks_x(),ny=n_chunks_y(),nz=n_chunks_z();
+    const six=Math.max(0,Math.min(Chunk_ix,nx-1)),siy=Math.max(0,Math.min(Chunk_iy,ny-1)),siz=Math.max(0,Math.min(Chunk_iz,nz-1));
+    const cx=_xb[six],dx=_xb[six+1]-_xb[six], cy=_yb[siy],dy=_yb[siy+1]-_yb[siy], cz=_zb[siz],dz=_zb[siz+1]-_zb[siz];
+    let chunk=intersect(final_model,box(cx,cy,cz,dx,dy,dz));
+    if(Chunk_to_origin)chunk=translate([-cx,-cy,-cz],chunk);
+    solid=chunk;}
+
+  return {parts:_isChunk?null:parts, solid,
+    info:{box_x,box_y,h_box,Filters, xb:_xb, yb:_yb, zb:_zb, whole:final_model,
+      chunks:[n_chunks_x(),n_chunks_y(),n_chunks_z()],
+      chunkSize:[+chunk_size_x().toFixed(1),+chunk_size_y().toFixed(1),+chunk_size_z().toFixed(1)]}};
+}
+
+// ---------------------------------------------------------------------------
+//  PARAMETER UI  (mirrors the OpenSCAD Customizer groups)
+// ---------------------------------------------------------------------------
+// visibility predicates: "box/exhaust" fan type is only valid for the 4-filter tower
+const _isBoxExhaust = v => v.Filters===4 && v.Fan_diameter==="box/exhaust";
+const _notBoxExhaust = v => !_isBoxExhaust(v);
+// radius of the box-exhaust fan hole (uses current Fan hole size, else the 4/5-of-width default)
+const _fanHoleR = v => (v.Fan_hole_size!=null ? v.Fan_hole_size : 5/6*v.X) / 2;
+const PRINT_SCHEMA = [
+  ["Filter", [
+    ["X","num",501],["Y","num",501],["Filter_height","num",19],["Rim","num",30],
+    ["Filters","sel",2,[1,2,4]],
+  ]],
+  ["Fans", [
+    ["Fan_diameter","sel",140, v=> v.Filters===4 ? [120,140,"box/exhaust"] : [120,140] ],
+    ["Screw_holes","num",5,null,_notBoxExhaust],
+    ["Fans_left","num",-1,null,_notBoxExhaust],["Fans_right","num",-1,null,_notBoxExhaust],
+    ["Fans_top","num",0,null,_notBoxExhaust],["Fans_bottom","num",0,null,_notBoxExhaust],
+  ]],
+  ["Box / Exhaust", [
+    ["Fan_hole_size","num", v=>+(5/6*v.X).toFixed(1), null,_isBoxExhaust],   // 5/6 of the filter width
+    ["Ring_one_screw_holes","num",4,null,_isBoxExhaust],["Ring_one_screw_diameter","num",6,null,_isBoxExhaust],
+    ["Ring_one_radius","num", v=>+(1.2*(_fanHoleR(v))).toFixed(1), null,_isBoxExhaust],   // 120% of fan hole radius
+    ["Ring_two_screw_holes","num",4,null,_isBoxExhaust],["Ring_two_screw_diameter","num",6,null,_isBoxExhaust],
+    ["Ring_two_radius","num", v=>+(1.4*(_fanHoleR(v))).toFixed(1), null,_isBoxExhaust],   // 140% of fan hole radius
+  ]],
+  ["Hex Grill", [
+    ["Hex_grill","bool",true,null,_notBoxExhaust],["Hex_size","num",10,null,_notBoxExhaust],["Hex_spacing","num",1.6,null,_notBoxExhaust],
+  ]],
+  ["Filter Slot", [
+    ["Slot_wall","sel", v=> v.Filters===4 ? "top" : "bottom", v=> v.Filters===4 ? ["top","bottom"] : ["left","right","top","bottom"] ],
+    ["Slot_clearance","num",1],["Slot_end_margin","num",4],
+  ]],
+  ["Walls / Frame", [
+    ["Wall_thickness","num",5],["Outside_flange_thickness","num",10],["Chamfer_size","num",2],
+    ["Corner_post_chamfer","num", v=>+(v.Outside_flange_thickness+v.Filter_height).toFixed(1), null, null, "derived"],
+  ]],
+  ["Cord Pass-Through", [
+    ["Cord_hole_diameter","num",8],
+    ["Cord_hole_wall","sel","right",["none","front","back","left","right"]],
+    ["Cord_hole_side","sel","right",["left","center","right"]],
+    ["Cord_hole_corner_offset","num",17],
+  ]],
+  ["Alignment Pins", [
+    ["Pin_diameter","num",1.8],["Pin_hole_depth","num",10],["Pin_spacing","num",30],
+  ]],
+  ["Print Chunking", [
+    ["Bed_x","num",256],["Bed_y","num",256],["Bed_z","num",256],
+    ["Chunk_z_align","sel","chunk",["seam","chunk"]],
+    ["Render_part","sel","assembly",["assembly"]],   // options filled in from the live chunk grid
+    ["Chunk_to_origin","bool",true],
+    ["Show_cut_lines","bool",false],
+  ]],
+];
+
+// Laser-cut variable set — mirrors florianfesti/boxes airpurifier.py.
+const LASER_SCHEMA = [
+  ["Filter", [
+    ["X","num",501],["Y","num",501],["Filter_height","num",19],["Rim","num",30],
+    ["Filters","sel",2,[1,2]],
+  ]],
+  ["Fans", [
+    ["Fan_diameter","sel",140,[120,140]],["Screw_holes","num",5],
+    ["Fans_left","num",-1],["Fans_right","num",-1],["Fans_top","num",0],["Fans_bottom","num",0],
+  ]],
+  ["Hex Grill", [
+    ["Hex_grill","bool",true],["Hex_size","num",10],["Hex_spacing","num",1.6],
+  ]],
+  ["Material", [
+    ["Thickness","num",3],["Kerf","num",0.1],
+    ["Finger","num",2],["Finger_space","num",2],
+  ]],
+  ["Cord Pass-Through", [
+    ["Cord_hole_diameter","num",8],
+    ["Cord_hole_wall","sel","right",["none","front","back","left","right"]],
+    ["Cord_hole_side","sel","right",["left","center","right"]],
+    ["Cord_hole_corner_offset","num",17],
+  ]],
+  ["Layout", [
+    ["Split_frames","bool",true],
+    ["Show_cut_lines","bool",false],
+  ]],
+  ["Output", [
+    ["Labels","bool",true],
+    ["Reference","num",100],
+  ]],
+];
+const SCHEMAS = { print: PRINT_SCHEMA, laser: LASER_SCHEMA };
+let MODE = "print";
+const activeSchema = () => SCHEMAS[MODE];
+
+// 3D-printing tooltips (shown only in 3D Printed mode).
+const DESC = {
+  X:"Filter outer X dimension (mm). For Filters 1/2 the horizontal width; for Filters 4 the face width of each side filter (the box has a square footprint and all 4 filters share this width).",
+  Y:"Filter outer Y dimension (mm). For Filters 1/2 the horizontal depth; for Filters 4 the vertical height of each side filter.",
+  Filter_height:"Filter thickness in the airflow direction (mm). Vertical for Filters 1/2; horizontal for Filters 4.",
+  Rim:"Rim width (mm), measured from the outside of the box. Sets the printed air opening and the inside supporting flange so they line up.",
+  Filters:"Filter arrangement: 1 = single filter at top, 2 = top and bottom sandwich, 4 = vertical tower (one filter per side).",
+  Fan_diameter:"PC fan size- 120 mm or 140 mm. 4 filters also offers Box/Exhaust fan type: a single central hole surrounded by screw holes, instead of a fan grid. Use two holes in each corner to zip-tie box fan in place.",
+  Screw_holes:"Fan mounting screw hole diameter (mm).",
+  Fan_hole_size:"Box/Exhaust only: diameter (mm) of the single round hole cut in the center of the top plate. 0 = no hole.",
+  Ring_one_screw_holes:"Box/Exhaust only: number of screw holes evenly spaced around ring one. 0 = none. With 4 holes they land in the corners.",
+  Ring_one_screw_diameter:"Box/Exhaust only: diameter (mm) of each ring one screw hole.",
+  Ring_one_radius:"Box/Exhaust only: radius (mm) of ring one, measured from the center of the fan hole.",
+  Ring_two_screw_holes:"Box/Exhaust only: number of screw holes evenly spaced around ring two. 0 = none. With 4 holes they land in the corners.",
+  Ring_two_screw_diameter:"Box/Exhaust only: diameter (mm) of each ring two screw hole.",
+  Ring_two_radius:"Box/Exhaust only: radius (mm) of ring two, measured from the center of the fan hole.",
+  Fans_left:"Fans on the LEFT wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_right:"Fans on the RIGHT wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_top:"Fans on the FRONT wall (y=0). -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_bottom:"Fans on the BACK wall (y=Y). -1 = as many as fit, 0 = none, N = exactly N.",
+  Hex_grill:"Add a printed honeycomb grill across each fan opening.",
+  Hex_size:"Flat-to-flat distance of one hex hole (mm).",
+  Hex_spacing:"Rib thickness between adjacent hex holes (mm).",
+  Slot_wall:"Which wall carries the filter insertion slot(s) for sliding a filter in after printing and assembly.",
+  Slot_clearance:"Clearance around the filter inside the slot (mm).",
+  Slot_end_margin:"Wall material left at each end of the slot (mm). Keep it at or below Wall thickness minus Slot clearance so the filter can slide through.",
+  Wall_thickness:"Printed vertical wall thickness (mm). Also sets the inside filter flange thickness.",
+  Outside_flange_thickness:"Top and bottom outer frame thickness (mm). Independent of wall thickness so the frame can be beefier for filter retention.",
+  Chamfer_size:"45 degree chamfer (mm) on the outer vertical edges and the filter air opening.",
+  Corner_post_chamfer:"Filters 4 only: 45 degree chamfer (mm) cut into each outer corner of the tower box. Auto-scales with filter thickness.",
+  Cord_hole_diameter:"Cord hole diameter (mm). 0 = no cord hole.",
+  Cord_hole_wall:"Which wall the cord hole sits on. \"none\" disables it.",
+  Cord_hole_side:"Where along the wall the hole sits: the left end, the right end (viewed from outside), or center.",
+  Cord_hole_corner_offset:"Distance (mm) from the chosen corner to the cord hole centre. Ignored when side is center.",
+  Pin_diameter:"Diameter (mm) of the alignment pin holes drilled at chunk seams so glued chunks line up. 0 disables them.",
+  Pin_hole_depth:"Pin hole depth on each side of the seam (mm). Total hole length is twice this. For 18 mm pins use 10.",
+  Pin_spacing:"Spacing between pin holes along a seam (mm).",
+  Bed_x:"Print bed X size (mm). The assembly is sliced into a grid of bed-sized chunks.",
+  Bed_y:"Print bed Y size (mm).",
+  Bed_z:"Print bed Z size / printer max object height (mm).",
+  Chunk_z_align:"How the Z chunks line up. \"seam\": uniform from the bottom, sliced as-is (a seam can fall on the fans/grill). \"chunk\": a symmetric chunk centred on the box that keeps the fans and both flanges together, avoiding the grill cut-outs.",
+  Render_part:"What to show: the full assembly, or one printable chunk to export. The list is filled in from the current chunk grid.",
+  Chunk_to_origin:"On: shift the chunk to the origin, ready for STL export. Off: leave it in its assembly position.",
+  Show_cut_lines:"Overlay the chunk division planes and chunk names in red on the 3D view, showing where the model splits into printable pieces.",
+};
+
+// Laser-cutting tooltips (shown only in Laser cut mode).
+const LASER_DESC = {
+  X:"Filter outer X dimension (mm), the horizontal width of the filter the box is built around.",
+  Y:"Filter outer Y dimension (mm), the filter's other horizontal dimension. The box is shortened by one material thickness on this axis (it reuses the wall space).",
+  Filter_height:"Height of the filter along the airflow direction (mm). Sets how deep the box is.",
+  Rim:"Rim around the filter holding it in place (mm). Sets the size of the rectangular air opening cut into each frame panel.",
+  Filters:"Filters on both sides (2) or only one (1). With 1 filter the opposite face is a solid panel.",
+  Fan_diameter:"Size of the PC fans (mm). The screw hole spacing is derived from this. 120 or 140.",
+  Screw_holes:"Diameter of the holes for screwing in the fans (mm).",
+  Fans_left:"Number of fans on the LEFT wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_right:"Number of fans on the RIGHT wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_top:"Number of fans on the TOP wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Fans_bottom:"Number of fans on the BOTTOM wall. -1 = as many as fit, 0 = none, N = exactly N.",
+  Hex_grill:"Cut a honeycomb grill across each fan opening instead of a plain round hole.",
+  Hex_size:"Flat-to-flat distance of one hex hole (mm).",
+  Hex_spacing:"Rib thickness between adjacent hex holes (mm).",
+  Thickness:"Material (sheet) thickness in mm. Drives the finger joint depth and slot sizes.",
+  Kerf:"Laser kerf in mm, how much width the beam burns away. Tabs are shrunk and slots widened by this so parts fit snugly.",
+  Finger:"Finger joint tooth width as a multiple of material thickness.",
+  Finger_space:"Gap width between fingers as a multiple of material thickness.",
+  Cord_hole_diameter:"Diameter (mm) of the power cord pass-through hole. 0 = no hole.",
+  Cord_hole_wall:"Which wall the cord hole is cut into. \"none\" disables it.",
+  Cord_hole_side:"Position along that wall: the left end, the right end (viewed from outside), or center.",
+  Cord_hole_corner_offset:"Distance (mm) from the chosen end to the cord hole centre. Ignored when side is center.",
+  Split_frames:"Split each filter frame into four thin rails to save sheet material, instead of one full panel with a big cut-out in the center.",
+  Show_cut_lines:"Overlay the finger joints, dovetails and part names in red on the 3D view (part names match the SVG and DXF exports).",
+  Labels:"Print each part's name on the cut sheet in red. Turn off for a clean cut file.",
+  Reference:"Draw a reference scale line of this length (mm), labelled with the length and kerf, so you can verify the cut came out at true scale. 0 = none.",
+};
+const descFor = key => (MODE === "laser") ? LASER_DESC[key] : DESC[key];
+
+// values currently present in the DOM controls (only rendered fields).
+function domVals() {
+  const v = {};
+  document.querySelectorAll("#controls [data-key]").forEach(inp => {
+    const k = inp.dataset.key, ty = inp.dataset.type;
+    v[k] = ty==="bool" ? inp.checked : ty==="sel" ? (isNaN(+inp.value)?inp.value:+inp.value) : +inp.value;
+  });
+  return v;
+}
+function buildControls(preserve=false) {
+  const root = document.getElementById("controls");
+  const dom = preserve ? domVals() : {};
+  // scalar snapshot for predicates / option fns: scalar schema defaults overlaid with live DOM values
+  const vals = {};
+  for (const [,fields] of activeSchema()) for (const f of fields) if (typeof f[2] !== "function") vals[f[0]] = f[2];
+  Object.assign(vals, dom);
+  root.innerHTML = "";
+  for (const [group, fields] of activeSchema()) {
+    const vis = fields.filter(f => !f[4] || f[4](vals));   // f[4] = optional visibleIf predicate
+    if (!vis.length) continue;
+    const fs = document.createElement("fieldset");
+    const lg = document.createElement("legend"); lg.textContent = group; fs.appendChild(lg);
+    for (const f of vis) {
+      const [key, type, def, rawOpts] = f;
+      const defVal = (typeof def === "function") ? def(vals) : def;   // defaults may be computed from other values
+      // "derived" fields always track their formula (e.g. bevel follows filter thickness) and are not preserved
+      const cur = (key in dom && f[5] !== "derived") ? dom[key] : defVal;
+      const lab = document.createElement("label");
+      const LABELS = { Filter_height: "Filter thickness", X: "Filter X", Y: "Filter Y" };
+      const sp = document.createElement("span"); sp.textContent = LABELS[key] || key.replace(/_/g," ");
+      const desc = descFor(key);
+      if (desc) {
+        const ic = el("span",{className:"info",textContent:"i",tabIndex:0});
+        ic.dataset.desc = desc; sp.appendChild(ic);
+      }
+      let inp;
+      if (type === "bool") { inp = el("input",{type:"checkbox"}); inp.checked = !!cur; }
+      else if (type === "sel") {
+        const opts = (typeof rawOpts === "function") ? rawOpts(vals) : rawOpts;
+        const tc = o => (typeof o==="string") ? o.replace(/\b\w/g, c=>c.toUpperCase()) : o;  // display Title Case, keep value
+        inp = el("select"); for (const o of opts) inp.appendChild(el("option",{value:o,textContent:tc(o)}));
+        inp.value = opts.map(String).includes(String(cur)) ? cur : defVal;
+      } else { inp = el("input",{type:"number",step:"any",value:cur}); }
+      inp.dataset.key = key; inp.dataset.type = type;
+      if (key==="Show_cut_lines" || key==="Render_part" || key==="Chunk_z_align") inp.addEventListener("change", render);
+      // these toggle which other fields are visible / which options are offered
+      if (["Filters","Fan_diameter","Filter_height","Outside_flange_thickness","X"].includes(key)) inp.addEventListener("change", () => buildControls(true));
+      lab.append(sp, inp); fs.appendChild(lab);
+    }
+    root.appendChild(fs);
+  }
+  initTooltips();
+}
+
+// Shared tooltip: shows on hover/focus of any .info icon, near the icon.
+function initTooltips() {
+  let tip = document.getElementById("tip");
+  if (!tip) { tip = el("div",{id:"tip"}); document.body.appendChild(tip); }
+  const show = (ic) => {
+    tip.textContent = ic.dataset.desc;
+    const r = ic.getBoundingClientRect();
+    tip.classList.add("on");
+    const tr = tip.getBoundingClientRect();
+    let left = r.right + 8, top = r.top + r.height/2 - tr.height/2;
+    if (left + tr.width > innerWidth - 6) left = r.left - tr.width - 8; // flip to left side
+    tip.style.left = Math.max(6, left) + "px";
+    tip.style.top = Math.min(Math.max(6, top), innerHeight - tr.height - 6) + "px";
+  };
+  const hide = () => tip.classList.remove("on");
+  document.getElementById("controls").addEventListener("mouseover", e => {
+    const ic = e.target.closest(".info"); if (ic) show(ic);
+  });
+  document.getElementById("controls").addEventListener("mouseout", e => {
+    if (e.target.closest(".info")) hide();
+  });
+  document.getElementById("controls").addEventListener("focusin", e => {
+    const ic = e.target.closest(".info"); if (ic) show(ic);
+  });
+  document.getElementById("controls").addEventListener("focusout", e => {
+    if (e.target.closest(".info")) hide();
+  });
+  // tap-to-toggle on touch devices
+  document.getElementById("controls").addEventListener("click", e => {
+    const ic = e.target.closest(".info"); if (!ic) return;
+    if (tip.classList.contains("on")) hide(); else show(ic);
+  });
+}
+function el(tag, props={}) { const e=document.createElement(tag); Object.assign(e,props); return e; }
+function readParams() {
+  const P = {};
+  document.querySelectorAll("#controls [data-key]").forEach(inp => {
+    const k = inp.dataset.key, ty = inp.dataset.type;
+    if (ty === "bool") P[k] = inp.checked;
+    else if (ty === "sel") P[k] = isNaN(+inp.value) ? inp.value : +inp.value;
+    else P[k] = +inp.value;
+  });
+  return P;
+}
+
+// ---------------------------------------------------------------------------
+//  THREE.JS VIEWER  (+ minimal orbit control, no external deps)
+// ---------------------------------------------------------------------------
+let scene, camera, renderer, modelGroup, target = new THREE.Vector3();
+let orbit = { az: -0.7, el: 0.9, dist: 1200 };
+function initViewer() {
+  const host = document.getElementById("view");
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  host.appendChild(renderer.domElement);
+  scene = new THREE.Scene(); scene.background = new THREE.Color(0x11141a);
+  camera = new THREE.PerspectiveCamera(45, 1, 1, 20000);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const d1=new THREE.DirectionalLight(0xffffff,0.8); d1.position.set(1,1.4,1); scene.add(d1);
+  const d2=new THREE.DirectionalLight(0x88aaff,0.35); d2.position.set(-1,-0.5,-1); scene.add(d2);
+  scene.add(new THREE.GridHelper(2000,20,0x2c333f,0x20262f));
+  modelGroup = new THREE.Group(); scene.add(modelGroup);
+  addOrbit(renderer.domElement);
+  const ro = () => { const w=host.clientWidth,h=host.clientHeight;
+    renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); };
+  new ResizeObserver(ro).observe(host); ro();
+  (function loop(){ requestAnimationFrame(loop);
+    const ce=Math.cos(orbit.el),se=Math.sin(orbit.el),ca=Math.cos(orbit.az),sa=Math.sin(orbit.az);
+    camera.position.set(target.x+orbit.dist*ce*sa, target.y+orbit.dist*se, target.z+orbit.dist*ce*ca);
+    camera.up.set(0,1,0); camera.lookAt(target); renderer.render(scene,camera);
+  })();
+}
+function addOrbit(dom){ let down=false,px=0,py=0,btn=0;
+  dom.addEventListener("mousedown",e=>{down=true;px=e.clientX;py=e.clientY;btn=e.button;});
+  addEventListener("mouseup",()=>down=false);
+  addEventListener("mousemove",e=>{ if(!down)return; const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+    if(btn===0){orbit.az-=dx*0.008;orbit.el=Math.max(-1.5,Math.min(1.5,orbit.el+dy*0.008));}
+    else{const s=orbit.dist*0.0015;target.x-=dx*s*Math.cos(orbit.az);target.z+=dx*s*Math.sin(orbit.az);target.y+=dy*s;}});
+  dom.addEventListener("contextmenu",e=>e.preventDefault());
+  dom.addEventListener("wheel",e=>{e.preventDefault();orbit.dist=Math.max(150,Math.min(8000,orbit.dist*(1+Math.sign(e.deltaY)*0.1)));},{passive:false});
+}
+// JSCAD geom3 -> THREE.BufferGeometry (triangulate each polygon as a fan)
+function geomToThree(geom, color) {
+  const polys = jscadModeling.geometries.geom3.toPolygons(geom);
+  const pos = [];
+  for (const poly of polys) { const v = poly.vertices;
+    for (let i=2;i<v.length;i++){ pos.push(...v[0],...v[i-1],...v[i]); } }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.computeVertexNormals();
+  const m = new THREE.MeshStandardMaterial({ color:new THREE.Color(...color), metalness:0.1, roughness:0.7, flatShading:true });
+  return new THREE.Mesh(g, m);
+}
+
+// ---------------------------------------------------------------------------
+//  ASCII STL exporter (from JSCAD geom3 polygons; triangulated)
+// ---------------------------------------------------------------------------
+// Clean a triangle soup for a watertight STL: weld vertices, drop degenerate
+// and internal (coincident) faces, and split edges at T-junctions so adjacent
+// faces share full edges (JSCAD CSG output is riddled with T-junctions).
+function cleanMesh(tris) {
+  const R=1e3, key=p=>Math.round(p[0]*R)/R+","+Math.round(p[1]*R)/R+","+Math.round(p[2]*R)/R;  // weld to 1 micron
+  const vmap=new Map(), verts=[];
+  const idx=p=>{ const k=key(p); let i=vmap.get(k);
+    if(i===undefined){ i=verts.length; vmap.set(k,i); verts.push([Math.round(p[0]*R)/R,Math.round(p[1]*R)/R,Math.round(p[2]*R)/R]); } return i; };
+  let T=tris.map(t=>[idx(t[0]),idx(t[1]),idx(t[2])]).filter(t=>t[0]!==t[1]&&t[1]!==t[2]&&t[0]!==t[2]);
+  // drop internal coincident faces (same 3 verts, appearing 2+ times)
+  const fk=t=>[...t].sort((a,b)=>a-b).join("_"), fc=new Map();
+  for(const t of T) fc.set(fk(t),(fc.get(fk(t))||0)+1);
+  T=T.filter(t=>fc.get(fk(t))===1);
+  // spatial hash of vertices for on-edge (T-junction) queries
+  const CELL=5, grid=new Map(), ck=(x,y,z)=>Math.floor(x/CELL)+","+Math.floor(y/CELL)+","+Math.floor(z/CELL);
+  verts.forEach((v,i)=>{ const k=ck(v[0],v[1],v[2]); (grid.get(k)||grid.set(k,[]).get(k)).push(i); });
+  const onSeg=(a,b,c)=>{ const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+    const cr=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]];
+    const abl=Math.hypot(ab[0],ab[1],ab[2]); if(!abl||Math.hypot(cr[0],cr[1],cr[2])>1e-3*abl) return -1;
+    const tt=(ac[0]*ab[0]+ac[1]*ab[1]+ac[2]*ab[2])/(abl*abl); return (tt<=1e-4||tt>=1-1e-4)?-1:tt; };
+  const edgePts=(ai,bi)=>{ const a=verts[ai],b=verts[bi],res=[];
+    const lo=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.min(a[2],b[2])], hi=[Math.max(a[0],b[0]),Math.max(a[1],b[1]),Math.max(a[2],b[2])];
+    for(let X=Math.floor(lo[0]/CELL);X<=Math.floor(hi[0]/CELL);X++) for(let Y=Math.floor(lo[1]/CELL);Y<=Math.floor(hi[1]/CELL);Y++) for(let Z=Math.floor(lo[2]/CELL);Z<=Math.floor(hi[2]/CELL);Z++){
+      const arr=grid.get(X+","+Y+","+Z); if(!arr)continue;
+      for(const ci of arr){ if(ci===ai||ci===bi)continue; const tt=onSeg(a,b,verts[ci]); if(tt>0)res.push([tt,ci]); } }
+    res.sort((x,y)=>x[0]-y[0]); const seen=new Set(),o=[]; for(const[,ci]of res) if(!seen.has(ci)){seen.add(ci);o.push(ci);} return o; };
+  const out=[];
+  for(const [a,b,c] of T){ const loop=[a,...edgePts(a,b),b,...edgePts(b,c),c,...edgePts(c,a)];
+    for(let i=1;i<loop.length-1;i++){ const x=loop[0],y=loop[i],z=loop[i+1]; if(x!==y&&y!==z&&x!==z) out.push([verts[x],verts[y],verts[z]]); } }
+  return out;
+}
+function geomToStl(geom, name="tempest") {
+  const polys = jscadModeling.geometries.geom3.toPolygons(geom);
+  let tris=[];
+  for (const poly of polys) { const v=poly.vertices; for (let i=2;i<v.length;i++) tris.push([v[0],v[i-1],v[i]]); }
+  tris = cleanMesh(tris);
+  let s = `solid ${name}\n`;
+  for (const [a,b,c] of tris) {
+    const nx=(b[1]-a[1])*(c[2]-a[2])-(b[2]-a[2])*(c[1]-a[1]);
+    const ny=(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]);
+    const nz=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    const l=Math.hypot(nx,ny,nz)||1;
+    s+=`facet normal ${nx/l} ${ny/l} ${nz/l}\nouter loop\n`;
+    s+=`vertex ${a[0]} ${a[1]} ${a[2]}\nvertex ${b[0]} ${b[1]} ${b[2]}\nvertex ${c[0]} ${c[1]} ${c[2]}\n`;
+    s+=`endloop\nendfacet\n`;
+  }
+  return s + `endsolid ${name}\n`;
+}
+
+// ---------------------------------------------------------------------------
+//  LASER-CUT ENGINE  (finger-jointed flat panels -> SVG)
+//  Functional port of florianfesti/boxes airpurifier.py (1 & 2 filters).
+// ---------------------------------------------------------------------------
+const FAN_PITCH = {40:32.5,60:50,80:71.5,92:82.5,120:105,140:125};
+// Collision-aware fan layout (same rule as the 3D-printed version): the first
+// and last fan centres sit far enough from the corner that fan bodies on
+// perpendicular walls cannot collide inside the box.
+function fanBodyDepth(d){ return d===120?25 : d===140?27 : d*0.19; }
+function fanPositions(n, L, d, t){
+  const mc = t + fanBodyDepth(d) + d/2;                       // corner-safe min centre
+  const cap = Math.max(0, Math.floor((L-20)/(d+10)));         // keep the original fan COUNT
+  const na = (n<0 || n>cap) ? cap : n;
+  if (na<=0) return [];
+  if (na===1) return [L/2];
+  // spread fans between the corner-safe margins so first/last clear the corner;
+  // if that would make them overlap, fall back to spreading across the full wall.
+  let lo = mc, sp = (L - 2*mc)/(na-1);
+  if (sp < d) { lo = 10 + d/2; sp = (L - 2*lo)/(na-1); }
+  return Array.from({length:na}, (_,i)=>lo + i*sp);
+}
+
+// Build the laser-cut sheet as STRUCTURED geometry (shared by SVG + DXF):
+// each panel has an outline point list and a list of shapes (polylines / circles).
+function buildLaserSheet(P) {
+  const t = P.Thickness, kerf = P.Kerf||0, r = P.Rim, fh = P.Filter_height;
+  const filters = P.Filters, d = P.Fan_diameter;
+  const fw = (P.Finger||2) * t;
+  const x = P.X, y = P.Y - t, h = d + 2 + filters * (fh + t);
+  const pitch = FAN_PITCH[d] || d*0.85;
+  const split = !!P.Split_frames;
+  const hexGrill = !!P.Hex_grill, hexSize = P.Hex_size||10, hexSpace = P.Hex_spacing||1.6;
+  const cordD = P.Cord_hole_diameter||0, cordWall = P.Cord_hole_wall||"none";
+  const cordSide = P.Cord_hole_side||"center", cordOff = P.Cord_hole_corner_offset||0;
+  const chamLo = (filters===2) ? (2*t+fh) : t;          // fan-chamber bottom (for cord on short top wall)
+  const round = v => Math.round(v*1000)/1000, D2R = Math.PI/180;
+
+  // finger comb (equal odd segments => genders A/B are exact complements)
+  function comb(length, gender, depth) {
+    let segs = Math.max(3, Math.round(length / fw)); if (segs%2===0) segs++;
+    const w = length/segs, protrudeOdd = (gender==="A"), pts=[[0,0]];
+    for (let i=0;i<segs;i++){ const x0=i*w,x1=(i+1)*w,prot=((i%2===1)===protrudeOdd);
+      if(prot){const a0=x0+kerf/2,a1=x1-kerf/2;pts.push([a0,0],[a0,depth],[a1,depth],[a1,0]);}
+      else pts.push([x1,0]); }
+    return pts;
+  }
+  // dovetail comb: trapezoidal teeth (flared at the tip so they lock in plane)
+  function dovetail(length, gender, depth) {
+    // Male tails (A) PROTRUDE (out=+depth), flaring WIDER at the tip.
+    // Female sockets (B) are cut INTO the edge (out=-depth) at the SAME
+    // positions, flaring wider at the bottom — so each tail slots into a socket.
+    let segs = Math.max(3, Math.round(length / (2*t))); if (segs%2===0) segs++;
+    const w = length/segs, flare = Math.min(w*0.3, depth*0.6);
+    const male = (gender==="A"), dd = male?depth:-depth, k = male?kerf/2:-kerf/2, pts=[[0,0]];
+    for (let i=0;i<segs;i++){ const x0=i*w,x1=(i+1)*w;
+      if(i%2===1){ const a0=x0+k,a1=x1-k; pts.push([a0,0],[a0-flare,dd],[a1+flare,dd],[a1,0]); }
+      else pts.push([x1,0]); }
+    return pts;
+  }
+  function profileFor(type, length) {
+    if (Array.isArray(type)) { let pts=[], off=0;
+      for (const [ty,len] of type){ const sub=profileFor(ty,len);
+        for (const p of sub) pts.push([p[0]+off,p[1]]); off+=len; } return pts; }
+    if (type==="e"||type==="E") return [[0,0],[length,0]];      // plain straight
+    if (type==="D") return dovetail(length,"A",t);              // dovetail tab
+    if (type==="d") return dovetail(length,"B",t);              // dovetail socket (mates with D)
+    if (type==="F"||type==="h") return comb(length,"B",t);      // finger edge, gender B (mates with f)
+    return comb(length,"A",t);                                  // "f" finger edge, gender A
+  }
+
+  // shape helpers (return structured objects)
+  const cy2 = (H,yUp)=>H-yUp;
+  const circle = (cx,cy,dia)=>({type:"circle", cx:round(cx), cy:round(cy), r:round(Math.max(0.1,dia/2-kerf/2))});
+  function arcPts(cxc,cyc,rad,a0,a1,seg){ const o=[];
+    for(let i=0;i<=seg;i++){const a=(a0+(a1-a0)*i/seg)*D2R;o.push([cxc+rad*Math.cos(a),cyc+rad*Math.sin(a)]);} return o; }
+  function roundRectPts(cx,cy,w,hh,rad){ const q=Math.min(rad,w/2,hh/2);
+    if(q<=0){const x0=cx-w/2,y0=cy-hh/2,x1=cx+w/2,y1=cy+hh/2;return[[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]];}
+    const s=5,p=[]; p.push(...arcPts(cx-w/2+q,cy-hh/2+q,q,180,270,s));
+    p.push(...arcPts(cx+w/2-q,cy-hh/2+q,q,270,360,s)); p.push(...arcPts(cx+w/2-q,cy+hh/2-q,q,0,90,s));
+    p.push(...arcPts(cx-w/2+q,cy+hh/2-q,q,90,180,s)); p.push(p[0]); return p.map(pt=>[round(pt[0]),round(pt[1])]); }
+  const poly = pts => ({type:"poly", pts});
+
+  function panel(W,H,edges,shapes,label) {
+    const [be,re,te,le]=edges, pts=[]; const add=(px,py)=>pts.push([round(px),round(py)]);
+    for (const [a,o] of profileFor(be,W)) add(a, H+o);
+    for (const [a,o] of profileFor(re,H)) add(W+o, H-a);
+    for (const [a,o] of profileFor(te,W)) add(W-a, -o);
+    for (const [a,o] of profileFor(le,H)) add(-o, a);
+    const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+    return { W,H, outline:pts, shapes:(shapes||[]).slice(), label,
+      bb:{minx:Math.min(...xs),maxx:Math.max(...xs),miny:Math.min(...ys),maxy:Math.max(...ys)} };
+  }
+
+  function slotLine(H,x0,yUp,length){ const out=[]; let segs=Math.max(3,Math.round(length/fw)); if(segs%2===0)segs++;
+    const w=length/segs, yc=cy2(H,yUp);
+    for(let i=0;i<segs;i++){ if(i%2===1){ const a0=x0+i*w-kerf/2, a1=x0+(i+1)*w+kerf/2;
+      out.push(poly(roundRectPts((a0+a1)/2, yc, a1-a0, t+kerf, 0))); } } return out; }
+  // honeycomb hole cells filling a fan circle of `dia`, clipped flush to the circle
+  function hexCells(cx,cy,dia){
+    const rr=hexSize/Math.sqrt(3), px=hexSize+hexSpace, py=(hexSize+hexSpace)*Math.sqrt(3)/2;
+    const R=(dia-2*hexSpace)/2, nc=Math.ceil(dia/px)+2, nr=Math.ceil(dia/py)+2, out=[];
+    const NG=72, clip=[]; for(let k=0;k<NG;k++){const a=2*Math.PI*k/NG; clip.push([R*Math.cos(a),R*Math.sin(a)]);}
+    const side=(p,a,b)=>(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+    const isect=(p1,p2,a,b)=>{const d1=side(p1,a,b),d2=side(p2,a,b),tt=d1/(d1-d2);return [p1[0]+tt*(p2[0]-p1[0]),p1[1]+tt*(p2[1]-p1[1])];};
+    function clipPoly(subj){ let outp=subj;
+      for(let e=0;e<clip.length && outp.length;e++){ const a=clip[e],b=clip[(e+1)%clip.length], inp=outp; outp=[];
+        for(let i=0;i<inp.length;i++){ const cur=inp[i],prev=inp[(i+inp.length-1)%inp.length], ci=side(cur,a,b)>=0, pi=side(prev,a,b)>=0;
+          if(ci){ if(!pi)outp.push(isect(prev,cur,a,b)); outp.push(cur);} else if(pi)outp.push(isect(prev,cur,a,b)); } }
+      return outp; }
+    for(let j=-nr;j<=nr;j++)for(let i=-nc;i<=nc;i++){
+      const ox=(j%2===0)?0:px/2, hx=i*px+ox, hy=j*py, dist=Math.hypot(hx,hy);
+      if(dist > R+rr) continue;                          // entirely outside the circle
+      const hexPts=[]; for(let k=0;k<6;k++){const a=(60*k+30)*D2R; hexPts.push([hx+rr*Math.cos(a),hy+rr*Math.sin(a)]);}
+      const cl=(dist <= R-rr) ? hexPts : clipPoly(hexPts);   // full hex if well inside, else clip flush
+      if(cl.length<3) continue;
+      const pts=cl.map(p=>[round(cx+p[0]),round(cy+p[1])]); pts.push(pts[0]); out.push(poly(pts));
+    }
+    return out;
+  }
+  function fanFeatures(H,n,hh,l,fingerHoles){ const inner=[];
+    if(fingerHoles){ const heights = (filters===2) ? [fh+t/2, hh-fh-t/2] : [hh-fh-t/2];   // single filter at TOP
+      for(const h_ of heights) inner.push(...slotLine(H,0,h_,l)); }
+    const delta=pitch/2, posy=(filters===2)?hh/2:(hh-t-fh)/2;   // fan centred in the chamber BELOW the filter(s)
+    for(const posx of fanPositions(n,l,d,t)){ const yc=cy2(H,posy);
+      if(hexGrill) inner.push(...hexCells(posx,yc,d-4)); else inner.push(circle(posx,yc,d-4));
+      for(const dx of[-delta,delta])for(const dy of[-delta,delta]) inner.push(circle(posx+dx,cy2(H,posy+dy),P.Screw_holes)); }
+    return inner; }
+  // cord hole on a wall panel: along = position along the wall length, zUp = vertical centre
+  function cordShapes(wall, alongLen, H, zUp){ if(cordD<=0 || cordWall!==wall) return [];
+    const off=Math.max(cordD/2+t+1, cordOff);
+    const a=(cordSide==="center")?alongLen/2:(cordSide==="left")?off:alongLen-off;
+    return [circle(a, cy2(H,zUp), cordD)]; }
+
+  // --- panel set (mirrors boxes.py render()) ---
+  const panels = [];
+  // top wall is short (x*d) -> filter loading openings; cord centred at d/2
+  panels.push(panel(x, d, ["f","f","f","f"],
+    fanFeatures(d, P.Fans_top, d, x, false).concat(cordShapes("front", x, d, d/2)), "top"));
+  panels.push(panel(x, h, ["f","f","f","f"],
+    fanFeatures(h, P.Fans_bottom, h, x, true).concat(cordShapes("back", x, h, h/2)), "bottom"));
+  const le = (filters===2) ? [["E",fh+t],["F",d+2],["E",fh+t]] : [["F",d+2],["E",fh+t]];
+  // split mode: side-wall top/bottom edges segmented to align fingers with the rails
+  const beSide = split ? [["f",r],["f",y-2*r],["f",r]] : "f";
+  panels.push(panel(y, h, [beSide,"h",beSide,le],
+    fanFeatures(h, P.Fans_left, h, y, true).concat(cordShapes("left", y, h, h/2)), "left"));
+  panels.push(panel(y, h, [beSide,"h",beSide,le],
+    fanFeatures(h, P.Fans_right, h, y, true).concat(cordShapes("right", y, h, h/2)), "right"));
+
+  // frames: full panels with a rectangular opening, OR split into thin rails.
+  const openW = x - 2*r, openH = y - 2*r;
+  const frameHole = (H)=>[ poly(roundRectPts(x/2, cy2(H,y/2), openW, openH, 10)) ];
+  // Split frame = two rings of 4 rails each (matches boxes.py exactly):
+  //   the long (x) rails carry dovetails (DeD) at their ends, the side rails
+  //   carry the mating dovetails (d) on their short edges; finger-hole "h" /
+  //   finger "f" edges join the rails to the box walls.
+  const DeD = [["D",r],["e",x-2*r],["D",r]];
+  function splitFrameRails(lbl){
+    return [
+      panel(x,     r, ["E","h",DeD,"h"], [], lbl+" Th"),
+      panel(y-2*r, r, ["h","d","e","d"], [], lbl+" Sh1"),
+      panel(y-2*r, r, ["h","d","e","d"], [], lbl+" Sh2"),
+      panel(x,     r, [DeD,"h","h","h"], [], lbl+" Bh"),
+      panel(x,     r, ["F","f",DeD,"f"], [], lbl+" Tf"),
+      panel(y-2*r, r, ["f","d","e","d"], [], lbl+" Sf1"),
+      panel(y-2*r, r, ["f","d","e","d"], [], lbl+" Sf2"),
+      panel(x,     r, [DeD,"f","f","f"], [], lbl+" Bf"),
+    ];
+  }
+  for (let k=0;k<filters;k++) {
+    if (split) { panels.push(...splitFrameRails(`f${k+1}`)); }
+    else { panels.push(panel(x,y,["F","f","f","f"], frameHole(y), `frame ${k+1}a`));
+           panels.push(panel(x,y,["E","h","h","h"], frameHole(y), `frame ${k+1}b`)); }
+  }
+  if (filters===1) panels.push(panel(x, y, ["h","h","h","h"], [], "back"));
+
+  // layout: single vertical column
+  const gap=12, pad=8; let cursorY=0, sheetW=0; const placed=[];
+  for (const p of panels) { const pw=p.bb.maxx-p.bb.minx, ph=p.bb.maxy-p.bb.miny;
+    placed.push({ p, ox:-p.bb.minx, oy:cursorY-p.bb.miny }); cursorY+=ph+gap; sheetW=Math.max(sheetW,pw); }
+  const sheetH=Math.max(0,cursorY-gap);
+  const labels=(P.Labels!==false), reference=P.Reference||0, refGap=reference>0?22:0;
+  const W=Math.max(sheetW,reference)+pad*2, H=sheetH+pad*2+refGap, refY=sheetH+pad+12;
+  return { placed, pad, W, H, round, labels, reference, kerf, refY,
+    info:{ panels:panels.length, sheet:[round(sheetW),round(sheetH)], box:[x,y,h], t } };
+}
+
+// Serialize a sheet to SVG (mm units, hairline cut paths).
+function sheetToSVG(s) {
+  const r3=v=>s.round(v); let body="";
+  const ptsPath=pts=>"M "+pts.map(p=>r3(p[0])+","+r3(p[1])).join(" L ")+" Z";
+  const BLACK="rgb(0,0,0)", BLUE="rgb(0,0,255)", RED="rgb(255,0,0)";
+  for (const {p,ox,oy} of s.placed) {
+    body += `<g transform="translate(${r3(ox+s.pad)},${r3(oy+s.pad)})">`;
+    body += `<path d="${ptsPath(p.outline)}" fill="none" stroke="${BLACK}" stroke-width="0.3"/>`;  // perimeter = black
+    for (const sh of p.shapes) {                                                                    // interior = blue
+      if (sh.type==="circle") body += `<circle cx="${r3(sh.cx)}" cy="${r3(sh.cy)}" r="${r3(sh.r)}" fill="none" stroke="${BLUE}" stroke-width="0.3"/>`;
+      else body += `<path d="${ptsPath(sh.pts)}" fill="none" stroke="${BLUE}" stroke-width="0.3"/>`;
+    }
+    if (s.labels) body += `<text x="6" y="14" font-size="11" fill="${RED}" font-family="sans-serif">${p.label}</text>`;
+    body += `</g>`;
+  }
+  if (s.reference > 0) {                                                                            // reference scale
+    const y=r3(s.refY), x0=r3(s.pad), x1=r3(s.pad+s.reference);
+    body += `<path d="M ${x0},${y} L ${x1},${y}" fill="none" stroke="${BLACK}" stroke-width="0.3"/>`;
+    body += `<text x="${r3(s.pad+s.reference/2)}" y="${r3(y+10)}" font-size="8" fill="${RED}" font-family="sans-serif" text-anchor="middle">${s.reference.toFixed(2)}mm, burn:${s.kerf.toFixed(2)}mm</text>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${r3(s.W)}mm" height="${r3(s.H)}mm" viewBox="0 0 ${r3(s.W)} ${r3(s.H)}">${body}</svg>`;
+}
+
+// Serialize a sheet to a minimal R12 DXF (LINE + CIRCLE entities, mm, Y up).
+function sheetToDXF(s) {
+  const r3=v=>s.round(v); const ents=[];
+  const Y=v=>r3(s.H - v);                       // flip to CAD-up
+  // layers carry the colour intent: PERIMETER (black/7), INTERIOR (blue/5), LABEL (red/1)
+  const line=(x1,y1,x2,y2,L)=>ents.push("0\nLINE\n8\n"+L+"\n10\n"+r3(x1)+"\n20\n"+Y(y1)+"\n30\n0\n11\n"+r3(x2)+"\n21\n"+Y(y2)+"\n31\n0");
+  const circ=(cx,cy,rad,L)=>ents.push("0\nCIRCLE\n8\n"+L+"\n10\n"+r3(cx)+"\n20\n"+Y(cy)+"\n30\n0\n40\n"+r3(rad));
+  const text=(x,y,hgt,str,L)=>ents.push("0\nTEXT\n8\n"+L+"\n10\n"+r3(x)+"\n20\n"+Y(y)+"\n30\n0\n40\n"+hgt+"\n1\n"+str);
+  const polyline=(pts,ox,oy,L)=>{ for(let i=0;i<pts.length-1;i++) line(pts[i][0]+ox,pts[i][1]+oy,pts[i+1][0]+ox,pts[i+1][1]+oy,L);
+    const a=pts[pts.length-1], b=pts[0]; if(a[0]!==b[0]||a[1]!==b[1]) line(a[0]+ox,a[1]+oy,b[0]+ox,b[1]+oy,L); };
+  for (const {p,ox,oy} of s.placed) { const dx=ox+s.pad, dy=oy+s.pad;
+    polyline(p.outline, dx, dy, "PERIMETER");
+    for (const sh of p.shapes) {
+      if (sh.type==="circle") circ(sh.cx+dx, sh.cy+dy, sh.r, "INTERIOR");
+      else polyline(sh.pts, dx, dy, "INTERIOR");
+    }
+    if (s.labels) text(dx+6, dy+10, 4, p.label, "LABEL");
+  }
+  if (s.reference > 0) { line(s.pad, s.refY, s.pad+s.reference, s.refY, "PERIMETER");
+    text(s.pad, s.refY+10, 4, s.reference.toFixed(2)+"mm, burn:"+s.kerf.toFixed(2)+"mm", "LABEL"); }
+  // layer table so PERIMETER/INTERIOR/LABEL carry colours (7=white/black,5=blue,1=red)
+  const layer=(n,c)=>"0\nLAYER\n2\n"+n+"\n70\n0\n62\n"+c+"\n6\nCONTINUOUS";
+  const tables="0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n3\n"+layer("PERIMETER",7)+"\n"+layer("INTERIOR",5)+"\n"+layer("LABEL",1)+"\n0\nENDTAB\n0\nENDSEC\n";
+  return "0\nSECTION\n2\nHEADER\n0\nENDSEC\n"+tables+"0\nSECTION\n2\nENTITIES\n"+ents.join("\n")+"\n0\nENDSEC\n0\nEOF\n";
+}
+
+// Assembled-box 3D preview of the laser-cut design (representative solid:
+// 4 fan walls + filter-frame faces). Returns {parts,solid,info} like buildPurifier.
+function buildLaserModel(jscadModeling, P) {
+  const { booleans, primitives, transforms, extrusions } = jscadModeling;
+  const { union, subtract, intersect } = booleans;
+  const { cuboid, cylinder, circle, polygon } = primitives;
+  const { translate, rotateX, rotateY } = transforms;
+  const { extrudeLinear } = extrusions;
+  const FN = 48, D2R = Math.PI/180;
+  const t = P.Thickness, r = P.Rim, fh = P.Filter_height, filters = P.Filters, d = P.Fan_diameter;
+  const x = P.X, y = P.Y - t, h = d + 2 + filters*(fh + t);
+  const pitch = FAN_PITCH[d] || d*0.85, screw = P.Screw_holes, delta = pitch/2;
+  const hexGrill = !!P.Hex_grill, hexSize = P.Hex_size||10, hexSpace = P.Hex_spacing||1.6;
+  const cordD = P.Cord_hole_diameter||0, cordWall = P.Cord_hole_wall||"none";
+  const cordSide = P.Cord_hole_side||"center", cordOff = P.Cord_hole_corner_offset||0;
+  const posy = (filters===2) ? h/2 : (h - t - fh)/2;   // fan centred in chamber below the top filter
+  const box = (X,Y,Z,dx,dy,dz)=>translate([X,Y,Z],cuboid({size:[dx,dy,dz],center:[dx/2,dy/2,dz/2]}));
+  const orient = (g,axis)=>{ if(axis==="x")return rotateY(90*D2R,g); if(axis==="y")return rotateX(90*D2R,g); return g; };
+  const acyl = (dia,axis,cx,cy,cz)=>translate([cx,cy,cz], orient(cylinder({radius:dia/2,height:t+2,segments:FN}),axis));
+  // honeycomb grill as a 2D shape (intersection of fan circle and a hex tiling)
+  function hexGrill2D(dOuter){ const rr=hexSize/Math.sqrt(3);
+    const px=hexSize+hexSpace, py=(hexSize+hexSpace)*Math.sqrt(3)/2;
+    const nc=Math.ceil(dOuter/px)+2, nr=Math.ceil(dOuter/py)+2, hexes=[];
+    const oneHex=(hx,hy)=>{const pts=[];for(let k=0;k<=5;k++){const a=(60*k+30)*D2R;pts.push([hx+rr*Math.cos(a),hy+rr*Math.sin(a)]);}return polygon({points:pts});};
+    for(let j=-nr;j<=nr;j++)for(let i=-nc;i<=nc;i++){const ox=(j%2===0)?0:px/2;hexes.push(oneHex(i*px+ox,j*py));}
+    return intersect(circle({radius:(dOuter-2*hexSpace)/2,segments:FN}), union(hexes));
+  }
+  const fanCutZ = hexGrill ? translate([0,0,-(t+2)/2], extrudeLinear({height:t+2}, hexGrill2D(d-4))) : null;
+  const centers = (n,l)=>fanPositions(n,l,d,t);   // collision-aware (matches 3D-printed)
+
+  function wallWithFans(slab, axis, fixed, list, l) {
+    const cuts=[];
+    const at=(a,b)=>[axis==="y"?a:fixed, axis==="y"?fixed:a, b];   // (along, height) -> world
+    for(const c of list){
+      if(hexGrill){ const [wx,wy,wz]=at(c,posy); cuts.push(translate([wx,wy,wz], orient(fanCutZ,axis))); }
+      else cuts.push(acyl(d-4,axis,...at(c,posy)));
+      for(const s1 of[-delta,delta])for(const s2 of[-delta,delta]) cuts.push(acyl(screw,axis,...at(c+s1,posy+s2)));
+    }
+    return cuts.length?subtract(slab,union(cuts)):slab;
+  }
+
+  const wallCol=[0.69,0.77,0.87], frameCol=[0.86,0.86,0.86];
+  const parts=[];
+  // The TOP wall (front face) only spans the fan chamber, leaving the filter
+  // regions on that face OPEN — this is how filters load AFTER assembly.
+  // (Matches boxes.py, whose "top" panel is x*d, shorter than the others.)
+  const chamLo = (filters===2) ? (2*t+fh) : t;          // bottom of fan chamber
+  const chamHi = h - 2*t - fh;                          // top of fan chamber (below the top filter)
+  const topZ0  = (chamLo+chamHi)/2 - d/2;               // short top wall, centred on the chamber (leaves filter region open)
+  parts.push({geom:wallWithFans(box(0,0,topZ0,x,t,d),"y",t/2,centers(P.Fans_top,x),x),color:wallCol});  // top wall (height d → filter loading openings)
+  parts.push({geom:wallWithFans(box(0,y-t,0,x,t,h),"y",y-t/2,centers(P.Fans_bottom,x),x),color:wallCol});    // bottom wall (full height)
+  parts.push({geom:wallWithFans(box(0,0,0,t,y,h),"x",t/2,centers(P.Fans_left,y),y),color:wallCol});          // left wall (full height)
+  parts.push({geom:wallWithFans(box(x-t,0,0,t,y,h),"x",x-t/2,centers(P.Fans_right,y),y),color:wallCol});     // right wall (full height)
+  // Filter frames (the two large x*y end faces) PLUS the interior retaining
+  // flanges that hold each filter — same structure as the 3D-print preview.
+  const flangeCol=[0.41,0.41,0.41];
+  const airCut=(zc)=>box(r, r, zc-1, x-2*r, y-2*r, t+2);                 // opening (Rim each side, matches 3D-print flanges)
+  const framePlate=(zc,col)=>({geom:subtract(box(0,0,zc,x,y,t), airCut(zc)),color:col});
+  const solidPlate=(zc,col)=>({geom:box(0,0,zc,x,y,t),color:col});
+  if (filters===2) {
+    parts.push(framePlate(0, frameCol));            // bottom outer frame
+    parts.push(framePlate(h-t, frameCol));          // top outer frame
+    parts.push(framePlate(t+fh, flangeCol));        // inner flange holding bottom filter
+    parts.push(framePlate(h-2*t-fh, flangeCol));    // inner flange holding top filter
+  } else {
+    // single filter at the TOP (matches the 3D-printed version); fan chamber below.
+    parts.push(solidPlate(0, frameCol));            // solid back panel (bottom)
+    parts.push(framePlate(h-2*t-fh, flangeCol));    // inner flange below the top filter
+    parts.push(framePlate(h-t, frameCol));          // top outer frame (filter opening)
+  }
+
+  // cord pass-through: cut a cylinder through the chosen wall at the box's
+  // vertical centre (mirrors the 3D-print cord hole).
+  if (cordD>0 && cordWall!=="none") {
+    const off=Math.max(cordD/2+t+1, cordOff), cz=h/2;
+    const along=L=>cordSide==="center"?L/2:cordSide==="left"?off:L-off;
+    let idx=-1, cyl=null;
+    if (cordWall==="front") { idx=0; cyl=acyl(cordD,"y", along(x), t/2, cz); }
+    else if (cordWall==="back") { idx=1; cyl=acyl(cordD,"y", along(x), y-t/2, cz); }
+    else if (cordWall==="left") { idx=2; cyl=acyl(cordD,"x", t/2, along(y), cz); }
+    else if (cordWall==="right") { idx=3; cyl=acyl(cordD,"x", x-t/2, along(y), cz); }
+    if (cyl && idx>=0) parts[idx] = { geom:subtract(parts[idx].geom, cyl), color:parts[idx].color };
+  }
+
+  return { parts, solid:union(parts.map(p=>p.geom)), info:{ box:[x,y,h], t, filters } };
+}
+
+// ---------------------------------------------------------------------------
+//  WIRE-UP
+// ---------------------------------------------------------------------------
+let lastSolid = null, lastSVG = null, firstRender = true;
+const overlay = () => document.getElementById("overlay");
+function setOverlayText(main, sub){ const s=overlay().querySelector("span"); if(!s) return;
+  const m = /…$/.test(main) ? main.replace(/…$/,'<span class="ol-dots"><span>.</span><span>.</span><span>.</span></span>') : main;
+  s.innerHTML = `<div>${m}</div>` + (sub ? `<div class="ol-sub">${sub}</div>` : ""); }
+function setBusy(on, t){ if(t) setOverlayText(t); overlay().classList.toggle("on", on); }
+
+// Clear, draw and bbox-centre a list of {geom,color} parts; returns triangle count.
+function show3D(parts) {
+  while (modelGroup.children.length) modelGroup.remove(modelGroup.children[0]);
+  let tris = 0;
+  for (const p of parts) { const mesh = geomToThree(p.geom, p.color); modelGroup.add(mesh);
+    tris += mesh.geometry.attributes.position.count/3; }
+  modelGroup.rotation.x = -Math.PI/2;          // z-up model -> y-up view
+  modelGroup.position.set(0,0,0);
+  const bb = new THREE.Box3().setFromObject(modelGroup);
+  const ctr = bb.getCenter(new THREE.Vector3());
+  modelGroup.position.sub(ctr); target.set(0,0,0);
+  if (firstRender){ const sz=bb.getSize(new THREE.Vector3());
+    orbit.dist=Math.max(sz.x,sz.y,sz.z)*1.8||1200; firstRender=false; }
+  return tris;
+}
+
+// ---- red cut-line overlay (chunks for print; fingers/dovetails for laser) ----
+// the 12 edges of a box, as polylines
+function boxEdges(x0,y0,z0,x1,y1,z1) {
+  const c=[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+  return [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].map(([a,b])=>[c[a],c[b]]);
+}
+function printCutPolylines(info) {                        // chunk-seam rectangles (model coords, z up)
+  const X=info.box_x, Y=info.box_y, Z=info.h_box, [nx,ny,nz]=info.chunks, out=[];
+  const xb=info.xb||Array.from({length:nx+1},(_,k)=>k*X/nx);
+  const yb=info.yb||Array.from({length:ny+1},(_,k)=>k*Y/ny);
+  const zb=info.zb||Array.from({length:nz+1},(_,k)=>k*Z/nz);
+  for(let i=1;i<nx;i++){const x=xb[i]; out.push([[x,0,0],[x,Y,0],[x,Y,Z],[x,0,Z],[x,0,0]]);}
+  for(let j=1;j<ny;j++){const y=yb[j]; out.push([[0,y,0],[X,y,0],[X,y,Z],[0,y,Z],[0,y,0]]);}
+  for(let k=1;k<nz;k++){const z=zb[k]; out.push([[0,0,z],[X,0,z],[X,Y,z],[0,Y,z],[0,0,z]]);}
+  return out;
+}
+function _tooth(length, toothW, depth, dove) {           // zigzag profile [along,out]
+  let segs=Math.max(3,Math.round(length/toothW)); if(segs%2===0)segs++;
+  const w=length/segs, pts=[[0,0]];
+  for(let i=0;i<segs;i++){ const x0=i*w,x1=(i+1)*w;
+    if(i%2===1){ if(dove){const f=Math.min(w*0.3,depth*0.6); pts.push([x0,0],[x0-f,depth],[x1+f,depth],[x1,0]);}
+                 else pts.push([x0,0],[x0,depth],[x1,depth],[x1,0]); }
+    else pts.push([x1,0]); }
+  return pts;
+}
+// Laser overlay (model coords, z up): wall finger joints drawn ON the wall
+// faces (teeth contained, no air protrusions), and split-frame rails shown on
+// each flange plane with straight inner (opening) edges + dovetailed corners.
+function laserCutPolylines(P) {
+  const t=P.Thickness, fh=P.Filter_height, filters=P.Filters, d=P.Fan_diameter, r=P.Rim;
+  const x=P.X, y=P.Y-t, h=d+2+filters*(fh+t), fw=(P.Finger||2)*t;
+  const chamLo=(filters===2)?(2*t+fh):t, chamHi=h-2*t-fh, topZ0=(chamLo+chamHi)/2-d/2;
+  const out=[];
+  // --- walls: reflect the export outline so finger teeth stay on the face ---
+  const sheet = buildLaserSheet(P);
+  const wallPlace = { top:(u,v)=>[u,0,topZ0+v], bottom:(u,v)=>[u,y,v], left:(u,v)=>[0,u,v], right:(u,v)=>[x,u,v] };
+  const wallDim   = { top:[x,d], bottom:[x,h], left:[y,h], right:[y,h] };
+  for (const name of ["top","bottom","left","right"]) {
+    const pl = sheet.placed.find(p=>p.p.label===name); if(!pl) continue;
+    const [W,H]=wallDim[name], f=wallPlace[name];
+    out.push(pl.p.outline.map(pt=>{ let u=pt[0],v=pt[1];     // reflect protrusions inward
+      if(u<0)u=-u; else if(u>W)u=2*W-u; if(v<0)v=-v; else if(v>H)v=2*H-v; return f(u,v); }));
+  }
+  // --- flanges: rails with finger joints on the wall-facing (outer) edge,
+  //     straight inner (opening) edge, and dovetailed corner seams ---
+  function railPoly(x0,y0,x1,y1,outer,z) {
+    const W=x1-x0, H=y1-y0; let pre, teeth, post;
+    if (outer==="top")    { pre=[[x0,y0],[x1,y0],[x1,y1]]; teeth=_tooth(W,fw,t,false).map(([p,o])=>[x1-p,y1-o]); post=[[x0,y0]]; }
+    else if (outer==="bottom"){ pre=[[x0,y1],[x1,y1],[x1,y0]]; teeth=_tooth(W,fw,t,false).map(([p,o])=>[x1-p,y0+o]); post=[[x0,y1]]; }
+    else if (outer==="left")  { pre=[[x1,y0],[x1,y1],[x0,y1]]; teeth=_tooth(H,fw,t,false).map(([p,o])=>[x0+o,y1-p]); post=[[x1,y0]]; }
+    else                      { pre=[[x0,y0],[x0,y1],[x1,y1]]; teeth=_tooth(H,fw,t,false).map(([p,o])=>[x1-o,y1-p]); post=[[x0,y0]]; }
+    return pre.concat(teeth,post).map(([px,py])=>[px,py,z]);
+  }
+  const ringZs = (filters===2) ? [0, t+fh, h-2*t-fh, h-t] : [h-2*t-fh, h-t];
+  for (const z of ringZs) {
+    out.push(railPoly(0, y-r, x, y, "top", z));
+    out.push(railPoly(0, 0, x, r, "bottom", z));
+    out.push(railPoly(0, r, r, y-r, "left", z));
+    out.push(railPoly(x-r, r, x, y-r, "right", z));
+    // dovetail seams where the top/bottom rails meet the side rails (4 corners)
+    for (const yc of [r, y-r]) for (const x0 of [0, x-r]) {
+      const pl=[]; for (const [a,o] of _tooth(r, fw, t, true)) pl.push([x0+a, yc+o-t/2, z]); out.push(pl);
+    }
+  }
+  return out;
+}
+function addCutLines(polylines) {
+  const v=[]; for(const pl of polylines) for(let i=0;i<pl.length-1;i++){ v.push(...pl[i],...pl[i+1]); }
+  const g=new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(v,3));
+  const ls=new THREE.LineSegments(g, new THREE.LineBasicMaterial({color:0xff3030, depthTest:false, transparent:true}));
+  ls.renderOrder=999; modelGroup.add(ls);
+}
+// shared label texture (red text, dark outline)
+function labelCanvas(text) {
+  const fs=64, pad=12, cv=document.createElement("canvas"), c=cv.getContext("2d");
+  c.font=`bold ${fs}px sans-serif`; const w=c.measureText(text).width;
+  cv.width=Math.ceil(w)+pad*2; cv.height=fs+pad*2;
+  c.font=`bold ${fs}px sans-serif`; c.textBaseline="middle"; c.lineJoin="round";
+  c.strokeStyle="rgba(0,0,0,0.85)"; c.lineWidth=8; c.strokeText(text, pad, cv.height/2);
+  c.fillStyle="#ff5050"; c.fillText(text, pad, cv.height/2);
+  return cv;
+}
+// billboard label (always faces camera) — used for 3D-print chunk names
+function makeLabelSprite(text, pos, targetH) {
+  const cv=labelCanvas(text), tex=new THREE.CanvasTexture(cv); tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  const s=targetH/cv.height; sp.scale.set(cv.width*s, cv.height*s, 1);
+  sp.position.set(pos[0],pos[1],pos[2]); sp.renderOrder=1001; return sp;
+}
+function addCutLabels(labels, targetH) {
+  for(const {text,pos} of labels) modelGroup.add(makeLabelSprite(text,pos,targetH||40));
+}
+// flat label lying IN the part's plane — used for laser part names
+function makeFlatLabel(text, pos, normal, up, heightMM) {
+  const cv=labelCanvas(text), tex=new THREE.CanvasTexture(cv); tex.minFilter=THREE.LinearFilter;
+  const aspect=cv.width/cv.height;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(heightMM*aspect, heightMM),
+    new THREE.MeshBasicMaterial({map:tex, transparent:true, depthTest:false, depthWrite:false, side:THREE.DoubleSide}));
+  const n=new THREE.Vector3(...normal).normalize(), u=new THREE.Vector3(...up).normalize();
+  const xa=new THREE.Vector3().crossVectors(u,n).normalize();
+  const ya=new THREE.Vector3().crossVectors(n,xa).normalize();
+  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xa,ya,n));
+  mesh.position.set(pos[0]+n.x*0.6, pos[1]+n.y*0.6, pos[2]+n.z*0.6);  // lift just off the surface
+  mesh.renderOrder=1001; return mesh;
+}
+function addFlatLabels(labels, heightMM) {
+  for(const L of labels) modelGroup.add(makeFlatLabel(L.text, L.pos, L.normal, L.up, heightMM||24));
+}
+// chunk-cell centre labels (model coords, z up)
+function printCutLabels(info) {
+  const X=info.box_x, Y=info.box_y, Z=info.h_box, [nx,ny,nz]=info.chunks, out=[];
+  const xb=info.xb||Array.from({length:nx+1},(_,k)=>k*X/nx);
+  const yb=info.yb||Array.from({length:ny+1},(_,k)=>k*Y/ny);
+  const zb=info.zb||Array.from({length:nz+1},(_,k)=>k*Z/nz);
+  for(let k=0;k<nz;k++)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)
+    out.push({ text:`${i}-${j}-${k}`, pos:[(xb[i]+xb[i+1])/2, (yb[j]+yb[j+1])/2, (zb[k]+zb[k+1])/2] });
+  return out;
+}
+// laser part labels — names match the SVG export exactly (model coords, z up)
+function laserCutLabels(P) {
+  const t=P.Thickness, fh=P.Filter_height, filters=P.Filters, d=P.Fan_diameter, r=P.Rim, split=!!P.Split_frames;
+  const x=P.X, y=P.Y-t, h=d+2+filters*(fh+t);
+  const chamLo=(filters===2)?(2*t+fh):t, chamHi=h-2*t-fh, topZ0=(chamLo+chamHi)/2-d/2;
+  const Z=[0,0,1], UY=[0,1,0], UX=[1,0,0];
+  const out=[
+    {text:"top",    pos:[x/2, 0,   topZ0+d/2], normal:[0,-1,0], up:Z},
+    {text:"bottom", pos:[x/2, y,   h/2],       normal:[0, 1,0], up:Z},
+    {text:"left",   pos:[0,   y/2, h/2],       normal:[-1,0,0], up:Z},
+    {text:"right",  pos:[x,   y/2, h/2],       normal:[1, 0,0], up:Z},
+  ];
+  // flange planes, in the same order buildLaserSheet emits the frames/rails:
+  // each filter has two rings (a = "h" set, b = "f" set).
+  const levels = (filters===2) ? [0, t+fh, h-2*t-fh, h-t] : [h-2*t-fh, h-t];
+  levels.forEach((z,idx)=>{
+    const k=Math.floor(idx/2)+1, isA=(idx%2===0);
+    if (split) {
+      const suf = isA ? ["Th","Bh","Sh1","Sh2"] : ["Tf","Bf","Sf1","Sf2"];
+      out.push({text:`f${k} ${suf[0]}`, pos:[x/2,   y-r/2, z], normal:Z, up:UY});  // top rail
+      out.push({text:`f${k} ${suf[1]}`, pos:[x/2,   r/2,   z], normal:Z, up:UY});  // bottom rail
+      out.push({text:`f${k} ${suf[2]}`, pos:[r/2,   y/2,   z], normal:Z, up:UX});  // left rail (S1)
+      out.push({text:`f${k} ${suf[3]}`, pos:[x-r/2, y/2,   z], normal:Z, up:UX});  // right rail (S2)
+    } else {
+      out.push({text:`frame ${k}${isA?"a":"b"}`, pos:[x/2, y/2, z], normal:Z, up:UY});
+    }
+  });
+  if (filters===1) out.push({text:"back", pos:[x/2, y/2, 0], normal:Z, up:UY});
+  return out;
+}
+
+// fill the "Render part" dropdown with Assembly + each NON-EMPTY chunk.
+// Emptiness is tested by intersecting the whole solid with each cell; cached by
+// a geometry signature so it only recomputes when the geometry/grid changes.
+// a chunk counts as real only if it has a few polygons AND a 3D extent
+// (JSCAD intersect can leave a 1-2 triangle degenerate sliver in empty cells).
+function chunkNonEmpty(geom) {
+  const polys = jscadModeling.geometries.geom3.toPolygons(geom);
+  if (polys.length < 3) return false;
+  let mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+  for (const p of polys) for (const v of p.vertices) for (let i=0;i<3;i++){ if(v[i]<mn[i])mn[i]=v[i]; if(v[i]>mx[i])mx[i]=v[i]; }
+  return (mx[0]-mn[0])>0.5 && (mx[1]-mn[1])>0.5 && (mx[2]-mn[2])>0.5;
+}
+let _occSig=null, _occOpts=["assembly"];
+function updateRenderPartOptions(P, info) {
+  const sel = document.querySelector('#controls [data-key="Render_part"]');
+  if (!sel) return;
+  const sig = JSON.stringify({...P, Render_part:0, Chunk_to_origin:0, Show_cut_lines:0});
+  let opts;
+  if (sig === _occSig) opts = _occOpts;
+  else {
+    opts = ["assembly"];
+    const [nx,ny,nz] = info.chunks;
+    if (nx*ny*nz > 1 && info.whole) {
+      const { intersect } = jscadModeling.booleans, { cuboid } = jscadModeling.primitives,
+            { translate } = jscadModeling.transforms, toP = jscadModeling.geometries.geom3.toPolygons;
+      for (let k=0;k<nz;k++) for (let j=0;j<ny;j++) for (let i=0;i<nx;i++) {
+        const dx=info.xb[i+1]-info.xb[i], dy=info.yb[j+1]-info.yb[j], dz=info.zb[k+1]-info.zb[k];
+        const cube=translate([info.xb[i]+dx/2, info.yb[j]+dy/2, info.zb[k]+dz/2], cuboid({size:[dx,dy,dz]}));
+        if (chunkNonEmpty(intersect(info.whole, cube))) opts.push(`${i}-${j}-${k}`);
+      }
+    }
+    _occSig=sig; _occOpts=opts;
+  }
+  if ([...sel.options].map(o=>o.value).join("|") === opts.join("|")) return;  // unchanged
+  const cur = sel.value; sel.innerHTML = "";
+  for (const o of opts) { const op=document.createElement("option"); op.value=o;
+    op.textContent = (o==="assembly") ? "Assembly" : ("Chunk "+o); sel.appendChild(op); }
+  sel.value = opts.includes(cur) ? cur : "assembly";
+}
+
+function render() {
+  if (MODE === "laser") return renderLaser3D();
+  setBusy(true, "Rendering…");
+  setTimeout(() => {
+    try {
+      const P = readParams();
+      const t0 = performance.now();
+      const { parts, solid, info } = buildPurifier(jscadModeling, P);
+      lastSolid = solid;
+      updateRenderPartOptions(P, info);
+      const tris = show3D(parts || [{ geom: solid, color:[0.80,0.84,0.90] }]);
+      if (P.Show_cut_lines) {
+        const cm = String(P.Render_part||"").match(/(\d+)-(\d+)-(\d+)/);
+        if (cm) {   // single chunk: just this cell's box + its slice name, at the rendered position
+          const ix=+cm[1], iy=+cm[2], iz=+cm[3];
+          const xlo=info.xb[ix], dx=info.xb[ix+1]-info.xb[ix];
+          const ylo=info.yb[iy], dy=info.yb[iy+1]-info.yb[iy];
+          const zlo=info.zb[iz], dz=info.zb[iz+1]-info.zb[iz];
+          const ox=P.Chunk_to_origin?0:xlo, oy=P.Chunk_to_origin?0:ylo, oz=P.Chunk_to_origin?0:zlo;
+          addCutLines(boxEdges(ox,oy,oz, ox+dx,oy+dy,oz+dz));
+          addCutLabels([{text:`${ix}-${iy}-${iz}`, pos:[ox+dx/2, oy+dy/2, oz+dz/2]}]);
+        } else {
+          addCutLines(printCutPolylines(info));
+          addCutLabels(printCutLabels(info));
+        }
+      }
+      const ms = (performance.now()-t0).toFixed(0);
+      document.getElementById("stats").textContent =
+        `Box: ${info.box_x} × ${info.box_y} × ${info.h_box} mm\n`+
+        `Filters: ${info.Filters}   Chunk grid: ${info.chunks.join(' × ')} = ${info.chunks[0]*info.chunks[1]*info.chunks[2]}\n`+
+        `Chunk size: ${info.chunkSize.join(' × ')} mm\n`+
+        `Triangles: ${tris.toLocaleString()}\nBuild time: ${ms} ms`;
+    } catch(e) { document.getElementById("stats").textContent = "Error: "+e.message; console.error(e); }
+    setBusy(false);
+  }, 30);
+}
+
+// Laser mode: interactive 3D preview of the assembled box.
+function renderLaser3D() {
+  document.getElementById("svgview").style.display = "none"; // ensure 3D visible
+  setBusy(true, "Rendering…");
+  setTimeout(() => {
+    try {
+      const P = readParams(); const t0 = performance.now();
+      const { parts, solid, info } = buildLaserModel(jscadModeling, P);
+      lastSolid = solid;
+      const tris = show3D(parts);
+      if (P.Show_cut_lines) {
+        addCutLines(laserCutPolylines(P));
+        // one uniform label height, scaled to fit the parts (rail width + shortest rail length)
+        const _t=P.Thickness,_r=P.Rim,_x=P.X,_y=P.Y-_t,_h=P.Fan_diameter+2+P.Filters*(P.Filter_height+_t);
+        const lh=Math.max(3, Math.min(_r*0.5, Math.min(_x,_y-2*_r)/3.8, _h/3.8, 26));
+        addFlatLabels(laserCutLabels(P), lh);
+      }
+      const ms = (performance.now()-t0).toFixed(0);
+      document.getElementById("stats").textContent =
+        `Box: ${info.box[0]} × ${info.box[1]} × ${info.box[2]} mm   (material ${info.t} mm)\n`+
+        `Filters: ${info.filters}\nUse “SVG preview” / “Export SVG” for the flat cut files.\n`+
+        `Triangles: ${tris.toLocaleString()}\nBuild time: ${ms} ms`;
+    } catch(e){ document.getElementById("stats").textContent = "Error: "+e.message; console.error(e); }
+    setBusy(false);
+  }, 30);
+}
+
+// "Assembly" or "Chunk 0-0-0" from the current Render part selection
+function partLabel() {
+  const rp = readParams().Render_part;
+  return (!rp || rp === "assembly") ? "Assembly" : ("Chunk " + rp);
+}
+function exportStl() {
+  if (!lastSolid) render();
+  setTimeout(() => {
+    download(`Nukit Air Purifier Builder- ${partLabel()}.stl`, geomToStl(lastSolid), "model/stl");
+  }, 50);
+}
+
+// Toggle the flat-panel SVG layout as an overlay over the 3D view (with close X).
+function toggleSVGPreview() {
+  const sv = document.getElementById("svgview");
+  if (sv.style.display === "block") { sv.style.display = "none"; return; }
+  try {
+    const svg = sheetToSVG(buildLaserSheet(readParams()));
+    sv.innerHTML =
+      `<div style="position:sticky;top:0;height:0;text-align:right;z-index:5;">`+
+      `<button id="svgClose" style="margin:8px;background:#222;color:#fff;border:1px solid #555;`+
+      `border-radius:6px;padding:6px 11px;cursor:pointer;font:inherit;">✕ Close</button></div>`+
+      `<div style="padding:14px;min-height:100%;">${svg}</div>`;
+    const el2 = sv.querySelector("svg");
+    if (el2){ el2.style.maxWidth="100%"; el2.style.height="auto"; el2.style.background="#fff"; }
+    sv.querySelector("#svgClose").onclick = ()=>{ sv.style.display="none"; };
+    sv.style.display = "block";
+  } catch(e){ document.getElementById("stats").textContent = "Error: "+e.message; console.error(e); }
+}
+function download(name, text, mime) {
+  const blob = new Blob([text], {type:mime});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function exportSVG() { download("nukit-tempest-lasercut.svg", sheetToSVG(buildLaserSheet(readParams())), "image/svg+xml"); }
+function exportDXF() { download("nukit-tempest-lasercut.dxf", sheetToDXF(buildLaserSheet(readParams())), "image/vnd.dxf"); }
+function exportCurrent(){ return MODE==="laser" ? exportSVG() : exportStl(); }
+
+// Build + zip every chunk in the grid (skips empty cells). No backend.
+async function exportAllChunks() {
+  if (typeof JSZip === "undefined") { alert("JSZip failed to load (offline?)."); return; }
+  const ov = overlay();
+  const P = readParams();
+  // first pass: grid dimensions (Render_part doesn't affect the grid maths)
+  const probe = buildPurifier(jscadModeling, { ...P, Render_part:"assembly" });
+  const [nx, ny, nz] = probe.info.chunks;
+  const total = nx * ny * nz;
+  if (total === 1) { // nothing to split — just export the whole thing
+    exportStl(); return;
+  }
+  const zip = new JSZip();
+  let made = 0, done = 0;
+  for (let iz = 0; iz < nz; iz++)
+  for (let iy = 0; iy < ny; iy++)
+  for (let ix = 0; ix < nx; ix++) {
+    done++;
+    setOverlayText(`Building chunk ${done}/${total}…`,
+      "Chunks are generated in your browser, so this can take a while and depends on your computer's speed."); ov.classList.add("on");
+    await new Promise(r => setTimeout(r, 0)); // yield so the overlay paints
+    const { solid } = buildPurifier(jscadModeling,
+      { ...P, Render_part:`${ix}-${iy}-${iz}`, Chunk_to_origin:true });
+    if (!chunkNonEmpty(solid)) continue; // empty cell (e.g. hollow centre) or degenerate sliver
+    const name = `Nukit Air Purifier Builder- Chunk ${ix}-${iy}-${iz}.stl`;
+    zip.file(name, geomToStl(solid, name));
+    made++;
+  }
+  setOverlayText(`Zipping ${made} chunks…`);
+  const blob = await zip.generateAsync({ type:"blob" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "Nukit Air Purifier Builder- Assembly.zip"; a.click(); URL.revokeObjectURL(a.href);
+  ov.classList.remove("on");
+  document.getElementById("stats").textContent =
+    `Exported ${made} non-empty chunk(s) of ${total} grid cells to ZIP.`;
+}
+
+function modeButtons() {
+  const laser = MODE === "laser";
+  document.getElementById("svgview").style.display = "none";   // 3D is the default view in both modes
+  if (renderer && renderer.domElement) renderer.domElement.style.display = "block";
+  document.getElementById("export").textContent = laser ? "Export SVG" : "Export STL";
+  document.getElementById("exportAll").style.display = laser ? "none" : "";
+  document.getElementById("svgPreview").style.display = laser ? "" : "none";
+  document.getElementById("exportDXF").style.display = laser ? "" : "none";
+}
+function applyMode() {
+  buildControls();
+  modeButtons();
+  firstRender = true;
+  render();
+}
+
+// ---- shareable configuration in the URL ----------------------------------
+function configToUrl() {
+  const cfg = { mode: MODE, p: readParams() };
+  const s = btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))).replace(/=+$/,"");
+  return location.origin + location.pathname + "#cfg=" + s;
+}
+function applyParamsToControls(p) {
+  document.querySelectorAll("#controls [data-key]").forEach(inp => {
+    const k = inp.dataset.key; if (!(k in p)) return;
+    if (inp.dataset.type === "bool") inp.checked = !!p[k]; else inp.value = p[k];
+  });
+}
+function applyConfigFromHash() {
+  const m = (location.hash || "").match(/cfg=([^&]+)/); if (!m) return false;
+  try {
+    const cfg = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    if (cfg.mode === "print" || cfg.mode === "laser") { MODE = cfg.mode; document.getElementById("mode").value = MODE; }
+    const p = cfg.p || {};
+    buildControls();              // default field set
+    applyParamsToControls(p);     // set values (incl. Filters / Fan_diameter)
+    buildControls(true);          // re-evaluate visibility (e.g. box/exhaust fields appear)
+    applyParamsToControls(p);     // fill the now-visible fields
+    return true;
+  } catch (e) { return false; }
+}
+function copyShareLink() {
+  const url = configToUrl();
+  const note = msg => { const s = document.getElementById("stats"); const o = s.textContent; s.textContent = msg; setTimeout(()=>{ if (s.textContent===msg) s.textContent=o; }, 2500); };
+  const fallback = () => { const ta=document.createElement("textarea"); ta.value=url; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand("copy"); }catch(e){} document.body.removeChild(ta);
+    note(ok ? "Share link copied to clipboard" : "Copy failed - link is in the address bar"); if(!ok) location.hash = "cfg="+url.split("#cfg=")[1]; };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url).then(()=>note("Share link copied to clipboard")).catch(fallback);
+  } else fallback();
+}
+
+const _restored = applyConfigFromHash();
+if (!_restored) buildControls();
+modeButtons();
+initViewer();
+document.getElementById("render").onclick = render;
+document.getElementById("export").onclick = exportCurrent;
+document.getElementById("exportAll").onclick = exportAllChunks;
+document.getElementById("svgPreview").onclick = toggleSVGPreview;
+document.getElementById("exportDXF").onclick = exportDXF;
+document.getElementById("shareLink").onclick = copyShareLink;
+document.getElementById("mode").onchange = e => { MODE = e.target.value; applyMode(); };
+render();
+</script>
+</body>
+</html>
