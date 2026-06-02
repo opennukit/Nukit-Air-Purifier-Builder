@@ -24,3 +24,5 @@ output/
 
 # Large upstream reference downloads kept out of the published source tree
 references/external-models/
+
+dist-standalone/
