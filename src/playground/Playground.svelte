@@ -40,21 +40,37 @@
     };
   }
 
-  const settings = $derived.by<TempestSettings>(() => ({
-    ...defaultTempestSettings,
-    arrangement: buildArrangement(),
-    fan: {
-      ...defaultTempestSettings.fan,
-      diameter: fanDiameter,
-      opening: honeycomb ? defaultTempestSettings.fan.opening : { type: "plain" },
-    },
-  }));
+  function buildSettings(): TempestSettings {
+    return {
+      ...defaultTempestSettings,
+      arrangement: buildArrangement(),
+      fan: {
+        ...defaultTempestSettings.fan,
+        diameter: fanDiameter,
+        opening: honeycomb ? defaultTempestSettings.fan.opening : { type: "plain" },
+      },
+    };
+  }
+
+  const settings = $derived.by(buildSettings);
+
+  // Geometry builds are expensive, so don't rebuild on every keystroke. The input
+  // fields stay responsive (they bind to the draft state above); only the 3D
+  // rebuild waits ~350ms after the last edit, applied through this snapshot.
+  let appliedSettings = $state.raw<TempestSettings>(buildSettings());
+  $effect(() => {
+    const next = settings;
+    const handle = setTimeout(() => {
+      appliedSettings = next;
+    }, 350);
+    return () => clearTimeout(handle);
+  });
 
   // Preview the whole assembly (unsplit) on the same Manifold backend the
   // Builder exports with — what you see is what slices.
   const preview = $derived.by(() => {
     try {
-      const part = createTempestPrintableKit(settings, "unsplit").parts[0];
+      const part = createTempestPrintableKit(appliedSettings, "unsplit").parts[0];
       return {
         status: "ok" as const,
         mesh: part.mesh,
@@ -69,7 +85,7 @@
   // Separately report how the current design splits for the selected bed.
   const split = $derived.by(() => {
     try {
-      const kit = createTempestPrintableKit(settings, bed);
+      const kit = createTempestPrintableKit(appliedSettings, bed);
       return { status: "ok" as const, parts: kit.summary.partCount, oversized: kit.summary.oversizedPartCount };
     } catch {
       return { status: "error" as const };
