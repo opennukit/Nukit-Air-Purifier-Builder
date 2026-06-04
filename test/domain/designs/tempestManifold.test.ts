@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { defaultTempestSettings, defaultTempestTowerFilter } from "@/domain/designs/tempest/model";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
+import { towerCornerChamfer } from "@/fabrication/printing/designs/tempest/tempestGeometry";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
 
 type Mesh = { readonly vertices: readonly MeshVertex[]; readonly triangles: readonly MeshTriangle[] };
@@ -39,6 +40,39 @@ function manifoldReport(mesh: Mesh): ManifoldReport {
 
 const cleanManifold: ManifoldReport = { boundaryEdges: 0, overSharedEdges: 0, degenerateTriangles: 0 };
 
+// Total handle count (genus): chi = V - E + F = 2C - 2g for C closed shells. A
+// corner pinching through adds a tunnel (genus +1) while staying watertight, so
+// manifoldReport can't see it — this can.
+function totalGenus(mesh: Mesh): number {
+  const parent = new Map<number, number>();
+  const find = (a: number): number => {
+    let r = a;
+    while (parent.get(r) !== r) r = parent.get(r) as number;
+    return r;
+  };
+  const edges = new Set<string>();
+  const used = new Set<number>();
+  for (const t of mesh.triangles) {
+    for (const v of [t.v1, t.v2, t.v3]) {
+      if (!parent.has(v)) parent.set(v, v);
+      used.add(v);
+    }
+    for (const [a, b] of [
+      [t.v1, t.v2],
+      [t.v2, t.v3],
+      [t.v3, t.v1],
+    ] as const) {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+      edges.add(a < b ? `${a}:${b}` : `${b}:${a}`);
+    }
+  }
+  const roots = new Set<number>();
+  for (const v of used) roots.add(find(v));
+  return (2 * roots.size - (used.size - edges.size + mesh.triangles.length)) / 2;
+}
+
 describe("Tempest meshes are 2-manifold", () => {
   test("two-filter housing exports a watertight single body", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");
@@ -67,6 +101,46 @@ describe("Tempest meshes are 2-manifold", () => {
       "unsplit",
     );
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
+  });
+
+  const flange = defaultTempestSettings.frame.outsideFlangeThickness;
+  const wall = defaultTempestSettings.frame.wallThickness;
+  const fullChamfer = defaultTempestSettings.frame.towerCornerPostChamfer;
+
+  test("thin filter: bevel stays >=0.6mm clear of the air-chamber corner", () => {
+    // ~2mm filter -> structuralOffset 17 -> an unclamped 55mm bevel would cut
+    // through to the air-chamber corner (x+y = 2*structuralOffset).
+    const structuralOffset = flange + 2 + wall;
+    const clamped = towerCornerChamfer(fullChamfer, structuralOffset, flange);
+    expect(clamped).toBeLessThan(fullChamfer);
+    expect((2 * structuralOffset - clamped) / Math.SQRT2).toBeGreaterThanOrEqual(0.6 - 1e-9);
+  });
+
+  test("bevel stays >=0.6mm clear of the filter-pocket corner (no tunnel graze)", () => {
+    // The pocket outer corner is at x+y = structuralOffset + outsideFlange. At
+    // defaults a ~30mm filter lands the 55mm bevel exactly on it -> a corner
+    // tunnel. The clamp must back the bevel off so >=0.6mm of wall remains.
+    const structuralOffset = flange + 30 + wall; // 45; pocketCorner = 55 == fullChamfer
+    const clamped = towerCornerChamfer(fullChamfer, structuralOffset, flange);
+    expect((structuralOffset + flange - clamped) / Math.SQRT2).toBeGreaterThanOrEqual(0.6 - 1e-9);
+
+    // And the real build at that graze thickness must stay tunnel-free. The corner
+    // is independent of the grill, so use plain openings to keep this fast.
+    const towerAt = (thickness: number) =>
+      createTempestPrintableKit(
+        {
+          ...defaultTempestSettings,
+          fan: { ...defaultTempestSettings.fan, opening: { type: "plain" } },
+          arrangement: { type: "four-side-filter-tower", filter: { ...defaultTempestTowerFilter, thickness } },
+        },
+        "unsplit",
+      ).parts[0].mesh;
+    expect(totalGenus(towerAt(30))).toBe(totalGenus(towerAt(33)));
+  });
+
+  test("thick filters keep the full corner chamfer", () => {
+    // structuralOffset 65 (~50mm filter): both corners far away, no clamping.
+    expect(towerCornerChamfer(fullChamfer, 65, flange)).toBe(fullChamfer);
   });
 
   test("four-filter tower with single box-exhaust stays manifold and differs from the fan grid", () => {

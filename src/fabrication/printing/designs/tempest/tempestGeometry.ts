@@ -19,9 +19,31 @@ import type {
 
 const epsilon = 0.05;
 const scadWallCutOverlap = 0.5;
+// Minimum wall left at a tower corner between the corner-post bevel and the
+// air-chamber corner. A thin filter shrinks the structural offset; without this
+// floor the fixed bevel cuts clean through to the chamber and opens a gap.
+const minTowerCornerWall = 0.6;
 // The geometry's own tessellation resolution, passed explicitly to every
 // circular primitive so it does not depend on any backend's global default.
 const csgSegments = 48;
+
+// Keep the 45° corner-post bevel (face `x+y = chamfer`) at least `minTowerCornerWall`
+// clear of the two corner features it can collide with as the filter thickness
+// (hence structuralOffset) changes:
+//   • the air-chamber corner at `x+y = 2*structuralOffset` — binds for thin filters;
+//   • the filter-pocket outer corner at `x+y = structuralOffset + outsideFlange` —
+//     a bevel landing just inside it leaves a sub-minimum sliver, and at the exact
+//     graze opens a tunnel. A larger bevel that clears the pocket corner merges with
+//     the pocket cleanly, so only the thin band right below the corner is unsafe.
+export function towerCornerChamfer(requestedChamfer: number, structuralOffset: number, outsideFlange: number): number {
+  const margin = minTowerCornerWall * Math.SQRT2;
+  let chamfer = Math.min(requestedChamfer, 2 * structuralOffset - margin);
+  const pocketCorner = structuralOffset + outsideFlange;
+  if (chamfer > pocketCorner - margin && chamfer <= pocketCorner) {
+    chamfer = pocketCorner - margin;
+  }
+  return Math.max(0, chamfer);
+}
 
 type TempestGeometryOptions = {
   readonly alignmentPinChunkGrid?: TempestChunkGrid;
@@ -190,7 +212,7 @@ function assemblyTower(
     model.box.width,
     model.box.depth,
     model.box.height,
-    model.frame.towerCornerPostChamfer,
+    towerCornerChamfer(model.frame.towerCornerPostChamfer, filterLayout.structuralOffset, model.frame.outsideFlangeThickness),
   );
 
   return subtractAll(solid, [
