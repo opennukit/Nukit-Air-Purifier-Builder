@@ -1616,17 +1616,6 @@
                   </span>
                   <span class="preview-control-label">Fans</span>
                 </label>
-                {#if isTempestControlsActive}
-                  <label class="toggle-field preview-toggle-field preview-control-lines" title="Model edge lines">
-                    <input
-                      type="checkbox"
-                      name="showPreviewEdges"
-                      checked={settings.showPreviewEdges}
-                      onchange={(event) => updateBooleanSetting("showPreviewEdges", event)}
-                    />
-                    <span class="preview-control-label">Lines</span>
-                  </label>
-                {/if}
                 <span class="preview-toolbar-primary-break" aria-hidden="true"></span>
                 {#if !isCorsiRosenthalPrintDesignId(settings.printDesign)}
                   <label class="toggle-field preview-toggle-field preview-control-spatial" title="Exploded view">

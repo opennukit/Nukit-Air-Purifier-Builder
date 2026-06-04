@@ -296,10 +296,10 @@ export class PurifierThreePreview {
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
-    // Dark backdrop matches the playground: a neutral-gray model reads crisp
-    // against it (chamfers/facets pop), whereas a transparent canvas over the
-    // light page washed the model out.
-    this.renderer.setClearColor(0x161a20, 1);
+    // Soft light studio backdrop: a gentle warm-white vertical gradient reads as
+    // a clean white background while giving the framed viewport a little depth.
+    this.renderer.setClearColor(0x000000, 0);
+    this.scene.background = createStudioBackdropTexture();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
     // Playground parity: no shadows, no auto-rotate — a static, orbitable view.
@@ -329,8 +329,8 @@ export class PurifierThreePreview {
     this.scene.add(keyLight);
 
     const ground = new Mesh(
-      new CircleGeometry(1.8, 96),
-      new MeshBasicMaterial({ color: 0x1f6f56, transparent: true, opacity: 0.06 }),
+      new CircleGeometry(2.1, 96),
+      new MeshBasicMaterial({ map: createGroundShadowTexture(), transparent: true, depthWrite: false }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = groundY;
@@ -3474,6 +3474,47 @@ function createFilterTexture(): CanvasTexture {
     context.lineTo(canvas.width, y + 0.5);
     context.stroke();
   }
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+function createStudioBackdropTexture(): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 4;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createStudioBackdropTexture: Could not create canvas context");
+  }
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#fbfaf7");
+  gradient.addColorStop(1, "#e7e4db");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+// A soft round contact shadow — fake but cheap, and reads cleanly on the light
+// backdrop where a real cast shadow would be fussy to tune.
+function createGroundShadowTexture(): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createGroundShadowTexture: Could not create canvas context");
+  }
+  const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gradient.addColorStop(0, "rgba(28, 32, 30, 0.30)");
+  gradient.addColorStop(0.55, "rgba(28, 32, 30, 0.13)");
+  gradient.addColorStop(1, "rgba(28, 32, 30, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
