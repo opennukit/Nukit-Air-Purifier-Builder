@@ -12,8 +12,8 @@ import {
   Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
+  AmbientLight,
   Group,
-  HemisphereLight,
   LineBasicMaterial,
   Line,
   LineSegments,
@@ -296,17 +296,20 @@ export class PurifierThreePreview {
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setClearColor(0x000000, 0);
+    // Dark backdrop matches the playground: a neutral-gray model reads crisp
+    // against it (chamfers/facets pop), whereas a transparent canvas over the
+    // light page washed the model out.
+    this.renderer.setClearColor(0x161a20, 1);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
+    // Playground parity: no shadows, no auto-rotate — a static, orbitable view.
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = PCFShadowMap;
     this.container.append(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.55;
+    this.controls.autoRotate = false;
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;
@@ -317,17 +320,13 @@ export class PurifierThreePreview {
     this.scene.add(this.modelGroup);
     this.scene.add(this.staticSceneGroup);
     this.scene.add(this.scaleReferenceGroup);
-    this.scene.add(new HemisphereLight(0xfff7e8, 0x7d897d, 2.2));
-    const keyLight = new DirectionalLight(0xffffff, 2.4);
+    // Playground-style lighting: one hard white key + neutral ambient. The
+    // single directional light makes each flat facet read a distinct shade
+    // (crisp hard-surface look); the ambient just keeps shadow sides off black.
+    this.scene.add(new AmbientLight(0xffffff, 0.55));
+    const keyLight = new DirectionalLight(0xffffff, 1.4);
     keyLight.position.set(2.5, 3.5, 3.2);
-    keyLight.castShadow = true;
     this.scene.add(keyLight);
-    const fillLight = new DirectionalLight(0xd7efe4, 0.65);
-    fillLight.position.set(-3.2, 1.6, 1.8);
-    this.scene.add(fillLight);
-    const rimLight = new DirectionalLight(0xecfff3, 1.15);
-    rimLight.position.set(-2.8, 3.2, -4.4);
-    this.scene.add(rimLight);
 
     const ground = new Mesh(
       new CircleGeometry(1.8, 96),
@@ -1163,8 +1162,8 @@ export class PurifierThreePreview {
     const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
     const material = createPrintedPartMaterial({
       color: printedPartColor,
-      roughness: 0.64,
-      metalness: 0.04,
+      roughness: 0.85,
+      metalness: 0.05,
     });
     const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.58);
 
@@ -3075,9 +3074,13 @@ function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
     positions.push(vertex.x * sceneScale, vertex.z * sceneScale, vertex.y * sceneScale);
   }
 
+  // The position map above swaps Y↔Z, which is a reflection (determinant −1) and
+  // therefore reverses triangle winding. Swap v2/v3 back so the shell stays
+  // CCW-outward; otherwise FrontSide culling renders the housing inside-out
+  // (you see through near walls to the interior — phantom holes at corners/grills).
   const indices: number[] = [];
   for (const triangle of mesh.triangles) {
-    indices.push(triangle.v1, triangle.v2, triangle.v3);
+    indices.push(triangle.v1, triangle.v3, triangle.v2);
   }
 
   const geometry = new BufferGeometry();
@@ -3384,6 +3387,7 @@ function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshSta
     color: options.color,
     roughness: options.roughness,
     metalness: options.metalness,
+    flatShading: true,
   });
 }
 
@@ -3394,7 +3398,6 @@ function createFilterMediaMaterial(opacity: number): Material {
     roughness: 0.52,
     transparent: true,
     opacity,
-    transmission: 0.08,
     side: DoubleSide,
     depthWrite: false,
   });
@@ -3461,20 +3464,14 @@ function createFilterTexture(): CanvasTexture {
 
   context.fillStyle = "#eef1e6";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  for (let x = -canvas.height; x < canvas.width; x += 14) {
-    context.strokeStyle = "rgba(108, 119, 110, 0.24)";
-    context.lineWidth = 4;
+  // Subtle fine pleats: faint, low-contrast parallel lines that read as filter
+  // media up close without the loud cross-hatch that overpowered the housing.
+  context.strokeStyle = "rgba(108, 119, 110, 0.08)";
+  context.lineWidth = 1;
+  for (let y = 0; y < canvas.height; y += 6) {
     context.beginPath();
-    context.moveTo(x, canvas.height);
-    context.lineTo(x + canvas.height, 0);
-    context.stroke();
-  }
-  for (let x = -canvas.height + 7; x < canvas.width; x += 14) {
-    context.strokeStyle = "rgba(255, 255, 255, 0.34)";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(x, canvas.height);
-    context.lineTo(x + canvas.height, 0);
+    context.moveTo(0, y + 0.5);
+    context.lineTo(canvas.width, y + 0.5);
     context.stroke();
   }
 
@@ -4226,9 +4223,17 @@ function createLoadedFanCadMesh(
     positions.push(sourceX - center[0], sourceZ - center[2], sourceY - center[1]);
   }
 
+  // Same Y↔Z reflection as the position map above reverses winding; swap each
+  // triangle's last two indices back so glTF's CCW-outward faces stay outward
+  // under FrontSide culling (otherwise the loaded fan renders inside-out).
+  const windingFixedIndex: number[] = [];
+  for (let triangle = 0; triangle < mesh.index.length; triangle += 3) {
+    windingFixedIndex.push(mesh.index[triangle], mesh.index[triangle + 2], mesh.index[triangle + 1]);
+  }
+
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex([...mesh.index]);
+  geometry.setIndex(windingFixedIndex);
   geometry.computeVertexNormals();
 
   const isRotor = mesh.name.toLowerCase().includes("impeller");
