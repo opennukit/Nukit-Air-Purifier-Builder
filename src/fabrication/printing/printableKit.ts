@@ -391,6 +391,7 @@ export function createPrintableThreeMfExportFromKit(
   kit: PrintableKit,
   title: string,
   filename: string,
+  displayColor?: string,
 ): PrintableThreeMfExport {
   const sheetPlan = createPrintableSheetPlanFromKit(kit);
 
@@ -401,6 +402,7 @@ export function createPrintableThreeMfExportFromKit(
       title,
       createThreeMfObjectsFromSheetPlan(sheetPlan),
       createThreeMfPlatesFromSheetPlan(sheetPlan),
+      displayColor,
     ),
     kit,
     sheetPlan,

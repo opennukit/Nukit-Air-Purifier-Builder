@@ -2,6 +2,7 @@ import { createCorsiRosenthalPrintableKit } from "@/fabrication/printing/designs
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import {
+  findPreviewMaterialColorPreset,
   isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
@@ -44,6 +45,8 @@ export function createPrintDesignThreeMfExportFromKit(
   layout: LayoutResult,
   kit: PrintableKit,
 ): PrintableThreeMfExport {
+  const displayColor = enclosureDisplayColor(layout);
+
   if (
     isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id) ||
     isDonutFilterPrintDesignId(layout.configuration.printDesign.id) ||
@@ -53,6 +56,7 @@ export function createPrintDesignThreeMfExportFromKit(
       kit,
       `${layout.configuration.printDesign.label} print kit`,
       `${layout.configuration.printDesign.id}-print-kit.3mf`,
+      displayColor,
     );
   }
 
@@ -60,5 +64,12 @@ export function createPrintDesignThreeMfExportFromKit(
     kit,
     "Nukit Open Air Purifier print kit",
     "nukit-open-air-purifier-print-kit.3mf",
+    displayColor,
   );
+}
+
+// The selected preview enclosure color, as a 3MF displaycolor hex (#RRGGBBAA).
+function enclosureDisplayColor(layout: LayoutResult): string {
+  const color = findPreviewMaterialColorPreset(layout.configuration.preview.enclosure.materialColor).color;
+  return `#${color.toString(16).padStart(6, "0")}ff`;
 }
