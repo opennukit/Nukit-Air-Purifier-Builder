@@ -1,4 +1,7 @@
 import {
+  ACESFilmicToneMapping,
+  PMREMGenerator,
+  Texture,
   Box3,
   BoxGeometry,
   BufferGeometry,
@@ -13,6 +16,7 @@ import {
   ExtrudeGeometry,
   Float32BufferAttribute,
   AmbientLight,
+  GridHelper,
   Group,
   LineBasicMaterial,
   Line,
@@ -24,7 +28,7 @@ import {
   MeshStandardMaterial,
   Object3D,
   Path,
-  PCFShadowMap,
+  PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
   Raycaster,
@@ -39,8 +43,11 @@ import {
   Vector2,
   WebGLRenderer,
 } from "three";
+import type { ToneMapping } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   findPreviewMaterialColorPreset,
   isCorsiRosenthalPrintDesignId,
@@ -100,6 +107,67 @@ import {
   type TempestPrintablePose,
 } from "@/fabrication/printing/designs/tempest/printableKit";
 import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
+
+// #######################################
+// Appearance Lab (temporary surface/lighting experiment)
+// #######################################
+// A throwaway set of material + lighting "looks" to flip between in a floating
+// selector and pick the nicest surface. Once chosen, drop the rest and inline the
+// winner. Each preset drives the printed-part material, the lighting rig, an
+// optional IBL environment, and tone mapping.
+
+type PrintedSurfaceSpec = {
+  readonly kind: "standard" | "physical";
+  readonly normals: "flat" | "creased";
+  readonly roughness: number;
+  readonly metalness: number;
+  readonly clearcoat?: number;
+  readonly clearcoatRoughness?: number;
+  readonly envMapIntensity?: number;
+};
+
+type AppearancePreset = {
+  readonly id: string;
+  readonly label: string;
+  readonly surface: PrintedSurfaceSpec;
+  readonly environment: "room" | "none";
+  readonly toneMapping: ToneMapping;
+  readonly exposure: number;
+  readonly lights: () => Object3D[];
+};
+
+function directionalLight(intensity: number, position: readonly [number, number, number], color = 0xffffff): DirectionalLight {
+  const light = new DirectionalLight(color, intensity);
+  light.position.set(position[0], position[1], position[2]);
+  return light;
+}
+
+const APPEARANCE_PRESETS: readonly AppearancePreset[] = [
+  {
+    id: "studio",
+    label: "Studio matte",
+    // The product look: a matte creased-normal surface, a dominant world-fixed key
+    // (which casts the floor shadow), a soft opposing fill, a uniform ambient, and a
+    // faint IBL accent. The key being clearly directional is intentional — its cast
+    // shadow on the floor is the cue that the box is fixed and the camera orbits it.
+    surface: { kind: "standard", normals: "creased", roughness: 0.68, metalness: 0, envMapIntensity: 0.3 },
+    environment: "room",
+    toneMapping: ACESFilmicToneMapping,
+    exposure: 0.72,
+    lights: () => [
+      new AmbientLight(0xffffff, 0.35),
+      directionalLight(1.15, [3, 4.5, 2.5]),
+      directionalLight(0.4, [-2.5, 2, -3.2], 0xeef2ff),
+    ],
+  },
+];
+
+const DEFAULT_APPEARANCE_PRESET_ID = "studio";
+// Smooth shading within faces but crisp at dihedral angles >= this, so box edges
+// and chamfers stay sharp while grills and rounded corners read smooth.
+const CREASE_ANGLE_RADIANS = (40 * Math.PI) / 180;
+
+let activeAppearance: PrintedSurfaceSpec = APPEARANCE_PRESETS[0].surface;
 
 // #######################################
 // Preview Model
@@ -281,6 +349,9 @@ export class PurifierThreePreview {
   private readonly pointer = new Vector2();
   private animationId: number | null = null;
   private latestLayout: LayoutResult | null = null;
+  private latestPrintSeamPlan: PrintableSheetPlan | null = null;
+  private readonly lightGroup = new Group();
+  private roomEnvTexture: Texture | null = null;
   private hoveredDimensionId: string | null = null;
   private dimensionTargets: Object3D[] = [];
   private readonly fanRotors: Object3D[] = [];
@@ -302,9 +373,11 @@ export class PurifierThreePreview {
     this.scene.background = createStudioBackdropTexture();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
-    // Playground parity: no shadows, no auto-rotate — a static, orbitable view.
-    this.renderer.shadowMap.enabled = false;
-    this.renderer.shadowMap.type = PCFShadowMap;
+    // Soft cast shadow on the floor: the box's shadow falls in a fixed world
+    // direction and sweeps across the view as you orbit — the clearest cue that the
+    // box is stationary and the camera is the thing moving.
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.container.append(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -313,6 +386,9 @@ export class PurifierThreePreview {
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;
+    // Keep the camera above the floor — you orbit around a box sitting on a surface,
+    // you don't fly underneath it. This reinforces "fixed box, moving camera".
+    this.controls.maxPolarAngle = Math.PI * 0.5;
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.clearDimensionHover);
@@ -320,21 +396,40 @@ export class PurifierThreePreview {
     this.scene.add(this.modelGroup);
     this.scene.add(this.staticSceneGroup);
     this.scene.add(this.scaleReferenceGroup);
-    // Playground-style lighting: one hard white key + neutral ambient. The
-    // single directional light makes each flat facet read a distinct shade
-    // (crisp hard-surface look); the ambient just keeps shadow sides off black.
-    this.scene.add(new AmbientLight(0xffffff, 0.55));
-    const keyLight = new DirectionalLight(0xffffff, 1.4);
-    keyLight.position.set(2.5, 3.5, 3.2);
-    this.scene.add(keyLight);
+    // Lighting/material come from the active appearance preset (see Appearance Lab).
+    this.scene.add(this.lightGroup);
+    this.applyAppearancePreset(DEFAULT_APPEARANCE_PRESET_ID);
 
-    const ground = new Mesh(
-      new CircleGeometry(2.1, 96),
+    // A large matte floor the box visibly rests on. Lit by the (world-fixed) rig, it
+    // gives perspective + parallax as you orbit, so the scene reads as a stationary
+    // box on a surface with the camera moving around it — not a floating object.
+    const floor = new Mesh(
+      new PlaneGeometry(160, 160),
+      new MeshStandardMaterial({ color: 0xd9d5cb, roughness: 0.97, metalness: 0 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = groundY - 0.02;
+    floor.receiveShadow = true;
+    this.staticSceneGroup.add(floor);
+
+    // Soft contact shadow sitting just on top of the floor, anchoring the box.
+    const shadow = new Mesh(
+      new CircleGeometry(2.4, 96),
       new MeshBasicMaterial({ map: createGroundShadowTexture(), transparent: true, depthWrite: false }),
     );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = groundY;
-    this.staticSceneGroup.add(ground);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = groundY;
+    this.staticSceneGroup.add(shadow);
+
+    // A faint world-fixed floor grid. As the camera orbits, the grid slides in
+    // perspective — the clearest cue that the box is stationary and you are moving.
+    const grid = new GridHelper(30, 30, 0xb4b0a4, 0xc6c2b6);
+    grid.position.y = groundY + 0.003;
+    if (grid.material instanceof LineBasicMaterial) {
+      grid.material.transparent = true;
+      grid.material.opacity = 0.38;
+    }
+    this.staticSceneGroup.add(grid);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.container);
@@ -357,12 +452,57 @@ export class PurifierThreePreview {
       previousLayout.configuration.preview.enclosure.cameraPreset !== layout.configuration.preview.enclosure.cameraPreset;
 
     this.latestLayout = layout;
+    this.latestPrintSeamPlan = printSeamPlan;
     this.rebuildModel(layout, printSeamPlan);
     if (shouldApplyPresetCamera) {
       this.frameModel(layout);
     } else {
       this.restoreCameraPose(layout, previousPose);
     }
+  }
+
+  applyAppearancePreset(presetId: string): void {
+    if (this.destroyed) {
+      return;
+    }
+    const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === presetId) ?? APPEARANCE_PRESETS[0];
+    activeAppearance = preset.surface;
+    this.lightGroup.clear();
+    let shadowAssigned = false;
+    for (const light of preset.lights()) {
+      // The first directional is the key — let it cast the floor shadow.
+      if (!shadowAssigned && light instanceof DirectionalLight) {
+        light.castShadow = true;
+        light.shadow.mapSize.set(2048, 2048);
+        light.shadow.bias = -0.0006;
+        const shadowCamera = light.shadow.camera;
+        shadowCamera.near = 0.5;
+        shadowCamera.far = 30;
+        shadowCamera.left = -7;
+        shadowCamera.right = 7;
+        shadowCamera.top = 7;
+        shadowCamera.bottom = -7;
+        shadowCamera.updateProjectionMatrix();
+        shadowAssigned = true;
+      }
+      this.lightGroup.add(light);
+    }
+    this.scene.environment = preset.environment === "room" ? this.roomEnvironment() : null;
+    this.renderer.toneMapping = preset.toneMapping;
+    this.renderer.toneMappingExposure = preset.exposure;
+    // Material + surface normals are baked at build time, so rebuild the model.
+    if (this.latestLayout !== null) {
+      this.rebuildModel(this.latestLayout, this.latestPrintSeamPlan);
+    }
+  }
+
+  private roomEnvironment(): Texture {
+    if (this.roomEnvTexture === null) {
+      const pmrem = new PMREMGenerator(this.renderer);
+      this.roomEnvTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    return this.roomEnvTexture;
   }
 
   setAutoRotate(enabled: boolean): void {
@@ -390,6 +530,7 @@ export class PurifierThreePreview {
     this.disposeObject(this.modelGroup);
     this.disposeObject(this.staticSceneGroup);
     this.disposeObject(this.scaleReferenceGroup);
+    this.roomEnvTexture?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -437,7 +578,7 @@ export class PurifierThreePreview {
     const panelPrintSeams = createPanelPrintSeams(printSeamPlan);
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
-    const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.5 : 0.68);
+    const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
     const fanAppearance = settings.fan.productSelection.product.appearance;
 
     for (const panel of assembly.panels) {
@@ -755,7 +896,7 @@ export class PurifierThreePreview {
 
     const filter = new Mesh(
       new BoxGeometry(filterWidth, filterHeight, filterThickness),
-      createFilterMediaMaterial(0.72),
+      createFilterMediaMaterial(0.77),
     );
     filter.name = "static-reference-installed-filter";
     filter.position.set(0, assetHeight * 0.5, assetDepth * 0.12);
@@ -812,7 +953,7 @@ export class PurifierThreePreview {
     for (const side of [-1, 1]) {
       const filter = new Mesh(
         new BoxGeometry(filterWidth, filterThickness, filterDepth),
-        createFilterMediaMaterial(0.58),
+        createFilterMediaMaterial(0.63),
       );
       filter.name = side > 0 ? "static-reference-installed-top-filter" : "static-reference-installed-bottom-filter";
       filter.position.set(0, side * (assetHeight / 2 - filterThickness / 2 - 7 * sceneScale), assetDepth / 2);
@@ -850,7 +991,7 @@ export class PurifierThreePreview {
 
     const filter = new Mesh(
       new BoxGeometry(filterWidth, filterThickness, filterDepth),
-      createFilterMediaMaterial(0.72),
+      createFilterMediaMaterial(0.77),
     );
     filter.name = "static-reference-installed-top-filter";
     filter.position.set(0, assetDepth / 2 - filterThickness / 2 - 26 * sceneScale, -assetHeight * 0.5);
@@ -1001,7 +1142,7 @@ export class PurifierThreePreview {
       metalness: 0.05,
     });
     const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.76);
-    const filterMaterial = createFilterMediaMaterial(0.7);
+    const filterMaterial = createFilterMediaMaterial(0.75);
     const filterEdgeMaterial = createFilterMediaEdgeMaterial(0.34);
     const metrics = createCorsiPreviewMetrics(layout);
 
@@ -1215,7 +1356,7 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.56 : 0.64);
+    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.61 : 0.69);
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
     const filterBoxes =
       model.filterLayout.type === "horizontal-stack"
@@ -3087,7 +3228,10 @@ function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return geometry;
+  // Creased normals smooth within faces but split at sharp dihedrals, so grills
+  // and rounded corners read smooth while box edges stay crisp. The flat preset
+  // keeps the averaged normals (its material's flatShading ignores them anyway).
+  return activeAppearance.normals === "creased" ? toCreasedNormals(geometry, CREASE_ANGLE_RADIANS) : geometry;
 }
 
 function createPrintableMeshPreviewGroup(
@@ -3383,12 +3527,24 @@ type PrintedPartMaterialOptions = {
 };
 
 function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshStandardMaterial {
-  return new MeshStandardMaterial({
+  // Driven by the active appearance preset (Appearance Lab) rather than the
+  // per-part roughness/metalness, so every printed surface shares one look.
+  const surface = activeAppearance;
+  const base = {
     color: options.color,
-    roughness: options.roughness,
-    metalness: options.metalness,
-    flatShading: true,
-  });
+    roughness: surface.roughness,
+    metalness: surface.metalness,
+    flatShading: surface.normals === "flat",
+    envMapIntensity: surface.envMapIntensity ?? 1,
+  };
+  if (surface.kind === "physical") {
+    return new MeshPhysicalMaterial({
+      ...base,
+      clearcoat: surface.clearcoat ?? 0,
+      clearcoatRoughness: surface.clearcoatRoughness ?? 0,
+    });
+  }
+  return new MeshStandardMaterial(base);
 }
 
 function createFilterMediaMaterial(opacity: number): Material {
@@ -3464,14 +3620,20 @@ function createFilterTexture(): CanvasTexture {
 
   context.fillStyle = "#eef1e6";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  // Subtle fine pleats: faint, low-contrast parallel lines that read as filter
-  // media up close without the loud cross-hatch that overpowered the housing.
-  context.strokeStyle = "rgba(108, 119, 110, 0.08)";
+  // A faint fine grid (horizontal + vertical cross lines) reads as filter mesh —
+  // visible enough to feel like a filter, light enough not to overpower the housing.
+  context.strokeStyle = "rgba(108, 119, 110, 0.13)";
   context.lineWidth = 1;
   for (let y = 0; y < canvas.height; y += 6) {
     context.beginPath();
     context.moveTo(0, y + 0.5);
     context.lineTo(canvas.width, y + 0.5);
+    context.stroke();
+  }
+  for (let x = 0; x < canvas.width; x += 6) {
+    context.beginPath();
+    context.moveTo(x + 0.5, 0);
+    context.lineTo(x + 0.5, canvas.height);
     context.stroke();
   }
 
@@ -3489,8 +3651,8 @@ function createStudioBackdropTexture(): CanvasTexture {
     throw new Error("createStudioBackdropTexture: Could not create canvas context");
   }
   const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#fbfaf7");
-  gradient.addColorStop(1, "#e7e4db");
+  gradient.addColorStop(0, "#f1efe9");
+  gradient.addColorStop(1, "#ddd9d0");
   context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
 

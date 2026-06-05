@@ -586,7 +586,7 @@ export type EnclosurePreviewOptions = {
 };
 
 export const previewMaterialColorPresets = [
-  { id: "matte-gray", label: "Gray", color: 0x888f84 },
+  { id: "matte-gray", label: "Gray", color: 0x82858a },
   { id: "matte-black", label: "Black", color: 0x111817 },
   { id: "warm-white", label: "White", color: 0xf3f0e6 },
   { id: "natural-tan", label: "Tan", color: 0xc7965a },
