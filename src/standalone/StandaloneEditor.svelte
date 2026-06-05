@@ -23,7 +23,7 @@
     type TempestFilterArrangement,
     type TempestSettings,
   } from "@/domain/designs/tempest/model";
-  import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
+  import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/geometry";
   import { jscadModeling } from "@/fabrication/printing/modeling/jscadModeling";
 
   // The JSCAD geom3 the editor previews/exports. Derived from the JSCAD backend's

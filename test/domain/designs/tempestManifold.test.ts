@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { defaultTempestSettings, defaultTempestTowerFilter } from "@/domain/designs/tempest/model";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
-import { towerCornerChamfer } from "@/fabrication/printing/designs/tempest/tempestGeometry";
+import { towerCornerChamfer } from "@/fabrication/printing/designs/tempest/geometry";
 import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
 
 type Mesh = { readonly vertices: readonly MeshVertex[]; readonly triangles: readonly MeshTriangle[] };

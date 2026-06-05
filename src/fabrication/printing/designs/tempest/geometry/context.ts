@@ -1,0 +1,34 @@
+import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
+
+// #######################################
+// Parametric Tempest Geometry (kernel-agnostic)
+// #######################################
+
+// The single source of truth for the Tempest purifier shape. It is written
+// against the abstract `ModelingApi`, never a concrete CSG kernel, so the same
+// code drives both the static Builder's Manifold export and the in-browser
+// design editor's JSCAD preview. Function names and construction order follow
+// the original model so it stays auditable feature-by-feature.
+
+// The geometry was originally one big generic function whose helpers closed over
+// the destructured modeling ops and a per-build fan-pattern cache. They are now
+// top-level generic functions that take this context as their first argument, so
+// the closure state becomes explicit data threaded through the call tree.
+export type GeometryContext<Solid, Region> = {
+  readonly modeling: ModelingApi<Solid, Region>;
+  // Per-build memo of fan-pattern cross-sections. Local to the build so it can
+  // never outlive it: under Manifold the arena wrapping the build owns and frees
+  // the handles it holds, and there is no cross-build state to dangle.
+  readonly fanPatternCache: Map<string, Region>;
+};
+
+export const epsilon = 0.05;
+export const scadWallCutOverlap = 0.5;
+// The 0.8mm gap to leave between the corner bevel and the filter's outer edge
+// (your step 2 — the length of the 45° offset). Edit this to move the bevel
+// nearer to / farther from the filter. The bevel is built from the filter, not
+// hardcoded, so thin filters get a smaller bevel automatically.
+export const towerCornerFilterClearance = 0.8;
+// The geometry's own tessellation resolution, passed explicitly to every
+// circular primitive so it does not depend on any backend's global default.
+export const csgSegments = 48;

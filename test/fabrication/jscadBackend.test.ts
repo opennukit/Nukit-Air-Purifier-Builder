@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { measurements } from "@jscad/modeling";
 import { createTempestModel, defaultTempestSettings } from "@/domain/designs/tempest/model";
-import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
+import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/geometry";
 import { jscadModeling } from "@/fabrication/printing/modeling/jscadModeling";
 import { manifoldModeling } from "@/fabrication/printing/modeling/manifoldOps";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";

@@ -23,7 +23,7 @@ import {
   type PrintablePart,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
+import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
