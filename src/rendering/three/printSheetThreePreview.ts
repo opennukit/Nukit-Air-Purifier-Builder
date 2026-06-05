@@ -469,9 +469,13 @@ function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeom
     );
   }
 
+  // The position map above swaps Y↔Z, which is a reflection (determinant −1) and
+  // reverses triangle winding. Swap v2/v3 back so the shell stays CCW-outward;
+  // otherwise FrontSide culling renders the parts inside-out (hollow look) — same
+  // bug, and same fix, as createPrintableMeshGeometry in the assembled preview.
   const indices: number[] = [];
   for (const triangle of placement.part.mesh.triangles) {
-    indices.push(triangle.v1, triangle.v2, triangle.v3);
+    indices.push(triangle.v1, triangle.v3, triangle.v2);
   }
 
   const geometry = new BufferGeometry();
