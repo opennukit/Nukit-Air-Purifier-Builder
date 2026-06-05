@@ -23,6 +23,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { StaticPrintReference } from "@/resources/static-print-references/references";
 import { loadStaticPrintAssets, type LoadedStaticPrintAsset } from "@/rendering/three/staticPrintAssets";
 import { printBedFitForDimensions, type PrintBed, type PrintBedFit } from "@/fabrication/printing/printableKit";
@@ -42,6 +43,9 @@ const staticPartGapMillimeters = 10;
 const bedThickness = 0.012;
 const bedGridLift = 0.001;
 const printPartLift = 0.004;
+// Smooth normals within a face but split them at dihedrals >= this, so flat walls
+// stay flat and grills/rounded corners read smooth (matches the assembled preview).
+const printPartCreaseAngleRadians = (40 * Math.PI) / 180;
 const panelColor = 0xd1a166;
 const glueKeyColor = 0x7f997d;
 const oversizedColor = 0xd78872;
@@ -482,7 +486,12 @@ function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeom
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return geometry;
+  // The mesh weld shares each flat-wall vertex with the triangle fan bored around
+  // screw holes and chamfers; plain averaged normals then bend the wall into a
+  // wrinkled "tent" radiating from the hole. Creasing splits normals at sharp
+  // dihedrals so flat walls stay flat — same fix as the assembled preview's
+  // createPrintableMeshGeometry.
+  return toCreasedNormals(geometry, printPartCreaseAngleRadians);
 }
 
 // ##############################
