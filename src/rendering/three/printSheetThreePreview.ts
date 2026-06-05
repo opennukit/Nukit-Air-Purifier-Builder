@@ -23,7 +23,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { printableMeshToBufferGeometry } from "@/rendering/three/printableMeshGeometry";
 import type { StaticPrintReference } from "@/resources/static-print-references/references";
 import { loadStaticPrintAssets, type LoadedStaticPrintAsset } from "@/rendering/three/staticPrintAssets";
 import { printBedFitForDimensions, type PrintBed, type PrintBedFit } from "@/fabrication/printing/printableKit";
@@ -464,34 +464,16 @@ function createStaticPlacementMesh(placement: StaticPrintSheetPlacement, materia
 // ##############################
 
 function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeometry {
-  const positions: number[] = [];
-  for (const vertex of placement.part.mesh.vertices) {
-    positions.push(
-      (placement.x + vertex.x) * printPreviewScale,
-      printPreviewPartY(vertex.z),
-      (placement.y + vertex.y) * printPreviewScale,
-    );
-  }
-
-  // The position map above swaps Y↔Z, which is a reflection (determinant −1) and
-  // reverses triangle winding. Swap v2/v3 back so the shell stays CCW-outward;
-  // otherwise FrontSide culling renders the parts inside-out (hollow look) — same
-  // bug, and same fix, as createPrintableMeshGeometry in the assembled preview.
-  const indices: number[] = [];
-  for (const triangle of placement.part.mesh.triangles) {
-    indices.push(triangle.v1, triangle.v3, triangle.v2);
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  // The mesh weld shares each flat-wall vertex with the triangle fan bored around
-  // screw holes and chamfers; plain averaged normals then bend the wall into a
-  // wrinkled "tent" radiating from the hole. Creasing splits normals at sharp
-  // dihedrals so flat walls stay flat — same fix as the assembled preview's
-  // createPrintableMeshGeometry.
-  return toCreasedNormals(geometry, printPartCreaseAngleRadians);
+  // Offset to the part's bed position; printPreviewPartY(0) is the part's resting
+  // height on the bed (the per-vertex z is scaled in by the shared placement).
+  return printableMeshToBufferGeometry(
+    placement.part.mesh,
+    {
+      scale: printPreviewScale,
+      offset: [placement.x * printPreviewScale, printPreviewPartY(0), placement.y * printPreviewScale],
+    },
+    { type: "creased", creaseAngleRadians: printPartCreaseAngleRadians },
+  );
 }
 
 // ##############################

@@ -47,7 +47,10 @@ import type { ToneMapping } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {
+  printableMeshToBufferGeometry,
+  type PrintableMeshShading,
+} from "@/rendering/three/printableMeshGeometry";
 import {
   findPreviewMaterialColorPreset,
   isCorsiRosenthalPrintDesignId,
@@ -3210,28 +3213,13 @@ function createSeamGroup(seams: readonly AssemblyLineCue[], material: Material):
 }
 
 function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
-  const positions: number[] = [];
-  for (const vertex of mesh.vertices) {
-    positions.push(vertex.x * sceneScale, vertex.z * sceneScale, vertex.y * sceneScale);
-  }
-
-  // The position map above swaps Y↔Z, which is a reflection (determinant −1) and
-  // therefore reverses triangle winding. Swap v2/v3 back so the shell stays
-  // CCW-outward; otherwise FrontSide culling renders the housing inside-out
-  // (you see through near walls to the interior — phantom holes at corners/grills).
-  const indices: number[] = [];
-  for (const triangle of mesh.triangles) {
-    indices.push(triangle.v1, triangle.v3, triangle.v2);
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  // Creased normals smooth within faces but split at sharp dihedrals, so grills
-  // and rounded corners read smooth while box edges stay crisp. The flat preset
-  // keeps the averaged normals (its material's flatShading ignores them anyway).
-  return activeAppearance.normals === "creased" ? toCreasedNormals(geometry, CREASE_ANGLE_RADIANS) : geometry;
+  // Grills and rounded corners read smooth while box edges stay crisp; the flat
+  // preset keeps averaged normals (its material's flatShading ignores them anyway).
+  const shading: PrintableMeshShading =
+    activeAppearance.normals === "creased"
+      ? { type: "creased", creaseAngleRadians: CREASE_ANGLE_RADIANS }
+      : { type: "averaged" };
+  return printableMeshToBufferGeometry(mesh, { scale: sceneScale, offset: [0, 0, 0] }, shading);
 }
 
 function createPrintableMeshPreviewGroup(
