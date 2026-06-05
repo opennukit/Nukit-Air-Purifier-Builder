@@ -107,25 +107,25 @@ describe("Tempest meshes are 2-manifold", () => {
   const wall = defaultTempestSettings.frame.wallThickness;
   const fullChamfer = defaultTempestSettings.frame.towerCornerPostChamfer;
 
-  test("thin filter: bevel stays >=0.6mm clear of the air-chamber corner", () => {
-    // ~2mm filter -> structuralOffset 17 -> an unclamped 55mm bevel would cut
-    // through to the air-chamber corner (x+y = 2*structuralOffset).
+  test("thin filter: bevel shrinks below the max and never reaches the filter", () => {
+    // ~2mm filter -> structuralOffset 17, pocket corner at x+y = 27. The 55mm max
+    // would carve past the filter; the derived bevel must shrink and stay short of
+    // the pocket corner (leaving the safe clearance to the filter).
     const structuralOffset = flange + 2 + wall;
-    const clamped = towerCornerChamfer(fullChamfer, structuralOffset, flange);
-    expect(clamped).toBeLessThan(fullChamfer);
-    expect((2 * structuralOffset - clamped) / Math.SQRT2).toBeGreaterThanOrEqual(0.6 - 1e-9);
+    const bevel = towerCornerChamfer(fullChamfer, structuralOffset, flange);
+    expect(bevel).toBeLessThan(fullChamfer);
+    expect(bevel).toBeLessThan(structuralOffset + flange);
   });
 
-  test("bevel stays >=0.6mm clear of the filter-pocket corner (no tunnel graze)", () => {
-    // The pocket outer corner is at x+y = structuralOffset + outsideFlange. At
-    // defaults a ~30mm filter lands the 55mm bevel exactly on it -> a corner
-    // tunnel. The clamp must back the bevel off so >=0.6mm of wall remains.
-    const structuralOffset = flange + 30 + wall; // 45; pocketCorner = 55 == fullChamfer
-    const clamped = towerCornerChamfer(fullChamfer, structuralOffset, flange);
-    expect((structuralOffset + flange - clamped) / Math.SQRT2).toBeGreaterThanOrEqual(0.6 - 1e-9);
+  test("bevel never reaches the filter-pocket corner, so the corner stays tunnel-free", () => {
+    // The pocket near corner is x+y = structuralOffset + outsideFlange. At defaults a
+    // ~30mm filter put the old fixed 55mm bevel exactly on it -> a corner tunnel.
+    const structuralOffset = flange + 30 + wall; // 45; pocket corner = 55
+    const bevel = towerCornerChamfer(fullChamfer, structuralOffset, flange);
+    expect(bevel).toBeLessThan(structuralOffset + flange);
 
-    // And the real build at that graze thickness must stay tunnel-free. The corner
-    // is independent of the grill, so use plain openings to keep this fast.
+    // And the real build at that thickness must stay tunnel-free. The corner is
+    // independent of the grill, so use plain openings to keep this fast.
     const towerAt = (thickness: number) =>
       createTempestPrintableKit(
         {
@@ -138,8 +138,8 @@ describe("Tempest meshes are 2-manifold", () => {
     expect(totalGenus(towerAt(30))).toBe(totalGenus(towerAt(33)));
   });
 
-  test("thick filters keep the full corner chamfer", () => {
-    // structuralOffset 65 (~50mm filter): both corners far away, no clamping.
+  test("thick filters keep the full corner chamfer (the max cap)", () => {
+    // structuralOffset 65 (~50mm filter): pocket corner far away, so the max applies.
     expect(towerCornerChamfer(fullChamfer, 65, flange)).toBe(fullChamfer);
   });
 

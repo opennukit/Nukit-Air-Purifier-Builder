@@ -1,6 +1,6 @@
 import { mount } from "svelte";
 import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
-import { initManifoldKernel } from "@/fabrication/printing/manifoldKernel";
+import { initManifoldKernel } from "@/fabrication/printing/modeling/manifoldKernel";
 import Playground from "./Playground.svelte";
 
 // The geometry-design playground: a separate entry from the main Builder so both

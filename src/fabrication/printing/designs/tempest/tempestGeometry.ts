@@ -1,4 +1,4 @@
-import type { ModelingApi } from "@/fabrication/printing/modelingApi";
+import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type {
   TempestChunkGrid,
   TempestFilterLayout,
@@ -19,30 +19,29 @@ import type {
 
 const epsilon = 0.05;
 const scadWallCutOverlap = 0.5;
-// Minimum wall left at a tower corner between the corner-post bevel and the
-// air-chamber corner. A thin filter shrinks the structural offset; without this
-// floor the fixed bevel cuts clean through to the chamber and opens a gap.
-const minTowerCornerWall = 0.6;
+// The 0.8mm gap to leave between the corner bevel and the filter's outer edge
+// (your step 2 — the length of the 45° offset). Edit this to move the bevel
+// nearer to / farther from the filter. The bevel is built from the filter, not
+// hardcoded, so thin filters get a smaller bevel automatically.
+const towerCornerFilterClearance = 0.8;
 // The geometry's own tessellation resolution, passed explicitly to every
 // circular primitive so it does not depend on any backend's global default.
 const csgSegments = 48;
 
-// Keep the 45° corner-post bevel (face `x+y = chamfer`) at least `minTowerCornerWall`
-// clear of the two corner features it can collide with as the filter thickness
-// (hence structuralOffset) changes:
-//   • the air-chamber corner at `x+y = 2*structuralOffset` — binds for thin filters;
-//   • the filter-pocket outer corner at `x+y = structuralOffset + outsideFlange` —
-//     a bevel landing just inside it leaves a sub-minimum sliver, and at the exact
-//     graze opens a tunnel. A larger bevel that clears the pocket corner merges with
-//     the pocket cleanly, so only the thin band right below the corner is unsafe.
-export function towerCornerChamfer(requestedChamfer: number, structuralOffset: number, outsideFlange: number): number {
-  const margin = minTowerCornerWall * Math.SQRT2;
-  let chamfer = Math.min(requestedChamfer, 2 * structuralOffset - margin);
-  const pocketCorner = structuralOffset + outsideFlange;
-  if (chamfer > pocketCorner - margin && chamfer <= pocketCorner) {
-    chamfer = pocketCorner - margin;
-  }
-  return Math.max(0, chamfer);
+// Builds the corner bevel from the filter, the way you described:
+//   1. The filter's outer-near corner sits at `x+y = structuralOffset + outsideFlange`
+//      (the filter pocket starts at `structuralOffset` along the wall, at the
+//      `outsideFlange` depth — that's the point where the two filter edges meet).
+//   2-3. Step back along the 45° corner bisector by `towerCornerFilterClearance` to
+//      get the bevel face line (`x+y = filterEdge - clearance*√2`); the bevel face
+//      is itself the line connecting the offset points.
+//   4. `chamferedRectangle2d` cuts the box corner up to that line (returns the cut leg).
+//   5. ...for all four corners, swept up the Z height by `chamferedPrism`.
+// Capped at `maxChamfer` so a thick filter doesn't produce an enormous bevel.
+export function towerCornerChamfer(maxChamfer: number, structuralOffset: number, outsideFlange: number): number {
+  const filterEdge = structuralOffset + outsideFlange; // step 1
+  const bevelFace = filterEdge - towerCornerFilterClearance * Math.SQRT2; // steps 2-3
+  return Math.max(0, Math.min(maxChamfer, bevelFace));
 }
 
 type TempestGeometryOptions = {

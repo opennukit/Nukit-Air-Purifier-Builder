@@ -1,5 +1,5 @@
 import { booleans, expansions, extrusions, hulls, primitives, transforms } from "@jscad/modeling";
-import type { ModelingApi } from "@/fabrication/printing/modelingApi";
+import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 
 // #######################################
 // JSCAD backend for the design editor

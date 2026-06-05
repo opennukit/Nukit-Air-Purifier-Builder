@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { measurements } from "@jscad/modeling";
 import { createTempestModel, defaultTempestSettings } from "@/domain/designs/tempest/model";
 import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
-import { jscadModeling } from "@/fabrication/printing/jscadModeling";
-import { manifoldModeling } from "@/fabrication/printing/manifoldOps";
-import { withGeometryArena } from "@/fabrication/printing/manifoldKernel";
+import { jscadModeling } from "@/fabrication/printing/modeling/jscadModeling";
+import { manifoldModeling } from "@/fabrication/printing/modeling/manifoldOps";
+import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
 
 type Bounds = { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
 

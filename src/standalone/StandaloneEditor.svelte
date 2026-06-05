@@ -24,7 +24,7 @@
     type TempestSettings,
   } from "@/domain/designs/tempest/model";
   import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/tempestGeometry";
-  import { jscadModeling } from "@/fabrication/printing/jscadModeling";
+  import { jscadModeling } from "@/fabrication/printing/modeling/jscadModeling";
 
   // The JSCAD geom3 the editor previews/exports. Derived from the JSCAD backend's
   // own primitive return type so we don't depend on @jscad/modeling's type paths.

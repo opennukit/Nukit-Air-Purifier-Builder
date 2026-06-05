@@ -1,6 +1,6 @@
 import type { CrossSection, Manifold } from "manifold-3d";
-import { manifoldKernel, track } from "@/fabrication/printing/manifoldKernel";
-import type { JoinCorners, ModelingApi, Vec2, Vec3 } from "@/fabrication/printing/modelingApi";
+import { manifoldKernel, track } from "@/fabrication/printing/modeling/manifoldKernel";
+import type { JoinCorners, ModelingApi, Vec2, Vec3 } from "@/fabrication/printing/modeling/modelingApi";
 
 // #######################################
 // JSCAD-Shaped Facade over Manifold

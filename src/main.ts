@@ -2,7 +2,7 @@ import "./app/styles.css";
 import { mount } from "svelte";
 import App from "./App.svelte";
 import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
-import { initManifoldKernel } from "@/fabrication/printing/manifoldKernel";
+import { initManifoldKernel } from "@/fabrication/printing/modeling/manifoldKernel";
 
 const appRoot = document.querySelector<HTMLElement>("#app");
 if (appRoot === null) {

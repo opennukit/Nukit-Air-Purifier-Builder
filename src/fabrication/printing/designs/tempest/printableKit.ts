@@ -6,8 +6,8 @@ import {
   POSITION_PROP_COUNT,
   primitives,
   transforms,
-} from "@/fabrication/printing/manifoldOps";
-import { withGeometryArena } from "@/fabrication/printing/manifoldKernel";
+} from "@/fabrication/printing/modeling/manifoldOps";
+import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
 import {
   createTempestModel,
   defaultTempestSettings,
