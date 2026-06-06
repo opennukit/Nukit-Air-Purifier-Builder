@@ -1,5 +1,7 @@
 import type { Millimeters } from "@/domain/units";
-import type { TempestTopology } from "./topology";
+import { assertNever, type TempestTopology } from "./topology";
+import { sandwichPlan } from "./sandwich";
+import { quadPlan } from "./quad";
 
 // #######################################
 // Tempest Input Model
@@ -454,27 +456,53 @@ export const defaultTempestSettings: TempestSettings = {
 
 export function createTempestModel(settings: TempestSettings = defaultTempestSettings): TempestModel {
   const safeSettings = normalizeTempestSettings(settings);
-  const box = createBoxEnvelope(safeSettings);
+  const plan = planForArrangement(safeSettings.arrangement); // the ONE topology decision
   const frame = createFrameModel(safeSettings.frame);
-  const filterLayout = createFilterLayout(safeSettings, box, frame);
-  const fanLayout = createFanLayout(safeSettings, box, filterLayout);
+  const box = plan.box(safeSettings, frame);
+  const filterLayout = plan.filterLayout(safeSettings, box, frame);
+  const fanLayout = plan.fanLayout(safeSettings, box, filterLayout);
+  const cordPassThrough = plan.cordPlacement(safeSettings, box, filterLayout);
   const chunkGrid = createChunkGrid(box, safeSettings.printBed);
 
   return {
     settings: safeSettings,
-    topology: tempestTopologyForArrangement(safeSettings.arrangement),
+    topology: plan.topology,
     box,
     frame,
     filterLayout,
     fanLayout,
-    cordPassThrough: createCordPassThroughPlacement(safeSettings, box, filterLayout),
+    cordPassThrough,
     chunkGrid,
     renderTarget: resolveRenderTarget(safeSettings.renderTarget, chunkGrid),
   };
 }
 
-function tempestTopologyForArrangement(arrangement: TempestFilterArrangement): TempestTopology {
-  return arrangement.type === "four-side-filter-tower" ? "quad" : "sandwich";
+// The family of derived-model builders for one topology. createTempestModel runs
+// its steps in order; the spine (topology.ts) guarantees the steps' tags agree.
+export type TempestModelPlan = {
+  readonly topology: TempestTopology;
+  readonly box: (settings: TempestSettings, frame: TempestFrameModel) => TempestBoxEnvelope;
+  readonly filterLayout: (settings: TempestSettings, box: TempestBoxEnvelope, frame: TempestFrameModel) => TempestFilterLayout;
+  readonly fanLayout: (settings: TempestSettings, box: TempestBoxEnvelope, filterLayout: TempestFilterLayout) => TempestFanLayout;
+  readonly cordPlacement: (
+    settings: TempestSettings,
+    box: TempestBoxEnvelope,
+    filterLayout: TempestFilterLayout,
+  ) => TempestCordPassThroughPlacement;
+};
+
+// The ONLY place an arrangement preset maps to a topology after the settings
+// boundary. Three presets collapse to two topologies.
+function planForArrangement(arrangement: TempestFilterArrangement): TempestModelPlan {
+  switch (arrangement.type) {
+    case "single-horizontal-top-filter":
+    case "dual-horizontal-sandwich":
+      return sandwichPlan;
+    case "four-side-filter-tower":
+      return quadPlan;
+    default:
+      return assertNever(arrangement);
+  }
 }
 
 // ##############################
@@ -608,35 +636,8 @@ function normalizeTempestRenderTarget(renderTarget: TempestRenderTarget): Tempes
 }
 
 // ##############################
-// Derived Box
+// Derived Frame
 // ##############################
-
-function createBoxEnvelope(settings: TempestSettings): TempestBoxEnvelope {
-  const frame = settings.frame;
-  if (settings.arrangement.type === "four-side-filter-tower") {
-    const offset = towerStructuralOffset(settings.arrangement, frame);
-    const height = frame.wallThickness + settings.arrangement.filter.faceHeight + frame.outsideFlangeThickness;
-    return {
-      width: settings.arrangement.filter.faceWidth + 2 * offset,
-      depth: settings.arrangement.filter.faceWidth + 2 * offset,
-      height,
-      wallHeight: height - frame.wallThickness - frame.outsideFlangeThickness,
-    };
-  }
-
-  const filterCount = horizontalFilterCount(settings.arrangement);
-  const height =
-    settings.fan.diameter +
-    HORIZONTAL_FAN_VERTICAL_PADDING_MM +
-    2 * frame.outsideFlangeThickness +
-    filterCount * (settings.arrangement.filter.thickness + frame.wallThickness);
-  return {
-    width: settings.arrangement.filter.footprintWidth + 2 * frame.wallThickness,
-    depth: settings.arrangement.filter.footprintDepth + 2 * frame.wallThickness,
-    height,
-    wallHeight: height - 2 * frame.outsideFlangeThickness,
-  };
-}
 
 function createFrameModel(frame: TempestFrameSettings): TempestFrameModel {
   return {
@@ -645,235 +646,9 @@ function createFrameModel(frame: TempestFrameSettings): TempestFrameModel {
   };
 }
 
-function towerStructuralOffset(arrangement: Extract<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>, frame: TempestFrameSettings): Millimeters {
-  return frame.outsideFlangeThickness + arrangement.filter.thickness + frame.wallThickness;
-}
-
-function horizontalFilterCount(arrangement: Exclude<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>): 1 | 2 {
-  return arrangement.type === "single-horizontal-top-filter" ? 1 : 2;
-}
-
 // ##############################
-// Derived Filters
+// Shared Fan Sizing
 // ##############################
-
-function createFilterLayout(
-  settings: TempestSettings,
-  box: TempestBoxEnvelope,
-  frame: TempestFrameModel,
-): TempestFilterLayout {
-  if (settings.arrangement.type === "four-side-filter-tower") {
-    return createTowerFilterLayout(settings.arrangement, box, frame);
-  }
-  return createHorizontalFilterLayout(settings.arrangement, settings.filterSlot, box, frame);
-}
-
-function createHorizontalFilterLayout(
-  arrangement: Exclude<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>,
-  filterSlot: TempestFilterSlotSettings,
-  box: TempestBoxEnvelope,
-  frame: TempestFrameModel,
-): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
-  const filterCount = horizontalFilterCount(arrangement);
-  const filters = Array.from({ length: filterCount }, (_, index) => {
-    const zBottom = horizontalFilterZ(index, filterCount, box.height, frame.outsideFlangeThickness, arrangement.filter.thickness);
-    return {
-      index,
-      zBottom,
-      zTop: zBottom + arrangement.filter.thickness,
-    };
-  });
-  const flanges =
-    filterCount === 1
-      ? [createHorizontalFlange("below-filter", filters[0], frame.insideFlangeThickness)]
-      : [
-          createHorizontalFlange("above-filter", filters[0], frame.insideFlangeThickness),
-          createHorizontalFlange("below-filter", filters[1], frame.insideFlangeThickness),
-        ];
-
-  return {
-    topology: "sandwich",
-    filterCount,
-    bottomPanel: filterCount === 1 ? "solid-plate" : "open-frame",
-    filters,
-    flanges,
-    loading: {
-      type: "wall-slots",
-      slots: filters.map((filter) => ({
-        filterIndex: filter.index,
-        wall: filterSlot.wall,
-        localZBottom: Math.max(0, filter.zBottom - filterSlot.clearance - frame.outsideFlangeThickness),
-        localZTop: Math.min(box.wallHeight, filter.zTop + filterSlot.clearance - frame.outsideFlangeThickness),
-      })),
-    },
-  };
-}
-
-function horizontalFilterZ(
-  index: number,
-  filterCount: 1 | 2,
-  boxHeight: Millimeters,
-  outsideFlangeThickness: Millimeters,
-  filterThickness: Millimeters,
-): Millimeters {
-  if (filterCount === 1) {
-    return boxHeight - outsideFlangeThickness - filterThickness;
-  }
-  return index === 0 ? outsideFlangeThickness : boxHeight - outsideFlangeThickness - filterThickness;
-}
-
-function createHorizontalFlange(
-  type: TempestHorizontalFlangeLayer["type"],
-  filter: TempestHorizontalFilterLayer,
-  thickness: Millimeters,
-): TempestHorizontalFlangeLayer {
-  const zBottom = type === "below-filter" ? filter.zBottom - thickness : filter.zTop;
-  return {
-    type,
-    filterIndex: filter.index,
-    zBottom,
-    zTop: zBottom + thickness,
-  };
-}
-
-function createTowerFilterLayout(
-  arrangement: Extract<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>,
-  box: TempestBoxEnvelope,
-  frame: TempestFrameModel,
-): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  const structuralOffset = towerStructuralOffset(arrangement, frame);
-  const zMin = frame.wallThickness;
-  const zMax = box.height - frame.outsideFlangeThickness;
-  const pocket: TempestTowerFilterPocket = {
-    width: arrangement.filter.faceWidth,
-    height: arrangement.filter.faceHeight,
-    depth: arrangement.filter.thickness,
-  };
-  return {
-    topology: "quad",
-    filterCount: 4,
-    filter: arrangement.filter,
-    structuralOffset,
-    bottomPlateThickness: frame.wallThickness,
-    topPlateThickness: frame.outsideFlangeThickness,
-    airChamber: {
-      xMin: structuralOffset,
-      xMax: box.width - structuralOffset,
-      yMin: structuralOffset,
-      yMax: box.depth - structuralOffset,
-      zMin,
-      zMax,
-    },
-    wallRects: mapTempestWalls((wall) =>
-      quadWallRect(wall, box, structuralOffset, frame.outsideFlangeThickness, arrangement.filter.thickness),
-    ),
-    filterPockets: mapTempestWalls(() => pocket),
-    loading: {
-      type: "top-plate-slots",
-      slotCount: 4,
-    },
-  };
-}
-
-// The filter-pocket rect for one wall, in model coordinates. The pocket is a thin
-// slab one filter-thickness deep, set one outer-wall in from the outer face and
-// running between the two structural offsets on the in-plane span.
-function quadWallRect(
-  wall: TempestWall,
-  box: TempestBoxEnvelope,
-  structuralOffset: Millimeters,
-  outsideFlange: Millimeters,
-  filterThickness: Millimeters,
-): TempestQuadWallRect {
-  const planes = { innerPlaneOffset: structuralOffset, outerPlaneOffset: outsideFlange };
-  if (wall === "front") {
-    return {
-      xMin: structuralOffset,
-      xMax: box.width - structuralOffset,
-      yMin: outsideFlange,
-      yMax: outsideFlange + filterThickness,
-      inletNormalAxis: "y",
-      ...planes,
-    };
-  }
-  if (wall === "back") {
-    return {
-      xMin: structuralOffset,
-      xMax: box.width - structuralOffset,
-      yMin: box.depth - outsideFlange - filterThickness,
-      yMax: box.depth - outsideFlange,
-      inletNormalAxis: "y",
-      ...planes,
-    };
-  }
-  if (wall === "left") {
-    return {
-      xMin: outsideFlange,
-      xMax: outsideFlange + filterThickness,
-      yMin: structuralOffset,
-      yMax: box.depth - structuralOffset,
-      inletNormalAxis: "x",
-      ...planes,
-    };
-  }
-  return {
-    xMin: box.width - outsideFlange - filterThickness,
-    xMax: box.width - outsideFlange,
-    yMin: structuralOffset,
-    yMax: box.depth - structuralOffset,
-    inletNormalAxis: "x",
-    ...planes,
-  };
-}
-
-// ##############################
-// Derived Fans
-// ##############################
-
-function createFanLayout(settings: TempestSettings, box: TempestBoxEnvelope, filterLayout: TempestFilterLayout): TempestFanLayout {
-  const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
-  const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
-  if (filterLayout.topology === "quad") {
-    const minimumCenterFromEdge = filterLayout.structuralOffset + settings.fan.diameter / 2;
-    const positionsX = towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
-    const positionsY = towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
-    return {
-      topology: "quad",
-      bodyDepth,
-      screwPitch,
-      minimumCenterFromEdge,
-      topExhaust: settings.fan.topExhaust ?? "fan-grid",
-      columns: positionsX.length,
-      rows: positionsY.length,
-      positionsX,
-      positionsY,
-      fanCount: positionsX.length * positionsY.length,
-    };
-  }
-
-  const cornerSafeMinimum = settings.frame.wallThickness + bodyDepth + settings.fan.diameter / 2;
-  const localVerticalCenter = horizontalFanVerticalCenter(
-    filterLayout.filterCount,
-    box.wallHeight,
-    settings.fan.diameter,
-    settings.arrangement.filter.thickness,
-    settings.frame.wallThickness,
-    settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter : 0,
-  );
-  return {
-    topology: "sandwich",
-    bodyDepth,
-    screwPitch,
-    cornerSafeMinimum,
-    localVerticalCenter,
-    walls: {
-      front: createWallFanLayout("front", box.width, settings.fan.wallRequests.front, cornerSafeMinimum, settings.fan.diameter),
-      back: createWallFanLayout("back", box.width, settings.fan.wallRequests.back, cornerSafeMinimum, settings.fan.diameter),
-      left: createWallFanLayout("left", box.depth, settings.fan.wallRequests.left, cornerSafeMinimum, settings.fan.diameter),
-      right: createWallFanLayout("right", box.depth, settings.fan.wallRequests.right, cornerSafeMinimum, settings.fan.diameter),
-    },
-  };
-}
 
 export function tempestFanBodyDepth(fanDiameter: Millimeters): Millimeters {
   if (fanDiameter === 120) {
@@ -895,161 +670,22 @@ export function tempestFanScrewPitch(fanDiameter: Millimeters): Millimeters {
   return fanDiameter * FAN_SCREW_PITCH_RATIO;
 }
 
-function createWallFanLayout(
-  wall: TempestWall,
-  wallLength: Millimeters,
-  requested: TempestFanCountRequest,
-  cornerSafeMinimum: Millimeters,
-  fanDiameter: Millimeters,
-): TempestWallFanLayout {
-  const maximumCount = maxHorizontalWallFans(wallLength, cornerSafeMinimum, fanDiameter);
-  const actualCount = actualWallFanCount(requested, maximumCount);
-  return {
-    wall,
-    requested,
-    maximumCount,
-    actualCount,
-    positionsAlongWall: horizontalWallFanPositions(actualCount, wallLength, cornerSafeMinimum, fanDiameter),
-  };
-}
-
-function maxHorizontalWallFans(wallLength: Millimeters, cornerSafeMinimum: Millimeters, fanDiameter: Millimeters): number {
-  const span = wallLength - 2 * cornerSafeMinimum;
-  if (span < 0) {
-    return 0;
-  }
-  return Math.max(0, Math.floor(1 + span / fanSpacing(fanDiameter)));
-}
-
-function actualWallFanCount(requested: TempestFanCountRequest, maximumCount: number): number {
-  if (requested.type === "automatic") {
-    return maximumCount;
-  }
-  const count = finiteNonNegativeInteger(requested.count, 0);
-  return count > maximumCount ? maximumCount : count;
-}
-
-function horizontalWallFanPositions(
-  fanCount: number,
-  wallLength: Millimeters,
-  cornerSafeMinimum: Millimeters,
-  fanDiameter: Millimeters,
-): readonly Millimeters[] {
-  if (fanCount === 0) {
-    return [];
-  }
-  const minimumSpacing = fanSpacing(fanDiameter);
-  const spread = fanCount <= 1 ? minimumSpacing : (wallLength - 2 * cornerSafeMinimum) / (fanCount - 1);
-  const spacing = Math.max(minimumSpacing, spread);
-  const total = fanCount <= 1 ? 0 : (fanCount - 1) * spacing;
-  const first = fanCount === 1 ? wallLength / 2 : (wallLength - total) / 2;
-  return Array.from({ length: fanCount }, (_, index) => first + index * spacing);
-}
-
-function horizontalFanVerticalCenter(
-  filterCount: 1 | 2,
-  wallHeight: Millimeters,
-  fanDiameter: Millimeters,
-  filterThickness: Millimeters,
-  insideFlangeThickness: Millimeters,
-  cordHoleDiameter: Millimeters,
-): Millimeters {
-  const natural = filterCount === 2 ? wallHeight / 2 : (wallHeight - filterThickness - insideFlangeThickness) / 2;
-  const fanRadius = fanDiameter / 2;
-  const maxSafe = wallHeight - 2 * cordHoleDiameter - fanRadius;
-  return Math.min(natural, maxSafe);
-}
-
-function towerFansPerSide(length: Millimeters, minimumCenterFromEdge: Millimeters, fanDiameter: Millimeters): number {
-  const span = length - 2 * minimumCenterFromEdge;
-  if (span < 0) {
-    return 0;
-  }
-  return Math.max(0, Math.floor(1 + span / fanSpacing(fanDiameter)));
-}
-
-function towerFanPositions(
-  fanCount: number,
-  length: Millimeters,
-  fanDiameter: Millimeters,
-): readonly Millimeters[] {
-  if (fanCount === 0) {
-    return [];
-  }
-  const total = fanCount <= 1 ? 0 : (fanCount - 1) * fanSpacing(fanDiameter);
-  const first = fanCount === 1 ? length / 2 : (length - total) / 2;
-  return Array.from({ length: fanCount }, (_, index) => first + index * fanSpacing(fanDiameter));
-}
-
-function fanSpacing(fanDiameter: Millimeters): Millimeters {
+export function fanSpacing(fanDiameter: Millimeters): Millimeters {
   return fanDiameter + FAN_TO_FAN_GAP_MM;
 }
 
 // ##############################
-// Derived Cord Hole
+// Shared Cord Helpers
 // ##############################
 
-function createCordPassThroughPlacement(
-  settings: TempestSettings,
-  box: TempestBoxEnvelope,
-  filterLayout: TempestFilterLayout,
-): TempestCordPassThroughPlacement {
-  if (settings.cordPassThrough.type === "none") {
-    return { type: "none" };
-  }
-  if (filterLayout.topology === "quad") {
-    return createTowerCordPassThroughPlacement(settings.cordPassThrough, filterLayout);
-  }
-  const wallLength = settings.cordPassThrough.wall === "front" || settings.cordPassThrough.wall === "back" ? box.width : box.depth;
-  return {
-    topology: "sandwich",
-    type: "wall-cylinder",
-    wall: settings.cordPassThrough.wall,
-    side: settings.cordPassThrough.side,
-    diameter: settings.cordPassThrough.diameter,
-    positionAlongWall: cordPositionAlongWall(wallLength, settings.cordPassThrough.side, horizontalCordOffset(settings)),
-    verticalCenter: box.height / 2,
-    axis: settings.cordPassThrough.wall === "front" || settings.cordPassThrough.wall === "back" ? "y" : "x",
-  };
-}
-
-function createTowerCordPassThroughPlacement(
-  cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>,
-  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
-): TempestCordPassThroughPlacement {
-  const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
-  const corner = quadCordCorner(cord);
-  return {
-    topology: "quad",
-    type: "top-cylinder",
-    diameter: cord.diameter,
-    x: corner.x === "max" ? filterLayout.airChamber.xMax - offset : filterLayout.airChamber.xMin + offset,
-    y: corner.y === "max" ? filterLayout.airChamber.yMax - offset : filterLayout.airChamber.yMin + offset,
-    zStart: filterLayout.airChamber.zMax,
-    depth: filterLayout.topPlateThickness,
-  };
-}
-
-// Which corner of the air chamber the tower cord exits through, as min/max on
-// each axis. The chosen wall+side maps to a corner: the cord hugs the high edge
-// when the wall is back/right, or when a front/back/left/right wall's "right"
-// side points to the high edge.
-type QuadCordCorner = { readonly x: "min" | "max"; readonly y: "min" | "max" };
-
-function quadCordCorner(cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>): QuadCordCorner {
-  const usesHighX = cord.wall === "right" || ((cord.wall === "front" || cord.wall === "back") && cord.side === "right");
-  const usesHighY = cord.wall === "back" || ((cord.wall === "left" || cord.wall === "right") && cord.side === "right");
-  return { x: usesHighX ? "max" : "min", y: usesHighY ? "max" : "min" };
-}
-
-function horizontalCordOffset(settings: TempestSettings): Millimeters {
+export function horizontalCordOffset(settings: TempestSettings): Millimeters {
   if (settings.cordPassThrough.type === "none") {
     return 0;
   }
   return Math.max(settings.cordPassThrough.diameter / 2 + settings.frame.wallThickness + CORD_WALL_MARGIN_MM, settings.cordPassThrough.cornerOffset);
 }
 
-function cordPositionAlongWall(wallLength: Millimeters, side: "left" | "center" | "right", offset: Millimeters): Millimeters {
+export function cordPositionAlongWall(wallLength: Millimeters, side: "left" | "center" | "right", offset: Millimeters): Millimeters {
   if (side === "center") {
     return wallLength / 2;
   }
@@ -1122,7 +758,7 @@ function finiteInteger(value: number, fallback: number): number {
   return Number.isFinite(value) ? Math.floor(value) : fallback;
 }
 
-function finiteNonNegativeInteger(value: number, fallback: number): number {
+export function finiteNonNegativeInteger(value: number, fallback: number): number {
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
 }
 
@@ -1130,15 +766,13 @@ function finiteNonNegativeInteger(value: number, fallback: number): number {
 // Constants
 // #######################################
 
-// Fan sizing.
+// Shared fan sizing (family-specific spacing lives in sandwich.ts / quad.ts).
 const FAN_TO_FAN_GAP_MM = 10; // minimum gap between adjacent fans (center spacing = diameter + this)
-const HORIZONTAL_FAN_VERTICAL_PADDING_MM = 2; // headroom added above the fan in the sandwich box height
 const FAN_BODY_DEPTH_RATIO = 0.19; // fallback body depth = diameter * this (off the 120/140 lookup)
 const FAN_SCREW_PITCH_RATIO = 0.85; // fallback screw pitch = diameter * this (off the 120/140 lookup)
 
 // Cord hole placement.
 const CORD_WALL_MARGIN_MM = 1; // extra clearance past the wall when offsetting the cord hole from a corner
-const CORD_TOWER_MIN_EDGE_MM = 2; // minimum gap from the air-chamber edge to the tower cord hole
 
 export const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
 
