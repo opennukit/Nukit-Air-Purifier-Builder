@@ -1,5 +1,6 @@
-import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel, TempestWall } from "@/domain/designs/tempest/model";
-import { assertNever } from "@/domain/designs/tempest/topology";
+import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
+import { tempestWalls } from "@/domain/designs/tempest/model";
+import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
@@ -11,9 +12,8 @@ import {
   towerFilterPocket,
   towerFilterSlots,
   towerSideOpening,
-} from "./towerAssembly";
-import { flangePanel, framePanel, platePanel, wall } from "./horizontalAssembly";
-import { horizontalWallFanLayout, towerFilterThickness } from "./layout";
+} from "./quadAssembly";
+import { flangePanel, framePanel, platePanel, wall } from "./sandwichAssembly";
 import { cordHoleCylinders, pinHoles } from "./pins";
 
 // #######################################
@@ -22,13 +22,13 @@ import { cordHoleCylinders, pinHoles } from "./pins";
 
 // Read this file top to bottom and it is the recipe for building the box — like a
 // Fusion 360 timeline. Each step is a named call, and that call IS one timeline
-// node; opening the function it names (in ./towerAssembly, ./horizontalAssembly,
+// node; opening the function it names (in ./quadAssembly, ./sandwichAssembly,
 // ./pins) is the "double-click to see this operation's internals". The low-level
 // shapes those nodes are built from live in ./primitives and ./patterns2d.
 //
 // There are two recipes because the builder makes two product families — a
-// 1/2-filter horizontal box and a 4-filter side-filter tower. `assembly` picks the
-// one named by the model's filter layout.
+// 1/2-filter sandwich box and a 4-filter side-filter quad tower. `assembly`
+// dispatches on the model's topology via matchTopology.
 
 type TempestGeometryOptions = {
   readonly alignmentPinChunkGrid?: TempestChunkGrid;
@@ -59,28 +59,37 @@ function finalModel<Solid, Region>(
   ]);
 }
 
-// Pick the recipe named by the model's filter layout.
+// Pick the recipe named by the model's topology.
 function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
-  return model.filterLayout.topology === "quad"
-    ? assemblyTower(ctx, model, model.filterLayout)
-    : assemblyHorizontal(ctx, model, model.filterLayout);
+  return matchTopology(model.topology, {
+    sandwich: () => assembleSandwich(ctx, model, expectSandwichFilters(model.filterLayout), expectSandwichFans(model.fanLayout)),
+    quad: () => assembleQuad(ctx, model, expectQuadFilters(model.filterLayout), expectQuadFans(model.fanLayout)),
+  });
 }
 
-// The quad recipe runs only for a quad-topology model, so its fan layout is the
-// quad arm. planForArrangement guarantees the two tags agree; this proves the
-// dead branch unreachable to the type system without re-validating caller input.
-function expectQuadFanLayout(fanLayout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "quad" }> {
-  if (fanLayout.topology !== "quad") {
-    return assertNever(fanLayout.topology as never);
-  }
-  return fanLayout;
+// planForArrangement returns a topology-consistent triple, so once the model's
+// topology tag has matched, the layout arms are known. These guards prove the
+// dead branch unreachable to the type system without re-validating caller input
+// (unlike the deleted layout.ts throws, which guarded against real mismatches).
+function expectSandwichFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function expectQuadFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
+  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
+}
+
+function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function expectQuadFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "quad" }> {
+  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 // #######################################
-// Recipe: 4-filter side-filter tower
+// Recipe: 4-filter side-filter quad tower
 // #######################################
-
-const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
 
 // Built top to bottom:
 //   1. Start with the outer box, corners chamfered.
@@ -89,10 +98,11 @@ const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
 //   4. Cut each wall's inlet (outer) and outlet (inner) opening.
 //   5. Cut the top fan grid (or a single box-fan exhaust).
 //   6. Cut the slots you push the filters down through.
-function assemblyTower<Solid, Region>(
+function assembleQuad<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): Solid {
   // 1. The outer box; towerCornerChamfer keeps the bevel a full wall clear of the
   //    nearest filter pocket.
@@ -122,18 +132,18 @@ function assemblyTower<Solid, Region>(
           filterLayout,
           wallName,
           rect,
-          model.frame.outsideFlangeThickness + towerFilterThickness(model) - EPSILON_LIP,
+          model.frame.outsideFlangeThickness + filterLayout.filter.thickness - EPSILON_LIP,
           filterLayout.structuralOffset + EPSILON_LIP,
         ),
       ];
     }),
-    ...towerFanGrid(ctx, model, filterLayout, expectQuadFanLayout(model.fanLayout)), // 5. top fan grid (or single box-fan exhaust)
+    ...towerFanGrid(ctx, model, filterLayout, fanLayout), // 5. top fan grid (or single box-fan exhaust)
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
   ]);
 }
 
 // #######################################
-// Recipe: 1 / 2-filter horizontal box
+// Recipe: 1 / 2-filter sandwich box
 // #######################################
 
 // Assembled from stacked panels + four walls:
@@ -142,10 +152,11 @@ function assemblyTower<Solid, Region>(
 //   3. The inside flange(s) the filter(s) rest on.
 //   4. The four side walls, each carrying its fan holes (and a filter slot on the
 //      loading wall). Everything is unioned into one body.
-function assemblyHorizontal<Solid, Region>(
+function assembleSandwich<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
 ): Solid {
   const { transforms } = ctx.modeling;
 
@@ -157,7 +168,7 @@ function assemblyHorizontal<Solid, Region>(
   const flanges = filterLayout.flanges.map((flange) =>
     transforms.translate([0, 0, flange.zBottom], flangePanel(ctx, model, model.frame.insideFlangeThickness)),
   ); // 3.
-  const fanLayout = horizontalWallFanLayout(model);
+  const fanCenter = fanLayout.localVerticalCenter;
 
   // 4. Union the panels with the four side walls.
   return unionAll(ctx, [
@@ -166,19 +177,19 @@ function assemblyHorizontal<Solid, Region>(
     ...flanges,
     transforms.translate(
       [0, 0, model.frame.outsideFlangeThickness],
-      wall(ctx, model, model.box.width, fanLayout.walls.front, filterLayout),
+      wall(ctx, model, model.box.width, fanLayout.walls.front, filterLayout, fanCenter),
     ),
     transforms.translate(
       [model.box.width, model.box.depth, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(Math.PI, wall(ctx, model, model.box.width, fanLayout.walls.back, filterLayout)),
+      transforms.rotateZ(Math.PI, wall(ctx, model, model.box.width, fanLayout.walls.back, filterLayout, fanCenter)),
     ),
     transforms.translate(
       [0, model.box.depth, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(-Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.left, filterLayout)),
+      transforms.rotateZ(-Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.left, filterLayout, fanCenter)),
     ),
     transforms.translate(
       [model.box.width, 0, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.right, filterLayout)),
+      transforms.rotateZ(Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.right, filterLayout, fanCenter)),
     ),
   ]);
 }

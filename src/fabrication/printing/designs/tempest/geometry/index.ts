@@ -1,4 +1,4 @@
 // Public API of the parametric Tempest geometry. See ./buildTempest for the entry
 // point and ./context for how the modeling backend is threaded through the helpers.
 export { buildTempestGeometry } from "./buildTempest";
-export { towerCornerChamfer } from "./towerAssembly";
+export { towerCornerChamfer } from "./quadAssembly";

@@ -17,7 +17,6 @@ import {
   unionAll,
 } from "./primitives";
 import { fanPatternCut, towerOpening2d } from "./patterns2d";
-import { towerFilter } from "./layout";
 
 // Box-fan top exhaust.
 const BOX_FAN_TIE_RADIUS_FLOOR_MM = 0.001; // never let a zero screw-hole diameter collapse the tie hole
@@ -105,7 +104,7 @@ export function towerSideOpening<Solid, Region>(
   depthHigh: number,
 ): readonly Solid[] {
   const { transforms } = ctx.modeling;
-  const filter = towerFilter(model);
+  const filter = filterLayout.filter;
   const width = filter.faceWidth - 2 * model.frame.rim;
   const height = filter.faceHeight - 2 * model.frame.rim;
   if (width <= 0 || height <= 0) {

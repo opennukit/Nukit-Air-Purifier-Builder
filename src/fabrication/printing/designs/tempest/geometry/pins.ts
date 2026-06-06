@@ -1,8 +1,8 @@
-import type { TempestChunkGrid, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
+import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
+import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
-import { horizontalWallLocalFanCenter } from "./layout";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
 
@@ -58,19 +58,39 @@ export function pinHoles<Solid, Region>(
     return [];
   }
 
-  const candidates =
-    model.filterLayout.topology === "quad"
-      ? pinCandidatesTower(ctx, model, model.filterLayout, chunkGrid, pin)
-      : pinCandidatesHorizontal(ctx, model, model.filterLayout, chunkGrid, pin);
-  if (candidates.length === 0) {
-    return [];
-  }
-  const fanZones = fanBodyZones(ctx, model);
-  const candidateGeometry = unionAll(ctx, candidates);
-  return [fanZones.length === 0 ? candidateGeometry : ctx.modeling.booleans.subtract(candidateGeometry, unionAll(ctx, fanZones))];
+  return matchTopology(model.topology, {
+    sandwich: () => {
+      const filterLayout = expectSandwichFilters(model.filterLayout);
+      const fanLayout = expectSandwichFans(model.fanLayout);
+      const candidates = pinCandidatesSandwich(ctx, model, filterLayout, chunkGrid, pin);
+      if (candidates.length === 0) {
+        return [];
+      }
+      // Keep pins clear of the fan bodies so a seam pin never lands in a fan bore.
+      const fanZones = fanBodyZones(ctx, model, fanLayout);
+      const candidateGeometry = unionAll(ctx, candidates);
+      return [fanZones.length === 0 ? candidateGeometry : ctx.modeling.booleans.subtract(candidateGeometry, unionAll(ctx, fanZones))];
+    },
+    quad: () => {
+      const candidates = pinCandidatesQuad(ctx, model, expectQuadFilters(model.filterLayout), chunkGrid, pin);
+      return candidates.length === 0 ? [] : [unionAll(ctx, candidates)];
+    },
+  });
 }
 
-function pinCandidatesHorizontal<Solid, Region>(
+function expectSandwichFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function expectQuadFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
+  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
+}
+
+function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function pinCandidatesSandwich<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
@@ -148,7 +168,7 @@ function pinCandidatesHorizontal<Solid, Region>(
   return geometries;
 }
 
-function pinCandidatesTower<Solid, Region>(
+function pinCandidatesQuad<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
@@ -260,27 +280,28 @@ function pinCandidatesTower<Solid, Region>(
   return geometries;
 }
 
-function fanBodyZones<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid[] {
-  if (model.fanLayout.topology !== "sandwich") {
-    return [];
-  }
+function fanBodyZones<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
+): Solid[] {
   const { transforms } = ctx.modeling;
   const oneWall = (positions: readonly number[]) =>
     positions.map((position) =>
-      cylinderAlongFromStart(ctx, "y", [position, -1, horizontalWallLocalFanCenter(model)], model.frame.wallThickness + 2, model.settings.fan.diameter / 2),
+      cylinderAlongFromStart(ctx, "y", [position, -1, fanLayout.localVerticalCenter], model.frame.wallThickness + 2, model.settings.fan.diameter / 2),
     );
 
   return [
-    ...oneWall(model.fanLayout.walls.front.positionsAlongWall).map((geometry) =>
+    ...oneWall(fanLayout.walls.front.positionsAlongWall).map((geometry) =>
       transforms.translate([0, 0, model.frame.outsideFlangeThickness], geometry),
     ),
-    ...oneWall(model.fanLayout.walls.back.positionsAlongWall).map((geometry) =>
+    ...oneWall(fanLayout.walls.back.positionsAlongWall).map((geometry) =>
       transforms.translate([model.box.width, model.box.depth, model.frame.outsideFlangeThickness], transforms.rotateZ(Math.PI, geometry)),
     ),
-    ...oneWall(model.fanLayout.walls.left.positionsAlongWall).map((geometry) =>
+    ...oneWall(fanLayout.walls.left.positionsAlongWall).map((geometry) =>
       transforms.translate([0, model.box.depth, model.frame.outsideFlangeThickness], transforms.rotateZ(-Math.PI / 2, geometry)),
     ),
-    ...oneWall(model.fanLayout.walls.right.positionsAlongWall).map((geometry) =>
+    ...oneWall(fanLayout.walls.right.positionsAlongWall).map((geometry) =>
       transforms.translate([model.box.width, 0, model.frame.outsideFlangeThickness], transforms.rotateZ(Math.PI / 2, geometry)),
     ),
   ];

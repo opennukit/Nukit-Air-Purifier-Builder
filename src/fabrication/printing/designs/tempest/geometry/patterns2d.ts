@@ -2,7 +2,6 @@ import type { TempestExtrudeAxis, TempestModel } from "@/domain/designs/tempest/
 import type { GeometryContext } from "./context";
 import { CSG_SEGMENTS } from "./context";
 import { orientZExtrusion, unionAll2d } from "./primitives";
-import { fanScrewPitch } from "./layout";
 
 // The honeycomb grill is drawn this far inside the fan opening so the grill ring
 // sits within the bore; a plain opening is inset half this so its edge clears.
@@ -78,7 +77,7 @@ export function fanPattern2d<Solid, Region>(ctx: GeometryContext<Solid, Region>,
     model.settings.fan.opening.type === "honeycomb"
       ? hexGrill2d(ctx, model, model.settings.fan.diameter - FAN_GRILL_DRAW_INSET_MM)
       : primitives.circle({ radius: Math.max(0.001, model.settings.fan.diameter / 2 - FAN_PLAIN_OPENING_INSET_MM), segments: CSG_SEGMENTS });
-  const screwDelta = fanScrewPitch(model) / 2;
+  const screwDelta = model.fanLayout.screwPitch / 2;
   const screwRadius = model.settings.fan.screwHoleDiameter / 2;
   const screwHoles = [-screwDelta, screwDelta].flatMap((x) =>
     [-screwDelta, screwDelta].map((y) =>

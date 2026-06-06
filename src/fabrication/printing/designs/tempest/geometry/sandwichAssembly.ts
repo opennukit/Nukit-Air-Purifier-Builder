@@ -12,10 +12,9 @@ import {
   subtractAll,
 } from "./primitives";
 import { fanPatternCut, filterOpening2d } from "./patterns2d";
-import { horizontalWallLocalFanCenter } from "./layout";
 
 // #######################################
-// 1 / 2 Filter Horizontal Assembly
+// 1 / 2 Filter Sandwich Assembly
 // #######################################
 
 export function framePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
@@ -70,6 +69,7 @@ export function wall<Solid, Region>(
   length: number,
   fanLayout: TempestWallFanLayout,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+  localFanCenter: number,
 ): Solid {
   const body = chamferedPrism(ctx, 0, 0, 0, length, model.frame.wallThickness, model.box.wallHeight, model.frame.chamferSize);
   const fanHoles = fanLayout.positionsAlongWall.map((position) =>
@@ -77,7 +77,7 @@ export function wall<Solid, Region>(
       ctx,
       model,
       "y",
-      [position, model.frame.wallThickness / 2, horizontalWallLocalFanCenter(model)],
+      [position, model.frame.wallThickness / 2, localFanCenter],
       model.frame.wallThickness + 2 * SHELL_OVERLAP_MM,
     ),
   );
