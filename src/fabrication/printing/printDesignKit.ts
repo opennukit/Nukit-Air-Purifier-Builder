@@ -1,8 +1,7 @@
-import { createCorsiRosenthalPrintableKit } from "@/fabrication/printing/designs/corsi-rosenthal/printableKit";
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import {
-  isCorsiRosenthalPrintDesignId,
+  findPreviewMaterialColorPreset,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
@@ -19,9 +18,6 @@ import {
 export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
     throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
-  }
-  if (isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id)) {
-    return createCorsiRosenthalPrintableKit(layout, presetId);
   }
   if (isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
     return createDonutFilterPrintableKit(layout, presetId);
@@ -44,8 +40,9 @@ export function createPrintDesignThreeMfExportFromKit(
   layout: LayoutResult,
   kit: PrintableKit,
 ): PrintableThreeMfExport {
+  const displayColor = enclosureDisplayColor(layout);
+
   if (
-    isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id) ||
     isDonutFilterPrintDesignId(layout.configuration.printDesign.id) ||
     isTempestPrintDesignId(layout.configuration.printDesign.id)
   ) {
@@ -53,6 +50,7 @@ export function createPrintDesignThreeMfExportFromKit(
       kit,
       `${layout.configuration.printDesign.label} print kit`,
       `${layout.configuration.printDesign.id}-print-kit.3mf`,
+      displayColor,
     );
   }
 
@@ -60,5 +58,12 @@ export function createPrintDesignThreeMfExportFromKit(
     kit,
     "Nukit Open Air Purifier print kit",
     "nukit-open-air-purifier-print-kit.3mf",
+    displayColor,
   );
+}
+
+// The selected preview enclosure color, as a 3MF displaycolor hex (#RRGGBBAA).
+function enclosureDisplayColor(layout: LayoutResult): string {
+  const color = findPreviewMaterialColorPreset(layout.configuration.preview.enclosure.materialColor).color;
+  return `#${color.toString(16).padStart(6, "0")}ff`;
 }

@@ -1,5 +1,4 @@
-import type { BoxesDocument } from "@/ports/boxes/kernel";
-import type { Shape } from "@/ports/boxes/drawing";
+import type { BoxesDocument, Shape } from "@/ports/boxes/cutDocument";
 import {
   defaultCutJointSettings,
   type CutJointSettings,

@@ -21,7 +21,7 @@ describe("Tempest OpenSCAD model port", () => {
       height: 262,
       wallHeight: 242,
     });
-    expect(model.chunkGrid).toEqual({
+    expect(model.chunkGrid).toMatchObject({
       countX: 2,
       countY: 2,
       countZ: 2,
@@ -116,7 +116,7 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.positionsX).toEqual([157.5, 307.5, 457.5]);
     expect(model.fanLayout.positionsY).toEqual([157.5, 307.5, 457.5]);
 
-    expect(model.chunkGrid).toEqual({
+    expect(model.chunkGrid).toMatchObject({
       countX: 3,
       countY: 3,
       countZ: 2,
@@ -226,7 +226,7 @@ describe("Tempest OpenSCAD model port", () => {
 
     expect(model.settings.printBed).toEqual(defaultTempestSettings.printBed);
     expect(model.settings.alignmentPins).toEqual(defaultTempestSettings.alignmentPins);
-    expect(model.chunkGrid).toEqual({
+    expect(model.chunkGrid).toMatchObject({
       countX: 2,
       countY: 2,
       countZ: 2,

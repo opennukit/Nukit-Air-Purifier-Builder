@@ -26,7 +26,7 @@ const upstreamRoot = process.env.BOXES_PY_PATH ?? "/tmp/boxes.py";
 const portedGenerators: PortedGenerator[] = [
   {
     upstream: "boxes/generators/airpurifier.py",
-    translated: "src/ports/boxes/generators/airPurifier.ts",
+    translated: "src/ports/boxes/reference/airPurifierGenerator.ts",
     status: "usable-browser-port",
   },
 ];

@@ -1,4 +1,19 @@
-import { Boxes } from "@/ports/boxes/kernel";
+// Part of the boxes.py correctness oracle — see ./README.md.
+//
+// A faithful, line-for-line TypeScript port of upstream `boxes/generators/
+// airpurifier.py`. It deliberately mirrors the Python source: the same
+// `rectangularWall(...)` call sequence, the same edge-pattern strings ("ffff",
+// "Ehhh", "hded", compoundEdge("fff", ...)), the same fan/finger-hole callbacks.
+//
+// It is NOT how the app builds cut sheets — the shipped app uses the native,
+// app-idiomatic `@/fabrication/laser/cutGeometry` + `panels`. This generator
+// exists solely as an executable golden reference: `test/ports/boxes/
+// airPurifierCutSheetEquivalence.test.ts` runs it to prove the native path stays
+// a correct port of boxes.py, and `scripts/boxes-port/airpurifier-oracle.ts`
+// cross-checks both against the real Python boxes.py. Keep it in lockstep with
+// upstream; do not "improve" it to match our native output.
+
+import { Boxes } from "@/ports/boxes/reference/boxes";
 import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";
 import {
   normalizeSettings,

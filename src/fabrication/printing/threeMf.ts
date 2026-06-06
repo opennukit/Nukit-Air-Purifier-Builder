@@ -38,13 +38,14 @@ export function createThreeMfPackage(
   title: string,
   objects: readonly MeshObject[],
   plates: readonly MeshPlate[] = [],
+  displayColor?: string,
 ): Uint8Array {
   assertValidPackageContract(objects, plates);
 
   return createStoredZipPackage([
     textZipFile("[Content_Types].xml", contentTypesXml(plates.length > 0)),
     textZipFile("_rels/.rels", relationshipsXml()),
-    textZipFile(modelPath, modelXml(title, objects)),
+    textZipFile(modelPath, modelXml(title, objects, displayColor)),
     ...(plates.length > 0 ? [textZipFile(modelSettingsPath, modelSettingsXml(plates))] : []),
   ]);
 }
@@ -101,10 +102,20 @@ function relationshipsXml(): string {
 </Relationships>`;
 }
 
-function modelXml(title: string, objects: readonly MeshObject[]): string {
-  const resources = objects
-    .map((object, index) => objectXml(index + 1, object))
-    .join("\n");
+function modelXml(title: string, objects: readonly MeshObject[], displayColor?: string): string {
+  // One enclosure color for the whole kit: a single base material the objects
+  // reference (pid/pindex) so Bambu Studio shows them in the selected color.
+  const materialId = displayColor === undefined ? undefined : objects.length + 1;
+  const baseMaterials =
+    materialId === undefined
+      ? ""
+      : `    <basematerials id="${materialId}">
+      <base name="Enclosure" displaycolor="${displayColor}"/>
+    </basematerials>
+`;
+  const resources =
+    baseMaterials +
+    objects.map((object, index) => objectXml(index + 1, object, materialId)).join("\n");
   const buildItems = objects
     .map((object, index) => {
       const position = [
@@ -157,7 +168,7 @@ ${modelInstances}
   </plate>`;
 }
 
-function objectXml(objectId: number, object: MeshObject): string {
+function objectXml(objectId: number, object: MeshObject, materialId?: number): string {
   const vertices = object.vertices
     .map((vertex) => {
       return `        <vertex x="${formatNumber(vertex.x)}" y="${formatNumber(vertex.y)}" z="${formatNumber(vertex.z)}"/>`;
@@ -169,7 +180,8 @@ function objectXml(objectId: number, object: MeshObject): string {
     })
     .join("\n");
 
-  return `    <object id="${objectId}" type="model" name="${escapeXml(object.name)}">
+  const materialAttributes = materialId === undefined ? "" : ` pid="${materialId}" pindex="0"`;
+  return `    <object id="${objectId}" type="model"${materialAttributes} name="${escapeXml(object.name)}">
       <mesh>
         <vertices>
 ${vertices}

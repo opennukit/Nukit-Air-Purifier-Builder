@@ -1,5 +1,5 @@
-import type { BoxesDocument } from "@/ports/boxes/kernel";
-import type { Point, Shape, ShapeColor } from "@/ports/boxes/drawing";
+// Live laser export: renders the shared cut-document model to Inkscape-layered SVG.
+import type { BoxesDocument, Point, Shape, ShapeColor } from "@/ports/boxes/cutDocument";
 
 export function renderBoxesDocumentSvg(document: BoxesDocument): string {
   const width = roundForSvg(document.width);

@@ -23,6 +23,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { printableMeshToBufferGeometry } from "@/rendering/three/printableMeshGeometry";
 import type { StaticPrintReference } from "@/resources/static-print-references/references";
 import { loadStaticPrintAssets, type LoadedStaticPrintAsset } from "@/rendering/three/staticPrintAssets";
 import { printBedFitForDimensions, type PrintBed, type PrintBedFit } from "@/fabrication/printing/printableKit";
@@ -42,6 +43,9 @@ const staticPartGapMillimeters = 10;
 const bedThickness = 0.012;
 const bedGridLift = 0.001;
 const printPartLift = 0.004;
+// Smooth normals within a face but split them at dihedrals >= this, so flat walls
+// stay flat and grills/rounded corners read smooth (matches the assembled preview).
+const printPartCreaseAngleRadians = (40 * Math.PI) / 180;
 const panelColor = 0xd1a166;
 const glueKeyColor = 0x7f997d;
 const oversizedColor = 0xd78872;
@@ -460,25 +464,16 @@ function createStaticPlacementMesh(placement: StaticPrintSheetPlacement, materia
 // ##############################
 
 function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeometry {
-  const positions: number[] = [];
-  for (const vertex of placement.part.mesh.vertices) {
-    positions.push(
-      (placement.x + vertex.x) * printPreviewScale,
-      printPreviewPartY(vertex.z),
-      (placement.y + vertex.y) * printPreviewScale,
-    );
-  }
-
-  const indices: number[] = [];
-  for (const triangle of placement.part.mesh.triangles) {
-    indices.push(triangle.v1, triangle.v2, triangle.v3);
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+  // Offset to the part's bed position; printPreviewPartY(0) is the part's resting
+  // height on the bed (the per-vertex z is scaled in by the shared placement).
+  return printableMeshToBufferGeometry(
+    placement.part.mesh,
+    {
+      scale: printPreviewScale,
+      offset: [placement.x * printPreviewScale, printPreviewPartY(0), placement.y * printPreviewScale],
+    },
+    { type: "creased", creaseAngleRadians: printPartCreaseAngleRadians },
+  );
 }
 
 // ##############################

@@ -4,7 +4,8 @@ import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";
 import { edgeSections } from "@/fabrication/laser/cutGeometry";
-import { generateAirPurifier } from "@/ports/boxes/generators/airPurifier";
+// `generateAirPurifier` is the boxes.py golden reference (see src/ports/boxes/reference/README.md).
+import { generateAirPurifier } from "@/ports/boxes/reference/airPurifierGenerator";
 
 describe("Air purifier cut-sheet equivalence", () => {
   test("uses the generated Boxes document for summary and SVG output", () => {
@@ -22,7 +23,7 @@ describe("Air purifier cut-sheet equivalence", () => {
     expect(readNumericSvgAttribute(svg, "height")).toBeCloseTo(cutSheet(layout).height);
   });
 
-  test("keeps the legacy Boxes.py-compatible generator available for audits", () => {
+  test("keeps the boxes.py golden-reference generator available as a correctness oracle", () => {
     const generator = generateAirPurifier(defaultSettings);
     const document = generator.toDocument();
     const circles = document.shapes.filter((shape) => shape.type === "circle");

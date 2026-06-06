@@ -65,11 +65,6 @@ export type PrintablePartKind =
   | "dovetail-glue-key"
   | "scarf-glue-key"
   | "rail-connector"
-  | "corsi-frame-rail"
-  | "corsi-corner-block"
-  | "corsi-fan-cassette"
-  | "corsi-sealed-face-panel"
-  | "corsi-fan-panel-seal"
   | "donut-filter-adapter"
   | "donut-fan-guard"
   | "donut-filter-cap"
@@ -391,6 +386,7 @@ export function createPrintableThreeMfExportFromKit(
   kit: PrintableKit,
   title: string,
   filename: string,
+  displayColor?: string,
 ): PrintableThreeMfExport {
   const sheetPlan = createPrintableSheetPlanFromKit(kit);
 
@@ -401,6 +397,7 @@ export function createPrintableThreeMfExportFromKit(
       title,
       createThreeMfObjectsFromSheetPlan(sheetPlan),
       createThreeMfPlatesFromSheetPlan(sheetPlan),
+      displayColor,
     ),
     kit,
     sheetPlan,

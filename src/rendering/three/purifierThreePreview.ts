@@ -1,10 +1,12 @@
 import {
+  ACESFilmicToneMapping,
+  PMREMGenerator,
+  Texture,
   Box3,
   BoxGeometry,
   BufferGeometry,
   CanvasTexture,
   CircleGeometry,
-  ArrowHelper,
   CylinderGeometry,
   DirectionalLight,
   DoubleSide,
@@ -12,8 +14,9 @@ import {
   Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
+  AmbientLight,
+  GridHelper,
   Group,
-  HemisphereLight,
   LineBasicMaterial,
   Line,
   LineSegments,
@@ -24,7 +27,7 @@ import {
   MeshStandardMaterial,
   Object3D,
   Path,
-  PCFShadowMap,
+  PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
   Raycaster,
@@ -39,11 +42,16 @@ import {
   Vector2,
   WebGLRenderer,
 } from "three";
+import type { ToneMapping } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import {
+  printableMeshToBufferGeometry,
+  type PrintableMeshShading,
+} from "@/rendering/three/printableMeshGeometry";
 import {
   findPreviewMaterialColorPreset,
-  isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
@@ -76,8 +84,6 @@ import {
   type Vector3Tuple,
 } from "@/fabrication/assemblyModel";
 import type { AssemblyLineCue } from "@/fabrication/assemblyModel";
-import { createCorsiRosenthalModel } from "@/domain/designs/corsi-rosenthal/model";
-import type { CorsiFaceSide, CorsiFanGrid, CorsiFanPanel, CorsiFilterFace, CorsiSealedFace } from "@/domain/designs/corsi-rosenthal/model";
 import {
   createDonutFilterModel,
   donutAdapterTotalHeight,
@@ -100,6 +106,67 @@ import {
   type TempestPrintablePose,
 } from "@/fabrication/printing/designs/tempest/printableKit";
 import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
+
+// #######################################
+// Appearance Lab (temporary surface/lighting experiment)
+// #######################################
+// A throwaway set of material + lighting "looks" to flip between in a floating
+// selector and pick the nicest surface. Once chosen, drop the rest and inline the
+// winner. Each preset drives the printed-part material, the lighting rig, an
+// optional IBL environment, and tone mapping.
+
+type PrintedSurfaceSpec = {
+  readonly kind: "standard" | "physical";
+  readonly normals: "flat" | "creased";
+  readonly roughness: number;
+  readonly metalness: number;
+  readonly clearcoat?: number;
+  readonly clearcoatRoughness?: number;
+  readonly envMapIntensity?: number;
+};
+
+type AppearancePreset = {
+  readonly id: string;
+  readonly label: string;
+  readonly surface: PrintedSurfaceSpec;
+  readonly environment: "room" | "none";
+  readonly toneMapping: ToneMapping;
+  readonly exposure: number;
+  readonly lights: () => Object3D[];
+};
+
+function directionalLight(intensity: number, position: readonly [number, number, number], color = 0xffffff): DirectionalLight {
+  const light = new DirectionalLight(color, intensity);
+  light.position.set(position[0], position[1], position[2]);
+  return light;
+}
+
+const APPEARANCE_PRESETS: readonly AppearancePreset[] = [
+  {
+    id: "studio",
+    label: "Studio matte",
+    // The product look: a matte creased-normal surface, a dominant world-fixed key
+    // (which casts the floor shadow), a soft opposing fill, a uniform ambient, and a
+    // faint IBL accent. The key being clearly directional is intentional — its cast
+    // shadow on the floor is the cue that the box is fixed and the camera orbits it.
+    surface: { kind: "standard", normals: "creased", roughness: 0.68, metalness: 0, envMapIntensity: 0.3 },
+    environment: "room",
+    toneMapping: ACESFilmicToneMapping,
+    exposure: 0.72,
+    lights: () => [
+      new AmbientLight(0xffffff, 0.35),
+      directionalLight(1.15, [3, 4.5, 2.5]),
+      directionalLight(0.4, [-2.5, 2, -3.2], 0xeef2ff),
+    ],
+  },
+];
+
+const DEFAULT_APPEARANCE_PRESET_ID = "studio";
+// Smooth shading within faces but crisp at dihedral angles >= this, so box edges
+// and chamfers stay sharp while grills and rounded corners read smooth.
+const CREASE_ANGLE_RADIANS = (40 * Math.PI) / 180;
+
+let activeAppearance: PrintedSurfaceSpec = APPEARANCE_PRESETS[0].surface;
 
 // #######################################
 // Preview Model
@@ -185,23 +252,6 @@ type PanelPrintSeam = {
 // Design Preview Metrics
 // ##############################
 
-type CorsiPreviewMetrics = {
-  readonly mode: "top-exhaust" | "side-exhaust";
-  readonly filterFaces: readonly CorsiFilterFace[];
-  readonly fanPanels: readonly CorsiFanPanel[];
-  readonly sealedFaces: readonly CorsiSealedFace[];
-  readonly filterWidth: number;
-  readonly filterHeight: number;
-  readonly filterThickness: number;
-  readonly boxWidth: number;
-  readonly boxHeight: number;
-  readonly boxDepth: number;
-  readonly rail: number;
-  readonly printLayerDepth: number;
-  readonly fanRadius: number;
-  readonly fanCassetteOuter: number;
-};
-
 type StaticReferenceAssembledPreviewPose = {
   readonly meshRotationX: number;
   readonly rotateWholePreview: boolean;
@@ -240,7 +290,6 @@ const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
 const tempestPreviewFanWallInset = 0.8 * sceneScale;
 const filterMediaPreviewClearanceMillimeters = 3;
 const filterMediaPreviewSurfaceGapMillimeters = 2;
-const filterMediaPreviewSurfaceGap = filterMediaPreviewSurfaceGapMillimeters * sceneScale;
 const bananaReferenceLength = 180 * sceneScale;
 const bananaReferenceRadius = 14 * sceneScale;
 const oneMeterCubeSize = 1000 * sceneScale;
@@ -281,6 +330,9 @@ export class PurifierThreePreview {
   private readonly pointer = new Vector2();
   private animationId: number | null = null;
   private latestLayout: LayoutResult | null = null;
+  private latestPrintSeamPlan: PrintableSheetPlan | null = null;
+  private readonly lightGroup = new Group();
+  private roomEnvTexture: Texture | null = null;
   private hoveredDimensionId: string | null = null;
   private dimensionTargets: Object3D[] = [];
   private readonly fanRotors: Object3D[] = [];
@@ -296,20 +348,28 @@ export class PurifierThreePreview {
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    // Soft light studio backdrop: a gentle warm-white vertical gradient reads as
+    // a clean white background while giving the framed viewport a little depth.
     this.renderer.setClearColor(0x000000, 0);
+    this.scene.background = createStudioBackdropTexture();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
+    // Soft cast shadow on the floor: the box's shadow falls in a fixed world
+    // direction and sweeps across the view as you orbit — the clearest cue that the
+    // box is stationary and the camera is the thing moving.
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFShadowMap;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.container.append(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.55;
+    this.controls.autoRotate = false;
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;
+    // Keep the camera above the floor — you orbit around a box sitting on a surface,
+    // you don't fly underneath it. This reinforces "fixed box, moving camera".
+    this.controls.maxPolarAngle = Math.PI * 0.5;
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.clearDimensionHover);
@@ -317,25 +377,40 @@ export class PurifierThreePreview {
     this.scene.add(this.modelGroup);
     this.scene.add(this.staticSceneGroup);
     this.scene.add(this.scaleReferenceGroup);
-    this.scene.add(new HemisphereLight(0xfff7e8, 0x7d897d, 2.2));
-    const keyLight = new DirectionalLight(0xffffff, 2.4);
-    keyLight.position.set(2.5, 3.5, 3.2);
-    keyLight.castShadow = true;
-    this.scene.add(keyLight);
-    const fillLight = new DirectionalLight(0xd7efe4, 0.65);
-    fillLight.position.set(-3.2, 1.6, 1.8);
-    this.scene.add(fillLight);
-    const rimLight = new DirectionalLight(0xecfff3, 1.15);
-    rimLight.position.set(-2.8, 3.2, -4.4);
-    this.scene.add(rimLight);
+    // Lighting/material come from the active appearance preset (see Appearance Lab).
+    this.scene.add(this.lightGroup);
+    this.applyAppearancePreset(DEFAULT_APPEARANCE_PRESET_ID);
 
-    const ground = new Mesh(
-      new CircleGeometry(1.8, 96),
-      new MeshBasicMaterial({ color: 0x1f6f56, transparent: true, opacity: 0.06 }),
+    // A large matte floor the box visibly rests on. Lit by the (world-fixed) rig, it
+    // gives perspective + parallax as you orbit, so the scene reads as a stationary
+    // box on a surface with the camera moving around it — not a floating object.
+    const floor = new Mesh(
+      new PlaneGeometry(160, 160),
+      new MeshStandardMaterial({ color: 0xd9d5cb, roughness: 0.97, metalness: 0 }),
     );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = groundY;
-    this.staticSceneGroup.add(ground);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = groundY - 0.02;
+    floor.receiveShadow = true;
+    this.staticSceneGroup.add(floor);
+
+    // Soft contact shadow sitting just on top of the floor, anchoring the box.
+    const shadow = new Mesh(
+      new CircleGeometry(2.4, 96),
+      new MeshBasicMaterial({ map: createGroundShadowTexture(), transparent: true, depthWrite: false }),
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = groundY;
+    this.staticSceneGroup.add(shadow);
+
+    // A faint world-fixed floor grid. As the camera orbits, the grid slides in
+    // perspective — the clearest cue that the box is stationary and you are moving.
+    const grid = new GridHelper(30, 30, 0xb4b0a4, 0xc6c2b6);
+    grid.position.y = groundY + 0.003;
+    if (grid.material instanceof LineBasicMaterial) {
+      grid.material.transparent = true;
+      grid.material.opacity = 0.38;
+    }
+    this.staticSceneGroup.add(grid);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.container);
@@ -358,12 +433,57 @@ export class PurifierThreePreview {
       previousLayout.configuration.preview.enclosure.cameraPreset !== layout.configuration.preview.enclosure.cameraPreset;
 
     this.latestLayout = layout;
+    this.latestPrintSeamPlan = printSeamPlan;
     this.rebuildModel(layout, printSeamPlan);
     if (shouldApplyPresetCamera) {
       this.frameModel(layout);
     } else {
       this.restoreCameraPose(layout, previousPose);
     }
+  }
+
+  applyAppearancePreset(presetId: string): void {
+    if (this.destroyed) {
+      return;
+    }
+    const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === presetId) ?? APPEARANCE_PRESETS[0];
+    activeAppearance = preset.surface;
+    this.lightGroup.clear();
+    let shadowAssigned = false;
+    for (const light of preset.lights()) {
+      // The first directional is the key — let it cast the floor shadow.
+      if (!shadowAssigned && light instanceof DirectionalLight) {
+        light.castShadow = true;
+        light.shadow.mapSize.set(2048, 2048);
+        light.shadow.bias = -0.0006;
+        const shadowCamera = light.shadow.camera;
+        shadowCamera.near = 0.5;
+        shadowCamera.far = 30;
+        shadowCamera.left = -7;
+        shadowCamera.right = 7;
+        shadowCamera.top = 7;
+        shadowCamera.bottom = -7;
+        shadowCamera.updateProjectionMatrix();
+        shadowAssigned = true;
+      }
+      this.lightGroup.add(light);
+    }
+    this.scene.environment = preset.environment === "room" ? this.roomEnvironment() : null;
+    this.renderer.toneMapping = preset.toneMapping;
+    this.renderer.toneMappingExposure = preset.exposure;
+    // Material + surface normals are baked at build time, so rebuild the model.
+    if (this.latestLayout !== null) {
+      this.rebuildModel(this.latestLayout, this.latestPrintSeamPlan);
+    }
+  }
+
+  private roomEnvironment(): Texture {
+    if (this.roomEnvTexture === null) {
+      const pmrem = new PMREMGenerator(this.renderer);
+      this.roomEnvTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    return this.roomEnvTexture;
   }
 
   setAutoRotate(enabled: boolean): void {
@@ -391,6 +511,7 @@ export class PurifierThreePreview {
     this.disposeObject(this.modelGroup);
     this.disposeObject(this.staticSceneGroup);
     this.disposeObject(this.scaleReferenceGroup);
+    this.roomEnvTexture?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -419,10 +540,6 @@ export class PurifierThreePreview {
       this.rebuildDonutFilterModel(layout);
       return;
     }
-    if (isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id)) {
-      this.rebuildCorsiRosenthalModel(layout);
-      return;
-    }
     if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
       this.rebuildTempestModel(layout);
       return;
@@ -438,7 +555,7 @@ export class PurifierThreePreview {
     const panelPrintSeams = createPanelPrintSeams(printSeamPlan);
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
-    const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.5 : 0.68);
+    const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
     const fanAppearance = settings.fan.productSelection.product.appearance;
 
     for (const panel of assembly.panels) {
@@ -756,7 +873,7 @@ export class PurifierThreePreview {
 
     const filter = new Mesh(
       new BoxGeometry(filterWidth, filterHeight, filterThickness),
-      createFilterMediaMaterial(0.72),
+      createFilterMediaMaterial(0.77),
     );
     filter.name = "static-reference-installed-filter";
     filter.position.set(0, assetHeight * 0.5, assetDepth * 0.12);
@@ -813,7 +930,7 @@ export class PurifierThreePreview {
     for (const side of [-1, 1]) {
       const filter = new Mesh(
         new BoxGeometry(filterWidth, filterThickness, filterDepth),
-        createFilterMediaMaterial(0.58),
+        createFilterMediaMaterial(0.63),
       );
       filter.name = side > 0 ? "static-reference-installed-top-filter" : "static-reference-installed-bottom-filter";
       filter.position.set(0, side * (assetHeight / 2 - filterThickness / 2 - 7 * sceneScale), assetDepth / 2);
@@ -851,7 +968,7 @@ export class PurifierThreePreview {
 
     const filter = new Mesh(
       new BoxGeometry(filterWidth, filterThickness, filterDepth),
-      createFilterMediaMaterial(0.72),
+      createFilterMediaMaterial(0.77),
     );
     filter.name = "static-reference-installed-top-filter";
     filter.position.set(0, assetDepth / 2 - filterThickness / 2 - 26 * sceneScale, -assetHeight * 0.5);
@@ -992,68 +1109,6 @@ export class PurifierThreePreview {
   // Generated Design Models
   // ##############################
 
-  private rebuildCorsiRosenthalModel(layout: LayoutResult): void {
-    const settings = layout.configuration;
-    const fanAppearance = settings.fan.productSelection.product.appearance;
-    const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
-    const frameMaterial = createPrintedPartMaterial({
-      color: printedPartColor,
-      roughness: 0.66,
-      metalness: 0.05,
-    });
-    const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.76);
-    const filterMaterial = createFilterMediaMaterial(0.7);
-    const filterEdgeMaterial = createFilterMediaEdgeMaterial(0.34);
-    const metrics = createCorsiPreviewMetrics(layout);
-
-    if (settings.preview.enclosure.showFilterFrame) {
-      this.addCorsiStructuralFrame(metrics, frameMaterial, edgeMaterial);
-      for (const face of metrics.sealedFaces) {
-        this.addCorsiSealedFace(metrics, face.side, frameMaterial, edgeMaterial);
-      }
-    }
-
-    for (const face of metrics.filterFaces) {
-      this.addCorsiFilterFace(
-        metrics,
-        face.side,
-        settings.preview.enclosure.showFilterMedia,
-        settings.preview.enclosure.showFilterFrame,
-        filterMaterial,
-        filterEdgeMaterial,
-        frameMaterial,
-        edgeMaterial,
-      );
-    }
-    if (settings.preview.enclosure.showFilterFrame || settings.preview.enclosure.showFans) {
-      for (const fanPanel of metrics.fanPanels) {
-        this.addCorsiFanPanel(
-          metrics,
-          fanPanel,
-          settings.preview.enclosure.showFans,
-          settings.preview.enclosure.showFilterFrame,
-          fanAppearance,
-          frameMaterial,
-          edgeMaterial,
-        );
-      }
-    }
-
-    explodeGeneratedPreviewChildrenFromCenter(this.modelGroup, settings.preview.enclosure.explodedView);
-
-    const outline = new Box3().setFromObject(this.modelGroup);
-    const center = outline.getCenter(new Vector3());
-    this.modelGroup.position.sub(center);
-    const centeredOutline = new Box3().setFromObject(this.modelGroup);
-    this.modelGroup.position.y += groundY - centeredOutline.min.y;
-    const settledOutline = new Box3().setFromObject(this.modelGroup);
-    this.addScaleReference(layout, settledOutline);
-    this.updateModelFocus(settledOutline);
-    if (!settings.preview.enclosure.explodedView) {
-      this.addCorsiAirflowCues(metrics, settings.preview.enclosure.showFilterMedia, settings.preview.enclosure.showFans);
-    }
-  }
-
   private rebuildDonutFilterModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const model = createDonutFilterModel(layout);
@@ -1163,8 +1218,8 @@ export class PurifierThreePreview {
     const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
     const material = createPrintedPartMaterial({
       color: printedPartColor,
-      roughness: 0.64,
-      metalness: 0.04,
+      roughness: 0.85,
+      metalness: 0.05,
     });
     const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.58);
 
@@ -1216,7 +1271,7 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.56 : 0.64);
+    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.61 : 0.69);
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
     const filterBoxes =
       model.filterLayout.type === "horizontal-stack"
@@ -1550,531 +1605,6 @@ export class PurifierThreePreview {
       guard.add(edges);
     }
     this.modelGroup.add(guard);
-  }
-
-  private addCorsiBox(
-    id: string,
-    size: readonly [number, number, number],
-    position: readonly [number, number, number],
-    material: Material,
-    edgeMaterial: Material,
-  ): void {
-    const geometry = new BoxGeometry(size[0], size[1], size[2]);
-    const mesh = new Mesh(geometry, material);
-    mesh.name = id;
-    mesh.position.set(position[0], position[1], position[2]);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    this.modelGroup.add(mesh);
-
-    const edges = new LineSegments(new EdgesGeometry(geometry), edgeMaterial);
-    edges.position.copy(mesh.position);
-    this.modelGroup.add(edges);
-  }
-
-  private addCorsiStructuralFrame(
-    metrics: CorsiPreviewMetrics,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    const halfWidth = metrics.boxWidth / 2;
-    const halfDepth = metrics.boxDepth / 2;
-    const cornerSize = metrics.rail * 0.72;
-    const railSize = metrics.rail * 0.62;
-    for (const x of [-halfWidth, halfWidth]) {
-      for (const z of [-halfDepth, halfDepth]) {
-        this.addCorsiBox(
-          "corsi-corner-post",
-          [cornerSize, metrics.boxHeight, cornerSize],
-          [x, metrics.boxHeight / 2, z],
-          frameMaterial,
-          edgeMaterial,
-        );
-      }
-    }
-
-    for (const y of [metrics.rail / 2, metrics.boxHeight - metrics.rail / 2]) {
-      for (const z of [-halfDepth, halfDepth]) {
-        this.addCorsiBox("corsi-horizontal-face-rail", [metrics.boxWidth, railSize, railSize], [0, y, z], frameMaterial, edgeMaterial);
-      }
-      for (const x of [-halfWidth, halfWidth]) {
-        this.addCorsiBox("corsi-horizontal-depth-rail", [railSize, railSize, metrics.boxDepth], [x, y, 0], frameMaterial, edgeMaterial);
-      }
-    }
-  }
-
-  private addCorsiFilterFace(
-    metrics: CorsiPreviewMetrics,
-    side: CorsiFaceSide,
-    showFilterMedia: boolean,
-    showFilterFrame: boolean,
-    filterMaterial: Material,
-    filterEdgeMaterial: Material,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    if (side === "front" || side === "back") {
-      this.addCorsiFrontBackFilterFace(
-        metrics,
-        side === "front" ? metrics.boxDepth / 2 : -metrics.boxDepth / 2,
-        showFilterMedia,
-        showFilterFrame,
-        filterMaterial,
-        filterEdgeMaterial,
-        frameMaterial,
-        edgeMaterial,
-      );
-      return;
-    }
-
-    if (side === "left" || side === "right") {
-      this.addCorsiSideFilterFace(
-        metrics,
-        side === "right" ? metrics.boxWidth / 2 : -metrics.boxWidth / 2,
-        showFilterMedia,
-        showFilterFrame,
-        filterMaterial,
-        filterEdgeMaterial,
-        frameMaterial,
-        edgeMaterial,
-      );
-      return;
-    }
-
-    this.addCorsiHorizontalFilterFace(
-      metrics,
-      side === "top" ? metrics.boxHeight : 0,
-      showFilterMedia,
-      showFilterFrame,
-      filterMaterial,
-      filterEdgeMaterial,
-      frameMaterial,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiSealedFace(
-    metrics: CorsiPreviewMetrics,
-    side: CorsiFaceSide,
-    material: Material,
-    edgeMaterial: Material,
-  ): void {
-    if (side === "front" || side === "back") {
-      this.addCorsiBox(
-        "corsi-sealed-face",
-        [metrics.boxWidth, metrics.boxHeight, metrics.printLayerDepth],
-        [0, metrics.boxHeight / 2, side === "front" ? metrics.boxDepth / 2 : -metrics.boxDepth / 2],
-        material,
-        edgeMaterial,
-      );
-      return;
-    }
-
-    if (side === "left" || side === "right") {
-      this.addCorsiBox(
-        "corsi-sealed-side-face",
-        [metrics.printLayerDepth, metrics.boxHeight, metrics.boxDepth],
-        [side === "right" ? metrics.boxWidth / 2 : -metrics.boxWidth / 2, metrics.boxHeight / 2, 0],
-        material,
-        edgeMaterial,
-      );
-      return;
-    }
-
-    this.addCorsiBox(
-      "corsi-sealed-horizontal-face",
-      [metrics.boxWidth, metrics.printLayerDepth, metrics.boxDepth],
-      [0, side === "top" ? metrics.boxHeight : 0, 0],
-      material,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiFrontBackFilterFace(
-    metrics: CorsiPreviewMetrics,
-    z: number,
-    showFilterMedia: boolean,
-    showFilterFrame: boolean,
-    filterMaterial: Material,
-    filterEdgeMaterial: Material,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
-    const filterZ = z > 0
-      ? z - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
-      : z + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
-    if (showFilterMedia) {
-      this.addCorsiBox(
-        "corsi-filter-media",
-        [
-          visualSceneFilterMediaDimension(metrics.filterWidth),
-          visualSceneFilterMediaDimension(metrics.filterHeight),
-          filterThickness,
-        ],
-        [0, metrics.boxHeight / 2, filterZ],
-        filterMaterial,
-        filterEdgeMaterial,
-      );
-    }
-
-    if (!showFilterFrame) {
-      return;
-    }
-
-    this.addCorsiBox(
-      "corsi-filter-top-rail",
-      [metrics.boxWidth, metrics.rail, metrics.printLayerDepth],
-      [0, metrics.boxHeight - metrics.rail / 2, z],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-filter-bottom-rail",
-      [metrics.boxWidth, metrics.rail, metrics.printLayerDepth],
-      [0, metrics.rail / 2, z],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-filter-left-rail",
-      [metrics.rail, metrics.boxHeight, metrics.printLayerDepth],
-      [-metrics.boxWidth / 2 + metrics.rail / 2, metrics.boxHeight / 2, z],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-filter-right-rail",
-      [metrics.rail, metrics.boxHeight, metrics.printLayerDepth],
-      [metrics.boxWidth / 2 - metrics.rail / 2, metrics.boxHeight / 2, z],
-      frameMaterial,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiSideFilterFace(
-    metrics: CorsiPreviewMetrics,
-    x: number,
-    showFilterMedia: boolean,
-    showFilterFrame: boolean,
-    filterMaterial: Material,
-    filterEdgeMaterial: Material,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
-    const filterX = x > 0
-      ? x - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
-      : x + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
-    if (showFilterMedia) {
-      this.addCorsiBox(
-        "corsi-side-filter-media",
-        [
-          filterThickness,
-          visualSceneFilterMediaDimension(metrics.filterHeight),
-          visualSceneFilterMediaDimension(metrics.filterWidth),
-        ],
-        [filterX, metrics.boxHeight / 2, 0],
-        filterMaterial,
-        filterEdgeMaterial,
-      );
-    }
-
-    if (!showFilterFrame) {
-      return;
-    }
-
-    this.addCorsiBox(
-      "corsi-side-filter-top-rail",
-      [metrics.printLayerDepth, metrics.rail, metrics.boxDepth],
-      [x, metrics.boxHeight - metrics.rail / 2, 0],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-side-filter-bottom-rail",
-      [metrics.printLayerDepth, metrics.rail, metrics.boxDepth],
-      [x, metrics.rail / 2, 0],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-side-filter-front-rail",
-      [metrics.printLayerDepth, metrics.boxHeight, metrics.rail],
-      [x, metrics.boxHeight / 2, metrics.boxDepth / 2 - metrics.rail / 2],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-side-filter-back-rail",
-      [metrics.printLayerDepth, metrics.boxHeight, metrics.rail],
-      [x, metrics.boxHeight / 2, -metrics.boxDepth / 2 + metrics.rail / 2],
-      frameMaterial,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiHorizontalFilterFace(
-    metrics: CorsiPreviewMetrics,
-    y: number,
-    showFilterMedia: boolean,
-    showFilterFrame: boolean,
-    filterMaterial: Material,
-    filterEdgeMaterial: Material,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    const filterThickness = recessedSceneFilterMediaThickness(metrics.filterThickness);
-    const filterY = y > metrics.boxHeight / 2
-      ? y - metrics.printLayerDepth / 2 - filterThickness / 2 - filterMediaPreviewSurfaceGap
-      : y + metrics.printLayerDepth / 2 + filterThickness / 2 + filterMediaPreviewSurfaceGap;
-    if (showFilterMedia) {
-      this.addCorsiBox(
-        "corsi-horizontal-filter-media",
-        [
-          visualSceneFilterMediaDimension(metrics.filterWidth),
-          filterThickness,
-          visualSceneFilterMediaDimension(metrics.boxDepth - metrics.rail * 2),
-        ],
-        [0, filterY, 0],
-        filterMaterial,
-        filterEdgeMaterial,
-      );
-    }
-
-    if (!showFilterFrame) {
-      return;
-    }
-
-    this.addCorsiBox(
-      "corsi-horizontal-filter-front-rail",
-      [metrics.boxWidth, metrics.printLayerDepth, metrics.rail],
-      [0, y, metrics.boxDepth / 2 - metrics.rail / 2],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-horizontal-filter-back-rail",
-      [metrics.boxWidth, metrics.printLayerDepth, metrics.rail],
-      [0, y, -metrics.boxDepth / 2 + metrics.rail / 2],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-horizontal-filter-left-rail",
-      [metrics.rail, metrics.printLayerDepth, metrics.boxDepth],
-      [-metrics.boxWidth / 2 + metrics.rail / 2, y, 0],
-      frameMaterial,
-      edgeMaterial,
-    );
-    this.addCorsiBox(
-      "corsi-horizontal-filter-right-rail",
-      [metrics.rail, metrics.printLayerDepth, metrics.boxDepth],
-      [metrics.boxWidth / 2 - metrics.rail / 2, y, 0],
-      frameMaterial,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiFanPanel(
-    metrics: CorsiPreviewMetrics,
-    panel: CorsiFanPanel,
-    showFans: boolean,
-    showFilterFrame: boolean,
-    fanAppearance: FanAppearance,
-    frameMaterial: Material,
-    edgeMaterial: Material,
-  ): void {
-    const panelPlacement = corsiFanPanelPlacement(metrics, panel.side);
-    const firstX = -((panel.grid.columns - 1) * (panel.grid.cell + panel.grid.gap)) / 2;
-    const firstZ = ((panel.grid.rows - 1) * (panel.grid.cell + panel.grid.gap)) / 2;
-    if (showFilterFrame) {
-      this.addCorsiFanPanelFiller(metrics, panel, panelPlacement, firstX, firstZ, frameMaterial, edgeMaterial);
-    }
-    for (let index = 0; index < panel.fanCount; index += 1) {
-      const column = index % panel.grid.columns;
-      const row = Math.floor(index / panel.grid.columns);
-      const localX = firstX + column * (panel.grid.cell + panel.grid.gap);
-      const localZ = firstZ - row * (panel.grid.cell + panel.grid.gap);
-      this.addCorsiFanCassetteFrame(metrics, panelPlacement, localX, localZ, frameMaterial, edgeMaterial);
-      if (!showFans) {
-        continue;
-      }
-      const fan = createFan({
-        axis: panelPlacement.axis,
-        position: corsiFanPosition(panelPlacement, localX, localZ),
-        radius: metrics.fanRadius,
-        appearance: fanAppearance,
-      });
-      collectFanRotors(fan, this.fanRotors);
-      this.modelGroup.add(fan);
-    }
-  }
-
-  private addCorsiFanPanelFiller(
-    metrics: CorsiPreviewMetrics,
-    panel: CorsiFanPanel,
-    placement: CorsiFanPanelPlacement,
-    firstU: number,
-    firstV: number,
-    material: Material,
-    edgeMaterial: Material,
-  ): void {
-    const { sizeU, sizeV } = corsiFanPanelSize(metrics, placement);
-    const halfU = sizeU / 2;
-    const halfV = sizeV / 2;
-    const outer = metrics.fanCassetteOuter;
-    const centerSpacing = panel.grid.cell + panel.grid.gap;
-    const lastColumn = Math.max(0, Math.min(panel.fanCount, panel.grid.columns) - 1);
-    const lastRow = Math.max(0, Math.ceil(panel.fanCount / panel.grid.columns) - 1);
-    const gridLeft = firstU - outer / 2;
-    const gridRight = firstU + lastColumn * centerSpacing + outer / 2;
-    const gridTop = firstV + outer / 2;
-    const gridBottom = firstV - lastRow * centerSpacing - outer / 2;
-    const addPiece = (id: string, minU: number, maxU: number, minV: number, maxV: number): void => {
-      const clippedMinU = clamp(minU, -halfU, halfU);
-      const clippedMaxU = clamp(maxU, -halfU, halfU);
-      const clippedMinV = clamp(minV, -halfV, halfV);
-      const clippedMaxV = clamp(maxV, -halfV, halfV);
-      if (clippedMaxU - clippedMinU <= 0.002 || clippedMaxV - clippedMinV <= 0.002) {
-        return;
-      }
-      this.addCorsiPlaneBox(
-        id,
-        placement,
-        (clippedMinU + clippedMaxU) / 2,
-        (clippedMinV + clippedMaxV) / 2,
-        clippedMaxU - clippedMinU,
-        clippedMaxV - clippedMinV,
-        material,
-        edgeMaterial,
-      );
-    };
-
-    addPiece("corsi-fan-panel-top-fill", -halfU, halfU, gridTop, halfV);
-    addPiece("corsi-fan-panel-bottom-fill", -halfU, halfU, -halfV, gridBottom);
-    addPiece("corsi-fan-panel-left-fill", -halfU, gridLeft, gridBottom, gridTop);
-    addPiece("corsi-fan-panel-right-fill", gridRight, halfU, gridBottom, gridTop);
-
-    for (let row = 0; row < lastRow; row += 1) {
-      const upperCenter = firstV - row * centerSpacing;
-      const lowerCenter = firstV - (row + 1) * centerSpacing;
-      addPiece(
-        "corsi-fan-panel-row-gap-fill",
-        gridLeft,
-        gridRight,
-        lowerCenter + outer / 2,
-        upperCenter - outer / 2,
-      );
-    }
-
-    for (let index = 0; index < panel.fanCount; index += 1) {
-      const column = index % panel.grid.columns;
-      const nextIndex = index + 1;
-      if (column >= panel.grid.columns - 1 || nextIndex >= panel.fanCount) {
-        continue;
-      }
-      const row = Math.floor(index / panel.grid.columns);
-      const leftCenter = firstU + column * centerSpacing;
-      const rightCenter = firstU + (column + 1) * centerSpacing;
-      const rowCenter = firstV - row * centerSpacing;
-      addPiece(
-        "corsi-fan-panel-column-gap-fill",
-        leftCenter + outer / 2,
-        rightCenter - outer / 2,
-        rowCenter - outer / 2,
-        rowCenter + outer / 2,
-      );
-    }
-  }
-
-  private addCorsiFanCassetteFrame(
-    metrics: CorsiPreviewMetrics,
-    placement: CorsiFanPanelPlacement,
-    localU: number,
-    localV: number,
-    material: Material,
-    edgeMaterial: Material,
-  ): void {
-    const outer = metrics.fanCassetteOuter;
-    const bar = Math.min(metrics.rail * 0.5, 18 * sceneScale);
-    this.addCorsiPlaneBox("corsi-fan-cassette-top", placement, localU, localV + outer / 2 - bar / 2, outer, bar, material, edgeMaterial);
-    this.addCorsiPlaneBox("corsi-fan-cassette-bottom", placement, localU, localV - outer / 2 + bar / 2, outer, bar, material, edgeMaterial);
-    this.addCorsiPlaneBox("corsi-fan-cassette-left", placement, localU - outer / 2 + bar / 2, localV, bar, outer, material, edgeMaterial);
-    this.addCorsiPlaneBox("corsi-fan-cassette-right", placement, localU + outer / 2 - bar / 2, localV, bar, outer, material, edgeMaterial);
-  }
-
-  private addCorsiPlaneBox(
-    id: string,
-    placement: CorsiFanPanelPlacement,
-    localU: number,
-    localV: number,
-    sizeU: number,
-    sizeV: number,
-    material: Material,
-    edgeMaterial: Material,
-  ): void {
-    if (placement.axis === "x") {
-      this.addCorsiBox(
-        id,
-        [placement.thickness, sizeV, sizeU],
-        [placement.position[0], placement.position[1] + localV, placement.position[2] + localU],
-        material,
-        edgeMaterial,
-      );
-      return;
-    }
-    this.addCorsiBox(
-      id,
-      [sizeU, placement.thickness, sizeV],
-      [placement.position[0] + localU, placement.position[1], placement.position[2] + localV],
-      material,
-      edgeMaterial,
-    );
-  }
-
-  private addCorsiAirflowCues(metrics: CorsiPreviewMetrics, showFilterMedia: boolean, showFans: boolean): void {
-    if (showFilterMedia) {
-      for (const face of metrics.filterFaces) {
-        this.addCorsiAirflowCue(metrics, face.side, "intake");
-      }
-    }
-
-    if (showFans) {
-      for (const panel of metrics.fanPanels) {
-        this.addCorsiAirflowCue(metrics, panel.side, "exhaust");
-      }
-    }
-  }
-
-  private addCorsiAirflowCue(
-    metrics: CorsiPreviewMetrics,
-    side: CorsiFaceSide,
-    direction: "intake" | "exhaust",
-  ): void {
-    if (side === "bottom") {
-      return;
-    }
-    const outward = corsiFaceNormal(side);
-    const arrowDirection = direction === "exhaust" ? outward : outward.clone().multiplyScalar(-1);
-    const faceCenter = corsiFaceCenter(metrics, side);
-    const arrowLength = Math.max(0.11, Math.min(metrics.boxWidth, metrics.boxHeight, metrics.boxDepth) * 0.14);
-    const surfaceOffset = metrics.printLayerDepth * 1.4 + 0.018;
-    const origin =
-      direction === "exhaust"
-        ? faceCenter.clone().addScaledVector(outward, surfaceOffset)
-        : faceCenter.clone().addScaledVector(outward, surfaceOffset + arrowLength);
-    const cue = new ArrowHelper(
-      arrowDirection,
-      origin,
-      arrowLength,
-      direction === "exhaust" ? 0xf0a63a : 0x2cae86,
-      arrowLength * 0.32,
-      arrowLength * 0.17,
-    );
-    cue.name = `corsi-airflow-${direction}-${side}`;
-    styleCorsiAirflowCue(cue);
-    this.modelGroup.add(cue);
   }
 
   // ##############################
@@ -2448,14 +1978,6 @@ function visualAssemblyBoxSize(part: AssemblyBoxPart): MillimeterSize3 {
 
 function visualFilterMediaDimension(size: number): number {
   return Math.max(1, size - filterMediaPreviewClearanceMillimeters * 2, size * 0.72);
-}
-
-function visualSceneFilterMediaDimension(size: number): number {
-  return visualFilterMediaDimension(size / sceneScale) * sceneScale;
-}
-
-function recessedSceneFilterMediaThickness(size: number): number {
-  return Math.max(sceneScale, size - filterMediaPreviewSurfaceGap * 2);
 }
 
 function recessedMillimeterFilterMediaThickness(size: number): number {
@@ -3070,21 +2592,13 @@ function createSeamGroup(seams: readonly AssemblyLineCue[], material: Material):
 }
 
 function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
-  const positions: number[] = [];
-  for (const vertex of mesh.vertices) {
-    positions.push(vertex.x * sceneScale, vertex.z * sceneScale, vertex.y * sceneScale);
-  }
-
-  const indices: number[] = [];
-  for (const triangle of mesh.triangles) {
-    indices.push(triangle.v1, triangle.v2, triangle.v3);
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+  // Grills and rounded corners read smooth while box edges stay crisp; the flat
+  // preset keeps averaged normals (its material's flatShading ignores them anyway).
+  const shading: PrintableMeshShading =
+    activeAppearance.normals === "creased"
+      ? { type: "creased", creaseAngleRadians: CREASE_ANGLE_RADIANS }
+      : { type: "averaged" };
+  return printableMeshToBufferGeometry(mesh, { scale: sceneScale, offset: [0, 0, 0] }, shading);
 }
 
 function createPrintableMeshPreviewGroup(
@@ -3380,11 +2894,24 @@ type PrintedPartMaterialOptions = {
 };
 
 function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshStandardMaterial {
-  return new MeshStandardMaterial({
+  // Driven by the active appearance preset (Appearance Lab) rather than the
+  // per-part roughness/metalness, so every printed surface shares one look.
+  const surface = activeAppearance;
+  const base = {
     color: options.color,
-    roughness: options.roughness,
-    metalness: options.metalness,
-  });
+    roughness: surface.roughness,
+    metalness: surface.metalness,
+    flatShading: surface.normals === "flat",
+    envMapIntensity: surface.envMapIntensity ?? 1,
+  };
+  if (surface.kind === "physical") {
+    return new MeshPhysicalMaterial({
+      ...base,
+      clearcoat: surface.clearcoat ?? 0,
+      clearcoatRoughness: surface.clearcoatRoughness ?? 0,
+    });
+  }
+  return new MeshStandardMaterial(base);
 }
 
 function createFilterMediaMaterial(opacity: number): Material {
@@ -3394,7 +2921,6 @@ function createFilterMediaMaterial(opacity: number): Material {
     roughness: 0.52,
     transparent: true,
     opacity,
-    transmission: 0.08,
     side: DoubleSide,
     depthWrite: false,
   });
@@ -3461,22 +2987,63 @@ function createFilterTexture(): CanvasTexture {
 
   context.fillStyle = "#eef1e6";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  for (let x = -canvas.height; x < canvas.width; x += 14) {
-    context.strokeStyle = "rgba(108, 119, 110, 0.24)";
-    context.lineWidth = 4;
+  // A faint fine grid (horizontal + vertical cross lines) reads as filter mesh —
+  // visible enough to feel like a filter, light enough not to overpower the housing.
+  context.strokeStyle = "rgba(108, 119, 110, 0.13)";
+  context.lineWidth = 1;
+  for (let y = 0; y < canvas.height; y += 6) {
     context.beginPath();
-    context.moveTo(x, canvas.height);
-    context.lineTo(x + canvas.height, 0);
+    context.moveTo(0, y + 0.5);
+    context.lineTo(canvas.width, y + 0.5);
     context.stroke();
   }
-  for (let x = -canvas.height + 7; x < canvas.width; x += 14) {
-    context.strokeStyle = "rgba(255, 255, 255, 0.34)";
-    context.lineWidth = 2;
+  for (let x = 0; x < canvas.width; x += 6) {
     context.beginPath();
-    context.moveTo(x, canvas.height);
-    context.lineTo(x + canvas.height, 0);
+    context.moveTo(x + 0.5, 0);
+    context.lineTo(x + 0.5, canvas.height);
     context.stroke();
   }
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+function createStudioBackdropTexture(): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 4;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createStudioBackdropTexture: Could not create canvas context");
+  }
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#f1efe9");
+  gradient.addColorStop(1, "#ddd9d0");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+// A soft round contact shadow — fake but cheap, and reads cleanly on the light
+// backdrop where a real cast shadow would be fussy to tune.
+function createGroundShadowTexture(): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createGroundShadowTexture: Could not create canvas context");
+  }
+  const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gradient.addColorStop(0, "rgba(28, 32, 30, 0.30)");
+  gradient.addColorStop(0.55, "rgba(28, 32, 30, 0.13)");
+  gradient.addColorStop(1, "rgba(28, 32, 30, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
@@ -3569,11 +3136,6 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
       model.filter.outerDiameter,
       model.fanSize,
     );
-  }
-
-  if (isCorsiRosenthalPrintDesignId(settings.printDesign.id)) {
-    const model = createCorsiRosenthalModel(layout);
-    return Math.max(model.filterWidth, model.filterHeight, model.filterThickness);
   }
 
   return Math.max(
@@ -3741,10 +3303,6 @@ function modelViewScale(layout: LayoutResult): number {
       1.25;
     return baseScale + scalePadding;
   }
-  if (isCorsiRosenthalPrintDesignId(settings.printDesign.id)) {
-    const metrics = createCorsiPreviewMetrics(layout);
-    return Math.max(metrics.boxWidth, metrics.boxHeight, metrics.boxDepth) * 1.16 + scalePadding;
-  }
   return (
     Math.max(
       filterSelectionDimensions(settings.filter).width,
@@ -3762,183 +3320,6 @@ function staticReferencePreviewAssets(reference: StaticPrintReference): readonly
     return reference.assembledPreview.assets;
   }
   return reference.previewAssets;
-}
-
-// #######################################
-// Corsi-Rosenthal Preview
-// #######################################
-
-function createCorsiPreviewMetrics(layout: LayoutResult): CorsiPreviewMetrics {
-  const model = createCorsiRosenthalModel(layout);
-  const filterWidth = model.filterWidth * sceneScale;
-  const filterHeight = model.filterHeight * sceneScale;
-  const filterThickness = model.filterThickness * sceneScale;
-  const rail = 32 * sceneScale;
-  const printLayerDepth = (model.partHeight + 2) * sceneScale;
-  const fanRadius = (layout.configuration.fan.spec.diameter / 2) * sceneScale;
-  const fanCassetteOuter = model.fanCassetteOuter * sceneScale;
-
-  return {
-    mode: model.mode,
-    filterFaces: model.filterFaces,
-    fanPanels: model.fanPanels.map(scaleCorsiFanPanel),
-    sealedFaces: model.sealedFaces,
-    filterWidth,
-    filterHeight,
-    filterThickness,
-    boxWidth: filterWidth + rail * 2,
-    boxHeight: filterHeight + rail * 2,
-    boxDepth: filterWidth + rail * 2,
-    rail,
-    printLayerDepth,
-    fanRadius,
-    fanCassetteOuter,
-  };
-}
-
-function scaleCorsiFanPanel(panel: CorsiFanPanel): CorsiFanPanel {
-  return {
-    ...panel,
-    grid: scaleCorsiFanGrid(panel.grid),
-  };
-}
-
-function scaleCorsiFanGrid(grid: CorsiFanGrid): CorsiFanGrid {
-  return {
-    columns: grid.columns,
-    rows: grid.rows,
-    cell: grid.cell * sceneScale,
-    gap: grid.gap * sceneScale,
-    depth: grid.depth * sceneScale,
-    height: grid.height * sceneScale,
-  };
-}
-
-type CorsiFanPanelPlacement = {
-  readonly axis: FanAxis;
-  readonly position: readonly [number, number, number];
-  readonly u: "x" | "z";
-  readonly v: "y" | "z";
-  readonly outward: number;
-  readonly thickness: number;
-};
-
-function corsiFanPanelPlacement(metrics: CorsiPreviewMetrics, side: CorsiFaceSide): CorsiFanPanelPlacement {
-  if (side === "left") {
-    return {
-      axis: "x",
-      position: [-metrics.boxWidth / 2 - metrics.printLayerDepth / 2, metrics.boxHeight / 2, 0],
-      u: "z",
-      v: "y",
-      outward: -1,
-      thickness: metrics.printLayerDepth,
-    };
-  }
-  if (side === "right") {
-    return {
-      axis: "x",
-      position: [metrics.boxWidth / 2 + metrics.printLayerDepth / 2, metrics.boxHeight / 2, 0],
-      u: "z",
-      v: "y",
-      outward: 1,
-      thickness: metrics.printLayerDepth,
-    };
-  }
-  return {
-    axis: "y",
-    position: [0, metrics.boxHeight + metrics.printLayerDepth / 2, 0],
-    u: "x",
-    v: "z",
-    outward: 1,
-    thickness: metrics.printLayerDepth,
-  };
-}
-
-function corsiFanPanelSize(
-  metrics: CorsiPreviewMetrics,
-  placement: CorsiFanPanelPlacement,
-): { readonly sizeU: number; readonly sizeV: number } {
-  if (placement.axis === "x") {
-    return { sizeU: metrics.boxDepth, sizeV: metrics.boxHeight };
-  }
-  return { sizeU: metrics.boxWidth, sizeV: metrics.boxDepth };
-}
-
-function corsiFaceNormal(side: CorsiFaceSide): Vector3 {
-  if (side === "front") {
-    return new Vector3(0, 0, 1);
-  }
-  if (side === "back") {
-    return new Vector3(0, 0, -1);
-  }
-  if (side === "left") {
-    return new Vector3(-1, 0, 0);
-  }
-  if (side === "right") {
-    return new Vector3(1, 0, 0);
-  }
-  if (side === "top") {
-    return new Vector3(0, 1, 0);
-  }
-  return new Vector3(0, -1, 0);
-}
-
-function corsiFaceCenter(metrics: CorsiPreviewMetrics, side: CorsiFaceSide): Vector3 {
-  if (side === "front") {
-    return new Vector3(0, metrics.boxHeight / 2, metrics.boxDepth / 2);
-  }
-  if (side === "back") {
-    return new Vector3(0, metrics.boxHeight / 2, -metrics.boxDepth / 2);
-  }
-  if (side === "left") {
-    return new Vector3(-metrics.boxWidth / 2, metrics.boxHeight / 2, 0);
-  }
-  if (side === "right") {
-    return new Vector3(metrics.boxWidth / 2, metrics.boxHeight / 2, 0);
-  }
-  if (side === "top") {
-    return new Vector3(0, metrics.boxHeight, 0);
-  }
-  return new Vector3(0, 0, 0);
-}
-
-function corsiFanPosition(placement: CorsiFanPanelPlacement, localU: number, localV: number): Vector3 {
-  const position = new Vector3(placement.position[0], placement.position[1], placement.position[2]);
-  if (placement.u === "x") {
-    position.x += localU;
-  } else {
-    position.z += localU;
-  }
-
-  if (placement.v === "y") {
-    position.y += localV;
-  } else {
-    position.z += localV;
-  }
-
-  if (placement.axis === "x") {
-    position.x += placement.outward * 0.024;
-  } else {
-    position.y += placement.outward * 0.024;
-  }
-  return position;
-}
-
-function styleCorsiAirflowCue(cue: ArrowHelper): void {
-  cue.traverse((child) => {
-    if (child instanceof Line && child.material instanceof LineBasicMaterial) {
-      child.material.transparent = true;
-      child.material.opacity = 0.74;
-      child.material.depthWrite = false;
-      child.renderOrder = 8;
-    }
-    if (child instanceof Mesh && child.material instanceof MeshBasicMaterial) {
-      child.material.transparent = true;
-      child.material.opacity = 0.78;
-      child.material.depthWrite = false;
-      child.renderOrder = 8;
-    }
-  });
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -3994,6 +3375,11 @@ function addProceduralFanRotor(rotor: Group, radius: number, appearance: FanAppe
     transparent: true,
     opacity: appearance.bladeOpacity,
     side: DoubleSide,
+    // The 7 blade meshes share one origin (rotation-only), so Three.js cannot
+    // order them in the transparent pass; leaving depthWrite on let mis-ordered
+    // blades cull each other and vanish at some angles. Match the other
+    // transparent materials in this file and skip depth writes.
+    depthWrite: false,
   });
   for (let index = 0; index < 7; index += 1) {
     const blade = new Mesh(createBladeGeometry(radius), bladeMaterial);
@@ -4226,9 +3612,17 @@ function createLoadedFanCadMesh(
     positions.push(sourceX - center[0], sourceZ - center[2], sourceY - center[1]);
   }
 
+  // Same Y↔Z reflection as the position map above reverses winding; swap each
+  // triangle's last two indices back so glTF's CCW-outward faces stay outward
+  // under FrontSide culling (otherwise the loaded fan renders inside-out).
+  const windingFixedIndex: number[] = [];
+  for (let triangle = 0; triangle < mesh.index.length; triangle += 3) {
+    windingFixedIndex.push(mesh.index[triangle], mesh.index[triangle + 2], mesh.index[triangle + 1]);
+  }
+
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex([...mesh.index]);
+  geometry.setIndex(windingFixedIndex);
   geometry.computeVertexNormals();
 
   const isRotor = mesh.name.toLowerCase().includes("impeller");
