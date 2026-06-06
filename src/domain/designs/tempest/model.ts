@@ -220,6 +220,19 @@ export type TempestTowerFilterPocket = {
   readonly depth: Millimeters;
 };
 
+// One filter-pocket rect per wall, in model coordinates, derived ONCE in
+// createTowerFilterLayout. Every quad consumer reads these instead of recomputing
+// structuralOffset/outsideFlange/thickness math with `if (wall === ...)` chains.
+export type TempestQuadWallRect = {
+  readonly xMin: Millimeters;
+  readonly xMax: Millimeters;
+  readonly yMin: Millimeters;
+  readonly yMax: Millimeters;
+  readonly inletNormalAxis: TempestPlanarAxis; // "y" for front/back, "x" for left/right
+  readonly innerPlaneOffset: Millimeters; // structuralOffset — the chamber face plane
+  readonly outerPlaneOffset: Millimeters; // outsideFlange — the outer face plane
+};
+
 export type TempestFilterLayout =
   | {
       readonly topology: "sandwich";
@@ -240,6 +253,7 @@ export type TempestFilterLayout =
       readonly bottomPlateThickness: Millimeters;
       readonly topPlateThickness: Millimeters;
       readonly airChamber: TempestTowerAirChamber;
+      readonly wallRects: TempestWallMap<TempestQuadWallRect>;
       readonly filterPockets: TempestWallMap<TempestTowerFilterPocket>;
       readonly loading: {
         readonly type: "top-plate-slots";
@@ -752,11 +766,65 @@ function createTowerFilterLayout(
       zMin,
       zMax,
     },
+    wallRects: mapTempestWalls((wall) =>
+      quadWallRect(wall, box, structuralOffset, frame.outsideFlangeThickness, arrangement.filter.thickness),
+    ),
     filterPockets: mapTempestWalls(() => pocket),
     loading: {
       type: "top-plate-slots",
       slotCount: 4,
     },
+  };
+}
+
+// The filter-pocket rect for one wall, in model coordinates. The pocket is a thin
+// slab one filter-thickness deep, set one outer-wall in from the outer face and
+// running between the two structural offsets on the in-plane span.
+function quadWallRect(
+  wall: TempestWall,
+  box: TempestBoxEnvelope,
+  structuralOffset: Millimeters,
+  outsideFlange: Millimeters,
+  filterThickness: Millimeters,
+): TempestQuadWallRect {
+  const planes = { innerPlaneOffset: structuralOffset, outerPlaneOffset: outsideFlange };
+  if (wall === "front") {
+    return {
+      xMin: structuralOffset,
+      xMax: box.width - structuralOffset,
+      yMin: outsideFlange,
+      yMax: outsideFlange + filterThickness,
+      inletNormalAxis: "y",
+      ...planes,
+    };
+  }
+  if (wall === "back") {
+    return {
+      xMin: structuralOffset,
+      xMax: box.width - structuralOffset,
+      yMin: box.depth - outsideFlange - filterThickness,
+      yMax: box.depth - outsideFlange,
+      inletNormalAxis: "y",
+      ...planes,
+    };
+  }
+  if (wall === "left") {
+    return {
+      xMin: outsideFlange,
+      xMax: outsideFlange + filterThickness,
+      yMin: structuralOffset,
+      yMax: box.depth - structuralOffset,
+      inletNormalAxis: "x",
+      ...planes,
+    };
+  }
+  return {
+    xMin: box.width - outsideFlange - filterThickness,
+    xMax: box.width - outsideFlange,
+    yMin: structuralOffset,
+    yMax: box.depth - structuralOffset,
+    inletNormalAxis: "x",
+    ...planes,
   };
 }
 
