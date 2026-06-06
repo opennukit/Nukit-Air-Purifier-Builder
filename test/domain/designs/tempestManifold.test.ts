@@ -107,14 +107,17 @@ describe("Tempest meshes are 2-manifold", () => {
   const wall = defaultTempestSettings.frame.wallThickness;
   const fullChamfer = defaultTempestSettings.frame.towerCornerPostChamfer;
 
-  test("thin filter: bevel shrinks below the max and never reaches the filter", () => {
+  test("thin filter: bevel shrinks below the max and leaves a full wall to the filter", () => {
     // ~2mm filter -> structuralOffset 17, pocket corner at x+y = 27. The 55mm max
-    // would carve past the filter; the derived bevel must shrink and stay short of
-    // the pocket corner (leaving the safe clearance to the filter).
+    // would carve past the filter; the derived bevel must shrink so it leaves one
+    // outer-wall thickness to the pocket — the corner is the outer shell at 45°.
     const structuralOffset = flange + 2 + wall;
     const bevel = towerCornerChamfer(fullChamfer, structuralOffset, flange);
     expect(bevel).toBeLessThan(fullChamfer);
-    expect(bevel).toBeLessThan(structuralOffset + flange);
+    // Perpendicular wall from the bevel face to the pocket's near corner. When the
+    // max doesn't bind, it equals exactly the outer-wall thickness (flange).
+    const wallToPocket = (structuralOffset + flange - bevel) / Math.SQRT2;
+    expect(wallToPocket).toBeCloseTo(flange);
   });
 
   test("bevel never reaches the filter-pocket corner, so the corner stays tunnel-free", () => {

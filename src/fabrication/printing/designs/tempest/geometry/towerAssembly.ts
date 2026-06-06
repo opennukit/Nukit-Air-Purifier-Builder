@@ -4,7 +4,7 @@ import type {
   TempestWall,
 } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { epsilon, towerCornerFilterClearance } from "./context";
+import { epsilon } from "./context";
 import {
   chamferedPrism,
   cuboidFromMinSize,
@@ -16,19 +16,17 @@ import {
 import { fanPatternCut, towerOpening2d } from "./patterns2d";
 import { towerFilter, towerFilterThickness } from "./layout";
 
-// Builds the corner bevel from the filter, the way you described:
-//   1. The filter's outer-near corner sits at `x+y = structuralOffset + outsideFlange`
-//      (the filter pocket starts at `structuralOffset` along the wall, at the
-//      `outsideFlange` depth — that's the point where the two filter edges meet).
-//   2-3. Step back along the 45° corner bisector by `towerCornerFilterClearance` to
-//      get the bevel face line (`x+y = filterEdge - clearance*√2`); the bevel face
-//      is itself the line connecting the offset points.
-//   4. `chamferedRectangle2d` cuts the box corner up to that line (returns the cut leg).
-//   5. ...for all four corners, swept up the Z height by `chamferedPrism`.
-// Capped at `maxChamfer` so a thick filter doesn't produce an enormous bevel.
+// Places the 45° corner bevel one outer-wall thickness clear of the nearest air.
+// The closest void to the corner is the filter pocket, whose near-corner edge sits
+// at `x+y = structuralOffset + outsideFlange` (the air chamber is always farther,
+// at `2*structuralOffset`). Stepping back along the corner bisector by one outer
+// wall (`outsideFlange`) puts the bevel face a full wall from that pocket — so the
+// chamfer is just the outer shell wrapped around the corner at 45°, leaving the
+// same wall thickness whatever the filter. Capped at `maxChamfer` so a deep pocket
+// can't produce an enormous bevel.
 export function towerCornerChamfer(maxChamfer: number, structuralOffset: number, outsideFlange: number): number {
-  const filterEdge = structuralOffset + outsideFlange; // step 1
-  const bevelFace = filterEdge - towerCornerFilterClearance * Math.SQRT2; // steps 2-3
+  const closestAirEdge = structuralOffset + outsideFlange;
+  const bevelFace = closestAirEdge - outsideFlange * Math.SQRT2;
   return Math.max(0, Math.min(maxChamfer, bevelFace));
 }
 

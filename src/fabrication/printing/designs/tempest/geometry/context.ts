@@ -24,11 +24,6 @@ export type GeometryContext<Solid, Region> = {
 
 export const epsilon = 0.05;
 export const scadWallCutOverlap = 0.5;
-// The 0.8mm gap to leave between the corner bevel and the filter's outer edge
-// (your step 2 — the length of the 45° offset). Edit this to move the bevel
-// nearer to / farther from the filter. The bevel is built from the filter, not
-// hardcoded, so thin filters get a smaller bevel automatically.
-export const towerCornerFilterClearance = 0.8;
 // The geometry's own tessellation resolution, passed explicitly to every
 // circular primitive so it does not depend on any backend's global default.
 export const csgSegments = 48;
