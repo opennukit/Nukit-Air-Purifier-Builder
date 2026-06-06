@@ -5,9 +5,6 @@ import {
   applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
-  automaticFanCount,
-  corsiFanCountFits,
-  corsiFanGridFit,
   customFanProductPresetId,
   decodeSettings,
   defaultSettings,
@@ -19,8 +16,6 @@ import {
   printDesignPresets,
   publicPrintDesignPresets,
   publicThreeDimensionalPrintDesignPresets,
-  resolveCorsiRosenthalLayout,
-  resolveCorsiRosenthalFanCount,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/airPurifier";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
@@ -36,7 +31,6 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
-import { createCorsiRosenthalModel } from "@/domain/designs/corsi-rosenthal/model";
 import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight } from "@/domain/designs/donut-filter/model";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import { createPrintableSheetPlan } from "@/fabrication/printing/printableKit";
@@ -312,7 +306,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("keeps structured design variants stable when normalized again", () => {
-    for (const printDesign of ["corsi-rosenthal", "donut-hepa-adapter", "static-cr-14x20-base"] as const) {
+    for (const printDesign of ["donut-hepa-adapter", "static-cr-14x20-base"] as const) {
       const normalized = normalizeSettings(applyPrintDesignPreset(defaultSettings, printDesign));
       const normalizedAgain = normalizeSettings(normalized);
 
@@ -450,36 +444,28 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("keeps generated print designs out of wall-bank fan diagnostics", () => {
-    const corsiLayout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
     const donutLayout = createLayout(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"));
 
-    expect(corsiLayout.summary.fans).toEqual({
-      type: "corsi-rosenthal",
-      mode: "top-exhaust",
-      filterCount: 4,
-      fanCount: 4,
-    });
     expect(donutLayout.summary.fans).toEqual({ type: "donut-filter-adapter", fanCount: 1 });
-    expect(evaluateBuildDiagnostics(corsiLayout).map((diagnostic) => diagnostic.id)).not.toContain("no-fans");
     expect(evaluateBuildDiagnostics(donutLayout).map((diagnostic) => diagnostic.id)).not.toContain("no-fans");
   });
 
   test("models fabrication artifacts as explicit layout variants", () => {
     const cutPanelLayout = createLayout(defaultSettings);
-    const corsiLayout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
+    const donutLayout = createLayout(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"));
     const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
 
     expect(cutPanelLayout.fabrication.type).toBe("cut-panel-source");
     expect(cutPanelLayout.summary.fabrication.type).toBe("cut-panel-source");
-    expect(corsiLayout.fabrication).toEqual({ type: "generated-print-design", designType: "corsi-rosenthal" });
-    expect(corsiLayout.summary.fabrication).toEqual({ type: "generated-print-design", designType: "corsi-rosenthal" });
+    expect(donutLayout.fabrication).toEqual({ type: "generated-print-design", designType: "donut-filter-adapter" });
+    expect(donutLayout.summary.fabrication).toEqual({ type: "generated-print-design", designType: "donut-filter-adapter" });
     expect(staticLayout.fabrication.type).toBe("static-print-reference");
     expect(staticLayout.summary.fabrication).toEqual({
       type: "static-print-reference",
       sourceFileCount: staticPrintReferenceForPreset(staticLayout.configuration.printDesign)?.previewAssets.length ?? 0,
       localPlatePreviewCount: staticPrintReferenceForPreset(staticLayout.configuration.printDesign)?.platePreviewAssets.length ?? 0,
     });
-    expect(() => createLaserSvg(corsiLayout)).toThrow("does not have cut-panel fabrication");
+    expect(() => createLaserSvg(donutLayout)).toThrow("does not have cut-panel fabrication");
   });
 
   // ##############################
@@ -542,7 +528,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
       "nukit-tempest",
       "static-cr-14x20-base",
     ]);
-    expect(printDesignPresets.map((preset) => preset.id)).toContain("corsi-rosenthal");
     expect(printDesignPresets.map((preset) => preset.id)).toContain("donut-hepa-adapter");
     expect(printDesignPresets.map((preset) => preset.id)).toContain("nukit-tempest");
     expect(publicPrintDesignPresets[0]?.detail).toContain("dovetail lap keys");
@@ -643,288 +628,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
     expect(staticPrintReferenceForPreset(layout.configuration.printDesign)?.printablesId).toBe("1251061");
     expect(() => createPrintDesignKit(layout, "bed-256")).toThrow(/Static reference designs/);
-  });
-
-  // ##############################
-  // Corsi-Rosenthal Print Design
-  // ##############################
-
-  test("applies the Corsi-Rosenthal printable design defaults explicitly", () => {
-    const settings = applyPrintDesignPreset(defaultSettings, "corsi-rosenthal");
-    const layout = createLayout(settings);
-    const encoded = encodeSettings(settings);
-    const decoded = decodeSettings(encoded);
-
-    expect(settings.printDesign).toBe("corsi-rosenthal");
-    expect(settings.filterPreset).toBe("ikea-starkvind");
-    expect(settings.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(settings.corsiMode).toBe("top-exhaust");
-    expect(settings.corsiFilterCount).toBe(4);
-    expect(settings.corsiFanCount).toBe(automaticFanCount);
-    expect(settings.fansLeft).toBe(0);
-    expect(settings.fansRight).toBe(0);
-    expect(settings.fansTop).toBe(0);
-    expect(settings.fansBottom).toBe(0);
-    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
-    expect(layout.configuration.design.type).toBe("corsi-rosenthal");
-    expect(
-      layout.configuration.design.type === "corsi-rosenthal" ? layout.configuration.design.configuration : undefined,
-    ).toEqual({
-      mode: "top-exhaust",
-      filterCount: 4,
-      fanCount: { type: "auto" },
-    });
-    expect(layout.configuration.printDesign.label).toContain("Corsi-Rosenthal");
-    expect(layout.configuration.printDesign.label).not.toContain("glue");
-    expect(decoded.printDesign).toBe("corsi-rosenthal");
-    expect(decoded.corsiMode).toBe("top-exhaust");
-    expect(decoded.corsiFilterCount).toBe(4);
-    expect(decoded.corsiFanCount).toBe(automaticFanCount);
-  });
-
-  test("generates Corsi-Rosenthal printable parts instead of laser panel tiles", () => {
-    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
-    const kit = createPrintDesignKit(layout, "bed-256");
-    const printExport = createPrintDesignThreeMfExport(layout, "bed-256");
-    const content = new TextDecoder("latin1").decode(printExport.bytes);
-
-    expect(kit.summary.partCount).toBeGreaterThan(30);
-    expect(kit.summary.glueKeyCount).toBe(0);
-    expect(kit.summary.oversizedPartCount).toBe(0);
-    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
-    expect(kit.parts.some((part) => part.name.startsWith("Fan pop-in retainer"))).toBe(false);
-    expect(kit.parts.some((part) => part.name.startsWith("Modular rail connector"))).toBe(true);
-    expect(kit.parts.some((part) => part.kind === "rail-connector")).toBe(true);
-    expect(kit.parts.some((part) => part.name.startsWith("Filter X brace strip"))).toBe(false);
-    expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
-    expect(printExport.filename).toBe("corsi-rosenthal-print-kit.3mf");
-    expect(printExport.mimeType).toBe("model/3mf");
-    expect(printExport.sheetPlan.sheets.length).toBeGreaterThan(1);
-    expect(content).toContain("Corsi-Rosenthal box print kit");
-    expect(content).toContain("Snap-in fan cassette");
-  });
-
-  test("keeps the Corsi-Rosenthal selector to one modular printable model", () => {
-    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
-    const model = createCorsiRosenthalModel(layout);
-    const kit = createPrintDesignKit(layout, "unsplit");
-
-    expect(printDesignPresets.filter((preset) => preset.id === "corsi-rosenthal")).toHaveLength(1);
-    expect(layout.rawSettings.filterPreset).toBe("ikea-starkvind");
-    expect(layout.rawSettings.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(layout.rawSettings.fanDiameter).toBe(120);
-    expect(layout.rawSettings.corsiFanCount).toBe(automaticFanCount);
-    expect(layout.rawSettings.corsiFilterCount).toBe(4);
-    expect(model.frameStyle).toBe("modular-rail");
-    expect(model.filterThickness).toBeCloseTo(38.1);
-    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
-      ["top", 4, 2, 2],
-    ]);
-    expect(kit.parts.filter((part) => part.name.startsWith("Modular corner block"))).toHaveLength(8);
-    expect(kit.parts.filter((part) => part.name.startsWith("Modular ") && part.name.includes("frame unit"))).toHaveLength(12);
-    expect(kit.parts.filter((part) => part.name.startsWith("Modular rail connector")).length).toBeGreaterThanOrEqual(8);
-    expect(kit.parts.filter((part) => part.name.startsWith("Modular rail connector")).length).toBeLessThan(24);
-    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
-    expect(kit.summary.partCount).toBeLessThan(90);
-  });
-
-  test("applies print design defaults for sparse design URLs", () => {
-    const decoded = decodeSettings("printDesign=corsi-rosenthal");
-    const withAutoFanParam = decodeSettings("printDesign=corsi-rosenthal&corsiFanCount=auto");
-    const withExplicitFanCount = decodeSettings("printDesign=corsi-rosenthal&corsiFanCount=6");
-
-    expect(decoded.printDesign).toBe("corsi-rosenthal");
-    expect(decoded.filterPreset).toBe("ikea-starkvind");
-    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(decoded.corsiFanCount).toBe(automaticFanCount);
-    expect(withAutoFanParam.filterPreset).toBe("ikea-starkvind");
-    expect(withAutoFanParam.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(withAutoFanParam.corsiFanCount).toBe(automaticFanCount);
-    expect(withExplicitFanCount.filterPreset).toBe("ikea-starkvind");
-    expect(withExplicitFanCount.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(withExplicitFanCount.corsiFanCount).toBe(automaticFanCount);
-  });
-
-  test("keeps the Tempest arrangement as a setting on the single Tempest design", () => {
-    const tower = decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower");
-    const encoded = encodeSettings(tower);
-    const layout = createLayout(tower);
-
-    expect(tower.printDesign).toBe("nukit-tempest");
-    expect(tower.tempestArrangement).toBe("four-side-filter-tower");
-    expect(tower.filterPreset).toBe("air-fanta-compatible");
-    expect(tower.filterWidth).toBe(290);
-    expect(tower.filterDepth).toBe(290);
-    expect(tower.filterThickness).toBe(25);
-    expect(tower.filters).toBe(2);
-    expect(tower.fansTop).toBe(0);
-    expect(encoded).toContain("printDesign=nukit-tempest");
-    expect(encoded).toContain("tempestArrangement=four-side-filter-tower");
-    expect(encoded).not.toContain("filters=");
-    expect(encoded).not.toContain("fansTop=");
-    expect(layout.configuration.design.type === "tempest" ? layout.configuration.design.arrangement : undefined).toBe(
-      "four-side-filter-tower",
-    );
-  });
-
-  test("migrates the old modular Corsi-Rosenthal design URL to the single Corsi model", () => {
-    const decoded = decodeSettings("printDesign=modular-corsi-rosenthal");
-
-    expect(decoded.printDesign).toBe("corsi-rosenthal");
-    expect(decoded.filterPreset).toBe("ikea-starkvind");
-    expect(resolveCorsiRosenthalFanCount(createLayout(decoded))).toBe(4);
-  });
-
-  test("rejects unsupported Corsi-Rosenthal fan counts before model creation", () => {
-    const invalidSettings = {
-      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-      corsiFanCount: 5,
-    };
-    const layout = createLayout(invalidSettings);
-    const model = createCorsiRosenthalModel(layout);
-
-    expect(layout.rawSettings.corsiFanCount).toBe(automaticFanCount);
-    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
-    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
-      ["top", 4, 2, 2],
-    ]);
-  });
-
-  test("lays out the default Corsi-Rosenthal fans as a 2 by 2 top panel grid", () => {
-    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"));
-    const model = createCorsiRosenthalModel(layout);
-
-    expect(model.fanCount).toBe(4);
-    expect(model.mode).toBe("top-exhaust");
-    expect(model.filterFaces.map((face) => face.side)).toEqual(["front", "right", "back", "left"]);
-    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount])).toEqual([["top", 4]]);
-    expect(model.sealedFaces.map((face) => face.side)).toEqual(["bottom"]);
-    expect(model.faceRoles.map((face) => [face.side, face.role])).toEqual([
-      ["front", "filter"],
-      ["right", "filter"],
-      ["back", "filter"],
-      ["left", "filter"],
-      ["top", "fan"],
-      ["bottom", "sealed"],
-    ]);
-    expect(model.fanGrid.columns).toBe(2);
-    expect(model.fanGrid.rows).toBe(2);
-  });
-
-  test("keeps every Corsi-Rosenthal face assigned to filter, fan, or seal", () => {
-    const cases = [
-      ...[1, 2, 3, 4, 5].map((filterCount) => ({ mode: "top-exhaust" as const, filterCount })),
-      ...[1, 2, 3, 4].map((filterCount) => ({ mode: "side-exhaust" as const, filterCount })),
-    ];
-
-    for (const testCase of cases) {
-      const model = createCorsiRosenthalModel(
-        createLayout({
-          ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-          corsiMode: testCase.mode,
-          corsiFilterCount: testCase.filterCount,
-        }),
-      );
-
-      expect(model.faceRoles).toHaveLength(6);
-      expect(new Set(model.faceRoles.map((face) => face.side)).size).toBe(6);
-      expect(model.faceRoles.every((face) => ["filter", "fan", "sealed"].includes(face.role))).toBe(true);
-      expect(model.filterFaces.length + model.fanPanels.length + model.sealedFaces.length).toBe(6);
-    }
-  });
-
-  test("canonicalizes Corsi-Rosenthal fan counts that cannot fit the selected face", () => {
-    const requestedEightFans = createLayout({
-      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-      corsiFanCount: 8,
-    });
-    const model = createCorsiRosenthalModel(requestedEightFans);
-
-    expect(requestedEightFans.rawSettings.corsiFanCount).toBe(automaticFanCount);
-    expect(resolveCorsiRosenthalFanCount(requestedEightFans)).toBe(4);
-    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount, panel.grid.columns, panel.grid.rows])).toEqual([
-      ["top", 4, 2, 2],
-    ]);
-    expect(
-      corsiFanCountFits({
-        mode: "top-exhaust",
-        fanCount: 8,
-        filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
-        fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
-      }),
-    ).toBe(false);
-    expect(
-      corsiFanGridFit({
-        mode: "top-exhaust",
-        fanCount: 8,
-        filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
-        fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
-      }).type,
-    ).toBe("does-not-fit");
-    const invalidFit = corsiFanGridFit({
-      mode: "side-exhaust",
-      fanCount: 3,
-      filterDimensions: filterSelectionDimensions(requestedEightFans.configuration.filter),
-      fanDiameter: requestedEightFans.configuration.fan.spec.diameter,
-    });
-
-    expect(invalidFit).toEqual({
-      type: "invalid",
-      mode: "side-exhaust",
-      fanCount: 3,
-      reason: "side-exhaust-requires-even-fan-count",
-    });
-    expect("requiredWidth" in invalidFit).toBe(false);
-  });
-
-  test("supports the flipped Corsi-Rosenthal side-exhaust topology", () => {
-    const layout = createLayout({
-      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-      corsiMode: "side-exhaust",
-      corsiFilterCount: 5,
-      corsiFanCount: 4,
-    });
-    const model = createCorsiRosenthalModel(layout);
-    const corsiLayout = resolveCorsiRosenthalLayout(layout);
-
-    expect(corsiLayout).toEqual({ mode: "side-exhaust", filterCount: 4, fanCount: 4 });
-    expect(model.filterFaces.map((face) => face.side)).toEqual(["front", "back", "top", "bottom"]);
-    expect(model.fanPanels.map((panel) => [panel.side, panel.fanCount])).toEqual([
-      ["left", 2],
-      ["right", 2],
-    ]);
-    expect(model.sealedFaces).toEqual([]);
-  });
-
-  test("uses dedicated Corsi-Rosenthal fan count and ignores hidden wall-bank fans", () => {
-    const layout = createLayout({
-      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-      corsiFanCount: 4,
-      fansLeft: 5,
-      fansRight: 3,
-      fansTop: 0,
-      fansBottom: 0,
-    });
-    const kit = createPrintDesignKit(layout, "bed-256");
-
-    expect(layout.rawSettings.fansLeft).toBe(0);
-    expect(layout.rawSettings.fansRight).toBe(0);
-    expect(resolveCorsiRosenthalFanCount(layout)).toBe(4);
-    expect(kit.parts.filter((part) => part.name.startsWith("Snap-in fan cassette"))).toHaveLength(4);
-  });
-
-  test("migrates legacy Corsi-Rosenthal fan count from fansLeft", () => {
-    const decoded = decodeSettings("printDesign=corsi-rosenthal&fansLeft=6&fansRight=2&fansTop=1");
-    const encoded = encodeSettings(decoded);
-
-    expect(decoded.filterPreset).toBe("ikea-starkvind");
-    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(decoded.corsiFanCount).toBe(automaticFanCount);
-    expect(decoded.fansLeft).toBe(0);
-    expect(decoded.fansRight).toBe(0);
-    expect(decoded.fansTop).toBe(0);
-    expect(encoded).toContain("corsiFanCount=-1");
-    expect(encoded).toContain("fansLeft=0");
   });
 
   // ##############################

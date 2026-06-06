@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   applyPrintDesignPreset,
   applyTempestArrangement,
-  automaticFanCount,
   defaultSettings,
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
@@ -15,16 +14,14 @@ import {
 describe("Print design settings memory", () => {
   test("applies recommended settings the first time a design is selected", () => {
     const memory = createPrintDesignSettingsMemory(defaultSettings);
-    const switched = switchPrintDesignSettings(memory, defaultSettings, "corsi-rosenthal");
+    const switched = switchPrintDesignSettings(memory, defaultSettings, "nukit-tempest");
     const settings = serializePurifierDraft(switched.settings);
 
-    expect(switched.settings.design.type).toBe("corsi-rosenthal");
-    expect(settings.printDesign).toBe("corsi-rosenthal");
-    expect(settings.filterPreset).toBe("ikea-starkvind");
-    expect(settings.corsiMode).toBe("top-exhaust");
-    expect(settings.corsiFilterCount).toBe(4);
-    expect(settings.corsiFanCount).toBe(automaticFanCount);
-    expect(settings.materialThickness).toBe(6);
+    expect(switched.settings.design.type).toBe("tempest");
+    expect(settings.printDesign).toBe("nukit-tempest");
+    expect(settings.filterPreset).toBe("merv13-20x20x2");
+    expect(settings.tempestArrangement).toBe("dual-horizontal-sandwich");
+    expect(settings.materialThickness).toBe(5);
   });
 
   test("restores the last settings used for a design when switching back", () => {
@@ -33,27 +30,21 @@ describe("Print design settings memory", () => {
       fansTop: 2,
       rim: 34,
     };
-    const corsiSettings = {
-      ...applyPrintDesignPreset(nukitSettings, "corsi-rosenthal"),
-      corsiMode: "side-exhaust" as const,
-      corsiFilterCount: 3,
-      corsiFanCount: 4,
+    const tempestSettings = {
+      ...applyPrintDesignPreset(nukitSettings, "nukit-tempest"),
       materialThickness: 5,
     };
     const memory = rememberPrintDesignSettings(
-      rememberPrintDesignSettings(createPrintDesignSettingsMemory(nukitSettings), corsiSettings),
+      rememberPrintDesignSettings(createPrintDesignSettingsMemory(nukitSettings), tempestSettings),
       nukitSettings,
     );
 
-    const toCorsi = switchPrintDesignSettings(memory, nukitSettings, "corsi-rosenthal");
-    const toCorsiSerialized = serializePurifierDraft(toCorsi.settings);
-    expect(toCorsi.settings.design.type).toBe("corsi-rosenthal");
-    expect(toCorsiSerialized.corsiMode).toBe("side-exhaust");
-    expect(toCorsiSerialized.corsiFilterCount).toBe(3);
-    expect(toCorsiSerialized.corsiFanCount).toBe(4);
-    expect(toCorsiSerialized.materialThickness).toBe(5);
+    const toTempest = switchPrintDesignSettings(memory, nukitSettings, "nukit-tempest");
+    const toTempestSerialized = serializePurifierDraft(toTempest.settings);
+    expect(toTempest.settings.design.type).toBe("tempest");
+    expect(toTempestSerialized.materialThickness).toBe(5);
 
-    const toNukit = switchPrintDesignSettings(toCorsi.memory, toCorsi.settings, "nukit-open-air");
+    const toNukit = switchPrintDesignSettings(toTempest.memory, toTempest.settings, "nukit-open-air");
     const toNukitSerialized = serializePurifierDraft(toNukit.settings);
     expect(toNukit.settings.design.type).toBe("laser-derived-printable-kit");
     expect(toNukitSerialized.fansTop).toBe(2);

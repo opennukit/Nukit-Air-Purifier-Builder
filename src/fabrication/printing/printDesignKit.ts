@@ -1,9 +1,7 @@
-import { createCorsiRosenthalPrintableKit } from "@/fabrication/printing/designs/corsi-rosenthal/printableKit";
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import {
   findPreviewMaterialColorPreset,
-  isCorsiRosenthalPrintDesignId,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
@@ -20,9 +18,6 @@ import {
 export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
   if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
     throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
-  }
-  if (isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id)) {
-    return createCorsiRosenthalPrintableKit(layout, presetId);
   }
   if (isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
     return createDonutFilterPrintableKit(layout, presetId);
@@ -48,7 +43,6 @@ export function createPrintDesignThreeMfExportFromKit(
   const displayColor = enclosureDisplayColor(layout);
 
   if (
-    isCorsiRosenthalPrintDesignId(layout.configuration.printDesign.id) ||
     isDonutFilterPrintDesignId(layout.configuration.printDesign.id) ||
     isTempestPrintDesignId(layout.configuration.printDesign.id)
   ) {

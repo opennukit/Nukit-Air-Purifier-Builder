@@ -6,14 +6,9 @@
     applyFilterPreset,
     applyTempestArrangementDefaults,
     automaticFanCount,
-    corsiFanCountFits,
-    corsiRosenthalFanCountOptions,
-    corsiRosenthalFilterCountRange,
-    corsiRosenthalModes,
     customDonutFilterPresetId,
     customFanProductPresetId,
     decodePurifierDraftSettings,
-    defaultCorsiRosenthalFilterCount,
     defaultSettings,
     defaultThreeDimensionalPrintDesignId,
     donutFilterPresets,
@@ -23,7 +18,6 @@
     findFanProductPreset,
     fixedFanCountOptions,
     formatMillimeters,
-    isCorsiRosenthalPrintDesignId,
     isDonutFilterPrintDesignId,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
@@ -32,12 +26,9 @@
     printDesignIdForPurifierDraft,
     previewMaterialColorPresets,
     publicThreeDimensionalPrintDesignPresets,
-    resolveCorsiRosenthalFanCount,
-    resolveCorsiRosenthalLayout,
     serializePurifierDraft,
     staticReferenceDefaultsForPreset,
     staticPrintReferenceForPreset,
-    type CorsiRosenthalMode,
     type DonutFilterPresetId,
     type FanDiameter,
     type FanProductPresetId,
@@ -52,18 +43,11 @@
   import {
     customFilterPresetId,
     filterPresets,
-    filterSelectionDimensions,
     findFilterPreset,
     type FilterPresetId,
   } from "@/domain/purifier/filter";
   import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
   import { createTempestModel } from "@/domain/designs/tempest/model";
-  import {
-    corsiFaceSides,
-    createCorsiRosenthalModel,
-    type CorsiFaceRoleAssignment,
-    type CorsiFaceSide,
-  } from "@/domain/designs/corsi-rosenthal/model";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -119,7 +103,7 @@
   type BooleanSettingName = {
     [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends boolean ? Key : never;
   }[keyof RawPurifierSettings];
-  type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom" | "corsiFanCount";
+  type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
   type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
   type RecommendedFanDiameter = Extract<FanDiameter, 120 | 140>;
   type FanDiameterSelection = RecommendedFanDiameter | "custom";
@@ -259,13 +243,10 @@
   let selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
   let selectedFanDiameterSelection: FanDiameterSelection = defaultRecommendedFanDiameter;
   let selectedFanProductOptions: readonly PresetFanProduct[] = [];
-  let corsiFilterCountMax = corsiRosenthalFilterCountRange(settings.corsiMode).max;
-  let allowedCorsiFanCounts: ReadonlySet<number> = new Set(corsiRosenthalFanCountOptions(settings.corsiMode));
   let isStaticReferenceControlsActive = false;
   let activeStaticReferenceCanPreviewPlate = false;
   let showCutSheetPreviewMode = false;
   let showPrintSheetsPreviewMode = true;
-  let isCorsiControlsActive = false;
   let isDonutControlsActive = false;
   let isTempestControlsActive = false;
   let isNukitControlsActive = true;
@@ -283,7 +264,6 @@
   let selectedFilterDimensionsText = "";
   let selectedDonutFilterDimensionsText = "";
   let selectedFanDetailText = "";
-  let corsiFaceAssignments: readonly CorsiFaceRoleAssignment[] = [];
 
   // ##############################
   // Reactive Derivations
@@ -299,7 +279,7 @@
   $: generatedPrintSheetPlan = createCurrentGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
-  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, settings, generatedPrintSheetPlan);
+  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: purchaseItems = createPurchaseListItems(layout, fabricationMethod, settings);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
@@ -312,14 +292,11 @@
   $: selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
   $: selectedFanDiameterSelection = fanDiameterSelectionForSettings(settings);
   $: selectedFanProductOptions = fanProductOptionsForSelection(selectedFanDiameterSelection);
-  $: corsiFilterCountMax = corsiRosenthalFilterCountRange(settings.corsiMode).max;
-  $: allowedCorsiFanCounts = new Set(corsiRosenthalFanCountOptions(settings.corsiMode));
   $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
   $: activeStaticReferenceCanPreviewPlate =
     activeDesignContext.type === "static-reference" && activeDesignContext.platePreview.type === "available";
   $: showCutSheetPreviewMode = activeFabricationPreview.type === "cut-sheet";
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
-  $: isCorsiControlsActive = activeDesignContext.type === "corsi-rosenthal";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
@@ -337,7 +314,6 @@
   $: selectedFilterDetailText = createSelectedFilterDetail(settings, layout, fabricationMethod);
   $: selectedDonutFilterDimensionsText = `${formatMillimeters(settings.donutFilterOuterDiameter)} dia x ${formatMillimeters(settings.donutFilterLength)} · ${formatMillimeters(settings.donutFilterHoleDiameter)} hole`;
   $: selectedFanDetailText = createSelectedFanDetail(settings, layout, fabricationMethod);
-  $: corsiFaceAssignments = isCorsiControlsActive ? createCorsiFaceAssignments(layout) : [];
 
   // ##############################
   // Lifecycle
@@ -452,15 +428,6 @@
     applyPrintDesignSelection(readPrintDesignControlValue(event));
   }
 
-  function updateCorsiMode(event: Event): void {
-    const corsiMode = readCorsiModeControlValue(event);
-    commitSettings({
-      ...settings,
-      corsiMode,
-      corsiFilterCount: defaultCorsiRosenthalFilterCount(corsiMode),
-    });
-  }
-
   function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
   }
@@ -524,13 +491,6 @@
     });
   }
 
-  function updateCorsiFilterCount(event: Event): void {
-    commitSettings({
-      ...settings,
-      corsiFilterCount: readNumberInput(event, settings.corsiFilterCount),
-    });
-  }
-
   function toggleAutoRotate(): void {
     commitSettings({
       ...settings,
@@ -575,11 +535,6 @@
   function readPrintDesignControlValue(event: Event): PrintDesignId {
     const preset = publicThreeDimensionalPrintDesignPresets.find((entry) => entry.id === requireSelect(event, "readPrintDesignControlValue").value);
     return preset?.id ?? defaultThreeDimensionalPrintDesignId;
-  }
-
-  function readCorsiModeControlValue(event: Event): CorsiRosenthalMode {
-    const mode = corsiRosenthalModes.find((entry) => entry === requireSelect(event, "readCorsiModeControlValue").value);
-    return mode ?? defaultSettings.corsiMode;
   }
 
   function readFanCountControlValue(event: Event): number {
@@ -716,8 +671,7 @@
 
     const usesGeneratedPrintKit =
       currentFabricationMethod === "print-3mf" &&
-      (isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id) ||
-        isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id) ||
+      (isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id) ||
         isTempestPrintDesignId(currentLayout.configuration.printDesign.id));
     const baseDiagnostics = usesGeneratedPrintKit
       ? evaluateBuildDiagnostics(currentLayout).filter(
@@ -803,7 +757,6 @@
     currentPreviewMode: PreviewMode,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
-    currentSettings: RawPurifierSettings,
     currentGeneratedPlan: PrintableSheetPlan | null,
   ): readonly SummaryItem[] {
     if (currentPreviewMode === "print-sheets") {
@@ -843,22 +796,6 @@
         { label: "Files", value: reference?.fileSummary ?? "Original source files" },
         ...staticPrintEstimateSummaryItems(reference?.printEstimate),
         { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
-      ];
-    }
-
-    if (currentFabricationMethod === "print-3mf" && isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
-      const corsiLayout = resolveCorsiRosenthalLayout(currentLayout);
-      return [
-        { label: "Design", value: currentLayout.configuration.printDesign.label },
-        { label: "Mode", value: corsiModeLabel(corsiLayout.mode) },
-        {
-          label: "Filters",
-          value: `${corsiLayout.filterCount} x ${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)}`,
-        },
-        { label: "Fans", value: `${corsiLayout.fanCount} x ${currentSettings.fanDiameter} mm` },
-        { label: "Print parts", value: String(plan.kit.summary.partCount) },
-        { label: "Bed", value: plan.kit.preset.label },
       ];
     }
 
@@ -1015,13 +952,11 @@
     }
 
     const filterPreset = findFilterPreset(currentSettings.filterPreset);
-    const isCorsi = currentFabricationMethod === "print-3mf" && isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id);
-    const corsiFilterCount = isCorsi ? resolveCorsiRosenthalLayout(currentLayout).filterCount : null;
     return [
       {
         category: "Filter",
-        label: corsiFilterCount === null ? filterPreset.label : `${corsiFilterCount} x ${filterPreset.label}`,
-        detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}${corsiFilterCount === null ? "" : " each"}`,
+        label: filterPreset.label,
+        detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`,
         url: webSearchUrl(`${filterPreset.label} air filter`),
       },
       ...baseItems,
@@ -1072,63 +1007,6 @@
   function webSearchUrl(query: string): string {
     const params = new URLSearchParams({ q: query });
     return `https://www.google.com/search?${params.toString()}`;
-  }
-
-  // #######################################
-  // Corsi-Rosenthal Controls
-  // #######################################
-
-  function createCorsiFaceAssignments(currentLayout: LayoutResult): readonly CorsiFaceRoleAssignment[] {
-    const model = createCorsiRosenthalModel(currentLayout);
-    return corsiFaceSides.map((side) => {
-      const assignment = model.faceRoles.find((entry) => entry.side === side);
-      return assignment ?? { side, role: "sealed" };
-    });
-  }
-
-  function corsiFanCountFitsLayout(mode: CorsiRosenthalMode, fanCount: number, currentLayout: LayoutResult): boolean {
-    if (fanCount === automaticFanCount) {
-      return true;
-    }
-    if (!Number.isFinite(fanCount) || fanCount <= 0 || (mode === "side-exhaust" && fanCount % 2 !== 0)) {
-      return false;
-    }
-    return corsiFanCountFits({
-      mode,
-      fanCount,
-      filterDimensions: filterSelectionDimensions(currentLayout.configuration.filter),
-      fanDiameter: currentLayout.configuration.fan.spec.diameter,
-    });
-  }
-
-  function corsiFanCountOptionLabel(fanCount: number, isAvailable: boolean): string {
-    const label = fanCountOptionLabel(fanCount);
-    return isAvailable || fanCount === automaticFanCount ? label : `${label} - too large`;
-  }
-
-  function corsiFanCountOptionTitle(isAvailable: boolean, isAllowed: boolean): string {
-    if (isAvailable) {
-      return "";
-    }
-    return isAllowed ? "Too large for this filter and fan size" : "Unavailable for this Corsi mode";
-  }
-
-  function fanCountOptionLabel(fanCount: number): string {
-    if (fanCount === automaticFanCount) {
-      return "Auto";
-    }
-    return fanCount === 0 ? "None" : String(fanCount);
-  }
-
-  function corsiFaceLabel(side: CorsiFaceSide): string {
-    return side.charAt(0).toUpperCase() + side.slice(1);
-  }
-
-  function corsiFaceRoleLabel(assignment: CorsiFaceRoleAssignment): string {
-    if (assignment.role === "fan") {
-      return `${assignment.fanCount} fan${assignment.fanCount === 1 ? "" : "s"}`;
-    }
-    return assignment.role === "filter" ? "Filter" : "Sealed";
   }
 
   // #######################################
@@ -1340,9 +1218,6 @@
       fansRight: rawSettings.fansRight,
       fansTop: rawSettings.fansTop,
       fansBottom: rawSettings.fansBottom,
-      corsiMode: rawSettings.corsiMode,
-      corsiFilterCount: rawSettings.corsiFilterCount,
-      corsiFanCount: rawSettings.corsiFanCount,
       tempestArrangement: rawSettings.tempestArrangement,
       donutFilterPreset: rawSettings.donutFilterPreset,
       donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
@@ -1406,10 +1281,6 @@
     return method === "print-3mf" ? "3D print" : "Laser cut";
   }
 
-  function corsiModeLabel(mode: CorsiRosenthalMode): string {
-    return mode === "side-exhaust" ? "Flipped side exhaust" : "Classic top exhaust";
-  }
-
   function filterPresetOptionLabel(preset: (typeof filterPresets)[number]): string {
     if (preset.id === customFilterPresetId) {
       return `${preset.label} - enter exact dimensions`;
@@ -1438,9 +1309,6 @@
   function configuredFanCountFor(currentLayout: LayoutResult, currentFabricationMethod: FabricationMethod): number {
     if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return staticReferenceDefaultsForPreset(currentLayout.configuration.printDesign)?.fanCount ?? 0;
-    }
-    if (currentFabricationMethod === "print-3mf" && isCorsiRosenthalPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      return resolveCorsiRosenthalFanCount(currentLayout);
     }
     if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
       return currentLayout.configuration.design.type === "donut-filter-adapter" ? currentLayout.configuration.design.fan.count : 0;
@@ -1617,35 +1485,33 @@
                   <span class="preview-control-label">Fans</span>
                 </label>
                 <span class="preview-toolbar-primary-break" aria-hidden="true"></span>
-                {#if !isCorsiRosenthalPrintDesignId(settings.printDesign)}
-                  <label class="toggle-field preview-toggle-field preview-control-spatial" title="Exploded view">
-                    <input
-                      type="checkbox"
-                      name="explodedView"
-                      checked={settings.explodedView}
-                      onchange={(event) => updateBooleanSetting("explodedView", event)}
-                    />
-                    <span class="preview-control-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" focusable="false">
-                        <path d="M9 9h6v6H9z" />
-                        <path d="M8 8L4 4M4 4h4M4 4v4M16 8l4-4M20 4h-4M20 4v4M8 16l-4 4M4 20h4M4 20v-4M16 16l4 4M20 20h-4M20 20v-4" />
-                      </svg>
-                    </span>
-                    <span class="preview-control-label">Exploded view</span>
-                  </label>
-                  <label class="toggle-field preview-toggle-field preview-control-spatial" title="Show dimensions">
-                    <input
-                      type="checkbox"
-                      name="showDimensions"
-                      checked={settings.showDimensions}
-                      onchange={(event) => updateBooleanSetting("showDimensions", event)}
-                    />
-                    <span class="preview-control-icon" aria-hidden="true">
-                      <span class="preview-control-glyph">mm</span>
-                    </span>
-                    <span class="preview-control-label">Dims</span>
-                  </label>
-                {/if}
+                <label class="toggle-field preview-toggle-field preview-control-spatial" title="Exploded view">
+                  <input
+                    type="checkbox"
+                    name="explodedView"
+                    checked={settings.explodedView}
+                    onchange={(event) => updateBooleanSetting("explodedView", event)}
+                  />
+                  <span class="preview-control-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M9 9h6v6H9z" />
+                      <path d="M8 8L4 4M4 4h4M4 4v4M16 8l4-4M20 4h-4M20 4v4M8 16l-4 4M4 20h4M4 20v-4M16 16l4 4M20 20h-4M20 20v-4" />
+                    </svg>
+                  </span>
+                  <span class="preview-control-label">Exploded view</span>
+                </label>
+                <label class="toggle-field preview-toggle-field preview-control-spatial" title="Show dimensions">
+                  <input
+                    type="checkbox"
+                    name="showDimensions"
+                    checked={settings.showDimensions}
+                    onchange={(event) => updateBooleanSetting("showDimensions", event)}
+                  />
+                  <span class="preview-control-icon" aria-hidden="true">
+                    <span class="preview-control-glyph">mm</span>
+                  </span>
+                  <span class="preview-control-label">Dims</span>
+                </label>
                 <label class="toggle-field preview-toggle-field preview-control-spatial" title="Scale reference">
                   <input
                     type="checkbox"
@@ -1674,7 +1540,7 @@
                     {/each}
                   </div>
                 {/if}
-                {#if fabricationMethod === "print-3mf" && !isCorsiRosenthalPrintDesignId(settings.printDesign) && !isTempestPrintDesignId(settings.printDesign) && !isStaticReferenceControlsActive}
+                {#if fabricationMethod === "print-3mf" && !isTempestPrintDesignId(settings.printDesign) && !isStaticReferenceControlsActive}
                   <label class="toggle-field preview-toggle-field preview-control-technical" title="Print split lines">
                     <input
                       type="checkbox"
@@ -1865,55 +1731,6 @@
                           </select>
                         </label>
                       {/each}
-                    </div>
-                  {/if}
-
-                  {#if isCorsiControlsActive}
-                    <div data-corsi-layout>
-                      <label class="field">
-                        <span>Mode</span>
-                        <select name="corsiMode" onchange={updateCorsiMode}>
-                          {#each corsiRosenthalModes as mode}
-                            <option value={mode} selected={settings.corsiMode === mode}>{corsiModeLabel(mode)}</option>
-                          {/each}
-                        </select>
-                      </label>
-                      <label class="field">
-                        <span>Filters</span>
-                        <select name="corsiFilterCount" onchange={updateCorsiFilterCount}>
-                          {#each ["1", "2", "3", "4", "5"] as count}
-                            <option value={count} disabled={Number(count) > corsiFilterCountMax} selected={settings.corsiFilterCount === Number(count)}>
-                              {count}
-                            </option>
-                          {/each}
-                        </select>
-                      </label>
-                      <label class="field compact-field">
-                        <span>{settings.corsiMode === "side-exhaust" ? "Side fans" : "Top fans"}</span>
-                        <select name="corsiFanCount" onchange={(event) => updateFanCountSetting("corsiFanCount", event)}>
-                          {#each [automaticFanCount, ...fixedFanCountOptions] as fanCount}
-                            {@const isAllowed = allowedCorsiFanCounts.has(fanCount)}
-                            {@const fitsLayout = isAllowed && corsiFanCountFitsLayout(settings.corsiMode, fanCount, layout)}
-                            {@const isAvailable = isAllowed && fitsLayout}
-                            <option
-                              value={fanCount}
-                              disabled={!isAvailable}
-                              title={corsiFanCountOptionTitle(isAvailable, isAllowed)}
-                              selected={settings.corsiFanCount === fanCount}
-                            >
-                              {isAllowed ? corsiFanCountOptionLabel(fanCount, fitsLayout) : fanCountOptionLabel(fanCount)}
-                            </option>
-                          {/each}
-                        </select>
-                      </label>
-                      <div class="corsi-topology-summary" id="corsiTopologySummary" aria-label="Corsi-Rosenthal face roles">
-                        {#each corsiFaceAssignments as assignment}
-                          <span class={`corsi-face-role is-${assignment.role}`} title={`${corsiFaceLabel(assignment.side)} face: ${corsiFaceRoleLabel(assignment)}`}>
-                            <small>{corsiFaceLabel(assignment.side)}</small>
-                            <strong>{corsiFaceRoleLabel(assignment)}</strong>
-                          </span>
-                        {/each}
-                      </div>
                     </div>
                   {/if}
 

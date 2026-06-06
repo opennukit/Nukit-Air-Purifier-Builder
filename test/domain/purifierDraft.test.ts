@@ -2,11 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   applyPrintDesignPreset,
   applyTempestArrangement,
-  automaticFanCount,
   createPurifierDraft,
   decodePurifierDraftSettings,
   defaultSettings,
-  normalizePurifierDraft,
   normalizeSettings,
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
@@ -60,24 +58,6 @@ describe("Purifier draft model", () => {
     expect(draft.design.arrangement).toBe("four-side-filter-tower");
     expect(serializePurifierDraft(draft).printDesign).toBe("nukit-tempest");
     expect(serializePurifierDraft(draft).tempestArrangement).toBe("four-side-filter-tower");
-  });
-
-  test("canonicalizes impossible Corsi fan counts inside the draft variant", () => {
-    const raw = {
-      ...applyPrintDesignPreset(defaultSettings, "corsi-rosenthal"),
-      corsiMode: "side-exhaust" as const,
-      corsiFanCount: 3,
-    };
-
-    const draft = normalizePurifierDraft(raw);
-
-    expect(draft.design.type).toBe("corsi-rosenthal");
-    if (draft.design.type !== "corsi-rosenthal") {
-      throw new Error("expected Corsi draft");
-    }
-
-    expect(draft.design.configuration.fanCount).toEqual({ type: "auto" });
-    expect(serializePurifierDraft(draft).corsiFanCount).toBe(automaticFanCount);
   });
 
   test("parses shared URLs into the draft model at the boundary", () => {

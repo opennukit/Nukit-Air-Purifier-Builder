@@ -3,7 +3,6 @@ import {
   normalizeSettings,
   normalizePurifierDraft,
   serializePurifierDraft,
-  resolveCorsiRosenthalFanCountForConfiguration,
   type BuildFabricationSummary,
   type BuildSummary,
   type BuildFanSummary,
@@ -24,7 +23,7 @@ type CutSheetDocument = ReturnType<typeof createAirPurifierCutSheet>["document"]
 
 type GeneratedPrintDesignType = Extract<
   ConfiguredPrintDesign["type"],
-  "corsi-rosenthal" | "donut-filter-adapter" | "tempest"
+  "donut-filter-adapter" | "tempest"
 >;
 
 export type CutPanelFabricationPlan = {
@@ -140,15 +139,6 @@ function createBuildFabricationSummary(fabrication: LayoutFabricationPlan): Buil
 }
 
 function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans: ResolvedFanBanks): BuildFanSummary {
-  if (configuration.design.type === "corsi-rosenthal") {
-    return {
-      type: "corsi-rosenthal",
-      mode: configuration.design.configuration.mode,
-      filterCount: configuration.design.configuration.filterCount,
-      fanCount: resolveCorsiRosenthalFanCountForConfiguration(configuration),
-    };
-  }
-
   if (configuration.design.type === "donut-filter-adapter") {
     return {
       type: "donut-filter-adapter",

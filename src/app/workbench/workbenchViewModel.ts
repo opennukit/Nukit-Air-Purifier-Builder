@@ -2,7 +2,6 @@ import {
   applyPrintDesignPreset,
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
-  isCorsiRosenthalPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
   isLaserDerivedPrintDesignPreset,
   isStaticReferencePrintDesignPreset,
@@ -12,7 +11,6 @@ import {
   normalizeRawSettings,
   printDesignIdForPurifierDraft,
   serializePurifierDraft,
-  type CorsiRosenthalPrintDesignPreset,
   type DonutFilterAdapterPrintDesignPreset,
   type LaserDerivedPrintDesignPreset,
   type PurifierDraft,
@@ -52,12 +50,6 @@ export type WorkbenchDesignContext =
       readonly type: "nukit";
       readonly preset: LaserDerivedPrintDesignPreset;
       readonly layoutSectionTitle: "Fan placement";
-      readonly partsSectionTitle: "Filter and fan";
-    }
-  | {
-      readonly type: "corsi-rosenthal";
-      readonly preset: CorsiRosenthalPrintDesignPreset;
-      readonly layoutSectionTitle: "Corsi layout";
       readonly partsSectionTitle: "Filter and fan";
     }
   | {
@@ -224,15 +216,6 @@ function createWorkbenchDesignContext(
       type: "nukit",
       preset: isLaserDerivedPrintDesignPreset(preset) ? preset : findLaserDerivedPrintDesignPreset(),
       layoutSectionTitle: "Fan placement",
-      partsSectionTitle: "Filter and fan",
-    };
-  }
-
-  if (isCorsiRosenthalPrintDesignPreset(preset)) {
-    return {
-      type: "corsi-rosenthal",
-      preset,
-      layoutSectionTitle: "Corsi layout",
       partsSectionTitle: "Filter and fan",
     };
   }

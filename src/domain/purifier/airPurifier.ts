@@ -1,5 +1,4 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
-import { corsiRosenthalGeometry } from "@/domain/designs/corsi-rosenthal/geometry";
 import type { Millimeters } from "@/domain/units";
 import {
   customFilterPresetId,
@@ -17,7 +16,6 @@ import {
   type CutJointSettings,
   type ReferenceScale,
 } from "@/fabrication/laser/cutSettings";
-import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   staticPrintReferenceIds,
   staticPrintReferenceHasPlatePreview,
@@ -56,64 +54,11 @@ export type FilterCount = 1 | 2;
 export const printDesignIds = [
   "nukit-open-air",
   "nukit-tempest",
-  "corsi-rosenthal",
   "donut-hepa-adapter",
   ...staticPrintReferenceIds,
 ] as const;
 
 export type PrintDesignId = (typeof printDesignIds)[number];
-
-export const corsiRosenthalModes = ["top-exhaust", "side-exhaust"] as const;
-
-export type CorsiRosenthalMode = (typeof corsiRosenthalModes)[number];
-
-// ##############################
-// Corsi-Rosenthal Types
-// ##############################
-
-export type CorsiRosenthalFilterCountRange = {
-  readonly defaultCount: number;
-  readonly min: number;
-  readonly max: number;
-};
-
-export type CorsiRosenthalLayoutSettings = {
-  readonly mode: CorsiRosenthalMode;
-  readonly filterCount: number;
-  readonly fanCount: number;
-};
-
-export type CorsiRosenthalConfiguration = {
-  readonly mode: CorsiRosenthalMode;
-  readonly filterCount: number;
-  readonly fanCount: FanCountRequest;
-};
-
-type CorsiFanGridFitFootprint = {
-  readonly mode: CorsiRosenthalMode;
-  readonly fanCount: number;
-  readonly panelFanCount: number;
-  readonly requiredWidth: Millimeters;
-  readonly requiredDepth: Millimeters;
-  readonly availableWidth: Millimeters;
-  readonly availableDepth: Millimeters;
-};
-
-export type CorsiFanGridFit =
-  | {
-      readonly type: "invalid";
-      readonly mode: CorsiRosenthalMode;
-      readonly fanCount: number;
-      readonly reason: CorsiFanGridFitInvalidReason;
-    }
-  | ({ readonly type: "fits" } & CorsiFanGridFitFootprint)
-  | ({ readonly type: "does-not-fit" } & CorsiFanGridFitFootprint);
-
-export type CorsiFanGridFitInvalidReason =
-  | "fan-count-not-finite"
-  | "fan-count-not-positive"
-  | "fan-count-not-integer"
-  | "side-exhaust-requires-even-fan-count";
 
 // ##############################
 // Donut Filter Types
@@ -163,10 +108,6 @@ export type PresetDonutFilter = DonutFilterPreset & {
   readonly id: PresetDonutFilterId;
 };
 
-export const corsiRosenthalFrameStyles = ["scarf-rail", "modular-rail"] as const;
-
-export type CorsiRosenthalFrameStyle = (typeof corsiRosenthalFrameStyles)[number];
-
 // ##############################
 // Preview and Fan Count Types
 // ##############################
@@ -178,9 +119,6 @@ export type CameraPreset = (typeof cameraPresets)[number];
 export const fixedFanCountOptions = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export const automaticFanCount = -1;
-
-const corsiRosenthalTopFanCountOptions = [1, 2, 3, 4, 6, 8] as const;
-const corsiRosenthalSideFanCountOptions = [2, 4, 6, 8] as const;
 
 export type FixedFanCount = (typeof fixedFanCountOptions)[number];
 
@@ -221,11 +159,6 @@ export type PrintDesignImplementation =
       readonly defaults: LaserDerivedPrintDesignDefaults;
     }
   | {
-      readonly type: "corsi-rosenthal";
-      readonly frameStyle: CorsiRosenthalFrameStyle;
-      readonly defaults: CorsiRosenthalPrintDesignDefaults;
-    }
-  | {
       readonly type: "donut-filter-adapter";
       readonly defaults: DonutFilterAdapterPrintDesignDefaults;
     }
@@ -243,10 +176,6 @@ export type LaserDerivedPrintDesignPreset = PrintDesignPresetBase & {
   readonly implementation: Extract<PrintDesignImplementation, { readonly type: "laser-derived-printable-kit" }>;
 };
 
-export type CorsiRosenthalPrintDesignPreset = PrintDesignPresetBase & {
-  readonly implementation: Extract<PrintDesignImplementation, { readonly type: "corsi-rosenthal" }>;
-};
-
 export type DonutFilterAdapterPrintDesignPreset = PrintDesignPresetBase & {
   readonly implementation: Extract<PrintDesignImplementation, { readonly type: "donut-filter-adapter" }>;
 };
@@ -261,7 +190,6 @@ export type StaticReferencePrintDesignPreset = PrintDesignPresetBase & {
 
 export type PrintDesignPreset =
   | LaserDerivedPrintDesignPreset
-  | CorsiRosenthalPrintDesignPreset
   | DonutFilterAdapterPrintDesignPreset
   | TempestPrintDesignPreset
   | StaticReferencePrintDesignPreset;
@@ -275,16 +203,6 @@ export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
   readonly splitFrames: boolean;
-};
-
-export type CorsiRosenthalPrintDesignDefaults = CommonPrintDesignDefaults & {
-  readonly mode: CorsiRosenthalMode;
-  readonly filterCount: number;
-  readonly fanCount: FanCountRequest;
-  readonly splitFrames: boolean;
-  readonly rim: Millimeters;
-  readonly materialThickness: Millimeters;
-  readonly screwHoleDiameter: Millimeters;
 };
 
 export type DonutFilterAdapterPrintDesignDefaults = CommonPrintDesignDefaults & {
@@ -523,12 +441,6 @@ export type BuildFanSummary =
       readonly resolvedFans: ResolvedFanBanks;
     }
   | {
-      readonly type: "corsi-rosenthal";
-      readonly mode: CorsiRosenthalMode;
-      readonly filterCount: number;
-      readonly fanCount: number;
-    }
-  | {
       readonly type: "donut-filter-adapter";
       readonly fanCount: FixedFanCount;
     }
@@ -586,8 +498,8 @@ export type EnclosurePreviewOptions = {
 };
 
 export const previewMaterialColorPresets = [
-  { id: "matte-gray", label: "Gray", color: 0x82858a },
   { id: "matte-black", label: "Black", color: 0x111817 },
+  { id: "matte-gray", label: "Gray", color: 0x82858a },
   { id: "warm-white", label: "White", color: 0xf3f0e6 },
   { id: "natural-tan", label: "Tan", color: 0xc7965a },
   { id: "forest-green", label: "Green", color: 0x1f6f56 },
@@ -748,37 +660,6 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       "Keeps the Tempest printable housing separate from the laser-derived Nukit panel kit",
       "Supports one top filter, a two-filter sandwich, or four side-loaded filters around a central chamber",
       "Automatically chunks the generated CSG model to the selected printer volume",
-    ],
-  },
-  {
-    id: "corsi-rosenthal",
-    label: "Corsi-Rosenthal box",
-    detail:
-      "Modular CR frame with small IKEA filter defaults, repeated rails, corner blocks, fan plates, and connector keys.",
-    source: "Gary Jepsen modular Printables CR reference",
-    sourceUrl: "https://www.printables.com/model/1348938-corsi-rosenthal-box-air-filter",
-    license: "Inspired by CC BY-NC 4.0 reference; generated geometry is original and parametric in this app",
-    licenseUrl: "https://creativecommons.org/licenses/by-nc/4.0/",
-    releaseVisibility: "internal",
-    implementation: {
-      type: "corsi-rosenthal",
-      frameStyle: "modular-rail",
-      defaults: {
-        filterPreset: "ikea-starkvind",
-        fanPreset: "arctic-p12-pwm-pst",
-        mode: "top-exhaust",
-        filterCount: 4,
-        fanCount: { type: "auto" },
-        splitFrames: true,
-        rim: 24,
-        materialThickness: 6,
-        screwHoleDiameter: 4.5,
-      },
-    },
-    assemblyNotes: [
-      "Uses repeated frame-unit rails and separate corner blocks so the frame can be printed on smaller beds",
-      "Automatic fan count keeps the top fan plate rectangular for the selected filter and fan size",
-      "Connector pieces are generated separately from the rails so the geometry can stay parametric",
     ],
   },
   {
@@ -952,9 +833,6 @@ export type RawPurifierSettings = {
   fansRight: number;
   fansTop: number;
   fansBottom: number;
-  corsiMode: CorsiRosenthalMode;
-  corsiFilterCount: number;
-  corsiFanCount: number;
   tempestArrangement: TempestArrangementPreset;
   donutFilterPreset: DonutFilterPresetId;
   donutFilterOuterDiameter: Millimeters;
@@ -1012,15 +890,6 @@ export type LaserDerivedPrintDesignDraft = {
   readonly frameConstruction: FilterFrameConstruction;
 };
 
-export type CorsiRosenthalPrintDesignDraft = {
-  readonly type: "corsi-rosenthal";
-  readonly printDesign: CorsiRosenthalPrintDesignPreset["id"];
-  readonly preset: CorsiRosenthalPrintDesignPreset;
-  readonly filter: FilterSelection;
-  readonly configuration: CorsiRosenthalConfiguration;
-  readonly frameStyle: CorsiRosenthalFrameStyle;
-};
-
 export type DonutFilterAdapterPrintDesignDraft = {
   readonly type: "donut-filter-adapter";
   readonly printDesign: DonutFilterAdapterPrintDesignPreset["id"];
@@ -1051,7 +920,6 @@ export type StaticReferencePrintDesignDraft = {
 
 export type PurifierDesignDraft =
   | LaserDerivedPrintDesignDraft
-  | CorsiRosenthalPrintDesignDraft
   | DonutFilterAdapterPrintDesignDraft
   | TempestPrintDesignDraft
   | StaticReferencePrintDesignDraft;
@@ -1071,13 +939,6 @@ export type ConfiguredPrintDesign =
       readonly filterCount: FilterCount;
       readonly fanBanks: FanBanks<FanCountRequest>;
       readonly frameConstruction: FilterFrameConstruction;
-    }
-  | {
-      readonly type: "corsi-rosenthal";
-      readonly preset: CorsiRosenthalPrintDesignPreset;
-      readonly filter: FilterSelection;
-      readonly configuration: CorsiRosenthalConfiguration;
-      readonly frameStyle: CorsiRosenthalFrameStyle;
     }
   | {
       readonly type: "donut-filter-adapter";
@@ -1122,7 +983,7 @@ export type BuildFabricationSummary =
     }
   | {
       readonly type: "generated-print-design";
-      readonly designType: "corsi-rosenthal" | "donut-filter-adapter" | "tempest";
+      readonly designType: "donut-filter-adapter" | "tempest";
     }
   | {
       readonly type: "static-print-reference";
@@ -1158,9 +1019,6 @@ export const defaultSettings: RawPurifierSettings = {
   fansRight: automaticFanCount,
   fansTop: 0,
   fansBottom: 0,
-  corsiMode: "top-exhaust",
-  corsiFilterCount: 4,
-  corsiFanCount: automaticFanCount,
   tempestArrangement: "dual-horizontal-sandwich",
   donutFilterPreset: defaultDonutFilterPresetId,
   donutFilterOuterDiameter: 125,
@@ -1263,16 +1121,12 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
 
 export function normalizeRawSettings(input: RawPurifierSettings): RawPurifierSettings {
   const normalized = toRawSettings(normalizeSettings(input));
-  const corsiMode = canonicalCorsiRosenthalMode(input.corsiMode);
   const tempestArrangement = canonicalTempestArrangement(input.tempestArrangement);
   const donutFilter = normalizeDonutFilterSettings(input);
   const donutCapRim = normalizeDonutCapRim(input, donutFilter.outerDiameter, donutFilter.holeDiameter);
   const donutFilterPreset = findDonutFilterPreset(input.donutFilterPreset);
   return canonicalizePrintDesignRawSettings({
     ...normalized,
-    corsiMode,
-    corsiFilterCount: canonicalCorsiFilterCount(input.corsiFilterCount, corsiMode),
-    corsiFanCount: canonicalCorsiFanCount(input.corsiFanCount, normalized.printDesign, corsiMode),
     tempestArrangement,
     donutFilterPreset: donutFilterPreset.id,
     donutFilterOuterDiameter: donutFilter.outerDiameter,
@@ -1365,21 +1219,6 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
     });
   }
 
-  if (draft.design.type === "corsi-rosenthal") {
-    return normalizeRawSettings({
-      ...base,
-      ...serializedFilterFields(draft.design.filter),
-      splitFrames: draft.design.preset.implementation.defaults.splitFrames,
-      fansLeft: 0,
-      fansRight: 0,
-      fansTop: 0,
-      fansBottom: 0,
-      corsiMode: draft.design.configuration.mode,
-      corsiFilterCount: draft.design.configuration.filterCount,
-      corsiFanCount: fanCountRequestToRawSetting(draft.design.configuration.fanCount),
-    });
-  }
-
   if (draft.design.type === "donut-filter-adapter") {
     return normalizeRawSettings({
       ...base,
@@ -1427,7 +1266,6 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
     fansRight: 0,
     fansTop: draft.design.fanCount,
     fansBottom: 0,
-    corsiFanCount: draft.design.fanCount > 0 ? draft.design.fanCount : defaultSettings.corsiFanCount,
   });
 }
 
@@ -1463,9 +1301,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansRight: fanCountRequestToRawSetting(input.fan.banks.right),
     fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
-    corsiMode: defaultSettings.corsiMode,
-    corsiFilterCount: defaultSettings.corsiFilterCount,
-    corsiFanCount: defaultSettings.corsiFanCount,
     tempestArrangement: defaultSettings.tempestArrangement,
     donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
@@ -1509,20 +1344,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       fansRight: fanCountRequestToRawSetting(input.design.fanBanks.right),
       fansTop: fanCountRequestToRawSetting(input.design.fanBanks.top),
       fansBottom: fanCountRequestToRawSetting(input.design.fanBanks.bottom),
-    };
-  }
-
-  if (input.design.type === "corsi-rosenthal") {
-    return {
-      ...base,
-      fansLeft: 0,
-      fansRight: 0,
-      fansTop: 0,
-      fansBottom: 0,
-      corsiMode: input.design.configuration.mode,
-      corsiFilterCount: input.design.configuration.filterCount,
-      corsiFanCount: fanCountRequestToRawSetting(input.design.configuration.fanCount),
-      splitFrames: input.design.preset.implementation.defaults.splitFrames,
     };
   }
 
@@ -1572,7 +1393,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansRight: 0,
     fansTop: input.design.fanCount,
     fansBottom: 0,
-    corsiFanCount: input.design.fanCount > 0 ? input.design.fanCount : defaultSettings.corsiFanCount,
   };
 }
 
@@ -1582,10 +1402,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
 
 export function findPrintDesignPreset(id: PrintDesignId | string | null): PrintDesignPreset {
   return printDesignPresets.find((preset) => preset.id === id) ?? requiredPrintDesignPreset(defaultPrintDesignId);
-}
-
-export function isCorsiRosenthalPrintDesignId(id: PrintDesignId): boolean {
-  return findPrintDesignPreset(id).implementation.type === "corsi-rosenthal";
 }
 
 export function isDonutFilterPrintDesignId(id: PrintDesignId): boolean {
@@ -1602,10 +1418,6 @@ export function isStaticReferencePrintDesignId(id: PrintDesignId): boolean {
 
 export function isLaserDerivedPrintDesignPreset(preset: PrintDesignPreset): preset is LaserDerivedPrintDesignPreset {
   return preset.implementation.type === "laser-derived-printable-kit";
-}
-
-export function isCorsiRosenthalPrintDesignPreset(preset: PrintDesignPreset): preset is CorsiRosenthalPrintDesignPreset {
-  return preset.implementation.type === "corsi-rosenthal";
 }
 
 export function isDonutFilterAdapterPrintDesignPreset(preset: PrintDesignPreset): preset is DonutFilterAdapterPrintDesignPreset {
@@ -1640,10 +1452,6 @@ export function staticReferenceDefaultsForPreset(
   preset: PrintDesignPreset,
 ): StaticReferencePrintDesignDefaults | undefined {
   return preset.implementation.type === "static-reference" ? preset.implementation.defaults : undefined;
-}
-
-export function corsiFrameStyleForPreset(preset: PrintDesignPreset): CorsiRosenthalFrameStyle | undefined {
-  return preset.implementation.type === "corsi-rosenthal" ? preset.implementation.frameStyle : undefined;
 }
 
 function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
@@ -1800,23 +1608,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
           filterThickness: filterPreset.dimensions.thickness,
         };
 
-  if (preset.implementation.type === "corsi-rosenthal") {
-    return {
-      ...withRecommendedFilter,
-      fansLeft: 0,
-      fansRight: 0,
-      fansTop: 0,
-      fansBottom: 0,
-      corsiMode: preset.implementation.defaults.mode,
-      corsiFilterCount: preset.implementation.defaults.filterCount,
-      corsiFanCount: fanCountRequestToRawSetting(preset.implementation.defaults.fanCount),
-      splitFrames: preset.implementation.defaults.splitFrames,
-      rim: preset.implementation.defaults.rim,
-      materialThickness: preset.implementation.defaults.materialThickness,
-      screwHoleDiameter: preset.implementation.defaults.screwHoleDiameter,
-    };
-  }
-
   if (preset.implementation.type === "donut-filter-adapter") {
     const donutPreset = findDonutFilterPreset(preset.implementation.defaults.donutFilterPreset);
     const donutFilter = donutPreset.id === customDonutFilterPresetId ? requiredDonutFilterDefaults(preset) : donutPreset.settings;
@@ -1831,9 +1622,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      corsiMode: defaultSettings.corsiMode,
-      corsiFilterCount: defaultSettings.corsiFilterCount,
-      corsiFanCount: defaultSettings.corsiFanCount,
       donutFilterPreset: donutPreset.id,
       donutFilterOuterDiameter: donutFilter.outerDiameter,
       donutFilterLength: donutFilter.length,
@@ -1858,9 +1646,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       fansRight: fanBanks.right,
       fansTop: fanBanks.top,
       fansBottom: fanBanks.bottom,
-      corsiMode: defaultSettings.corsiMode,
-      corsiFilterCount: defaultSettings.corsiFilterCount,
-      corsiFanCount: defaultSettings.corsiFanCount,
       donutFilterPreset: defaultSettings.donutFilterPreset,
       donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
       donutFilterLength: defaultSettings.donutFilterLength,
@@ -1882,9 +1667,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
       fansRight: 0,
       fansTop: preset.implementation.defaults.fanCount,
       fansBottom: 0,
-      corsiMode: defaultSettings.corsiMode,
-      corsiFilterCount: defaultSettings.corsiFilterCount,
-      corsiFanCount: preset.implementation.defaults.fanCount > 0 ? preset.implementation.defaults.fanCount : defaultSettings.corsiFanCount,
       donutFilterPreset: defaultSettings.donutFilterPreset,
       donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
       donutFilterLength: defaultSettings.donutFilterLength,
@@ -1905,9 +1687,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
     fansRight: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.right),
     fansTop: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.top),
     fansBottom: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.bottom),
-    corsiMode: defaultSettings.corsiMode,
-    corsiFilterCount: defaultSettings.corsiFilterCount,
-    corsiFanCount: defaultSettings.corsiFanCount,
     donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -1920,86 +1699,6 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
     materialThickness: defaultSettings.materialThickness,
     screwHoleDiameter: defaultSettings.screwHoleDiameter,
   };
-}
-
-// #######################################
-// Corsi-Rosenthal Layout Rules
-// #######################################
-
-// ##############################
-// Resolved Layout
-// ##############################
-
-export function resolveCorsiRosenthalFanCount(layout: LayoutResult): number {
-  return resolveCorsiRosenthalFanCountForConfiguration(layout.configuration);
-}
-
-export function resolveCorsiRosenthalLayout(layout: LayoutResult): CorsiRosenthalLayoutSettings {
-  const design = corsiRosenthalDesignConfiguration(layout.configuration);
-  return {
-    mode: design.configuration.mode,
-    filterCount: design.configuration.filterCount,
-    fanCount: resolveCorsiRosenthalFanCountForConfiguration(layout.configuration),
-  };
-}
-
-export function resolveCorsiRosenthalFanCountForConfiguration(configuration: PurifierSettings): number {
-  const design = corsiRosenthalDesignConfiguration(configuration);
-  const fanCount = design.configuration.fanCount;
-  if (
-    fanCount.type === "fixed" &&
-    corsiFanCountFitsConfiguration(configuration, design.configuration.mode, fanCount.count)
-  ) {
-    return fanCount.count;
-  }
-  return resolveAutomaticCorsiFanCount(configuration, design.configuration.mode);
-}
-
-// ##############################
-// Filter and Fan Options
-// ##############################
-
-export function defaultCorsiRosenthalFilterCount(mode: CorsiRosenthalMode): number {
-  return corsiRosenthalFilterCountRange(mode).defaultCount;
-}
-
-export function corsiRosenthalFilterCountRange(mode: CorsiRosenthalMode): CorsiRosenthalFilterCountRange {
-  if (mode === "side-exhaust") {
-    return {
-      defaultCount: 3,
-      min: 1,
-      max: 4,
-    };
-  }
-  return {
-    defaultCount: 4,
-    min: 1,
-    max: 5,
-  };
-}
-
-export function corsiRosenthalFanCountOptions(mode: CorsiRosenthalMode): readonly number[] {
-  return [automaticFanCount, ...corsiRosenthalFixedFanCountOptions(mode)];
-}
-
-export function corsiRosenthalFixedFanCountOptions(mode: CorsiRosenthalMode): readonly number[] {
-  return mode === "side-exhaust" ? corsiRosenthalSideFanCountOptions : corsiRosenthalTopFanCountOptions;
-}
-
-export function corsiFanGridColumns(fanCount: number): number {
-  if (fanCount <= 2) {
-    return Math.max(1, fanCount);
-  }
-  if (fanCount === 3 || fanCount === 6) {
-    return 3;
-  }
-  if (fanCount === 4) {
-    return 2;
-  }
-  if (fanCount === 8) {
-    return 4;
-  }
-  return Math.min(3, fanCount);
 }
 
 // #######################################
@@ -2025,9 +1724,6 @@ export function encodeSettings(input: RawPurifierSettings | PurifierDraft): stri
     params.set("fansTop", String(settings.fansTop));
     params.set("fansBottom", String(settings.fansBottom));
   }
-  params.set("corsiMode", settings.corsiMode);
-  params.set("corsiFilterCount", String(settings.corsiFilterCount));
-  params.set("corsiFanCount", String(settings.corsiFanCount));
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("donutFilterPreset", settings.donutFilterPreset);
   params.set("donutFilterOuterDiameter", formatNumber(settings.donutFilterOuterDiameter));
@@ -2069,7 +1765,6 @@ export function decodeSettings(search: string): RawPurifierSettings {
   const filterPreset = readFilterPreset(params);
   const fanDiameter = readFanDiameter(params, ["fanDiameter", "fan_diameter"], defaultSettings.fanDiameter);
   const fanPreset = readFanProductPreset(params, fanDiameter);
-  const corsiMode = readCorsiRosenthalMode(params);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
     printDesign,
@@ -2086,9 +1781,6 @@ export function decodeSettings(search: string): RawPurifierSettings {
     fansRight: readInteger(params, ["fansRight", "fans_right"], defaultSettings.fansRight),
     fansTop: readInteger(params, ["fansTop", "fans_top"], defaultSettings.fansTop),
     fansBottom: readInteger(params, ["fansBottom", "fans_bottom"], defaultSettings.fansBottom),
-    corsiMode,
-    corsiFilterCount: readCorsiFilterCount(params, corsiMode),
-    corsiFanCount: readCorsiFanCount(params, printDesign),
     tempestArrangement: readTempestArrangement(params),
     donutFilterPreset: readDonutFilterPreset(params),
     donutFilterOuterDiameter: readNumber(params, "donutFilterOuterDiameter", defaultSettings.donutFilterOuterDiameter),
@@ -2190,21 +1882,6 @@ function createConfiguredPrintDesign(input: {
     };
   }
 
-  if (isCorsiRosenthalPrintDesignPreset(printDesign)) {
-    const mode = canonicalCorsiRosenthalMode(input.raw.corsiMode);
-    return {
-      type: "corsi-rosenthal",
-      preset: printDesign,
-      filter: input.filter,
-      configuration: {
-        mode,
-        filterCount: canonicalCorsiFilterCount(input.raw.corsiFilterCount, mode),
-        fanCount: fanCountRequestFromRawSetting(canonicalCorsiFanCount(input.raw.corsiFanCount, printDesign.id, mode)),
-      },
-      frameStyle: printDesign.implementation.frameStyle,
-    };
-  }
-
   if (isDonutFilterAdapterPrintDesignPreset(printDesign)) {
     return {
       type: "donut-filter-adapter",
@@ -2291,17 +1968,6 @@ function createPurifierDesignDraft(configuration: PurifierSettings, raw: RawPuri
       filterCount: configuration.design.filterCount,
       fanBanks: configuration.design.fanBanks,
       frameConstruction: configuration.design.frameConstruction,
-    };
-  }
-
-  if (configuration.design.type === "corsi-rosenthal") {
-    return {
-      type: "corsi-rosenthal",
-      printDesign: configuration.design.preset.id,
-      preset: configuration.design.preset,
-      filter: configuration.design.filter,
-      configuration: configuration.design.configuration,
-      frameStyle: configuration.design.frameStyle,
     };
   }
 
@@ -2452,211 +2118,19 @@ function createFanProductSelection(presetId: FanProductPresetId): FanProductSele
 }
 
 // #######################################
-// Corsi-Rosenthal Canonicalization
+// Print Design Canonicalization
 // #######################################
-
-// ##############################
-// Raw Corsi Settings
-// ##############################
 
 function canonicalizePrintDesignRawSettings(settings: RawPurifierSettings): RawPurifierSettings {
   if (isTempestPrintDesignId(settings.printDesign)) {
     return applyTempestArrangement(settings, settings.tempestArrangement);
   }
-  if (!isCorsiRosenthalPrintDesignId(settings.printDesign)) {
-    return settings;
-  }
-  const corsiMode = canonicalCorsiRosenthalMode(settings.corsiMode);
-  const corsiFanCount = canonicalCorsiFanCount(settings.corsiFanCount, settings.printDesign, corsiMode);
-  return {
-    ...settings,
-    fansLeft: 0,
-    fansRight: 0,
-    fansTop: 0,
-    fansBottom: 0,
-    corsiMode,
-    corsiFilterCount: canonicalCorsiFilterCount(settings.corsiFilterCount, corsiMode),
-    corsiFanCount:
-      corsiFanCount === automaticFanCount || corsiFanCountFitsRawSettings(settings, corsiMode, corsiFanCount)
-        ? corsiFanCount
-        : automaticFanCount,
-  };
-}
-
-function canonicalCorsiRosenthalMode(value: CorsiRosenthalMode | string | null | undefined): CorsiRosenthalMode {
-  const found = corsiRosenthalModes.find((mode) => mode === value);
-  return found ?? defaultSettings.corsiMode;
+  return settings;
 }
 
 function canonicalTempestArrangement(value: TempestArrangementPreset | string | null | undefined): TempestArrangementPreset {
   const found = tempestArrangementPresets.find((arrangement) => arrangement === value);
   return found ?? defaultSettings.tempestArrangement;
-}
-
-// ##############################
-// Raw Count Canonicalization
-// ##############################
-
-function canonicalCorsiFilterCount(value: number, mode: CorsiRosenthalMode): number {
-  const range = corsiRosenthalFilterCountRange(mode);
-  const parsed = Number.isFinite(value) && value > 0 ? value : range.defaultCount;
-  return clampInteger(parsed, range.min, range.max);
-}
-
-function canonicalCorsiFanCount(value: number, printDesign: PrintDesignId, mode: CorsiRosenthalMode): number {
-  if (value === automaticFanCount) {
-    return automaticFanCount;
-  }
-  if (!isCorsiRosenthalPrintDesignId(printDesign)) {
-    return defaultSettings.corsiFanCount;
-  }
-
-  const fallback = defaultCorsiFanCountForPrintDesign(printDesign);
-  const parsed = Number.isFinite(value) ? Math.trunc(value) : fallback;
-  if (parsed === automaticFanCount) {
-    return automaticFanCount;
-  }
-
-  const allowedCounts = corsiRosenthalFixedFanCountOptions(mode);
-  return allowedCounts.includes(parsed) ? parsed : automaticFanCount;
-}
-
-function defaultCorsiFanCountForPrintDesign(printDesign: PrintDesignId): number {
-  const preset = findPrintDesignPreset(printDesign);
-  return isCorsiRosenthalPrintDesignPreset(preset)
-    ? fanCountRequestToRawSetting(preset.implementation.defaults.fanCount)
-    : defaultSettings.corsiFanCount;
-}
-
-function resolveAutomaticCorsiFanCount(configuration: PurifierSettings, mode: CorsiRosenthalMode): number {
-  const candidates = mode === "side-exhaust" ? [6, 4, 2] : [8, 6, 4, 3, 2, 1];
-
-  for (const candidate of candidates) {
-    if (corsiFanCountFitsConfiguration(configuration, mode, candidate)) {
-      return candidate;
-    }
-  }
-
-  return mode === "side-exhaust" ? 2 : 1;
-}
-
-// ##############################
-// Fan Grid Fit
-// ##############################
-
-export function corsiFanGridFit(input: {
-  readonly mode: CorsiRosenthalMode;
-  readonly fanCount: number;
-  readonly filterDimensions: FilterDimensions;
-  readonly fanDiameter: number;
-}): CorsiFanGridFit {
-  const invalidReason = invalidCorsiFanGridFitReason(input.mode, input.fanCount);
-  if (invalidReason !== null) {
-    return {
-      type: "invalid",
-      mode: input.mode,
-      fanCount: input.fanCount,
-      reason: invalidReason,
-    };
-  }
-
-  const panelFanCount = input.mode === "side-exhaust" ? Math.ceil(input.fanCount / 2) : input.fanCount;
-  const required = corsiFanGridFootprint(panelFanCount, input.fanDiameter);
-  const availableWidth = input.filterDimensions.width + 2 * corsiRosenthalGeometry.railDepth;
-  const availableDepth =
-    input.mode === "side-exhaust"
-      ? input.filterDimensions.depth + 2 * corsiRosenthalGeometry.railDepth
-      : input.filterDimensions.width + 2 * corsiRosenthalGeometry.railDepth;
-  const fitSlack = 8;
-  const type =
-    required.width <= availableWidth + fitSlack && required.depth <= availableDepth + fitSlack
-      ? "fits"
-      : "does-not-fit";
-  return {
-    type,
-    mode: input.mode,
-    fanCount: input.fanCount,
-    panelFanCount,
-    requiredWidth: required.width,
-    requiredDepth: required.depth,
-    availableWidth,
-    availableDepth,
-  };
-}
-
-function invalidCorsiFanGridFitReason(
-  mode: CorsiRosenthalMode,
-  fanCount: number,
-): CorsiFanGridFitInvalidReason | null {
-  if (!Number.isFinite(fanCount)) {
-    return "fan-count-not-finite";
-  }
-  if (fanCount <= 0) {
-    return "fan-count-not-positive";
-  }
-  if (!Number.isInteger(fanCount)) {
-    return "fan-count-not-integer";
-  }
-  if (mode === "side-exhaust" && fanCount % 2 !== 0) {
-    return "side-exhaust-requires-even-fan-count";
-  }
-  return null;
-}
-
-export function corsiFanCountFits(input: {
-  readonly mode: CorsiRosenthalMode;
-  readonly fanCount: number;
-  readonly filterDimensions: FilterDimensions;
-  readonly fanDiameter: number;
-}): boolean {
-  return corsiFanGridFit(input).type === "fits";
-}
-
-function corsiFanCountFitsConfiguration(
-  configuration: PurifierSettings,
-  mode: CorsiRosenthalMode,
-  fanCount: number,
-): boolean {
-  return corsiFanCountFits({
-    mode,
-    fanCount,
-    filterDimensions: filterSelectionDimensions(configuration.filter),
-    fanDiameter: configuration.fan.spec.diameter,
-  });
-}
-
-function corsiRosenthalDesignConfiguration(
-  configuration: PurifierSettings,
-): Extract<ConfiguredPrintDesign, { readonly type: "corsi-rosenthal" }> {
-  if (configuration.design.type !== "corsi-rosenthal") {
-    throw new Error("corsiRosenthalDesignConfiguration: Settings are not using the Corsi-Rosenthal print design");
-  }
-  return configuration.design;
-}
-
-function corsiFanCountFitsRawSettings(settings: RawPurifierSettings, mode: CorsiRosenthalMode, fanCount: number): boolean {
-  return corsiFanCountFits({
-    mode,
-    fanCount,
-    filterDimensions: rawFilterDimensions(settings),
-    fanDiameter: settings.fanDiameter,
-  });
-}
-
-function corsiFanGridFootprint(fanCount: number, fanDiameter: number): { readonly width: number; readonly depth: number } {
-  const columns = corsiFanGridColumns(fanCount);
-  const rows = Math.ceil(fanCount / columns);
-  const fanCell = fanDiameter * 1.18;
-  return {
-    width:
-      columns * fanCell +
-      Math.max(0, columns - 1) * corsiRosenthalGeometry.fanGap +
-      corsiRosenthalGeometry.railDepth * 1.4,
-    depth:
-      rows * fanCell +
-      Math.max(0, rows - 1) * corsiRosenthalGeometry.fanGap +
-      corsiRosenthalGeometry.railDepth * 2,
-  };
 }
 
 // ##############################
@@ -2859,34 +2333,12 @@ function applyDonutUrlPresetAndMeasurements(
 }
 
 // ##############################
-// Corsi URL Readers
+// Filter Count URL Reader
 // ##############################
 
 function readFilterCount(params: URLSearchParams, key: string, fallback: FilterCount): FilterCount {
   const parsed = Number(params.get(key));
   return parsed === 1 || parsed === 2 ? parsed : fallback;
-}
-
-function readCorsiRosenthalMode(params: URLSearchParams): CorsiRosenthalMode {
-  return canonicalCorsiRosenthalMode(params.get("corsiMode"));
-}
-
-function readCorsiFilterCount(params: URLSearchParams, mode: CorsiRosenthalMode): number {
-  if (params.has("corsiFilterCount")) {
-    return readInteger(params, "corsiFilterCount", defaultCorsiRosenthalFilterCount(mode));
-  }
-  return defaultCorsiRosenthalFilterCount(mode);
-}
-
-function readCorsiFanCount(params: URLSearchParams, printDesign: PrintDesignId): number {
-  const recommended = defaultCorsiFanCountForPrintDesign(printDesign);
-  if (params.has("corsiFanCount")) {
-    return readAutomaticInteger(params, "corsiFanCount", recommended);
-  }
-  if (isCorsiRosenthalPrintDesignId(printDesign) && hasAnyParam(params, ["fansLeft", "fans_left"])) {
-    return readInteger(params, ["fansLeft", "fans_left"], recommended);
-  }
-  return defaultSettings.corsiFanCount;
 }
 
 function readTempestArrangement(params: URLSearchParams): TempestArrangementPreset {
@@ -2922,7 +2374,6 @@ function applyPrintDesignUrlDefaults(
     hasAnyParam(params, ["filterThickness", "filter_height"]);
   const hasFanInputs = params.has("fanPreset") || hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
   const hasDonutFilterInputs = params.has("donutFilterPreset") || hasDonutFilterMeasurementParams(params);
-  const hasLegacyCorsiFanCount = isCorsiRosenthalPrintDesignId(printDesign) && hasAnyParam(params, ["fansLeft", "fans_left"]);
 
   return {
     ...parsed,
@@ -2938,9 +2389,6 @@ function applyPrintDesignUrlDefaults(
     fansRight: hasAnyParam(params, ["fansRight", "fans_right"]) ? parsed.fansRight : defaults.fansRight,
     fansTop: hasAnyParam(params, ["fansTop", "fans_top"]) ? parsed.fansTop : defaults.fansTop,
     fansBottom: hasAnyParam(params, ["fansBottom", "fans_bottom"]) ? parsed.fansBottom : defaults.fansBottom,
-    corsiMode: params.has("corsiMode") ? parsed.corsiMode : defaults.corsiMode,
-    corsiFilterCount: params.has("corsiFilterCount") ? parsed.corsiFilterCount : defaults.corsiFilterCount,
-    corsiFanCount: params.has("corsiFanCount") || hasLegacyCorsiFanCount ? parsed.corsiFanCount : defaults.corsiFanCount,
     tempestArrangement: params.has("tempestArrangement") ? parsed.tempestArrangement : defaults.tempestArrangement,
     donutFilterPreset: hasDonutFilterInputs ? parsed.donutFilterPreset : defaults.donutFilterPreset,
     donutFilterOuterDiameter: hasDonutFilterInputs || params.has("donutFilterOuterDiameter")
@@ -2969,10 +2417,6 @@ function applyPrintDesignUrlDefaults(
 // Fallback Readers
 // ##############################
 
-function readAutomaticInteger(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
-  return readParam(params, key) === "auto" ? automaticFanCount : readInteger(params, key, fallback);
-}
-
 function readCameraPreset(params: URLSearchParams, key: string, fallback: CameraPreset): CameraPreset {
   const value = params.get(key);
   const found = cameraPresets.find((preset) => preset === value);
@@ -2981,9 +2425,6 @@ function readCameraPreset(params: URLSearchParams, key: string, fallback: Camera
 
 function readPrintDesign(params: URLSearchParams): PrintDesignId {
   const value = params.get("printDesign");
-  if (value === "modular-corsi-rosenthal") {
-    return "corsi-rosenthal";
-  }
   const found = printDesignIds.find((design) => design === value);
   return found ?? defaultSettings.printDesign;
 }
