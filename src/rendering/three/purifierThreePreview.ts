@@ -3375,6 +3375,11 @@ function addProceduralFanRotor(rotor: Group, radius: number, appearance: FanAppe
     transparent: true,
     opacity: appearance.bladeOpacity,
     side: DoubleSide,
+    // The 7 blade meshes share one origin (rotation-only), so Three.js cannot
+    // order them in the transparent pass; leaving depthWrite on let mis-ordered
+    // blades cull each other and vanish at some angles. Match the other
+    // transparent materials in this file and skip depth writes.
+    depthWrite: false,
   });
   for (let index = 0; index < 7; index += 1) {
     const blade = new Mesh(createBladeGeometry(radius), bladeMaterial);
