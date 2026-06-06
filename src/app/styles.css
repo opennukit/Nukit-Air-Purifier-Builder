@@ -209,6 +209,32 @@ Shared Buttons
   transform: translateY(-1px);
 }
 
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 62%);
+  color: var(--ink);
+  transition:
+    transform 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.icon-link:hover {
+  transform: translateY(-1px);
+  color: var(--accent-strong);
+}
+
+.icon-link svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* #######################################
 Workbench Layout
 ####################################### */
