@@ -8,7 +8,7 @@ import { chamferedPrism, subtractAll, unionAll } from "./primitives";
 import {
   towerAirChamber,
   towerCornerChamfer,
-  towerFanGrid,
+  quadTopExhaust,
   towerFilterPocket,
   towerFilterSlots,
   towerSideOpening,
@@ -96,7 +96,7 @@ function expectQuadFans(layout: TempestFanLayout): Extract<TempestFanLayout, { r
 //   2. Hollow out the central air chamber.
 //   3. Carve the four filter pockets, one per wall.
 //   4. Cut each wall's inlet (outer) and outlet (inner) opening.
-//   5. Cut the top fan grid (or a single box-fan exhaust).
+//   5. Cut the top exhaust: a fan grid or a single box-fan opening.
 //   6. Cut the slots you push the filters down through.
 function assembleQuad<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
@@ -137,7 +137,7 @@ function assembleQuad<Solid, Region>(
         ),
       ];
     }),
-    ...towerFanGrid(ctx, model, filterLayout, fanLayout), // 5. top fan grid (or single box-fan exhaust)
+    ...quadTopExhaust(ctx, model, filterLayout, fanLayout), // 5. top exhaust: fan grid or single box-fan opening
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
   ]);
 }

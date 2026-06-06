@@ -161,7 +161,7 @@ const quadSideOpeningPlacement: TempestWallMap<QuadSideOpeningPlacement> = {
   },
 };
 
-export function towerFanGrid<Solid, Region>(
+export function quadTopExhaust<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
