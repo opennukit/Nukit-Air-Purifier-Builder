@@ -8,6 +8,7 @@
   let container: HTMLDivElement;
   let scene: THREE.Scene | undefined;
   let camera: THREE.PerspectiveCamera | undefined;
+  let controls: OrbitControls | undefined;
   let modelMesh: THREE.Mesh | undefined;
   let hasFramed = false;
 
@@ -46,7 +47,7 @@
     camera.up.set(0, 0, 1); // model is Z-up
     camera.position.set(500, -650, 480);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -58,7 +59,7 @@
     let frame = 0;
     const renderLoop = () => {
       frame = requestAnimationFrame(renderLoop);
-      controls.update();
+      controls?.update();
       renderer.render(scene!, camera!);
     };
     renderLoop();
@@ -73,11 +74,12 @@
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
-      controls.dispose();
+      controls?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       scene = undefined;
       camera = undefined;
+      controls = undefined;
       modelMesh = undefined;
     };
   });
@@ -94,8 +96,12 @@
       modelMesh.geometry.dispose();
     }
     const geometry = toBufferGeometry(mesh);
-    const center = geometry.boundingSphere?.center ?? new THREE.Vector3();
-    geometry.translate(-center.x, -center.y, -center.z);
+    geometry.computeBoundingBox();
+    const bounds = geometry.boundingBox ?? new THREE.Box3();
+    // Centre the model horizontally but stand it on the grid (z = 0), the way a
+    // print rests on the bed. Centring all three axes would sink half the model
+    // below the grid, making the floor appear to slice through its middle.
+    geometry.translate(-(bounds.min.x + bounds.max.x) / 2, -(bounds.min.y + bounds.max.y) / 2, -bounds.min.z);
     geometry.computeBoundingSphere();
     modelMesh = new THREE.Mesh(
       geometry,
@@ -104,9 +110,11 @@
     activeScene.add(modelMesh);
 
     if (!hasFramed && camera !== undefined) {
-      const radius = geometry.boundingSphere?.radius ?? 300;
-      camera.position.set(radius * 1.5, -radius * 1.9, radius * 1.3);
-      camera.lookAt(0, 0, 0);
+      const sphere = geometry.boundingSphere ?? new THREE.Sphere(new THREE.Vector3(), 300);
+      const { center, radius } = sphere;
+      camera.position.set(center.x + radius * 1.5, center.y - radius * 1.9, center.z + radius * 1.3);
+      controls?.target.copy(center);
+      camera.lookAt(center);
       hasFramed = true;
     }
   });
