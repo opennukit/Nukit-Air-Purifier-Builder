@@ -1,6 +1,6 @@
 import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
 import { tempestWalls } from "@/domain/designs/tempest/shared";
-import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
+import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
@@ -59,23 +59,14 @@ function finalModel<Solid, Region>(
   ]);
 }
 
-// Pick the recipe named by the model's filter topology, which narrows the layout
-// arm for that handler. planForArrangement built filterLayout and fanLayout from
-// the same topology, so the fan arm agrees; expectSandwichFans/expectQuadFans
-// prove that to the type system until TempestModel itself is a union.
+// Pick the recipe named by the model's topology. TempestModel is a union, so the
+// one match narrows the model AND its filter/fan layout arms together — both
+// recipe args come straight off the narrowed model with no re-narrow.
 function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
-  return matchTopology(model.filterLayout, {
-    sandwich: (filterLayout) => assembleSandwich(ctx, model, filterLayout, expectSandwichFans(model.fanLayout)),
-    quad: (filterLayout) => assembleQuad(ctx, model, filterLayout, expectQuadFans(model.fanLayout)),
+  return matchTopology(model, {
+    sandwich: (m) => assembleSandwich(ctx, m, m.filterLayout, m.fanLayout),
+    quad: (m) => assembleQuad(ctx, m, m.filterLayout, m.fanLayout),
   });
-}
-
-function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
-}
-
-function expectQuadFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "quad" }> {
-  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 // #######################################

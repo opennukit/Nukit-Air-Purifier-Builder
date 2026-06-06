@@ -13,12 +13,13 @@ import {
 } from "./shared";
 import type {
   TempestBoxEnvelope,
-  TempestCordPassThroughPlacement,
   TempestFanLayout,
   TempestFilterLayout,
   TempestFrameModel,
   TempestModelPlan,
+  TempestNoCord,
   TempestPrintablePose,
+  TempestQuadCord,
   TempestQuadWallRect,
   TempestTowerFilterPocket,
 } from "./model";
@@ -37,15 +38,6 @@ function expectQuadArrangement(arrangement: TempestFilterArrangement): QuadArran
     return assertNever(arrangement.type as never);
   }
   return arrangement;
-}
-
-function expectQuadFilterLayout(
-  filterLayout: TempestFilterLayout,
-): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  if (filterLayout.topology !== "quad") {
-    return assertNever(filterLayout.topology as never);
-  }
-  return filterLayout;
 }
 
 function towerStructuralOffset(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
@@ -158,9 +150,8 @@ function quadWallRect(
 export function createQuadFanLayout(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
-  filterLayout: TempestFilterLayout,
+  quadFilter: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Extract<TempestFanLayout, { readonly topology: "quad" }> {
-  const quadFilter = expectQuadFilterLayout(filterLayout);
   const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
   const minimumCenterFromEdge = quadFilter.structuralOffset + settings.fan.diameter / 2;
@@ -199,13 +190,12 @@ function towerFanPositions(fanCount: number, length: Millimeters, fanDiameter: M
 
 export function createQuadCordPlacement(
   settings: TempestSettings,
-  filterLayout: TempestFilterLayout,
-): TempestCordPassThroughPlacement {
+  quadFilter: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+): TempestQuadCord | TempestNoCord {
   if (settings.cordPassThrough.type === "none") {
     return { type: "none" };
   }
   const cord = settings.cordPassThrough;
-  const quadFilter = expectQuadFilterLayout(filterLayout);
   const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
   const corner = quadCordCorner(cord);
   return {
@@ -239,7 +229,7 @@ export function createQuadPose(box: TempestBoxEnvelope): TempestPrintablePose {
   };
 }
 
-export const quadPlan: TempestModelPlan = {
+export const quadPlan: TempestModelPlan<"quad"> = {
   topology: "quad",
   box: createQuadBox,
   filterLayout: createQuadFilterLayout,

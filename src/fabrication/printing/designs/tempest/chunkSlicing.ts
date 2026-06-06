@@ -1,5 +1,5 @@
 import type { TempestChunkGrid, TempestModel, TempestPrintablePose } from "@/domain/designs/tempest/model";
-import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
+import { matchTopology } from "@/domain/designs/tempest/topology";
 
 // #######################################
 // Feature-Aware Print-Chunk Slicing
@@ -95,26 +95,25 @@ function grillBandsInPose(model: TempestModel, pose: TempestPrintablePose, radiu
 // Fan-grill centres in source (model) coordinates. Wall positions are local to
 // each wall, so they are mapped through the same placement the geometry uses.
 function grillCentresSource(model: TempestModel): GrillCentre[] {
-  const { box, frame, filterLayout } = model;
-  return matchTopology(model.fanLayout, {
-    sandwich: (sandwichFans) => {
-      const z = frame.outsideFlangeThickness + sandwichFans.localVerticalCenter;
+  const { box, frame } = model;
+  return matchTopology(model, {
+    sandwich: ({ fanLayout }) => {
+      const z = frame.outsideFlangeThickness + fanLayout.localVerticalCenter;
       const wall = frame.wallThickness / 2;
       return [
-        ...sandwichFans.walls.front.positionsAlongWall.map((p): GrillCentre => [p, wall, z]),
-        ...sandwichFans.walls.back.positionsAlongWall.map((p): GrillCentre => [box.width - p, box.depth - wall, z]),
-        ...sandwichFans.walls.left.positionsAlongWall.map((p): GrillCentre => [wall, box.depth - p, z]),
-        ...sandwichFans.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
+        ...fanLayout.walls.front.positionsAlongWall.map((p): GrillCentre => [p, wall, z]),
+        ...fanLayout.walls.back.positionsAlongWall.map((p): GrillCentre => [box.width - p, box.depth - wall, z]),
+        ...fanLayout.walls.left.positionsAlongWall.map((p): GrillCentre => [wall, box.depth - p, z]),
+        ...fanLayout.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
       ];
     },
-    quad: (quadFans) => {
+    quad: ({ fanLayout, filterLayout }) => {
       // A single box-exhaust opening needs no seam avoidance.
-      if (quadFans.topExhaust === "single-box-fan") {
+      if (fanLayout.topExhaust === "single-box-fan") {
         return [];
       }
-      const quadFilter = filterLayout.topology === "quad" ? filterLayout : assertNever(filterLayout.topology as never);
-      const z = box.height - quadFilter.topPlateThickness / 2;
-      return quadFans.positionsX.flatMap((x) => quadFans.positionsY.map((y): GrillCentre => [x, y, z]));
+      const z = box.height - filterLayout.topPlateThickness / 2;
+      return fanLayout.positionsX.flatMap((x) => fanLayout.positionsY.map((y): GrillCentre => [x, y, z]));
     },
   });
 }

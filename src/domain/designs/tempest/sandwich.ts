@@ -14,14 +14,15 @@ import {
 } from "./shared";
 import type {
   TempestBoxEnvelope,
-  TempestCordPassThroughPlacement,
   TempestFanLayout,
   TempestFilterLayout,
   TempestFrameModel,
   TempestHorizontalFilterLayer,
   TempestHorizontalFlangeLayer,
   TempestModelPlan,
+  TempestNoCord,
   TempestPrintablePose,
+  TempestSandwichCord,
   TempestWallFanLayout,
 } from "./model";
 
@@ -42,15 +43,6 @@ function expectSandwichArrangement(arrangement: TempestFilterArrangement): Sandw
 // is the sandwich family's sub-variant count, not a topology decision.
 function horizontalFilterCount(arrangement: SandwichArrangement): 1 | 2 {
   return arrangement.type === "single-horizontal-top-filter" ? 1 : 2;
-}
-
-function expectSandwichFilterLayout(
-  filterLayout: TempestFilterLayout,
-): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
-  if (filterLayout.topology !== "sandwich") {
-    return assertNever(filterLayout.topology as never);
-  }
-  return filterLayout;
 }
 
 export function createSandwichBox(settings: TempestSettings, frame: TempestFrameModel): TempestBoxEnvelope {
@@ -141,10 +133,10 @@ function createHorizontalFlange(
 export function createSandwichFanLayout(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
-  filterLayout: TempestFilterLayout,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
   const arrangement = expectSandwichArrangement(settings.arrangement);
-  const filterCount = expectSandwichFilterLayout(filterLayout).filterCount;
+  const filterCount = filterLayout.filterCount;
   const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
   const cornerSafeMinimum = settings.frame.wallThickness + bodyDepth + settings.fan.diameter / 2;
@@ -239,7 +231,7 @@ function horizontalFanVerticalCenter(
 export function createSandwichCordPlacement(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
-): TempestCordPassThroughPlacement {
+): TempestSandwichCord | TempestNoCord {
   if (settings.cordPassThrough.type === "none") {
     return { type: "none" };
   }
@@ -259,8 +251,11 @@ export function createSandwichCordPlacement(
 
 // A two-filter sandwich prints best stood upright; a single-filter sandwich
 // stays as-modelled. Count-based, not tag-based — both are sandwich topology.
-export function createSandwichPose(box: TempestBoxEnvelope, filterLayout: TempestFilterLayout): TempestPrintablePose {
-  if (expectSandwichFilterLayout(filterLayout).filterCount === 2) {
+export function createSandwichPose(
+  box: TempestBoxEnvelope,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+): TempestPrintablePose {
+  if (filterLayout.filterCount === 2) {
     return {
       type: "upright-dual-filter",
       envelope: { width: box.width, depth: box.height, height: box.depth },
@@ -272,7 +267,7 @@ export function createSandwichPose(box: TempestBoxEnvelope, filterLayout: Tempes
   };
 }
 
-export const sandwichPlan: TempestModelPlan = {
+export const sandwichPlan: TempestModelPlan<"sandwich"> = {
   topology: "sandwich",
   box: createSandwichBox,
   filterLayout: createSandwichFilterLayout,

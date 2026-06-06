@@ -186,6 +186,12 @@ export type TempestCordPassThroughPlacement =
       readonly depth: Millimeters;
     };
 
+// The three arms of TempestCordPassThroughPlacement, named so the per-topology
+// model can pair "no cord" with either topology's present-cord arm.
+export type TempestNoCord = Extract<TempestCordPassThroughPlacement, { readonly type: "none" }>;
+export type TempestSandwichCord = Extract<TempestCordPassThroughPlacement, { readonly topology: "sandwich" }>;
+export type TempestQuadCord = Extract<TempestCordPassThroughPlacement, { readonly topology: "quad" }>;
+
 export type TempestChunkGrid = {
   readonly countX: number;
   readonly countY: number;
@@ -235,18 +241,34 @@ export type TempestPrintablePose =
       readonly envelope: TempestPrintableEnvelope;
     };
 
-export type TempestModel = {
+// Everything that is the same shape whatever the topology. The topology tag and
+// the three correlated layout fields live on the per-topology arms below, so an
+// illegal cross-combo (e.g. a "sandwich" model carrying a quad filter layout) is
+// simply unrepresentable.
+type TempestModelCommon = {
   readonly settings: TempestSettings;
-  readonly topology: TempestTopology;
   readonly box: TempestBoxEnvelope;
   readonly frame: TempestFrameModel;
-  readonly filterLayout: TempestFilterLayout;
-  readonly fanLayout: TempestFanLayout;
-  readonly cordPassThrough: TempestCordPassThroughPlacement;
-  readonly printablePose: TempestPrintablePose;
   readonly chunkGrid: TempestChunkGrid;
   readonly renderTarget: TempestResolvedRenderTarget;
+  readonly printablePose: TempestPrintablePose;
 };
+
+export type TempestSandwichModel = TempestModelCommon & {
+  readonly topology: "sandwich";
+  readonly filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>;
+  readonly fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>;
+  readonly cordPassThrough: TempestSandwichCord | TempestNoCord;
+};
+
+export type TempestQuadModel = TempestModelCommon & {
+  readonly topology: "quad";
+  readonly filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>;
+  readonly fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>;
+  readonly cordPassThrough: TempestQuadCord | TempestNoCord;
+};
+
+export type TempestModel = TempestSandwichModel | TempestQuadModel;
 
 // #######################################
 // Defaults
@@ -338,44 +360,76 @@ export function createTempestModel(settings: TempestSettings = defaultTempestSet
   const safeSettings = normalizeTempestSettings(settings);
   const plan = planForArrangement(safeSettings.arrangement); // the ONE topology decision
   const frame = createFrameModel(safeSettings.frame);
+  // plan.box has the same signature in both arms, so it calls on the union plan.
   const box = plan.box(safeSettings, frame);
-  const filterLayout = plan.filterLayout(safeSettings, box, frame);
-  const fanLayout = plan.fanLayout(safeSettings, box, filterLayout);
-  const cordPassThrough = plan.cordPlacement(safeSettings, box, filterLayout);
   const chunkGrid = createChunkGrid(box, safeSettings.printBed);
-
-  return {
+  // The topology-independent fields; printablePose joins per branch since it is
+  // derived from that branch's filter layout.
+  const common: Omit<TempestModelCommon, "printablePose"> = {
     settings: safeSettings,
-    topology: plan.topology,
     box,
     frame,
-    filterLayout,
-    fanLayout,
-    cordPassThrough,
-    printablePose: plan.pose(box, filterLayout),
     chunkGrid,
     renderTarget: resolveRenderTarget(safeSettings.renderTarget, chunkGrid),
+  };
+
+  // Dispatch on the plan's concrete topology, then build the variant from a plan
+  // whose filter/fan/cord/pose arms are already that topology. Nothing is generic
+  // at the point of construction, so each literal type-checks against
+  // TempestSandwichModel / TempestQuadModel and is assignable to TempestModel with
+  // no cast — the generic TempestModelPlan<T> keeps every step's tag in lockstep.
+  if (plan.topology === "sandwich") {
+    const filterLayout = plan.filterLayout(safeSettings, box, frame);
+    return {
+      ...common,
+      topology: "sandwich",
+      filterLayout,
+      fanLayout: plan.fanLayout(safeSettings, box, filterLayout),
+      cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout),
+      printablePose: plan.pose(box, filterLayout),
+    };
+  }
+  const filterLayout = plan.filterLayout(safeSettings, box, frame);
+  return {
+    ...common,
+    topology: "quad",
+    filterLayout,
+    fanLayout: plan.fanLayout(safeSettings, box, filterLayout),
+    cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout),
+    printablePose: plan.pose(box, filterLayout),
   };
 }
 
 // The family of derived-model builders for one topology. createTempestModel runs
-// its steps in order; the spine (topology.ts) guarantees the steps' tags agree.
-export type TempestModelPlan = {
-  readonly topology: TempestTopology;
+// its steps in order; the generic T keeps every step's tag in lockstep so the
+// filter, fan, and cord arms a plan produces all share its topology.
+export type TempestModelPlan<T extends TempestTopology> = {
+  readonly topology: T;
   readonly box: (settings: TempestSettings, frame: TempestFrameModel) => TempestBoxEnvelope;
-  readonly filterLayout: (settings: TempestSettings, box: TempestBoxEnvelope, frame: TempestFrameModel) => TempestFilterLayout;
-  readonly fanLayout: (settings: TempestSettings, box: TempestBoxEnvelope, filterLayout: TempestFilterLayout) => TempestFanLayout;
+  readonly filterLayout: (
+    settings: TempestSettings,
+    box: TempestBoxEnvelope,
+    frame: TempestFrameModel,
+  ) => Extract<TempestFilterLayout, { readonly topology: T }>;
+  readonly fanLayout: (
+    settings: TempestSettings,
+    box: TempestBoxEnvelope,
+    filterLayout: Extract<TempestFilterLayout, { readonly topology: T }>,
+  ) => Extract<TempestFanLayout, { readonly topology: T }>;
   readonly cordPlacement: (
     settings: TempestSettings,
     box: TempestBoxEnvelope,
-    filterLayout: TempestFilterLayout,
-  ) => TempestCordPassThroughPlacement;
-  readonly pose: (box: TempestBoxEnvelope, filterLayout: TempestFilterLayout) => TempestPrintablePose;
+    filterLayout: Extract<TempestFilterLayout, { readonly topology: T }>,
+  ) => Extract<TempestCordPassThroughPlacement, { readonly topology: T }> | TempestNoCord;
+  readonly pose: (
+    box: TempestBoxEnvelope,
+    filterLayout: Extract<TempestFilterLayout, { readonly topology: T }>,
+  ) => TempestPrintablePose;
 };
 
 // The ONLY place an arrangement preset maps to a topology after the settings
 // boundary. Three presets collapse to two topologies.
-function planForArrangement(arrangement: TempestFilterArrangement): TempestModelPlan {
+function planForArrangement(arrangement: TempestFilterArrangement): TempestModelPlan<"sandwich"> | TempestModelPlan<"quad"> {
   switch (arrangement.type) {
     case "single-horizontal-top-filter":
     case "dual-horizontal-sandwich":

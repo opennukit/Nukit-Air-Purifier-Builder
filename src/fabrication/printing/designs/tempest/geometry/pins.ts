@@ -1,5 +1,5 @@
 import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
-import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
+import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
@@ -56,27 +56,22 @@ export function pinHoles<Solid, Region>(
     return [];
   }
 
-  return matchTopology(model.filterLayout, {
-    sandwich: (filterLayout) => {
-      const fanLayout = expectSandwichFans(model.fanLayout);
-      const candidates = pinCandidatesSandwich(ctx, model, filterLayout, chunkGrid, pin);
+  return matchTopology(model, {
+    sandwich: (m) => {
+      const candidates = pinCandidatesSandwich(ctx, m, m.filterLayout, chunkGrid, pin);
       if (candidates.length === 0) {
         return [];
       }
       // Keep pins clear of the fan bodies so a seam pin never lands in a fan bore.
-      const fanZones = fanBodyZones(ctx, model, fanLayout);
+      const fanZones = fanBodyZones(ctx, m, m.fanLayout);
       const candidateGeometry = unionAll(ctx, candidates);
       return [fanZones.length === 0 ? candidateGeometry : ctx.modeling.booleans.subtract(candidateGeometry, unionAll(ctx, fanZones))];
     },
-    quad: (filterLayout) => {
-      const candidates = pinCandidatesQuad(ctx, model, filterLayout, chunkGrid, pin);
+    quad: (m) => {
+      const candidates = pinCandidatesQuad(ctx, m, m.filterLayout, chunkGrid, pin);
       return candidates.length === 0 ? [] : [unionAll(ctx, candidates)];
     },
   });
-}
-
-function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
 }
 
 function pinCandidatesSandwich<Solid, Region>(

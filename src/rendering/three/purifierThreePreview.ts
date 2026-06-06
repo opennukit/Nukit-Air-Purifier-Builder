@@ -1298,14 +1298,16 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
-    matchTopology(model.fanLayout, {
-      sandwich: (fanLayout) => {
+    matchTopology(model, {
+      sandwich: (m) => {
+        const { fanLayout } = m;
         for (const wall of tempestPreviewWalls) {
-          this.addTempestWallFans(model, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance);
+          this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance);
         }
       },
-      quad: (fanLayout) => {
-        const topFanCenterZ = tempestTowerTopFanCenterZ(model);
+      quad: (m) => {
+        const { fanLayout } = m;
+        const topFanCenterZ = m.box.height - m.filterLayout.topPlateThickness - fanPreviewRearDepthMillimeters;
         for (const x of fanLayout.positionsX) {
           for (const y of fanLayout.positionsY) {
             const fan = createFan({
@@ -2230,18 +2232,6 @@ function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
     return vector.y;
   }
   return vector.z;
-}
-
-// Reached only from the quad fan preview arm, so the filter layout is the quad
-// arm carrying the top-plate thickness.
-function tempestTowerTopFanCenterZ(model: TempestModel): number {
-  return model.box.height - expectQuadFilterLayout(model.filterLayout).topPlateThickness - fanPreviewRearDepthMillimeters;
-}
-
-// planForArrangement returns a topology-consistent triple; once the model's
-// topology has matched, this narrows the flat layout fields without re-validating.
-function expectQuadFilterLayout(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 // The sandwich preview filter media comes from the input arrangement's footprint
