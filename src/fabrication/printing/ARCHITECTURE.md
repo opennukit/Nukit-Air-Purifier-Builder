@@ -67,14 +67,13 @@ cycles and you can read it top-to-bottom:
 
 | File | Responsibility |
 |---|---|
-| `context.ts` | `GeometryContext<Solid,Region>` (the modeling backend + a per-build fan-pattern cache) and tuning constants (`epsilon`, `csgSegments`, `scadWallCutOverlap`). |
+| `context.ts` | `GeometryContext<Solid,Region>` (the modeling backend + a per-build fan-pattern cache) and tuning constants (`EPSILON_LIP`, `CSG_SEGMENTS`, `SHELL_OVERLAP_MM`). |
 | `primitives.ts` | Kernel-agnostic 3D/2D shapes (chamfered prisms, cylinders-along-axis, thin extrudes) and the boolean helpers (`unionAll`, `subtractAll`). Knows nothing about purifiers. |
 | `patterns2d.ts` | 2D cross-sections — hex grill, fan pattern, filter/tower openings — and `fanPatternCut`, which lifts the fan profile into a cutting solid. |
-| `layout.ts` | Pure placement math derived from a `TempestModel` (fan centres, screw pitch, filter thickness). Takes no context. |
-| `pins.ts` | Alignment-pin and cord-pass-through hole sets — the holes subtracted at the very end. |
-| `horizontalAssembly.ts` | Step implementations for the 1/2-filter horizontal box (panels + walls) — the timeline's nodes. |
-| `towerAssembly.ts` | Step implementations for the 4-filter tower (air chamber, pockets, openings, fan grid, slots) + `towerCornerChamfer`. |
-| `buildTempest.ts` | **The build timeline — start here.** Reads top to bottom as the recipe: dispatches to the tower or horizontal recipe, then subtracts the through-holes (cord + alignment pins). Each numbered step is a call into the files above; the call *is* one timeline node. |
+| `pins.ts` | Alignment-pin and cord-pass-through hole sets — the holes subtracted at the very end. `pinHoles` dispatches via `matchTopology`. |
+| `sandwichAssembly.ts` | Step implementations for the 1/2-filter sandwich box (panels + walls) — the timeline's nodes. |
+| `quadAssembly.ts` | Step implementations for the 4-filter quad tower (air chamber, pockets, openings, fan grid, slots) + `towerCornerChamfer`. |
+| `buildTempest.ts` | **The build timeline — start here.** Reads top to bottom as the recipe: dispatches to the quad or sandwich recipe via `matchTopology(model.topology, …)`, then subtracts the through-holes (cord + alignment pins). Each numbered step is a call into the files above; the call *is* one timeline node. The per-topology placement math now lives on the derived model (`src/domain/designs/tempest/{model,sandwich,quad}.ts`), so there is no separate `layout.ts`. |
 | `index.ts` | Public API: `buildTempestGeometry`, `towerCornerChamfer`. |
 
 ### Why GeometryContext is threaded explicitly

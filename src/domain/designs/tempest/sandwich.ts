@@ -33,12 +33,11 @@ const HORIZONTAL_FAN_VERTICAL_PADDING_MM = 2;
 type SandwichArrangement = Exclude<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>;
 
 function expectSandwichArrangement(arrangement: TempestFilterArrangement): SandwichArrangement {
-  if (arrangement.type === "four-side-filter-tower") {
-    return assertNever(arrangement.type as never);
-  }
-  return arrangement;
+  return arrangement.type !== "four-side-filter-tower" ? arrangement : assertNever(arrangement.type as never);
 }
 
+// A single-filter top arrangement has one filter; the dual sandwich has two. This
+// is the sandwich family's sub-variant count, not a topology decision.
 function horizontalFilterCount(arrangement: SandwichArrangement): 1 | 2 {
   return arrangement.type === "single-horizontal-top-filter" ? 1 : 2;
 }

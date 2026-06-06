@@ -94,6 +94,7 @@ import {
 import {
   createTempestModel,
   type TempestFilterLayout,
+  type TempestHorizontalFilterSize,
   type TempestModel,
   type TempestPrintablePose,
   type TempestWall,
@@ -1278,7 +1279,11 @@ export class PurifierThreePreview {
     const { material, filterBoxes } = matchTopology(model.topology, {
       sandwich: () => ({
         material: createFilterMediaMaterial(0.61),
-        filterBoxes: tempestHorizontalFilterBoxes(model, expectSandwichFilterLayout(model.filterLayout)),
+        filterBoxes: tempestHorizontalFilterBoxes(
+          model,
+          expectSandwichFilterLayout(model.filterLayout),
+          expectSandwichArrangementFilter(model.settings.arrangement),
+        ),
       }),
       quad: () => ({
         material: createFilterMediaMaterial(0.69),
@@ -2004,13 +2009,8 @@ function recessedMillimeterFilterMediaThickness(size: number): number {
 function tempestHorizontalFilterBoxes(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+  filter: TempestHorizontalFilterSize,
 ): readonly TempestCsgBox[] {
-  // Reached only from the sandwich preview arm, so the arrangement is a sandwich
-  // one carrying footprint dimensions.
-  if (model.settings.arrangement.type === "four-side-filter-tower") {
-    return [];
-  }
-  const filter = model.settings.arrangement.filter;
   const inset = filterMediaPreviewClearanceMillimeters;
   const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
   return filterLayout.filters.map((layer) => ({
@@ -2257,6 +2257,12 @@ function expectSandwichFanLayout(layout: TempestModel["fanLayout"]): Extract<Tem
 
 function expectQuadFanLayout(layout: TempestModel["fanLayout"]): Extract<TempestModel["fanLayout"], { readonly topology: "quad" }> {
   return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
+}
+
+// The sandwich preview filter media comes from the input arrangement's footprint
+// filter, which a sandwich-topology model always carries.
+function expectSandwichArrangementFilter(arrangement: TempestModel["settings"]["arrangement"]): TempestHorizontalFilterSize {
+  return arrangement.type !== "four-side-filter-tower" ? arrangement.filter : assertNever(arrangement.type as never);
 }
 
 const tempestPreviewWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
