@@ -1275,18 +1275,14 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const { material, filterBoxes } = matchTopology(model.filterLayout, {
-      sandwich: (filterLayout) => ({
+    const { material, filterBoxes } = matchTopology(model, {
+      sandwich: (m) => ({
         material: createFilterMediaMaterial(0.61),
-        filterBoxes: tempestHorizontalFilterBoxes(
-          model,
-          filterLayout,
-          expectSandwichArrangementFilter(model.settings.arrangement),
-        ),
+        filterBoxes: tempestHorizontalFilterBoxes(m, m.filterLayout, expectSandwichArrangementFilter(m.settings.arrangement)),
       }),
-      quad: (filterLayout) => ({
+      quad: (m) => ({
         material: createFilterMediaMaterial(0.69),
-        filterBoxes: tempestTowerFilterBoxes(model, filterLayout),
+        filterBoxes: tempestTowerFilterBoxes(m, m.filterLayout),
       }),
     });
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);

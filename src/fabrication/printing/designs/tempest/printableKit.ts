@@ -281,11 +281,11 @@ function positionChannelsFrom(positionBase: number): readonly number[] {
 // #######################################
 
 function estimateFeatureCount(model: TempestModel): number {
-  return matchTopology(model.fanLayout, {
-    quad: (fanLayout) => fanLayout.fanCount * fanOpeningAndScrewFeatureCount + 9,
-    sandwich: (fanLayout) => {
-      const fanHoleCount = Object.values(fanLayout.walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);
-      return fanHoleCount + (model.cordPassThrough.type === "none" ? 0 : 1);
+  return matchTopology(model, {
+    quad: (m) => m.fanLayout.fanCount * fanOpeningAndScrewFeatureCount + 9,
+    sandwich: (m) => {
+      const fanHoleCount = Object.values(m.fanLayout.walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);
+      return fanHoleCount + (m.cordPassThrough.type === "none" ? 0 : 1);
     },
   });
 }
