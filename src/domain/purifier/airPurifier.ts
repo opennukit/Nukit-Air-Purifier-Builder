@@ -18,7 +18,6 @@ import {
 } from "@/fabrication/laser/cutSettings";
 import {
   staticPrintReferenceIds,
-  staticPrintReferenceHasPlatePreview,
   staticPrintReferences,
   type StaticPrintReferenceCapabilities,
   type StaticPrintReference,
@@ -785,10 +784,6 @@ export const publicThreeDimensionalPrintDesignPresets: readonly PrintDesignPrese
 // Public Release Presets
 // #######################################
 
-export function isPublicPrintDesignId(id: PrintDesignId): boolean {
-  return publicPrintDesignPresets.some((preset) => preset.id === id);
-}
-
 export function isPublicThreeDimensionalPrintDesignId(id: PrintDesignId): boolean {
   return publicThreeDimensionalPrintDesignPresets.some((preset) => preset.id === id);
 }
@@ -1434,10 +1429,6 @@ export function isStaticReferencePrintDesignPreset(preset: PrintDesignPreset): p
 
 export function staticPrintReferenceForPreset(preset: PrintDesignPreset): StaticPrintReference | undefined {
   return preset.implementation.type === "static-reference" ? preset.implementation.reference : undefined;
-}
-
-export function staticReferenceCanPreviewPrintPlates(preset: PrintDesignPreset): boolean {
-  return preset.implementation.type === "static-reference" && staticPrintReferenceHasPlatePreview(preset.implementation.reference);
 }
 
 export function defaultFilterPresetForPrintDesign(preset: PrintDesignPreset): FilterPresetId {
