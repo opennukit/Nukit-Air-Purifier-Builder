@@ -9,7 +9,7 @@ import type {
 } from "@/domain/designs/tempest/model";
 import { tempestWalls } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { EPSILON_LIP } from "./context";
+import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP } from "./context";
 import {
   cuboidFromMinSize,
   cylinderAlong,
@@ -21,7 +21,6 @@ import { fanPatternCut, towerOpening2d } from "./patterns2d";
 // Box-fan top exhaust.
 const BOX_FAN_TIE_RADIUS_FLOOR_MM = 0.001; // never let a zero screw-hole diameter collapse the tie hole
 const BOX_FAN_TIE_PAIR_DIVISOR = 8; // tie holes sit ±(min open span / this) either side of each corner
-const CORD_CYLINDER_SEGMENTS = 24; // facets on the cord/tie cylinders
 
 // Places the 45° corner bevel one outer-wall thickness clear of the nearest air.
 // The closest void to the corner is the filter pocket, whose near-corner edge sits

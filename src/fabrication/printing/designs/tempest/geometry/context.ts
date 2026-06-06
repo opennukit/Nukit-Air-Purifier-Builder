@@ -32,3 +32,6 @@ export const SHELL_OVERLAP_MM = 0.5;
 // The geometry's own tessellation resolution, passed explicitly to every
 // circular primitive so it does not depend on any backend's global default.
 export const CSG_SEGMENTS = 48;
+// Facet count for the small cord/zip-tie pass-through cylinders, kept coarser
+// than CSG_SEGMENTS since these holes are tiny and never silhouette-critical.
+export const CORD_CYLINDER_SEGMENTS = 24;

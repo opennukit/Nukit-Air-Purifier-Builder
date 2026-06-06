@@ -1,12 +1,10 @@
 import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
 import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
-import { EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
+import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
-
-const CORD_CYLINDER_SEGMENTS = 24; // facets on the cord pass-through cylinders
 
 // #######################################
 // Cord Pass-Through
