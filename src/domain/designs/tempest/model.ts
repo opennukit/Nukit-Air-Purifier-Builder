@@ -603,7 +603,7 @@ function createBoxEnvelope(settings: TempestSettings): TempestBoxEnvelope {
   const filterCount = horizontalFilterCount(settings.arrangement);
   const height =
     settings.fan.diameter +
-    2 +
+    HORIZONTAL_FAN_VERTICAL_PADDING_MM +
     2 * frame.outsideFlangeThickness +
     filterCount * (settings.arrangement.filter.thickness + frame.wallThickness);
   return {
@@ -802,7 +802,7 @@ export function tempestFanBodyDepth(fanDiameter: Millimeters): Millimeters {
   if (fanDiameter === 140) {
     return 27;
   }
-  return fanDiameter * 0.19;
+  return fanDiameter * FAN_BODY_DEPTH_RATIO;
 }
 
 export function tempestFanScrewPitch(fanDiameter: Millimeters): Millimeters {
@@ -812,7 +812,7 @@ export function tempestFanScrewPitch(fanDiameter: Millimeters): Millimeters {
   if (fanDiameter === 140) {
     return 125;
   }
-  return fanDiameter * 0.85;
+  return fanDiameter * FAN_SCREW_PITCH_RATIO;
 }
 
 function createWallFanLayout(
@@ -902,7 +902,7 @@ function towerFanPositions(
 }
 
 function fanSpacing(fanDiameter: Millimeters): Millimeters {
-  return fanDiameter + 10;
+  return fanDiameter + FAN_TO_FAN_GAP_MM;
 }
 
 // ##############################
@@ -936,7 +936,7 @@ function createTowerCordPassThroughPlacement(
   cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>,
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
 ): TempestCordPassThroughPlacement {
-  const offset = Math.max(cord.diameter / 2 + 2, cord.cornerOffset);
+  const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
   return {
     type: "tower-top-cylinder",
     wall: cord.wall,
@@ -954,7 +954,7 @@ function horizontalCordOffset(settings: TempestSettings): Millimeters {
   if (settings.cordPassThrough.type === "none") {
     return 0;
   }
-  return Math.max(settings.cordPassThrough.diameter / 2 + settings.frame.wallThickness + 1, settings.cordPassThrough.cornerOffset);
+  return Math.max(settings.cordPassThrough.diameter / 2 + settings.frame.wallThickness + CORD_WALL_MARGIN_MM, settings.cordPassThrough.cornerOffset);
 }
 
 function cordPositionAlongWall(wallLength: Millimeters, side: "left" | "center" | "right", offset: Millimeters): Millimeters {
@@ -1045,5 +1045,15 @@ function finiteNonNegativeInteger(value: number, fallback: number): number {
 // #######################################
 // Constants
 // #######################################
+
+// Fan sizing.
+const FAN_TO_FAN_GAP_MM = 10; // minimum gap between adjacent fans (center spacing = diameter + this)
+const HORIZONTAL_FAN_VERTICAL_PADDING_MM = 2; // headroom added above the fan in the sandwich box height
+const FAN_BODY_DEPTH_RATIO = 0.19; // fallback body depth = diameter * this (off the 120/140 lookup)
+const FAN_SCREW_PITCH_RATIO = 0.85; // fallback screw pitch = diameter * this (off the 120/140 lookup)
+
+// Cord hole placement.
+const CORD_WALL_MARGIN_MM = 1; // extra clearance past the wall when offsetting the cord hole from a corner
+const CORD_TOWER_MIN_EDGE_MM = 2; // minimum gap from the air-chamber edge to the tower cord hole
 
 const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];

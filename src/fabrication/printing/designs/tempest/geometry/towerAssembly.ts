@@ -4,7 +4,7 @@ import type {
   TempestWall,
 } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { epsilon } from "./context";
+import { EPSILON_LIP } from "./context";
 import {
   cuboidFromMinSize,
   cylinderAlong,
@@ -13,6 +13,11 @@ import {
 } from "./primitives";
 import { fanPatternCut, towerOpening2d } from "./patterns2d";
 import { towerFilter } from "./layout";
+
+// Box-fan top exhaust.
+const BOX_FAN_TIE_RADIUS_FLOOR_MM = 0.001; // never let a zero screw-hole diameter collapse the tie hole
+const BOX_FAN_TIE_PAIR_DIVISOR = 8; // tie holes sit ±(min open span / this) either side of each corner
+const CORD_CYLINDER_SEGMENTS = 24; // facets on the cord/tie cylinders
 
 // Places the 45° corner bevel one outer-wall thickness clear of the nearest air.
 // The closest void to the corner is the filter pocket, whose near-corner edge sits
@@ -40,10 +45,10 @@ export function towerAirChamber<Solid, Region>(
     ctx,
     filterLayout.airChamber.xMin,
     filterLayout.airChamber.yMin,
-    filterLayout.airChamber.zMin - epsilon,
+    filterLayout.airChamber.zMin - EPSILON_LIP,
     filterLayout.airChamber.xMax - filterLayout.airChamber.xMin,
     filterLayout.airChamber.yMax - filterLayout.airChamber.yMin,
-    filterLayout.airChamber.zMax - filterLayout.airChamber.zMin + 2 * epsilon,
+    filterLayout.airChamber.zMax - filterLayout.airChamber.zMin + 2 * EPSILON_LIP,
   );
 }
 
@@ -54,8 +59,8 @@ export function towerFilterPocket<Solid, Region>(
   wallName: TempestWall,
 ): Solid {
   const filter = towerFilter(model);
-  const z = filterLayout.bottomPlateThickness - epsilon;
-  const height = model.box.height - filterLayout.bottomPlateThickness - filterLayout.topPlateThickness + 2 * epsilon;
+  const z = filterLayout.bottomPlateThickness - EPSILON_LIP;
+  const height = model.box.height - filterLayout.bottomPlateThickness - filterLayout.topPlateThickness + 2 * EPSILON_LIP;
   const offset = filterLayout.structuralOffset;
   const outsideFlange = model.frame.outsideFlangeThickness;
 
@@ -180,7 +185,7 @@ export function towerFanGrid<Solid, Region>(
             model,
             "z",
             [x, y, model.box.height - filterLayout.topPlateThickness / 2],
-            filterLayout.topPlateThickness + 2 * epsilon,
+            filterLayout.topPlateThickness + 2 * EPSILON_LIP,
           ),
         )
       : [],
@@ -196,7 +201,7 @@ export function towerBoxExhaustCuts<Solid, Region>(
 ): Solid[] {
   const { transforms, extrusions } = ctx.modeling;
   const chamber = filterLayout.airChamber;
-  const cutHeight = filterLayout.topPlateThickness + 2 * epsilon;
+  const cutHeight = filterLayout.topPlateThickness + 2 * EPSILON_LIP;
   const seatRim = model.frame.outsideFlangeThickness;
   const openWidth = Math.max(0.001, chamber.xMax - chamber.xMin - 2 * seatRim);
   const openDepth = Math.max(0.001, chamber.yMax - chamber.yMin - 2 * seatRim);
@@ -205,13 +210,13 @@ export function towerBoxExhaustCuts<Solid, Region>(
   const holeCenterZ = model.box.height - filterLayout.topPlateThickness / 2;
 
   const opening = transforms.translate(
-    [centerX, centerY, model.box.height - filterLayout.topPlateThickness - epsilon],
+    [centerX, centerY, model.box.height - filterLayout.topPlateThickness - EPSILON_LIP],
     extrusions.extrudeLinear({ height: cutHeight }, towerOpening2d(ctx, openWidth, openDepth)),
   );
 
-  const tieRadius = Math.max(0.001, model.settings.fan.screwHoleDiameter / 2);
+  const tieRadius = Math.max(BOX_FAN_TIE_RADIUS_FLOOR_MM, model.settings.fan.screwHoleDiameter / 2);
   const tieOutset = seatRim / 2;
-  const tiePairOffset = Math.min(openWidth, openDepth) / 8;
+  const tiePairOffset = Math.min(openWidth, openDepth) / BOX_FAN_TIE_PAIR_DIVISOR;
   const cornerX = openWidth / 2 + tieOutset;
   const cornerY = openDepth / 2 + tieOutset;
   const corners: ReadonlyArray<readonly [number, number]> = [
@@ -221,7 +226,7 @@ export function towerBoxExhaustCuts<Solid, Region>(
     [centerX + cornerX, centerY + cornerY],
   ];
   const zipTieHoles = corners.flatMap(([cx, cy]) =>
-    [-tiePairOffset, tiePairOffset].map((dy) => cylinderAlong(ctx, "z", [cx, cy + dy, holeCenterZ], cutHeight, tieRadius, 24)),
+    [-tiePairOffset, tiePairOffset].map((dy) => cylinderAlong(ctx, "z", [cx, cy + dy, holeCenterZ], cutHeight, tieRadius, CORD_CYLINDER_SEGMENTS)),
   );
 
   return [opening, ...zipTieHoles];
@@ -233,8 +238,8 @@ export function towerFilterSlots<Solid, Region>(
   filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
 ): Solid[] {
   const filter = towerFilter(model);
-  const z = model.box.height - filterLayout.topPlateThickness - epsilon;
-  const height = filterLayout.topPlateThickness + 2 * epsilon;
+  const z = model.box.height - filterLayout.topPlateThickness - EPSILON_LIP;
+  const height = filterLayout.topPlateThickness + 2 * EPSILON_LIP;
   return [
     cuboidFromMinSize(ctx, filterLayout.structuralOffset, model.frame.outsideFlangeThickness, z, filter.faceWidth, filter.thickness, height),
     cuboidFromMinSize(

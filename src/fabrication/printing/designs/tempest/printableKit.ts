@@ -68,6 +68,7 @@ export type TempestPrintablePose =
     };
 
 const epsilon = 0.05;
+// One fan cutout is five CSG features: the opening plus its four corner screw holes.
 const fanOpeningAndScrewFeatureCount = 5;
 
 // #######################################

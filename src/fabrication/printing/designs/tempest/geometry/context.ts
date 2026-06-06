@@ -22,8 +22,13 @@ export type GeometryContext<Solid, Region> = {
   readonly fanPatternCache: Map<string, Region>;
 };
 
-export const epsilon = 0.05;
-export const scadWallCutOverlap = 0.5;
+// A tiny lip subtracted/added so coincident cut faces never share a plane with
+// the solid they pierce, which would leave a zero-thickness sliver.
+export const EPSILON_LIP = 0.05;
+// Each through-wall cut is grown by this on both ends so it fully clears the
+// wall it pierces. (Named for the shell it overlaps; the old "scad" prefix
+// referred to a kernel no longer used.)
+export const SHELL_OVERLAP_MM = 0.5;
 // The geometry's own tessellation resolution, passed explicitly to every
 // circular primitive so it does not depend on any backend's global default.
-export const csgSegments = 48;
+export const CSG_SEGMENTS = 48;

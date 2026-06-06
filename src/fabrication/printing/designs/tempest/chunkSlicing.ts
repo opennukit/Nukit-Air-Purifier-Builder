@@ -21,15 +21,15 @@ type Band = readonly [number, number];
 type GrillCentre = readonly [number, number, number];
 type AxisBands = { readonly x: Band[]; readonly y: Band[]; readonly z: Band[] };
 
-const seamGap = 0.5;
-const grillMargin = 2;
+const SEAM_GAP_MM = 0.5; // a seam must clear the previous one (and the bed edge) by at least this
+const GRILL_MARGIN_MM = 2; // grill keep-out band radius padding beyond the fan radius
 
 export function featureAwarePrintableChunkGrid(
   model: TempestModel,
   pose: TempestPrintablePose,
   bed: { readonly width: number; readonly depth: number; readonly height: number },
 ): TempestChunkGrid {
-  const radius = model.settings.fan.diameter / 2 + grillMargin;
+  const radius = model.settings.fan.diameter / 2 + GRILL_MARGIN_MM;
   const bands = grillBandsInPose(model, pose, radius);
   return chunkGridFromBoundaries(
     axisCuts(pose.envelope.width, bed.width, bands.x),
@@ -162,14 +162,14 @@ function axisCuts(length: number, bed: number, bands: readonly Band[]): number[]
     let previous = 0;
     for (let index = 1; index < count; index += 1) {
       const seam = snap((index * length) / count);
-      if (seam <= previous + seamGap || seam - previous > bed + seamGap) {
+      if (seam <= previous + SEAM_GAP_MM || seam - previous > bed + SEAM_GAP_MM) {
         ok = false;
         break;
       }
       seams.push(Number(seam.toFixed(4)));
       previous = seam;
     }
-    if (ok && length - previous <= bed + seamGap) {
+    if (ok && length - previous <= bed + SEAM_GAP_MM) {
       return [0, ...seams, length];
     }
   }

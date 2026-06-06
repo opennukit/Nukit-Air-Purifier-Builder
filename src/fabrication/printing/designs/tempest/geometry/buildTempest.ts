@@ -1,7 +1,7 @@
 import type { TempestChunkGrid, TempestFilterLayout, TempestModel, TempestWall } from "@/domain/designs/tempest/model";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
-import { epsilon } from "./context";
+import { EPSILON_LIP } from "./context";
 import { chamferedPrism, subtractAll, unionAll } from "./primitives";
 import {
   towerAirChamber,
@@ -102,14 +102,14 @@ function assemblyTower<Solid, Region>(
     ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, wallName)), // 3. four filter pockets
     // 4. each wall's inlet (outer face -> flange) and outlet (filter -> chamber) opening
     ...tempestWalls.flatMap((wallName) => [
-      ...towerSideOpening(ctx, model, filterLayout, wallName, -epsilon, model.frame.outsideFlangeThickness + epsilon),
+      ...towerSideOpening(ctx, model, filterLayout, wallName, -EPSILON_LIP, model.frame.outsideFlangeThickness + EPSILON_LIP),
       ...towerSideOpening(
         ctx,
         model,
         filterLayout,
         wallName,
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) - epsilon,
-        filterLayout.structuralOffset + epsilon,
+        model.frame.outsideFlangeThickness + towerFilterThickness(model) - EPSILON_LIP,
+        filterLayout.structuralOffset + EPSILON_LIP,
       ),
     ]),
     ...towerFanGrid(ctx, model, filterLayout), // 5. top fan grid (or single box-fan exhaust)

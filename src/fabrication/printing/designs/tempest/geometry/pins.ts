@@ -1,10 +1,12 @@
 import type { TempestChunkGrid, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { epsilon, scadWallCutOverlap } from "./context";
+import { EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
 import { horizontalWallLocalFanCenter, towerFilterThickness } from "./layout";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
+
+const CORD_CYLINDER_SEGMENTS = 24; // facets on the cord pass-through cylinders
 
 // #######################################
 // Cord Pass-Through
@@ -16,22 +18,22 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
     return [];
   }
   if (cord.type === "tower-top-cylinder") {
-    return [cylinderAlong(ctx, "z", [cord.x, cord.y, cord.zStart + cord.depth / 2], cord.depth + 2 * epsilon, cord.diameter / 2, 24)];
+    return [cylinderAlong(ctx, "z", [cord.x, cord.y, cord.zStart + cord.depth / 2], cord.depth + 2 * EPSILON_LIP, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
 
   const wallCenter = model.frame.wallThickness / 2;
   const oppositeWallCenter = cord.wall === "front" || cord.wall === "back" ? model.box.depth - wallCenter : model.box.width - wallCenter;
-  const length = model.frame.wallThickness + 2 * scadWallCutOverlap;
+  const length = model.frame.wallThickness + 2 * SHELL_OVERLAP_MM;
   if (cord.wall === "front") {
-    return [cylinderAlong(ctx, "y", [cord.positionAlongWall, wallCenter, cord.verticalCenter], length, cord.diameter / 2, 24)];
+    return [cylinderAlong(ctx, "y", [cord.positionAlongWall, wallCenter, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
   if (cord.wall === "back") {
-    return [cylinderAlong(ctx, "y", [cord.positionAlongWall, oppositeWallCenter, cord.verticalCenter], length, cord.diameter / 2, 24)];
+    return [cylinderAlong(ctx, "y", [cord.positionAlongWall, oppositeWallCenter, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
   if (cord.wall === "left") {
-    return [cylinderAlong(ctx, "x", [wallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, 24)];
+    return [cylinderAlong(ctx, "x", [wallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
-  return [cylinderAlong(ctx, "x", [oppositeWallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, 24)];
+  return [cylinderAlong(ctx, "x", [oppositeWallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
 }
 
 // #######################################

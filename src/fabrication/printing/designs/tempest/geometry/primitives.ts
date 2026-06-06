@@ -1,5 +1,6 @@
+import type { TempestExtrudeAxis } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { csgSegments, epsilon } from "./context";
+import { CSG_SEGMENTS, EPSILON_LIP } from "./context";
 
 // #######################################
 // 3D Primitives
@@ -76,20 +77,20 @@ export function chamferedOpeningCutAlongZ<Solid, Region>(
 ): Solid {
   const { transforms, extrusions, expansions, hulls } = ctx.modeling;
   if (chamfer > 0 && depth > 2 * chamfer) {
-    const expanded = expansions.offset({ delta: chamfer, corners: "round", segments: csgSegments }, shape);
+    const expanded = expansions.offset({ delta: chamfer, corners: "round", segments: CSG_SEGMENTS }, shape);
     return unionAll(ctx, [
       hulls.hull(
-        transforms.translate([0, 0, -epsilon], thinExtrude(ctx, expanded, 0)),
+        transforms.translate([0, 0, -EPSILON_LIP], thinExtrude(ctx, expanded, 0)),
         transforms.translate([0, 0, chamfer], thinExtrude(ctx, shape, 0)),
       ),
       transforms.translate([0, 0, chamfer], extrusions.extrudeLinear({ height: depth - 2 * chamfer }, shape)),
       hulls.hull(
         transforms.translate([0, 0, depth - chamfer], thinExtrude(ctx, shape, 0)),
-        transforms.translate([0, 0, depth + epsilon], thinExtrude(ctx, expanded, 0)),
+        transforms.translate([0, 0, depth + EPSILON_LIP], thinExtrude(ctx, expanded, 0)),
       ),
     ]);
   }
-  return transforms.translate([0, 0, -epsilon], extrusions.extrudeLinear({ height: depth + 2 * epsilon }, shape));
+  return transforms.translate([0, 0, -EPSILON_LIP], extrusions.extrudeLinear({ height: depth + 2 * EPSILON_LIP }, shape));
 }
 
 export function thinExtrude<Solid, Region>(ctx: GeometryContext<Solid, Region>, shape: Region, z: number): Solid {
@@ -99,7 +100,7 @@ export function thinExtrude<Solid, Region>(ctx: GeometryContext<Solid, Region>, 
 
 export function orientZExtrusion<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
-  axis: "x" | "y" | "z",
+  axis: TempestExtrudeAxis,
   geometry: Solid,
 ): Solid {
   const { transforms } = ctx.modeling;
@@ -114,7 +115,7 @@ export function orientZExtrusion<Solid, Region>(
 
 export function cylinderAlong<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
-  axis: "x" | "y" | "z",
+  axis: TempestExtrudeAxis,
   center: readonly [number, number, number],
   length: number,
   radius: number,
@@ -131,18 +132,18 @@ export function cylinderAlong<Solid, Region>(
 
 export function cylinderAlongFromStart<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
-  axis: "x" | "y" | "z",
+  axis: TempestExtrudeAxis,
   start: readonly [number, number, number],
   length: number,
   radius: number,
 ): Solid {
   if (axis === "x") {
-    return cylinderAlong(ctx, axis, [start[0] + length / 2, start[1], start[2]], length, radius, csgSegments);
+    return cylinderAlong(ctx, axis, [start[0] + length / 2, start[1], start[2]], length, radius, CSG_SEGMENTS);
   }
   if (axis === "y") {
-    return cylinderAlong(ctx, axis, [start[0], start[1] + length / 2, start[2]], length, radius, csgSegments);
+    return cylinderAlong(ctx, axis, [start[0], start[1] + length / 2, start[2]], length, radius, CSG_SEGMENTS);
   }
-  return cylinderAlong(ctx, axis, [start[0], start[1], start[2] + length / 2], length, radius, csgSegments);
+  return cylinderAlong(ctx, axis, [start[0], start[1], start[2] + length / 2], length, radius, CSG_SEGMENTS);
 }
 
 export function cuboidFromMinSize<Solid, Region>(

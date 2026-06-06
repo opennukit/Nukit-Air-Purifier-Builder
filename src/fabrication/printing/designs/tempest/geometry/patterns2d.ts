@@ -1,8 +1,19 @@
-import type { TempestModel } from "@/domain/designs/tempest/model";
+import type { TempestExtrudeAxis, TempestModel } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { csgSegments } from "./context";
+import { CSG_SEGMENTS } from "./context";
 import { orientZExtrusion, unionAll2d } from "./primitives";
 import { fanScrewPitch } from "./layout";
+
+// The honeycomb grill is drawn this far inside the fan opening so the grill ring
+// sits within the bore; a plain opening is inset half this so its edge clears.
+const FAN_GRILL_DRAW_INSET_MM = 4;
+const FAN_PLAIN_OPENING_INSET_MM = 2;
+// Rounded openings cap their corner radius here so a small opening never rounds
+// itself away (also used by towerOpening2d).
+const OPENING_CORNER_RADIUS_CAP_MM = 10;
+// Screw holes are tiny; this is enough facets to read as round without bloating
+// the mesh.
+const SCREW_HOLE_SEGMENTS = 16;
 
 // #######################################
 // 2D Primitives
@@ -27,7 +38,7 @@ export function hexGrill2d<Solid, Region>(
   const { primitives, transforms2d, booleans2d } = ctx.modeling;
   const opening = model.settings.fan.opening;
   if (opening.type !== "honeycomb") {
-    return primitives.circle({ radius: Math.max(0.001, outerDiameter / 2), segments: csgSegments });
+    return primitives.circle({ radius: Math.max(0.001, outerDiameter / 2), segments: CSG_SEGMENTS });
   }
 
   const pitchX = opening.hexFlatToFlat + opening.ribThickness;
@@ -51,7 +62,7 @@ export function hexGrill2d<Solid, Region>(
   }
 
   return booleans2d.intersect(
-    primitives.circle({ radius: Math.max(0.001, (outerDiameter - 2 * opening.ribThickness) / 2), segments: csgSegments }),
+    primitives.circle({ radius: Math.max(0.001, (outerDiameter - 2 * opening.ribThickness) / 2), segments: CSG_SEGMENTS }),
     unionAll2d(ctx, holes),
   );
 }
@@ -65,13 +76,13 @@ export function fanPattern2d<Solid, Region>(ctx: GeometryContext<Solid, Region>,
   }
   const opening =
     model.settings.fan.opening.type === "honeycomb"
-      ? hexGrill2d(ctx, model, model.settings.fan.diameter - 4)
-      : primitives.circle({ radius: Math.max(0.001, model.settings.fan.diameter / 2 - 2), segments: csgSegments });
+      ? hexGrill2d(ctx, model, model.settings.fan.diameter - FAN_GRILL_DRAW_INSET_MM)
+      : primitives.circle({ radius: Math.max(0.001, model.settings.fan.diameter / 2 - FAN_PLAIN_OPENING_INSET_MM), segments: CSG_SEGMENTS });
   const screwDelta = fanScrewPitch(model) / 2;
   const screwRadius = model.settings.fan.screwHoleDiameter / 2;
   const screwHoles = [-screwDelta, screwDelta].flatMap((x) =>
     [-screwDelta, screwDelta].map((y) =>
-      transforms2d.translate([x, y], primitives.circle({ radius: Math.max(0.001, screwRadius), segments: 16 })),
+      transforms2d.translate([x, y], primitives.circle({ radius: Math.max(0.001, screwRadius), segments: SCREW_HOLE_SEGMENTS })),
     ),
   );
   const pattern = unionAll2d(ctx, [opening, ...screwHoles]);
@@ -88,9 +99,9 @@ export function fanPatternCacheKey(model: TempestModel): string {
         opening.type,
         opening.hexFlatToFlat,
         opening.ribThickness,
-        csgSegments,
+        CSG_SEGMENTS,
       ].join(":")
-    : [model.settings.fan.diameter, model.settings.fan.screwHoleDiameter, opening.type, csgSegments].join(":");
+    : [model.settings.fan.diameter, model.settings.fan.screwHoleDiameter, opening.type, CSG_SEGMENTS].join(":");
 }
 
 export function filterOpening2d<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Region | null {
@@ -100,12 +111,12 @@ export function filterOpening2d<Solid, Region>(ctx: GeometryContext<Solid, Regio
   if (width <= 0 || depth <= 0) {
     return null;
   }
-  const radius = Math.min(10, width / 2, depth / 2);
+  const radius = Math.min(OPENING_CORNER_RADIUS_CAP_MM, width / 2, depth / 2);
   return primitives.roundedRectangle({
     center: [model.frame.rim + width / 2, model.frame.rim + depth / 2],
     size: [width, depth],
     roundRadius: radius,
-    segments: csgSegments,
+    segments: CSG_SEGMENTS,
   });
 }
 
@@ -116,14 +127,14 @@ export function towerOpening2d<Solid, Region>(
   expand = 0,
 ): Region {
   const { primitives, expansions } = ctx.modeling;
-  const radius = Math.min(10, width / 2, height / 2);
+  const radius = Math.min(OPENING_CORNER_RADIUS_CAP_MM, width / 2, height / 2);
   const opening = primitives.roundedRectangle({
     center: [0, 0],
     size: [Math.max(0.001, width), Math.max(0.001, height)],
     roundRadius: Math.max(0.001, radius),
-    segments: csgSegments,
+    segments: CSG_SEGMENTS,
   });
-  return expand <= 0 ? opening : expansions.offset({ delta: expand, corners: "round", segments: csgSegments }, opening);
+  return expand <= 0 ? opening : expansions.offset({ delta: expand, corners: "round", segments: CSG_SEGMENTS }, opening);
 }
 
 // Extrudes the fan grill/opening pattern along an axis, ready to subtract from a
@@ -131,7 +142,7 @@ export function towerOpening2d<Solid, Region>(
 export function fanPatternCut<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  axis: "x" | "y" | "z",
+  axis: TempestExtrudeAxis,
   center: readonly [number, number, number],
   length: number,
 ): Solid {

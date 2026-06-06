@@ -4,7 +4,7 @@ import type {
   TempestWallFanLayout,
 } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
-import { epsilon, scadWallCutOverlap } from "./context";
+import { EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import {
   chamferedOpeningCutAlongZ,
   chamferedPrism,
@@ -58,8 +58,8 @@ export function flangePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, 
   }
   return subtractAll(ctx, panel, [
     transforms.translate(
-      [0, 0, -epsilon],
-      extrusions.extrudeLinear({ height: height + 2 * epsilon }, opening),
+      [0, 0, -EPSILON_LIP],
+      extrusions.extrudeLinear({ height: height + 2 * EPSILON_LIP }, opening),
     ),
   ]);
 }
@@ -78,7 +78,7 @@ export function wall<Solid, Region>(
       model,
       "y",
       [position, model.frame.wallThickness / 2, horizontalWallLocalFanCenter(model)],
-      model.frame.wallThickness + 2 * scadWallCutOverlap,
+      model.frame.wallThickness + 2 * SHELL_OVERLAP_MM,
     ),
   );
   const slotHoles =
@@ -103,10 +103,10 @@ export function horizontalFilterSlotHole<Solid, Region>(
     cuboidFromMinSize(
       ctx,
       model.settings.filterSlot.endMargin,
-      -scadWallCutOverlap,
+      -SHELL_OVERLAP_MM,
       localZBottom,
       Math.max(0.001, wallLength - 2 * model.settings.filterSlot.endMargin),
-      model.frame.wallThickness + 2 * scadWallCutOverlap,
+      model.frame.wallThickness + 2 * SHELL_OVERLAP_MM,
       localZTop - localZBottom,
     ),
   ];
