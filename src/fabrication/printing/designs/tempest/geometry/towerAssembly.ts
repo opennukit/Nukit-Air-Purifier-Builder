@@ -1,8 +1,12 @@
 import type {
   TempestFilterLayout,
   TempestModel,
+  TempestPlanarAxis,
+  TempestQuadWallRect,
   TempestWall,
+  TempestWallMap,
 } from "@/domain/designs/tempest/model";
+import { tempestWalls } from "@/domain/designs/tempest/model";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
 import {
@@ -56,40 +60,11 @@ export function towerFilterPocket<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
-  wallName: TempestWall,
+  rect: TempestQuadWallRect,
 ): Solid {
-  const filter = towerFilter(model);
   const z = filterLayout.bottomPlateThickness - EPSILON_LIP;
   const height = model.box.height - filterLayout.bottomPlateThickness - filterLayout.topPlateThickness + 2 * EPSILON_LIP;
-  const offset = filterLayout.structuralOffset;
-  const outsideFlange = model.frame.outsideFlangeThickness;
-
-  if (wallName === "front") {
-    return cuboidFromMinSize(ctx, offset, outsideFlange, z, model.box.width - 2 * offset, filter.thickness, height);
-  }
-  if (wallName === "back") {
-    return cuboidFromMinSize(
-      ctx,
-      offset,
-      model.box.depth - outsideFlange - filter.thickness,
-      z,
-      model.box.width - 2 * offset,
-      filter.thickness,
-      height,
-    );
-  }
-  if (wallName === "left") {
-    return cuboidFromMinSize(ctx, outsideFlange, offset, z, filter.thickness, model.box.depth - 2 * offset, height);
-  }
-  return cuboidFromMinSize(
-    ctx,
-    model.box.width - outsideFlange - filter.thickness,
-    offset,
-    z,
-    filter.thickness,
-    model.box.depth - 2 * offset,
-    height,
-  );
+  return cuboidFromMinSize(ctx, rect.xMin, rect.yMin, z, rect.xMax - rect.xMin, rect.yMax - rect.yMin, height);
 }
 
 // The tower's rounded wall opening, beveled (45°) on entry and exit faces so the
@@ -124,6 +99,7 @@ export function towerSideOpening<Solid, Region>(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   wallName: TempestWall,
+  rect: TempestQuadWallRect,
   depthLow: number,
   depthHigh: number,
 ): readonly Solid[] {
@@ -136,35 +112,55 @@ export function towerSideOpening<Solid, Region>(
   }
   const depth = depthHigh - depthLow;
   const centerZ = filterLayout.bottomPlateThickness + filter.faceHeight / 2;
+  // The cut's 2D shape lies in the wall plane: across the wall's inlet-normal axis
+  // the in-plane width is the face's other dimension, so X-normal walls swap w/h.
   const cut = towerChamferedOpeningCut(
     ctx,
-    wallName === "left" || wallName === "right" ? height : width,
-    wallName === "left" || wallName === "right" ? width : height,
+    rect.inletNormalAxis === "x" ? height : width,
+    rect.inletNormalAxis === "x" ? width : height,
     depth,
     model.frame.chamferSize,
   );
-
-  if (wallName === "front") {
-    return [transforms.translate([model.box.width / 2, depthLow + depth, centerZ], transforms.rotateX(Math.PI / 2, cut))];
-  }
-  if (wallName === "back") {
-    return [
-      transforms.translate(
-        [model.box.width / 2, model.box.depth - depthLow - depth, centerZ],
-        transforms.rotateX(-Math.PI / 2, cut),
-      ),
-    ];
-  }
-  if (wallName === "left") {
-    return [transforms.translate([depthLow + depth, model.box.depth / 2, centerZ], transforms.rotateY(-Math.PI / 2, cut))];
-  }
-  return [
-    transforms.translate(
-      [model.box.width - depthLow - depth, model.box.depth / 2, centerZ],
-      transforms.rotateY(Math.PI / 2, cut),
-    ),
-  ];
+  const place = quadSideOpeningPlacement[wallName];
+  const intoWallPlane =
+    place.rotateAxis === "x"
+      ? transforms.rotateX(place.quarterTurns * (Math.PI / 2), cut)
+      : transforms.rotateY(place.quarterTurns * (Math.PI / 2), cut);
+  return [transforms.translate(place.center(model, depthLow, depth, centerZ), intoWallPlane)];
 }
+
+// Where each wall's inlet cut sits and how it is rotated into the wall plane. The
+// near walls (front/left) measure the cut face at `depthLow + depth` from the
+// origin face; the far walls (back/right) measure it back from the opposite face.
+// Pure data so it carries no Solid type — the rotation is applied at the call site.
+type QuadSideOpeningPlacement = {
+  readonly center: (model: TempestModel, depthLow: number, depth: number, centerZ: number) => readonly [number, number, number];
+  readonly rotateAxis: TempestPlanarAxis;
+  readonly quarterTurns: 1 | -1;
+};
+
+const quadSideOpeningPlacement: TempestWallMap<QuadSideOpeningPlacement> = {
+  front: {
+    center: (model, depthLow, depth, centerZ) => [model.box.width / 2, depthLow + depth, centerZ],
+    rotateAxis: "x",
+    quarterTurns: 1,
+  },
+  back: {
+    center: (model, depthLow, depth, centerZ) => [model.box.width / 2, model.box.depth - depthLow - depth, centerZ],
+    rotateAxis: "x",
+    quarterTurns: -1,
+  },
+  left: {
+    center: (model, depthLow, depth, centerZ) => [depthLow + depth, model.box.depth / 2, centerZ],
+    rotateAxis: "y",
+    quarterTurns: -1,
+  },
+  right: {
+    center: (model, depthLow, depth, centerZ) => [model.box.width - depthLow - depth, model.box.depth / 2, centerZ],
+    rotateAxis: "y",
+    quarterTurns: 1,
+  },
+};
 
 export function towerFanGrid<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
@@ -237,29 +233,12 @@ export function towerFilterSlots<Solid, Region>(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
-  const filter = towerFilter(model);
+  // The slots you push the filters down through share each pocket's footprint;
+  // they are the wall rects cut through the top plate.
   const z = model.box.height - filterLayout.topPlateThickness - EPSILON_LIP;
   const height = filterLayout.topPlateThickness + 2 * EPSILON_LIP;
-  return [
-    cuboidFromMinSize(ctx, filterLayout.structuralOffset, model.frame.outsideFlangeThickness, z, filter.faceWidth, filter.thickness, height),
-    cuboidFromMinSize(
-      ctx,
-      filterLayout.structuralOffset,
-      model.box.depth - model.frame.outsideFlangeThickness - filter.thickness,
-      z,
-      filter.faceWidth,
-      filter.thickness,
-      height,
-    ),
-    cuboidFromMinSize(ctx, model.frame.outsideFlangeThickness, filterLayout.structuralOffset, z, filter.thickness, filter.faceWidth, height),
-    cuboidFromMinSize(
-      ctx,
-      model.box.width - model.frame.outsideFlangeThickness - filter.thickness,
-      filterLayout.structuralOffset,
-      z,
-      filter.thickness,
-      filter.faceWidth,
-      height,
-    ),
-  ];
+  return tempestWalls.map((wall) => {
+    const rect = filterLayout.wallRects[wall];
+    return cuboidFromMinSize(ctx, rect.xMin, rect.yMin, z, rect.xMax - rect.xMin, rect.yMax - rect.yMin, height);
+  });
 }

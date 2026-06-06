@@ -99,19 +99,23 @@ function assemblyTower<Solid, Region>(
   // 2-6. Subtract every void from the box.
   return subtractAll(ctx, outerBox, [
     towerAirChamber(ctx, filterLayout), // 2. central air chamber
-    ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, wallName)), // 3. four filter pockets
+    ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, filterLayout.wallRects[wallName])), // 3. four filter pockets
     // 4. each wall's inlet (outer face -> flange) and outlet (filter -> chamber) opening
-    ...tempestWalls.flatMap((wallName) => [
-      ...towerSideOpening(ctx, model, filterLayout, wallName, -EPSILON_LIP, model.frame.outsideFlangeThickness + EPSILON_LIP),
-      ...towerSideOpening(
-        ctx,
-        model,
-        filterLayout,
-        wallName,
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) - EPSILON_LIP,
-        filterLayout.structuralOffset + EPSILON_LIP,
-      ),
-    ]),
+    ...tempestWalls.flatMap((wallName) => {
+      const rect = filterLayout.wallRects[wallName];
+      return [
+        ...towerSideOpening(ctx, model, filterLayout, wallName, rect, -EPSILON_LIP, model.frame.outsideFlangeThickness + EPSILON_LIP),
+        ...towerSideOpening(
+          ctx,
+          model,
+          filterLayout,
+          wallName,
+          rect,
+          model.frame.outsideFlangeThickness + towerFilterThickness(model) - EPSILON_LIP,
+          filterLayout.structuralOffset + EPSILON_LIP,
+        ),
+      ];
+    }),
     ...towerFanGrid(ctx, model, filterLayout), // 5. top fan grid (or single box-fan exhaust)
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
   ]);

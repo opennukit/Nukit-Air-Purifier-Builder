@@ -2,7 +2,7 @@ import type { TempestChunkGrid, TempestFilterLayout, TempestModel } from "@/doma
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
-import { horizontalWallLocalFanCenter, towerFilterThickness } from "./layout";
+import { horizontalWallLocalFanCenter } from "./layout";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
 
@@ -160,6 +160,12 @@ function pinCandidatesTower<Solid, Region>(
   const radius = pin.diameter / 2;
   const wallZLow = filterLayout.bottomPlateThickness;
   const wallZHigh = model.box.height - filterLayout.topPlateThickness;
+  // The structural wall between each filter pocket and the air chamber: its inner
+  // face is the carried chamber-face plane, so its midline sits half a wall in.
+  // (All four rects share innerPlaneOffset === structuralOffset.)
+  const innerWallMidlineLow = filterLayout.wallRects.front.innerPlaneOffset - model.frame.wallThickness / 2;
+  const innerWallMidlineHighX = model.box.width - innerWallMidlineLow;
+  const innerWallMidlineHighY = model.box.depth - innerWallMidlineLow;
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
@@ -169,10 +175,7 @@ function pinCandidatesTower<Solid, Region>(
           geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
         }
       }
-      for (const wallY of [
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) + model.frame.wallThickness / 2,
-        model.box.depth - model.frame.outsideFlangeThickness - towerFilterThickness(model) - model.frame.wallThickness / 2,
-      ]) {
+      for (const wallY of [innerWallMidlineLow, innerWallMidlineHighY]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
           geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
         }
@@ -201,10 +204,7 @@ function pinCandidatesTower<Solid, Region>(
           geometries.push(cylinderAlongFromStart(ctx, "y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
         }
       }
-      for (const wallX of [
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) + model.frame.wallThickness / 2,
-        model.box.width - model.frame.outsideFlangeThickness - towerFilterThickness(model) - model.frame.wallThickness / 2,
-      ]) {
+      for (const wallX of [innerWallMidlineLow, innerWallMidlineHighX]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
           geometries.push(cylinderAlongFromStart(ctx, "y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
         }
@@ -238,18 +238,12 @@ function pinCandidatesTower<Solid, Region>(
           geometries.push(cylinderAlongFromStart(ctx, "z", [wallX, gridY, seamZ - pin.holeDepth], length, radius));
         }
       }
-      for (const wallY of [
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) + model.frame.wallThickness / 2,
-        model.box.depth - model.frame.outsideFlangeThickness - towerFilterThickness(model) - model.frame.wallThickness / 2,
-      ]) {
+      for (const wallY of [innerWallMidlineLow, innerWallMidlineHighY]) {
         for (const gridX of rimPositions(filterLayout.structuralOffset, model.box.width - filterLayout.structuralOffset, pin.spacing)) {
           geometries.push(cylinderAlongFromStart(ctx, "z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));
         }
       }
-      for (const wallX of [
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) + model.frame.wallThickness / 2,
-        model.box.width - model.frame.outsideFlangeThickness - towerFilterThickness(model) - model.frame.wallThickness / 2,
-      ]) {
+      for (const wallX of [innerWallMidlineLow, innerWallMidlineHighX]) {
         for (const gridY of rimPositions(filterLayout.structuralOffset, model.box.depth - filterLayout.structuralOffset, pin.spacing)) {
           geometries.push(cylinderAlongFromStart(ctx, "z", [wallX, gridY, seamZ - pin.holeDepth], length, radius));
         }
