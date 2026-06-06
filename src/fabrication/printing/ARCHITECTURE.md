@@ -2,9 +2,10 @@
 
 This folder turns a user's purifier configuration into printable geometry and a
 sliceable 3MF file. The defining decision is the **kernel-agnostic seam**: the
-parametric shape is written *once*, against an abstract modeling interface, and
-two different CSG kernels plug in behind it — Manifold for watertight export and
-JSCAD for a zero-build in-browser preview.
+parametric shape is written *once*, against an abstract modeling interface, with
+the Manifold CSG kernel behind it for watertight, sliceable output. The shape
+makes no kernel-specific assumptions, so a different kernel could be slotted in
+without touching the model.
 
 ## The pipeline at a glance
 
@@ -21,8 +22,7 @@ JSCAD for a zero-build in-browser preview.
         │  designs/tempest/geometry/   buildTempestGeometry(modeling, model)
         ▼
    ModelingApi<Solid, Region>   ◄── the seam [modeling/modelingApi.ts]
-     ├─ manifoldModeling  (modeling/manifoldOps.ts + manifoldKernel.ts)  → watertight Geom3
-     └─ jscadModeling     (modeling/jscadModeling.ts)                    → fast preview geom3
+     └─ manifoldModeling  (modeling/manifoldOps.ts + manifoldKernel.ts)  → watertight Geom3
         │
         │  designs/tempest/printableKit.ts
         ▼
@@ -44,11 +44,10 @@ general (the shape) cannot depend on the specific (a kernel).
 
 ```
 printing/
-├── modeling/                  the seam + its two backends
+├── modeling/                  the seam + the Manifold backend
 │   ├── modelingApi.ts         ModelingApi<Solid,Region> — the abstract CSG interface
-│   ├── manifoldOps.ts         Manifold backend (watertight export); mesh extraction
-│   ├── manifoldKernel.ts      Manifold WASM init + withGeometryArena (handle lifetime)
-│   └── jscadModeling.ts       JSCAD backend (live editor preview)
+│   ├── manifoldOps.ts         Manifold backend (watertight output); mesh extraction
+│   └── manifoldKernel.ts      Manifold WASM init + withGeometryArena (handle lifetime)
 │
 ├── designs/tempest/           the Tempest purifier, the one parametric design
 │   ├── settings.ts            PurifierSettings/LayoutResult → TempestSettings
@@ -96,19 +95,22 @@ Every helper is `f<Solid, Region>(ctx, …)`. The cache is created fresh per bui
 and discarded with it — under Manifold the `withGeometryArena` wrapping the build
 owns and frees the underlying handles, so there is no cross-build state to dangle.
 
-## Two backends, one shape
+## The Manifold backend
 
-`ModelingApi` mirrors the JSCAD modeling API closely, so the JSCAD backend is a
-near-identity adapter and the Manifold backend translates each op. 2D operations
-are split out (`transforms2d` / `booleans2d`) so neither backend has to branch on
-a runtime dimension.
+`ModelingApi`'s operation shapes follow JSCAD's modeling conventions (small,
+explicit ops); 2D operations are split out (`transforms2d` / `booleans2d`) so the
+backend never has to branch on a runtime dimension.
 
-- **Manifold** (`manifoldModeling`) produces watertight, T-junction-free solids —
-  required for slicing. `printableKit.ts` always builds on it, then welds
-  coincident vertices into a compact `PrintableMesh`. Allocation is bounded by
-  `withGeometryArena`, which frees every intermediate handle on exit.
-- **JSCAD** (`jscadModeling`) is used by the in-browser editor for instant preview
-  with no WASM build step.
+**Manifold** (`manifoldModeling`) produces watertight, T-junction-free solids —
+required for slicing. Both the in-browser preview and the STL/3MF export build on
+it, then weld coincident vertices into a compact `PrintableMesh`, so what you see
+is what you print. Allocation is bounded by `withGeometryArena`, which frees every
+intermediate handle on exit.
+
+Manifold is the only backend, but the geometry is still written against the
+abstract `ModelingApi` rather than Manifold's concrete types — that keeps it free
+of kernel-specific assumptions, so a different kernel could be dropped in without
+touching the model.
 
 A reflection caveat worth knowing when rendering: mapping a build vertex
 `(x, y, z)` into a Y-up scene as `(x, z, y)` is a reflection (determinant −1) that

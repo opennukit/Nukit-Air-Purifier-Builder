@@ -8,10 +8,10 @@ import type { JoinCorners, ModelingApi, Vec2, Vec3 } from "@/fabrication/printin
 
 // The Manifold-backed implementation of the kernel-agnostic `ModelingApi` (see
 // modelingApi.ts). The parametric geometry (`buildTempestGeometry`) is written
-// against that interface; the static Builder's export path injects this backend
-// for watertight, manifold-by-construction output. The op shapes mirror the
-// JSCAD modeling API so the design editor can implement the same interface on
-// JSCAD. Every value a facade op produces is tracked for disposal by the active
+// against that interface and this backend is injected into it, for watertight,
+// manifold-by-construction output. The op shapes follow the JSCAD modeling
+// conventions — small, explicit ops — which is the "JSCAD-shaped" in the header.
+// Every value a facade op produces is tracked for disposal by the active
 // geometry arena.
 
 // `Geom3` is a solid (Manifold) and `Geom2` a planar region (CrossSection). They
@@ -200,8 +200,8 @@ export const booleans2d = {
 // The Manifold-backed implementation of the kernel-agnostic ModelingApi. The
 // `satisfies` check is the compile-time proof that this backend covers exactly
 // the operation surface the shared geometry is written against. The geometry
-// module (and the editor's JSCAD backend) depend on the interface, never on
-// this object — so swapping or adding a kernel can't silently drift.
+// module depends on that interface, never on this object — so swapping in a
+// different kernel later can't silently drift from what the model expects.
 export const manifoldModeling = {
   primitives,
   transforms,

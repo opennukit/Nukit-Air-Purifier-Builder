@@ -3,18 +3,17 @@
 // #######################################
 
 // The parametric purifier geometry is written ONCE against this interface and
-// never against a concrete CSG kernel. Two backends implement it:
-//   - Manifold (`manifoldModeling` in manifoldOps.ts) — watertight output for
-//     the static Builder service's STL/3MF export.
-//   - JSCAD — fast, zero-build live preview for the in-browser design editor.
-// Because the geometry depends only on this abstraction (Parnas: the general
-// must not depend on the specific), "one model, many kernels" is enforced by
-// the type system rather than by a hand-maintained port.
+// never against a concrete CSG kernel. Manifold (`manifoldModeling` in
+// manifoldOps.ts) is the implementation — it produces the watertight,
+// T-junction-free meshes the in-browser preview and the STL/3MF export both
+// rely on. Keeping the geometry behind this abstraction (Parnas: the general
+// must not depend on the specific) means it makes no Manifold-specific
+// assumptions, so a different kernel could be dropped in without touching the
+// model — the property is enforced by the type system, not by convention.
 //
-// Operations and their option shapes mirror the JSCAD modeling API so a JSCAD
-// backend is a near-identity adapter; the Manifold backend translates them.
-// The 2D ops are split out (transforms2d / booleans2d) so neither backend has
-// to dispatch on a runtime dimension.
+// Operation names and option shapes follow the JSCAD modeling conventions, which
+// keeps each op small and explicit. The 2D ops are split out (transforms2d /
+// booleans2d) so the backend never has to dispatch on a runtime dimension.
 
 // Offsets and sizes are immutable coordinate data, taken as readonly tuples so
 // callers can pass their own readonly tuples directly and a missing component

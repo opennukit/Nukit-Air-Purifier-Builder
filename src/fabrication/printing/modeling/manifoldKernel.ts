@@ -5,8 +5,8 @@ import type { ManifoldToplevel } from "manifold-3d";
 // Manifold WASM Lifecycle
 // #######################################
 
-// Manifold is a C++ CSG kernel compiled to WebAssembly. Unlike the previous
-// JSCAD backend it guarantees watertight, 2-manifold, T-junction-free output by
+// Manifold is a C++ CSG kernel compiled to WebAssembly. Unlike a pure-JS CSG
+// library it guarantees watertight, 2-manifold, T-junction-free output by
 // construction, which is what 3MF slicers require. Its objects live in the WASM
 // heap and are not garbage collected, so every geometry value must be explicitly
 // freed; see `withGeometryArena`.

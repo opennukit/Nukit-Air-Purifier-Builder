@@ -7,14 +7,12 @@
     "dev": "vite --host 127.0.0.1",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",
     "build": "bun run typecheck && vite build",
-    "build:standalone": "vite build --config vite.standalone.config.ts",
     "test": "bun test",
     "port:audit": "bun scripts/boxes-port/boxes-port-audit.ts",
     "oracle:airpurifier": "bun scripts/boxes-port/airpurifier-oracle.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
   "devDependencies": {
-    "@jscad/modeling": "^2.13.0",
     "@sveltejs/vite-plugin-svelte": "^6",
     "@types/node": "^25.6.0",
     "@types/three": "^0.184.0",
@@ -22,8 +20,7 @@
     "svelte": "^5.55.10",
     "svelte-check": "^4.4.8",
     "typescript": "^5.9.3",
-    "vite": "^7.3.0",
-    "vite-plugin-singlefile": "^2.3.3"
+    "vite": "^7.3.0"
   },
   "dependencies": {
     "manifold-3d": "^3.5.0",

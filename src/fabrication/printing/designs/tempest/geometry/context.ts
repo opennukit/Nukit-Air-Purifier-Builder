@@ -5,10 +5,10 @@ import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 // #######################################
 
 // The single source of truth for the Tempest purifier shape. It is written
-// against the abstract `ModelingApi`, never a concrete CSG kernel, so the same
-// code drives both the static Builder's Manifold export and the in-browser
-// design editor's JSCAD preview. Function names and construction order follow
-// the original model so it stays auditable feature-by-feature.
+// against the abstract `ModelingApi`, never a concrete CSG kernel, so it makes
+// no kernel-specific assumptions; Manifold drives both the in-browser preview
+// and the STL/3MF export. Function names and construction order follow the
+// original model so it stays auditable feature-by-feature.
 
 // The geometry was originally one big generic function whose helpers closed over
 // the destructured modeling ops and a per-build fan-pattern cache. They are now
