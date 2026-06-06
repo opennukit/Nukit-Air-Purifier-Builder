@@ -47,6 +47,11 @@ export type TempestWallMap<T> = {
   readonly right: T;
 };
 
+// Wall normals, the sandwich cord, and the quad wall rect all run in-plane.
+// Primitives and fanPatternCut genuinely need the full set of three.
+export type TempestPlanarAxis = "x" | "y";
+export type TempestExtrudeAxis = "x" | "y" | "z";
+
 export type TempestFanCountRequest =
   | {
       readonly type: "automatic";
