@@ -14,8 +14,8 @@ import {
   type TempestChunkGrid,
   type TempestModel,
   type TempestPrintablePose,
-  type TempestSettings,
 } from "@/domain/designs/tempest/model";
+import type { TempestSettings } from "@/domain/designs/tempest/shared";
 import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import {
   findPrintVolumePreset,

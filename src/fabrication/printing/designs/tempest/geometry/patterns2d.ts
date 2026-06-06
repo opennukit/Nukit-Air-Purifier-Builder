@@ -1,4 +1,5 @@
-import type { TempestExtrudeAxis, TempestModel } from "@/domain/designs/tempest/model";
+import type { TempestModel } from "@/domain/designs/tempest/model";
+import type { TempestExtrudeAxis } from "@/domain/designs/tempest/shared";
 import type { GeometryContext } from "./context";
 import { CSG_SEGMENTS } from "./context";
 import { orientZExtrusion, unionAll2d } from "./primitives";

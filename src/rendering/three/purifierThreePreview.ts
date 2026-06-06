@@ -94,12 +94,11 @@ import {
 import {
   createTempestModel,
   type TempestFilterLayout,
-  type TempestHorizontalFilterSize,
   type TempestModel,
   type TempestPrintablePose,
-  type TempestWall,
   type TempestWallFanLayout,
 } from "@/domain/designs/tempest/model";
+import type { TempestHorizontalFilterSize, TempestWall } from "@/domain/designs/tempest/shared";
 import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 import {

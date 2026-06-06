@@ -2,12 +2,9 @@ import type {
   TempestFanLayout,
   TempestFilterLayout,
   TempestModel,
-  TempestPlanarAxis,
   TempestQuadWallRect,
-  TempestWall,
-  TempestWallMap,
 } from "@/domain/designs/tempest/model";
-import { tempestWalls } from "@/domain/designs/tempest/model";
+import { tempestWalls, type TempestPlanarAxis, type TempestWall, type TempestWallMap } from "@/domain/designs/tempest/shared";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP } from "./context";
 import {

@@ -7,20 +7,22 @@ import {
   horizontalCordOffset,
   tempestFanBodyDepth,
   tempestFanScrewPitch,
-  type TempestBoxEnvelope,
-  type TempestCordPassThroughPlacement,
   type TempestFanCountRequest,
-  type TempestFanLayout,
   type TempestFilterArrangement,
-  type TempestFilterLayout,
-  type TempestFrameModel,
-  type TempestHorizontalFilterLayer,
-  type TempestHorizontalFlangeLayer,
-  type TempestModelPlan,
-  type TempestPrintablePose,
   type TempestSettings,
   type TempestWall,
-  type TempestWallFanLayout,
+} from "./shared";
+import type {
+  TempestBoxEnvelope,
+  TempestCordPassThroughPlacement,
+  TempestFanLayout,
+  TempestFilterLayout,
+  TempestFrameModel,
+  TempestHorizontalFilterLayer,
+  TempestHorizontalFlangeLayer,
+  TempestModelPlan,
+  TempestPrintablePose,
+  TempestWallFanLayout,
 } from "./model";
 
 // #######################################

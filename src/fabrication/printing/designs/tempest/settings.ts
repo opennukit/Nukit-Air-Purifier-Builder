@@ -1,8 +1,5 @@
-import {
-  defaultTempestSettings,
-  type TempestFanCountRequest,
-  type TempestSettings,
-} from "@/domain/designs/tempest/model";
+import { defaultTempestSettings } from "@/domain/designs/tempest/model";
+import type { TempestFanCountRequest, TempestSettings } from "@/domain/designs/tempest/shared";
 import type { FanCountRequest as PurifierFanCountRequest, PurifierSettings } from "@/domain/purifier/airPurifier";
 import { filterSelectionDimensions, type FilterDimensions } from "@/domain/purifier/filter";
 import type { LayoutResult } from "@/fabrication/purifierLayout";

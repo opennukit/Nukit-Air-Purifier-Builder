@@ -1,5 +1,5 @@
 import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
-import { tempestWalls } from "@/domain/designs/tempest/model";
+import { tempestWalls } from "@/domain/designs/tempest/shared";
 import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";

@@ -5,20 +5,22 @@ import {
   mapTempestWalls,
   tempestFanBodyDepth,
   tempestFanScrewPitch,
-  type TempestBoxEnvelope,
   type TempestCordPassThrough,
-  type TempestCordPassThroughPlacement,
-  type TempestFanLayout,
   type TempestFilterArrangement,
-  type TempestFilterLayout,
-  type TempestFrameModel,
   type TempestFrameSettings,
-  type TempestModelPlan,
-  type TempestPrintablePose,
-  type TempestQuadWallRect,
   type TempestSettings,
-  type TempestTowerFilterPocket,
   type TempestWall,
+} from "./shared";
+import type {
+  TempestBoxEnvelope,
+  TempestCordPassThroughPlacement,
+  TempestFanLayout,
+  TempestFilterLayout,
+  TempestFrameModel,
+  TempestModelPlan,
+  TempestPrintablePose,
+  TempestQuadWallRect,
+  TempestTowerFilterPocket,
 } from "./model";
 
 // #######################################

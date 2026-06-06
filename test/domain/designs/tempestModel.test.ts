@@ -3,8 +3,8 @@ import {
   createTempestModel,
   defaultTempestSettings,
   defaultTempestTowerFilter,
-  type TempestSettings,
 } from "@/domain/designs/tempest/model";
+import type { TempestSettings } from "@/domain/designs/tempest/shared";
 
 describe("Tempest OpenSCAD model port", () => {
   test("ports the two-filter OpenSCAD defaults into deterministic dimensions and fan placement", () => {

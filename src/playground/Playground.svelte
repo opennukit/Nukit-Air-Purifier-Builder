@@ -3,9 +3,8 @@
     defaultTempestSettings,
     defaultTempestHorizontalFilter,
     defaultTempestTowerFilter,
-    type TempestFilterArrangement,
-    type TempestSettings,
   } from "@/domain/designs/tempest/model";
+  import type { TempestFilterArrangement, TempestSettings } from "@/domain/designs/tempest/shared";
   import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
   import { printVolumePresetIds, type PrintVolumePresetId } from "@/fabrication/printing/printableKit";
   import ThreePreview from "./ThreePreview.svelte";
