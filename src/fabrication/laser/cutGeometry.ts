@@ -124,7 +124,6 @@ type EdgeDirection = {
 
 const sheetGap = 18;
 const sheetMargin = 12;
-const maxSheetRowWidth = 1040;
 
 // #######################################
 // Panel Construction
@@ -168,32 +167,6 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
 // #######################################
 // Sheet Layout
 // #######################################
-
-export function layoutCutPanels(panels: readonly CutPanelDraft[]): LaidOutCutPanel[] {
-  let cursorX = sheetMargin;
-  let cursorY = sheetMargin;
-  let rowHeight = 0;
-
-  return panels.map((panel) => {
-    if (cursorX > sheetMargin && cursorX + panel.width > maxSheetRowWidth) {
-      cursorX = sheetMargin;
-      cursorY += rowHeight + sheetGap;
-      rowHeight = 0;
-    }
-
-    const laidOut = {
-      ...panel,
-      sheet: {
-        x: cursorX,
-        y: cursorY,
-      },
-    };
-
-    cursorX += panel.width + sheetGap;
-    rowHeight = Math.max(rowHeight, panel.height);
-    return laidOut;
-  });
-}
 
 export function layoutCutPanelsInColumn(panels: readonly CutPanelDraft[], gap: number): LaidOutCutPanel[] {
   let cursorY = sheetMargin;
