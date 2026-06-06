@@ -316,14 +316,11 @@ export type TempestCordPassThroughPlacement =
   | {
       readonly topology: "quad";
       readonly type: "top-cylinder";
-      readonly wall: TempestWall;
-      readonly side: "left" | "center" | "right";
       readonly diameter: Millimeters;
-      readonly x: Millimeters;
+      readonly x: Millimeters; // corner resolved — kills the towerCordUsesHigh* booleans
       readonly y: Millimeters;
       readonly zStart: Millimeters;
       readonly depth: Millimeters;
-      readonly axis: "z";
     };
 
 export type TempestChunkGrid = {
@@ -1021,18 +1018,28 @@ function createTowerCordPassThroughPlacement(
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): TempestCordPassThroughPlacement {
   const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
+  const corner = quadCordCorner(cord);
   return {
     topology: "quad",
     type: "top-cylinder",
-    wall: cord.wall,
-    side: cord.side,
     diameter: cord.diameter,
-    x: towerCordUsesHighX(cord) ? filterLayout.airChamber.xMax - offset : filterLayout.airChamber.xMin + offset,
-    y: towerCordUsesHighY(cord) ? filterLayout.airChamber.yMax - offset : filterLayout.airChamber.yMin + offset,
+    x: corner.x === "max" ? filterLayout.airChamber.xMax - offset : filterLayout.airChamber.xMin + offset,
+    y: corner.y === "max" ? filterLayout.airChamber.yMax - offset : filterLayout.airChamber.yMin + offset,
     zStart: filterLayout.airChamber.zMax,
     depth: filterLayout.topPlateThickness,
-    axis: "z",
   };
+}
+
+// Which corner of the air chamber the tower cord exits through, as min/max on
+// each axis. The chosen wall+side maps to a corner: the cord hugs the high edge
+// when the wall is back/right, or when a front/back/left/right wall's "right"
+// side points to the high edge.
+type QuadCordCorner = { readonly x: "min" | "max"; readonly y: "min" | "max" };
+
+function quadCordCorner(cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>): QuadCordCorner {
+  const usesHighX = cord.wall === "right" || ((cord.wall === "front" || cord.wall === "back") && cord.side === "right");
+  const usesHighY = cord.wall === "back" || ((cord.wall === "left" || cord.wall === "right") && cord.side === "right");
+  return { x: usesHighX ? "max" : "min", y: usesHighY ? "max" : "min" };
 }
 
 function horizontalCordOffset(settings: TempestSettings): Millimeters {
@@ -1047,14 +1054,6 @@ function cordPositionAlongWall(wallLength: Millimeters, side: "left" | "center" 
     return wallLength / 2;
   }
   return side === "left" ? offset : wallLength - offset;
-}
-
-function towerCordUsesHighX(cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>): boolean {
-  return cord.wall === "right" || ((cord.wall === "front" || cord.wall === "back") && cord.side === "right");
-}
-
-function towerCordUsesHighY(cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>): boolean {
-  return cord.wall === "back" || ((cord.wall === "left" || cord.wall === "right") && cord.side === "right");
 }
 
 // ##############################

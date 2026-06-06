@@ -131,14 +131,11 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.cordPassThrough).toMatchObject({
       topology: "quad",
       type: "top-cylinder",
-      wall: "right",
-      side: "right",
       diameter: 8,
       x: 538,
       y: 538,
       zStart: 500,
       depth: 10,
-      axis: "z",
     });
   });
 
