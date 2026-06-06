@@ -1,56 +1,9 @@
-export type Point = {
-  x: number;
-  y: number;
-};
+// Part of the boxes.py correctness oracle — see ./README.md.
+// A faithful port of the minimal boxes.py turtle/canvas: a mutable builder that
+// accumulates `Shape`s under a translation stack. The live app never uses this;
+// only the `Boxes` reference kernel and its generators draw through it.
 
-export type CircleShape = {
-  type: "circle";
-  cx: number;
-  cy: number;
-  radius: number;
-  color: ShapeColor;
-};
-
-export type RectShape = {
-  type: "rect";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: ShapeColor;
-};
-
-export type RoundedRectShape = {
-  type: "rounded-rect";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  radius: number;
-  color: ShapeColor;
-};
-
-export type TextShape = {
-  type: "text";
-  x: number;
-  y: number;
-  text: string;
-  color: ShapeColor;
-  fontSize: number;
-};
-
-export type PathShape = {
-  type: "path";
-  points: Point[];
-  closed: boolean;
-  color: ShapeColor;
-};
-
-export type Shape = CircleShape | RectShape | RoundedRectShape | TextShape | PathShape;
-
-export type LaserOperation = "cut" | "inner-cut" | "annotation" | "reference";
-
-export type ShapeColor = LaserOperation;
+import type { Point, Shape, ShapeColor } from "@/ports/boxes/cutDocument";
 
 type DrawingState = {
   offsetX: number;

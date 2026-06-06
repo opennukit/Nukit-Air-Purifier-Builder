@@ -1,4 +1,9 @@
-import type { Boxes } from "@/ports/boxes/kernel";
+// Part of the boxes.py correctness oracle — see ./README.md.
+// Port of the boxes.py edge registry (finger joints, dovetails, compound edges)
+// that the reference `Boxes` kernel resolves from its single-character edge
+// codes. Oracle-only: the live app's edges live in `@/fabrication/laser`.
+
+import type { Boxes } from "@/ports/boxes/reference/boxes";
 
 export interface Edge {
   readonly char: string;

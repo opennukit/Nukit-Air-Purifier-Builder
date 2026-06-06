@@ -1,5 +1,14 @@
-import { DrawingContext, getShapeBounds, type Shape } from "@/ports/boxes/drawing";
-import { CompoundEdge, createDefaultEdges, type Edge } from "@/ports/boxes/edges";
+// Part of the boxes.py correctness oracle — see ./README.md.
+// A faithful TypeScript port of the minimal subset of the upstream Python
+// `boxes.Boxes` framework (procedural `rectangularWall` / `hole` /
+// `fingerHolesAt` API with edge-pattern strings). It exists ONLY so generators
+// ported 1:1 from boxes.py (e.g. `./airPurifierGenerator`) can run unchanged and
+// act as an executable golden reference for the app's native cut geometry.
+// Nothing in the shipped app instantiates `Boxes`.
+
+import type { BoxesDocument } from "@/ports/boxes/cutDocument";
+import { DrawingContext, getShapeBounds } from "@/ports/boxes/reference/drawingContext";
+import { CompoundEdge, createDefaultEdges, type Edge } from "@/ports/boxes/reference/edges";
 
 export type WallCallback = () => void;
 
@@ -9,12 +18,6 @@ export type RectangularWallOptions = {
   callback?: WallCallback[];
   move?: MoveDirection;
   label?: string;
-};
-
-export type BoxesDocument = {
-  width: number;
-  height: number;
-  shapes: Shape[];
 };
 
 export class Boxes {

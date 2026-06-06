@@ -14,7 +14,7 @@ import {
   type FilterRailKey,
   type LaidOutCutPanel,
 } from "@/fabrication/laser/cutGeometry";
-import type { BoxesDocument } from "@/ports/boxes/kernel";
+import type { BoxesDocument } from "@/ports/boxes/cutDocument";
 
 // #######################################
 // Public Cut-Sheet API
