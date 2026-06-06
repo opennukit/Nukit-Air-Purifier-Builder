@@ -312,7 +312,7 @@ function positionChannelsFrom(positionBase: number): readonly number[] {
 // #######################################
 
 function estimateFeatureCount(model: TempestModel): number {
-  if (model.fanLayout.type === "tower-top-grid") {
+  if (model.fanLayout.topology === "quad") {
     return model.fanLayout.fanCount * fanOpeningAndScrewFeatureCount + 9;
   }
   const fanHoleCount = Object.values(model.fanLayout.walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);

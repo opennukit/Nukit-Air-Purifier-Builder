@@ -96,7 +96,7 @@ function grillBandsInPose(model: TempestModel, pose: TempestPrintablePose, radiu
 // each wall, so they are mapped through the same placement the geometry uses.
 function grillCentresSource(model: TempestModel): GrillCentre[] {
   const { box, frame, fanLayout } = model;
-  if (fanLayout.type === "horizontal-wall-fans") {
+  if (fanLayout.topology === "sandwich") {
     const z = frame.outsideFlangeThickness + fanLayout.localVerticalCenter;
     const wall = frame.wallThickness / 2;
     return [
@@ -110,7 +110,7 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
   if ((model.settings.fan.topExhaust ?? "fan-grid") === "single-box-fan") {
     return [];
   }
-  const topPlate = model.filterLayout.type === "side-filter-tower" ? model.filterLayout.topPlateThickness : 0;
+  const topPlate = model.filterLayout.topology === "quad" ? model.filterLayout.topPlateThickness : 0;
   const z = box.height - topPlate / 2;
   return fanLayout.positionsX.flatMap((x) => fanLayout.positionsY.map((y): GrillCentre => [x, y, z]));
 }

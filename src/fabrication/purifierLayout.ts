@@ -169,7 +169,7 @@ function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans
 }
 
 function resolvedTempestFanCount(fanLayout: TempestFanLayout): number {
-  if (fanLayout.type === "tower-top-grid") {
+  if (fanLayout.topology === "quad") {
     return fanLayout.fanCount;
   }
   return (

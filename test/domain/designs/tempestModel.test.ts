@@ -30,8 +30,8 @@ describe("Tempest OpenSCAD model port", () => {
       chunkDepth: 252.5,
       chunkHeight: 131,
     });
-    expect(model.filterLayout.type).toBe("horizontal-stack");
-    if (model.filterLayout.type !== "horizontal-stack") {
+    expect(model.filterLayout.topology).toBe("sandwich");
+    if (model.filterLayout.topology !== "sandwich") {
       throw new Error("Expected horizontal Tempest layout");
     }
     expect(model.filterLayout.filterCount).toBe(2);
@@ -46,8 +46,8 @@ describe("Tempest OpenSCAD model port", () => {
       ["back", 196, 242],
     ]);
 
-    expect(model.fanLayout.type).toBe("horizontal-wall-fans");
-    if (model.fanLayout.type !== "horizontal-wall-fans") {
+    expect(model.fanLayout.topology).toBe("sandwich");
+    if (model.fanLayout.topology !== "sandwich") {
       throw new Error("Expected horizontal fan layout");
     }
     expect(model.fanLayout.bodyDepth).toBe(27);
@@ -61,7 +61,8 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 252.5, 403]);
 
     expect(model.cordPassThrough).toMatchObject({
-      type: "horizontal-wall-cylinder",
+      topology: "sandwich",
+      type: "wall-cylinder",
       wall: "right",
       side: "right",
       diameter: 8,
@@ -87,8 +88,8 @@ describe("Tempest OpenSCAD model port", () => {
       height: 510,
       wallHeight: 495,
     });
-    expect(model.filterLayout.type).toBe("side-filter-tower");
-    if (model.filterLayout.type !== "side-filter-tower") {
+    expect(model.filterLayout.topology).toBe("quad");
+    if (model.filterLayout.topology !== "quad") {
       throw new Error("Expected tower Tempest layout");
     }
     expect(model.filterLayout.structuralOffset).toBe(60);
@@ -100,13 +101,15 @@ describe("Tempest OpenSCAD model port", () => {
       zMin: 5,
       zMax: 500,
     });
-    expect(model.filterLayout.filterPockets).toHaveLength(4);
-    expect(model.filterLayout.filterPockets.every((pocket) => pocket.width === 495 && pocket.height === 495 && pocket.depth === 45)).toBe(
-      true,
-    );
+    expect(Object.keys(model.filterLayout.filterPockets)).toHaveLength(4);
+    expect(
+      Object.values(model.filterLayout.filterPockets).every(
+        (pocket) => pocket.width === 495 && pocket.height === 495 && pocket.depth === 45,
+      ),
+    ).toBe(true);
 
-    expect(model.fanLayout.type).toBe("tower-top-grid");
-    if (model.fanLayout.type !== "tower-top-grid") {
+    expect(model.fanLayout.topology).toBe("quad");
+    if (model.fanLayout.topology !== "quad") {
       throw new Error("Expected tower fan layout");
     }
     expect(model.fanLayout.minimumCenterFromEdge).toBe(130);
@@ -126,7 +129,8 @@ describe("Tempest OpenSCAD model port", () => {
       chunkHeight: 255,
     });
     expect(model.cordPassThrough).toMatchObject({
-      type: "tower-top-cylinder",
+      topology: "quad",
+      type: "top-cylinder",
       wall: "right",
       side: "right",
       diameter: 8,
@@ -188,8 +192,8 @@ describe("Tempest OpenSCAD model port", () => {
       },
     });
 
-    expect(model.fanLayout.type).toBe("horizontal-wall-fans");
-    if (model.fanLayout.type !== "horizontal-wall-fans") {
+    expect(model.fanLayout.topology).toBe("sandwich");
+    if (model.fanLayout.topology !== "sandwich") {
       throw new Error("Expected horizontal fan layout");
     }
     expect(model.fanLayout.walls.front.maximumCount).toBe(3);
@@ -235,8 +239,8 @@ describe("Tempest OpenSCAD model port", () => {
       chunkDepth: 252.5,
       chunkHeight: 131,
     });
-    expect(model.fanLayout.type).toBe("horizontal-wall-fans");
-    if (model.fanLayout.type !== "horizontal-wall-fans") {
+    expect(model.fanLayout.topology).toBe("sandwich");
+    if (model.fanLayout.topology !== "sandwich") {
       throw new Error("Expected horizontal fan layout");
     }
     expect(model.fanLayout.walls.front.actualCount).toBe(0);

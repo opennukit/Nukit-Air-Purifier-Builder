@@ -1274,10 +1274,10 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const filterMaterial = createFilterMediaMaterial(model.filterLayout.type === "horizontal-stack" ? 0.61 : 0.69);
+    const filterMaterial = createFilterMediaMaterial(model.filterLayout.topology === "sandwich" ? 0.61 : 0.69);
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
     const filterBoxes =
-      model.filterLayout.type === "horizontal-stack"
+      model.filterLayout.topology === "sandwich"
         ? tempestHorizontalFilterBoxes(model, model.filterLayout)
         : tempestTowerFilterBoxes(model, model.filterLayout);
 
@@ -1289,7 +1289,7 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
-    if (model.fanLayout.type === "horizontal-wall-fans") {
+    if (model.fanLayout.topology === "sandwich") {
       for (const wall of tempestPreviewWalls) {
         this.addTempestWallFans(model, pose, model.fanLayout.walls[wall], fanAppearance);
       }
@@ -1993,7 +1993,7 @@ function recessedMillimeterFilterMediaThickness(size: number): number {
 
 function tempestHorizontalFilterBoxes(
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): readonly TempestCsgBox[] {
   const filter = model.settings.arrangement.type === "four-side-filter-tower" ? null : model.settings.arrangement.filter;
   if (filter === null) {
@@ -2017,7 +2017,7 @@ function tempestHorizontalFilterBoxes(
 
 function tempestTowerFilterBoxes(
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): readonly TempestCsgBox[] {
   const filter = model.settings.arrangement.type === "four-side-filter-tower" ? model.settings.arrangement.filter : null;
   if (filter === null) {
@@ -2222,14 +2222,14 @@ function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
 }
 
 function tempestTowerTopFanCenterZ(model: TempestModel): number {
-  if (model.filterLayout.type !== "side-filter-tower") {
+  if (model.filterLayout.topology !== "quad") {
     return model.box.height - model.frame.outsideFlangeThickness - fanPreviewRearDepthMillimeters;
   }
   return model.box.height - model.filterLayout.topPlateThickness - fanPreviewRearDepthMillimeters;
 }
 
-function horizontalTempestFanLayout(model: TempestModel): Extract<TempestModel["fanLayout"], { readonly type: "horizontal-wall-fans" }> {
-  if (model.fanLayout.type !== "horizontal-wall-fans") {
+function horizontalTempestFanLayout(model: TempestModel): Extract<TempestModel["fanLayout"], { readonly topology: "sandwich" }> {
+  if (model.fanLayout.topology !== "sandwich") {
     throw new Error("horizontalTempestFanLayout: Expected horizontal Tempest fan layout");
   }
   return model.fanLayout;

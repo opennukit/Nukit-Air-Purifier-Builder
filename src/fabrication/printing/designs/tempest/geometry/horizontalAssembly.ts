@@ -69,7 +69,7 @@ export function wall<Solid, Region>(
   model: TempestModel,
   length: number,
   fanLayout: TempestWallFanLayout,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): Solid {
   const body = chamferedPrism(ctx, 0, 0, 0, length, model.frame.wallThickness, model.box.wallHeight, model.frame.chamferSize);
   const fanHoles = fanLayout.positionsAlongWall.map((position) =>

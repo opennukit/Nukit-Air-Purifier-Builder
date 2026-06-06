@@ -17,7 +17,7 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
   if (cord.type === "none") {
     return [];
   }
-  if (cord.type === "tower-top-cylinder") {
+  if (cord.type === "top-cylinder") {
     return [cylinderAlong(ctx, "z", [cord.x, cord.y, cord.zStart + cord.depth / 2], cord.depth + 2 * EPSILON_LIP, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
 
@@ -59,7 +59,7 @@ export function pinHoles<Solid, Region>(
   }
 
   const candidates =
-    model.filterLayout.type === "side-filter-tower"
+    model.filterLayout.topology === "quad"
       ? pinCandidatesTower(ctx, model, model.filterLayout, chunkGrid, pin)
       : pinCandidatesHorizontal(ctx, model, model.filterLayout, chunkGrid, pin);
   if (candidates.length === 0) {
@@ -73,7 +73,7 @@ export function pinHoles<Solid, Region>(
 function pinCandidatesHorizontal<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
 ): Solid[] {
@@ -151,7 +151,7 @@ function pinCandidatesHorizontal<Solid, Region>(
 function pinCandidatesTower<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
 ): Solid[] {
@@ -267,7 +267,7 @@ function pinCandidatesTower<Solid, Region>(
 }
 
 function fanBodyZones<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid[] {
-  if (model.fanLayout.type !== "horizontal-wall-fans") {
+  if (model.fanLayout.topology !== "sandwich") {
     return [];
   }
   const { transforms } = ctx.modeling;
@@ -294,7 +294,7 @@ function fanBodyZones<Solid, Region>(ctx: GeometryContext<Solid, Region>, model:
 
 function horizontalFrameMidlinesWithOpening(
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): readonly number[] {
   return [
     model.box.height - model.frame.outsideFlangeThickness / 2,
@@ -305,7 +305,7 @@ function horizontalFrameMidlinesWithOpening(
 
 function horizontalSolidPlateMidlines(
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): readonly number[] {
   return filterLayout.bottomPanel === "solid-plate" ? [model.frame.outsideFlangeThickness / 2] : [];
 }

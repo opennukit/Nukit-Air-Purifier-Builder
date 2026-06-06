@@ -10,7 +10,7 @@ const bed = { width: 256, depth: 256, height: 256 };
 // just mirroring it.
 function poseGrillCentres(model: TempestModel, pose: TempestPrintablePose): Array<readonly [number, number, number]> {
   const fan = model.fanLayout;
-  if (fan.type !== "horizontal-wall-fans") {
+  if (fan.topology !== "sandwich") {
     return [];
   }
   const z = model.frame.outsideFlangeThickness + fan.localVerticalCenter;

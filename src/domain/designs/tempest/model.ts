@@ -1,4 +1,5 @@
 import type { Millimeters } from "@/domain/units";
+import type { TempestTopology } from "./topology";
 
 // #######################################
 // Tempest Input Model
@@ -210,8 +211,10 @@ export type TempestTowerAirChamber = {
   readonly zMax: Millimeters;
 };
 
+export type TempestBottomPanel = "solid-plate" | "open-frame";
+
 export type TempestTowerFilterPocket = {
-  readonly wall: TempestWall;
+  // The `wall` field is gone — the TempestWallMap key IS the wall.
   readonly width: Millimeters;
   readonly height: Millimeters;
   readonly depth: Millimeters;
@@ -219,9 +222,9 @@ export type TempestTowerFilterPocket = {
 
 export type TempestFilterLayout =
   | {
-      readonly type: "horizontal-stack";
+      readonly topology: "sandwich";
       readonly filterCount: 1 | 2;
-      readonly bottomPanel: "solid-plate" | "open-frame";
+      readonly bottomPanel: TempestBottomPanel;
       readonly filters: readonly TempestHorizontalFilterLayer[];
       readonly flanges: readonly TempestHorizontalFlangeLayer[];
       readonly loading: {
@@ -230,13 +233,14 @@ export type TempestFilterLayout =
       };
     }
   | {
-      readonly type: "side-filter-tower";
+      readonly topology: "quad";
       readonly filterCount: 4;
+      readonly filter: TempestTowerFilterSize;
       readonly structuralOffset: Millimeters;
       readonly bottomPlateThickness: Millimeters;
       readonly topPlateThickness: Millimeters;
       readonly airChamber: TempestTowerAirChamber;
-      readonly filterPockets: readonly TempestTowerFilterPocket[];
+      readonly filterPockets: TempestWallMap<TempestTowerFilterPocket>;
       readonly loading: {
         readonly type: "top-plate-slots";
         readonly slotCount: 4;
@@ -257,7 +261,7 @@ export type TempestWallFanLayout = {
 
 export type TempestFanLayout =
   | {
-      readonly type: "horizontal-wall-fans";
+      readonly topology: "sandwich";
       readonly bodyDepth: Millimeters;
       readonly screwPitch: Millimeters;
       readonly cornerSafeMinimum: Millimeters;
@@ -265,7 +269,7 @@ export type TempestFanLayout =
       readonly walls: TempestWallMap<TempestWallFanLayout>;
     }
   | {
-      readonly type: "tower-top-grid";
+      readonly topology: "quad";
       readonly bodyDepth: Millimeters;
       readonly screwPitch: Millimeters;
       readonly minimumCenterFromEdge: Millimeters;
@@ -285,16 +289,18 @@ export type TempestCordPassThroughPlacement =
       readonly type: "none";
     }
   | {
-      readonly type: "horizontal-wall-cylinder";
+      readonly topology: "sandwich";
+      readonly type: "wall-cylinder";
       readonly wall: TempestWall;
       readonly side: "left" | "center" | "right";
       readonly diameter: Millimeters;
       readonly positionAlongWall: Millimeters;
       readonly verticalCenter: Millimeters;
-      readonly axis: "x" | "y";
+      readonly axis: TempestPlanarAxis;
     }
   | {
-      readonly type: "tower-top-cylinder";
+      readonly topology: "quad";
+      readonly type: "top-cylinder";
       readonly wall: TempestWall;
       readonly side: "left" | "center" | "right";
       readonly diameter: Millimeters;
@@ -338,6 +344,7 @@ export type TempestResolvedRenderTarget =
 
 export type TempestModel = {
   readonly settings: TempestSettings;
+  readonly topology: TempestTopology;
   readonly box: TempestBoxEnvelope;
   readonly frame: TempestFrameModel;
   readonly filterLayout: TempestFilterLayout;
@@ -443,6 +450,7 @@ export function createTempestModel(settings: TempestSettings = defaultTempestSet
 
   return {
     settings: safeSettings,
+    topology: tempestTopologyForArrangement(safeSettings.arrangement),
     box,
     frame,
     filterLayout,
@@ -451,6 +459,10 @@ export function createTempestModel(settings: TempestSettings = defaultTempestSet
     chunkGrid,
     renderTarget: resolveRenderTarget(safeSettings.renderTarget, chunkGrid),
   };
+}
+
+function tempestTopologyForArrangement(arrangement: TempestFilterArrangement): TempestTopology {
+  return arrangement.type === "four-side-filter-tower" ? "quad" : "sandwich";
 }
 
 // ##############################
@@ -649,7 +661,7 @@ function createHorizontalFilterLayout(
   filterSlot: TempestFilterSlotSettings,
   box: TempestBoxEnvelope,
   frame: TempestFrameModel,
-): Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }> {
+): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
   const filterCount = horizontalFilterCount(arrangement);
   const filters = Array.from({ length: filterCount }, (_, index) => {
     const zBottom = horizontalFilterZ(index, filterCount, box.height, frame.outsideFlangeThickness, arrangement.filter.thickness);
@@ -668,7 +680,7 @@ function createHorizontalFilterLayout(
         ];
 
   return {
-    type: "horizontal-stack",
+    topology: "sandwich",
     filterCount,
     bottomPanel: filterCount === 1 ? "solid-plate" : "open-frame",
     filters,
@@ -716,13 +728,19 @@ function createTowerFilterLayout(
   arrangement: Extract<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>,
   box: TempestBoxEnvelope,
   frame: TempestFrameModel,
-): Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }> {
+): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
   const structuralOffset = towerStructuralOffset(arrangement, frame);
   const zMin = frame.wallThickness;
   const zMax = box.height - frame.outsideFlangeThickness;
+  const pocket: TempestTowerFilterPocket = {
+    width: arrangement.filter.faceWidth,
+    height: arrangement.filter.faceHeight,
+    depth: arrangement.filter.thickness,
+  };
   return {
-    type: "side-filter-tower",
+    topology: "quad",
     filterCount: 4,
+    filter: arrangement.filter,
     structuralOffset,
     bottomPlateThickness: frame.wallThickness,
     topPlateThickness: frame.outsideFlangeThickness,
@@ -734,12 +752,7 @@ function createTowerFilterLayout(
       zMin,
       zMax,
     },
-    filterPockets: tempestWalls.map((wall) => ({
-      wall,
-      width: arrangement.filter.faceWidth,
-      height: arrangement.filter.faceHeight,
-      depth: arrangement.filter.thickness,
-    })),
+    filterPockets: mapTempestWalls(() => pocket),
     loading: {
       type: "top-plate-slots",
       slotCount: 4,
@@ -754,12 +767,12 @@ function createTowerFilterLayout(
 function createFanLayout(settings: TempestSettings, box: TempestBoxEnvelope, filterLayout: TempestFilterLayout): TempestFanLayout {
   const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
-  if (filterLayout.type === "side-filter-tower") {
+  if (filterLayout.topology === "quad") {
     const minimumCenterFromEdge = filterLayout.structuralOffset + settings.fan.diameter / 2;
     const positionsX = towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
     const positionsY = towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
     return {
-      type: "tower-top-grid",
+      topology: "quad",
       bodyDepth,
       screwPitch,
       minimumCenterFromEdge,
@@ -781,7 +794,7 @@ function createFanLayout(settings: TempestSettings, box: TempestBoxEnvelope, fil
     settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter : 0,
   );
   return {
-    type: "horizontal-wall-fans",
+    topology: "sandwich",
     bodyDepth,
     screwPitch,
     cornerSafeMinimum,
@@ -917,12 +930,13 @@ function createCordPassThroughPlacement(
   if (settings.cordPassThrough.type === "none") {
     return { type: "none" };
   }
-  if (filterLayout.type === "side-filter-tower") {
+  if (filterLayout.topology === "quad") {
     return createTowerCordPassThroughPlacement(settings.cordPassThrough, filterLayout);
   }
   const wallLength = settings.cordPassThrough.wall === "front" || settings.cordPassThrough.wall === "back" ? box.width : box.depth;
   return {
-    type: "horizontal-wall-cylinder",
+    topology: "sandwich",
+    type: "wall-cylinder",
     wall: settings.cordPassThrough.wall,
     side: settings.cordPassThrough.side,
     diameter: settings.cordPassThrough.diameter,
@@ -934,11 +948,12 @@ function createCordPassThroughPlacement(
 
 function createTowerCordPassThroughPlacement(
   cord: Extract<TempestCordPassThrough, { readonly type: "wall" }>,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): TempestCordPassThroughPlacement {
   const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
   return {
-    type: "tower-top-cylinder",
+    topology: "quad",
+    type: "top-cylinder",
     wall: cord.wall,
     side: cord.side,
     diameter: cord.diameter,
@@ -1056,4 +1071,15 @@ const FAN_SCREW_PITCH_RATIO = 0.85; // fallback screw pitch = diameter * this (o
 const CORD_WALL_MARGIN_MM = 1; // extra clearance past the wall when offsetting the cord hole from a corner
 const CORD_TOWER_MIN_EDGE_MM = 2; // minimum gap from the air-chamber edge to the tower cord hole
 
-const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
+export const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
+
+// Builds a TempestWallMap by applying `build` to each wall. The key IS the wall,
+// so consumers index by wall name rather than searching a positional array.
+export function mapTempestWalls<T>(build: (wall: TempestWall) => T): TempestWallMap<T> {
+  return {
+    front: build("front"),
+    back: build("back"),
+    left: build("left"),
+    right: build("right"),
+  };
+}

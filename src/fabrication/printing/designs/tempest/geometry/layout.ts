@@ -6,8 +6,8 @@ import type { TempestModel } from "@/domain/designs/tempest/model";
 
 export function horizontalWallFanLayout(
   model: TempestModel,
-): Extract<TempestModel["fanLayout"], { readonly type: "horizontal-wall-fans" }> {
-  if (model.fanLayout.type !== "horizontal-wall-fans") {
+): Extract<TempestModel["fanLayout"], { readonly topology: "sandwich" }> {
+  if (model.fanLayout.topology !== "sandwich") {
     throw new Error("horizontalWallFanLayout: Expected horizontal wall fans");
   }
   return model.fanLayout;

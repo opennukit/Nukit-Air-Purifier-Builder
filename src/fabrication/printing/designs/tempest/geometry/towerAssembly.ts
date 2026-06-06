@@ -39,7 +39,7 @@ export function towerCornerChamfer(maxChamfer: number, structuralOffset: number,
 
 export function towerAirChamber<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid {
   return cuboidFromMinSize(
     ctx,
@@ -55,7 +55,7 @@ export function towerAirChamber<Solid, Region>(
 export function towerFilterPocket<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   wallName: TempestWall,
 ): Solid {
   const filter = towerFilter(model);
@@ -122,7 +122,7 @@ function towerChamferedOpeningCut<Solid, Region>(
 export function towerSideOpening<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   wallName: TempestWall,
   depthLow: number,
   depthHigh: number,
@@ -169,16 +169,16 @@ export function towerSideOpening<Solid, Region>(
 export function towerFanGrid<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
   if ((model.settings.fan.topExhaust ?? "fan-grid") === "single-box-fan") {
     return towerBoxExhaustCuts(ctx, model, filterLayout);
   }
-  if (model.fanLayout.type !== "tower-top-grid") {
+  if (model.fanLayout.topology !== "quad") {
     return [];
   }
   return model.fanLayout.positionsX.flatMap((x) =>
-    model.fanLayout.type === "tower-top-grid"
+    model.fanLayout.topology === "quad"
       ? model.fanLayout.positionsY.map((y) =>
           fanPatternCut(
             ctx,
@@ -197,7 +197,7 @@ export function towerFanGrid<Solid, Region>(
 export function towerBoxExhaustCuts<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
   const { transforms, extrusions } = ctx.modeling;
   const chamber = filterLayout.airChamber;
@@ -235,7 +235,7 @@ export function towerBoxExhaustCuts<Solid, Region>(
 export function towerFilterSlots<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
   const filter = towerFilter(model);
   const z = model.box.height - filterLayout.topPlateThickness - EPSILON_LIP;

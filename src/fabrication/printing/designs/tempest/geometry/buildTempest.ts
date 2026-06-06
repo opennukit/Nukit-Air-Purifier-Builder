@@ -60,7 +60,7 @@ function finalModel<Solid, Region>(
 
 // Pick the recipe named by the model's filter layout.
 function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
-  return model.filterLayout.type === "side-filter-tower"
+  return model.filterLayout.topology === "quad"
     ? assemblyTower(ctx, model, model.filterLayout)
     : assemblyHorizontal(ctx, model, model.filterLayout);
 }
@@ -81,7 +81,7 @@ const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
 function assemblyTower<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid {
   // 1. The outer box; towerCornerChamfer keeps the bevel a full wall clear of the
   //    nearest filter pocket.
@@ -130,7 +130,7 @@ function assemblyTower<Solid, Region>(
 function assemblyHorizontal<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): Solid {
   const { transforms } = ctx.modeling;
 
