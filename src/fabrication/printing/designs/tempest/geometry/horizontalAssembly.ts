@@ -10,50 +10,13 @@ import {
   chamferedPrism,
   cuboidFromMinSize,
   subtractAll,
-  unionAll,
 } from "./primitives";
 import { fanPatternCut, filterOpening2d } from "./patterns2d";
-import { horizontalWallFanLayout, horizontalWallLocalFanCenter } from "./layout";
+import { horizontalWallLocalFanCenter } from "./layout";
 
 // #######################################
 // 1 / 2 Filter Horizontal Assembly
 // #######################################
-
-export function assemblyHorizontal<Solid, Region>(
-  ctx: GeometryContext<Solid, Region>,
-  model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "horizontal-stack" }>,
-): Solid {
-  const { transforms } = ctx.modeling;
-  const bottomPanel = filterLayout.bottomPanel === "solid-plate" ? platePanel(ctx, model) : framePanel(ctx, model);
-  const topFrame = transforms.translate([0, 0, model.box.height - model.frame.outsideFlangeThickness], framePanel(ctx, model));
-  const flanges = filterLayout.flanges.map((flange) =>
-    transforms.translate([0, 0, flange.zBottom], flangePanel(ctx, model, model.frame.insideFlangeThickness)),
-  );
-  const fanLayout = horizontalWallFanLayout(model);
-
-  return unionAll(ctx, [
-    bottomPanel,
-    topFrame,
-    ...flanges,
-    transforms.translate(
-      [0, 0, model.frame.outsideFlangeThickness],
-      wall(ctx, model, model.box.width, fanLayout.walls.front, filterLayout),
-    ),
-    transforms.translate(
-      [model.box.width, model.box.depth, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(Math.PI, wall(ctx, model, model.box.width, fanLayout.walls.back, filterLayout)),
-    ),
-    transforms.translate(
-      [0, model.box.depth, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(-Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.left, filterLayout)),
-    ),
-    transforms.translate(
-      [model.box.width, 0, model.frame.outsideFlangeThickness],
-      transforms.rotateZ(Math.PI / 2, wall(ctx, model, model.box.depth, fanLayout.walls.right, filterLayout)),
-    ),
-  ]);
-}
 
 export function framePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
   const panel = chamferedPrism(

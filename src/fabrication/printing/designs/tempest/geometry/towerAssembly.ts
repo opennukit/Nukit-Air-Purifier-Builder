@@ -6,15 +6,13 @@ import type {
 import type { GeometryContext } from "./context";
 import { epsilon } from "./context";
 import {
-  chamferedPrism,
   cuboidFromMinSize,
   cylinderAlong,
-  subtractAll,
   thinExtrude,
   unionAll,
 } from "./primitives";
 import { fanPatternCut, towerOpening2d } from "./patterns2d";
-import { towerFilter, towerFilterThickness } from "./layout";
+import { towerFilter } from "./layout";
 
 // Places the 45° corner bevel one outer-wall thickness clear of the nearest air.
 // The closest void to the corner is the filter pocket, whose near-corner edge sits
@@ -33,43 +31,6 @@ export function towerCornerChamfer(maxChamfer: number, structuralOffset: number,
 // #######################################
 // 4 Filter Tower Assembly
 // #######################################
-
-const tempestWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
-
-export function assemblyTower<Solid, Region>(
-  ctx: GeometryContext<Solid, Region>,
-  model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly type: "side-filter-tower" }>,
-): Solid {
-  const solid = chamferedPrism(
-    ctx,
-    0,
-    0,
-    0,
-    model.box.width,
-    model.box.depth,
-    model.box.height,
-    towerCornerChamfer(model.frame.towerCornerPostChamfer, filterLayout.structuralOffset, model.frame.outsideFlangeThickness),
-  );
-
-  return subtractAll(ctx, solid, [
-    towerAirChamber(ctx, filterLayout),
-    ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, wallName)),
-    ...tempestWalls.flatMap((wallName) => [
-      ...towerSideOpening(ctx, model, filterLayout, wallName, -epsilon, model.frame.outsideFlangeThickness + epsilon),
-      ...towerSideOpening(
-        ctx,
-        model,
-        filterLayout,
-        wallName,
-        model.frame.outsideFlangeThickness + towerFilterThickness(model) - epsilon,
-        filterLayout.structuralOffset + epsilon,
-      ),
-    ]),
-    ...towerFanGrid(ctx, model, filterLayout),
-    ...towerFilterSlots(ctx, model, filterLayout),
-  ]);
-}
 
 export function towerAirChamber<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,

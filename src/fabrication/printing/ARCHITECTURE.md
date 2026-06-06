@@ -68,14 +68,14 @@ cycles and you can read it top-to-bottom:
 
 | File | Responsibility |
 |---|---|
-| `context.ts` | `GeometryContext<Solid,Region>` (the modeling backend + a per-build fan-pattern cache) and tuning constants (`epsilon`, `csgSegments`, `towerCornerFilterClearance`). |
+| `context.ts` | `GeometryContext<Solid,Region>` (the modeling backend + a per-build fan-pattern cache) and tuning constants (`epsilon`, `csgSegments`, `scadWallCutOverlap`). |
 | `primitives.ts` | Kernel-agnostic 3D/2D shapes (chamfered prisms, cylinders-along-axis, thin extrudes) and the boolean helpers (`unionAll`, `subtractAll`). Knows nothing about purifiers. |
 | `patterns2d.ts` | 2D cross-sections — hex grill, fan pattern, filter/tower openings — and `fanPatternCut`, which lifts the fan profile into a cutting solid. |
 | `layout.ts` | Pure placement math derived from a `TempestModel` (fan centres, screw pitch, filter thickness). Takes no context. |
 | `pins.ts` | Alignment-pin and cord-pass-through hole sets — the holes subtracted at the very end. |
-| `horizontalAssembly.ts` | The 1/2-filter horizontal housing. |
-| `towerAssembly.ts` | The 4-filter tower housing + `towerCornerChamfer` (the filter-derived corner bevel). |
-| `buildTempest.ts` | Entry point: builds the context, dispatches on the filter arrangement, subtracts the holes. |
+| `horizontalAssembly.ts` | Step implementations for the 1/2-filter horizontal box (panels + walls) — the timeline's nodes. |
+| `towerAssembly.ts` | Step implementations for the 4-filter tower (air chamber, pockets, openings, fan grid, slots) + `towerCornerChamfer`. |
+| `buildTempest.ts` | **The build timeline — start here.** Reads top to bottom as the recipe: dispatches to the tower or horizontal recipe, then subtracts the through-holes (cord + alignment pins). Each numbered step is a call into the files above; the call *is* one timeline node. |
 | `index.ts` | Public API: `buildTempestGeometry`, `towerCornerChamfer`. |
 
 ### Why GeometryContext is threaded explicitly
