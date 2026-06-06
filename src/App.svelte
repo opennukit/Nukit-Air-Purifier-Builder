@@ -239,7 +239,6 @@
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
   let activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
-  let selectedDonutFilterPreset = findDonutFilterPreset(settings.donutFilterPreset);
   let selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
   let selectedFanDiameterSelection: FanDiameterSelection = defaultRecommendedFanDiameter;
   let selectedFanProductOptions: readonly PresetFanProduct[] = [];
@@ -260,10 +259,6 @@
   let copyMobileButtonText = "Copy URL";
   let exportMainButtonText = "Download 3MF";
   let exportMobileButtonText = "Download 3MF";
-  let selectedFilterDetailText = "";
-  let selectedFilterDimensionsText = "";
-  let selectedDonutFilterDimensionsText = "";
-  let selectedFanDetailText = "";
 
   // ##############################
   // Reactive Derivations
@@ -288,7 +283,6 @@
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
   $: activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
-  $: selectedDonutFilterPreset = findDonutFilterPreset(settings.donutFilterPreset);
   $: selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
   $: selectedFanDiameterSelection = fanDiameterSelectionForSettings(settings);
   $: selectedFanProductOptions = fanProductOptionsForSelection(selectedFanDiameterSelection);
@@ -310,10 +304,6 @@
   $: copyMobileButtonText = transientButtonLabels["copy-mobile"] ?? "Copy URL";
   $: exportMainButtonText = transientButtonLabels["export-main"] ?? exportActionText;
   $: exportMobileButtonText = transientButtonLabels["export-mobile"] ?? exportActionText;
-  $: selectedFilterDimensionsText = `${formatMillimeters(settings.filterWidth)} x ${formatMillimeters(settings.filterDepth)} x ${formatMillimeters(settings.filterThickness)}`;
-  $: selectedFilterDetailText = createSelectedFilterDetail(settings, layout, fabricationMethod);
-  $: selectedDonutFilterDimensionsText = `${formatMillimeters(settings.donutFilterOuterDiameter)} dia x ${formatMillimeters(settings.donutFilterLength)} · ${formatMillimeters(settings.donutFilterHoleDiameter)} hole`;
-  $: selectedFanDetailText = createSelectedFanDetail(settings, layout, fabricationMethod);
 
   // ##############################
   // Lifecycle
@@ -627,25 +617,6 @@
 
   function publicThreeDimensionalPrintDesignId(printDesign: PrintDesignId): PrintDesignId {
     return isPublicThreeDimensionalPrintDesignId(printDesign) ? printDesign : defaultThreeDimensionalPrintDesignId;
-  }
-
-  function createSelectedFilterDetail(
-    currentSettings: RawPurifierSettings,
-    currentLayout: LayoutResult,
-    currentFabricationMethod: FabricationMethod,
-  ): string {
-    const preset = findFilterPreset(currentSettings.filterPreset);
-    const examples = preset.examples.length > 0 ? ` (${preset.examples.join(", ")})` : "";
-    return `${preset.detail}${examples} · ${preset.nominalSize} · ${configuredFanCountFor(currentLayout, currentFabricationMethod)} fans`;
-  }
-
-  function createSelectedFanDetail(
-    currentSettings: RawPurifierSettings,
-    currentLayout: LayoutResult,
-    currentFabricationMethod: FabricationMethod,
-  ): string {
-    const product = findFanProductPreset(currentSettings.fanPreset);
-    return `${configuredFanCountFor(currentLayout, currentFabricationMethod)} x ${currentLayout.configuration.fan.spec.diameter} mm · ${product.detail} · ${product.powerNote}`;
   }
 
   function swatchColor(color: number): string {
@@ -1848,17 +1819,6 @@
                             {/each}
                           </select>
                         </label>
-                        <details class="selector-info">
-                          <summary aria-label="Filter details" title="Filter details">
-                            <span>Details</span>
-                          </summary>
-                          <div class="selector-info-panel">
-                            <div class="filter-preset-card" id="filterPresetDetail">
-                              <strong>{selectedFilterDimensionsText}</strong>
-                              <span>{selectedFilterDetailText}</span>
-                            </div>
-                          </div>
-                        </details>
                       </div>
                       {#if settings.filterPreset === customFilterPresetId}
                       <div class="custom-dimensions" data-custom-filter-dimensions>
@@ -1894,23 +1854,6 @@
                             {/each}
                           </select>
                         </label>
-                        <details class="selector-info">
-                          <summary aria-label="Round filter details" title="Round filter details">
-                            <span>Details</span>
-                          </summary>
-                          <div class="selector-info-panel">
-                            <div class="filter-preset-card" id="donutFilterPresetDetail">
-                              <strong>{selectedDonutFilterDimensionsText}</strong>
-                              <span>{selectedDonutFilterPreset.detail} · {selectedDonutFilterPreset.measurementNote}</span>
-                              <small>
-                                {selectedDonutFilterPreset.source}
-                                {#if selectedDonutFilterPreset.sourceUrl !== undefined}
-                                  <a href={selectedDonutFilterPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
-                                {/if}
-                              </small>
-                            </div>
-                          </div>
-                        </details>
                       </div>
                       <div class="donut-filter-dimensions">
                         {#each donutFilterDimensionControls as control}
@@ -1980,32 +1923,6 @@
                           </span>
                         </label>
                       {/if}
-                      <details class="selector-info">
-                        <summary aria-label="Fan model details" title="Fan model details">
-                          <span>Details</span>
-                        </summary>
-                        <div class="selector-info-panel">
-                          <div class="fan-preset-card" id="fanPresetDetail">
-                            <div class="fan-card-header">
-                              <div>
-                                <strong>{selectedFanProductPreset.label}</strong>
-                                <span>{selectedFanDetailText}</span>
-                              </div>
-                              <div class="fan-color-swatches" aria-label="Fan colors">
-                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.frameColor)}></span>
-                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.bladeColor)}></span>
-                                <span style:--swatch-color={swatchColor(selectedFanProductPreset.appearance.hubColor)}></span>
-                              </div>
-                            </div>
-                            <small>
-                              {selectedFanProductPreset.source}
-                              {#if selectedFanProductPreset.productUrl !== undefined}
-                                <a href={selectedFanProductPreset.productUrl} target="_blank" rel="noreferrer">Source</a>
-                              {/if}
-                            </small>
-                          </div>
-                        </div>
-                      </details>
                     </div>
                   </div>
                 </div>
