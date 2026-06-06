@@ -172,19 +172,31 @@ export type PrintDesignImplementation =
     };
 
 export type LaserDerivedPrintDesignPreset = PrintDesignPresetBase & {
-  readonly implementation: Extract<PrintDesignImplementation, { readonly type: "laser-derived-printable-kit" }>;
+  readonly implementation: Extract<
+    PrintDesignImplementation,
+    { readonly type: "laser-derived-printable-kit" }
+  >;
 };
 
 export type DonutFilterAdapterPrintDesignPreset = PrintDesignPresetBase & {
-  readonly implementation: Extract<PrintDesignImplementation, { readonly type: "donut-filter-adapter" }>;
+  readonly implementation: Extract<
+    PrintDesignImplementation,
+    { readonly type: "donut-filter-adapter" }
+  >;
 };
 
 export type TempestPrintDesignPreset = PrintDesignPresetBase & {
-  readonly implementation: Extract<PrintDesignImplementation, { readonly type: "tempest" }>;
+  readonly implementation: Extract<
+    PrintDesignImplementation,
+    { readonly type: "tempest" }
+  >;
 };
 
 export type StaticReferencePrintDesignPreset = PrintDesignPresetBase & {
-  readonly implementation: Extract<PrintDesignImplementation, { readonly type: "static-reference" }>;
+  readonly implementation: Extract<
+    PrintDesignImplementation,
+    { readonly type: "static-reference" }
+  >;
 };
 
 export type PrintDesignPreset =
@@ -204,14 +216,15 @@ export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
   readonly splitFrames: boolean;
 };
 
-export type DonutFilterAdapterPrintDesignDefaults = CommonPrintDesignDefaults & {
-  readonly donutFilterPreset: PresetDonutFilterId;
-  readonly filter: DonutFilterSettings;
-  readonly fanCount: FixedFanCount;
-  readonly splitFrames: boolean;
-  readonly materialThickness: Millimeters;
-  readonly screwHoleDiameter: Millimeters;
-};
+export type DonutFilterAdapterPrintDesignDefaults =
+  CommonPrintDesignDefaults & {
+    readonly donutFilterPreset: PresetDonutFilterId;
+    readonly filter: DonutFilterSettings;
+    readonly fanCount: FixedFanCount;
+    readonly splitFrames: boolean;
+    readonly materialThickness: Millimeters;
+    readonly screwHoleDiameter: Millimeters;
+  };
 
 export const tempestArrangementPresets = [
   "single-horizontal-top-filter",
@@ -219,7 +232,8 @@ export const tempestArrangementPresets = [
   "four-side-filter-tower",
 ] as const;
 
-export type TempestArrangementPreset = (typeof tempestArrangementPresets)[number];
+export type TempestArrangementPreset =
+  (typeof tempestArrangementPresets)[number];
 
 const defaultFilterPresetByTempestArrangement = {
   "single-horizontal-top-filter": "merv13-20x20x2",
@@ -256,17 +270,15 @@ export type FanAppearance = {
   readonly bladeColor: number;
   readonly hubColor: number;
   readonly accentColor: number;
-  readonly bladeOpacity: number;
   readonly previewCadModel?: FanPreviewCadModel;
 };
 
-export type FanPreviewCadModel =
-  | {
-      readonly type: "noctua-nf-a14-public-cad";
-      readonly sourceUrl: "https://www.noctua.at/en/3d-cad-models";
-      readonly assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json";
-      readonly usage: "preview-only";
-    };
+export type FanPreviewCadModel = {
+  readonly type: "noctua-nf-a14-public-cad";
+  readonly sourceUrl: "https://www.noctua.at/en/3d-cad-models";
+  readonly assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json";
+  readonly usage: "preview-only";
+};
 
 export const fanProductPresetIds = [
   "nukit-arctic-p14",
@@ -307,74 +319,83 @@ export const fanProductPresets: readonly FanProductPreset[] = [
   {
     id: "nukit-arctic-p14",
     label: "ARCTIC P14 PWM PST",
-    detail: "Nukit baseline recommendation: black 140 mm pressure-optimized PWM fan with PST daisy-chain cabling.",
+    detail:
+      "Nukit baseline recommendation: black 140 mm pressure-optimized PWM fan with PST daisy-chain cabling.",
     diameter: 140,
     source: "Nukit README / ARCTIC P14 PWM PST",
     productUrl: "https://www.arctic.de/en/P14-PWM-PST/ACFAN00125A",
     powerNote: "4-pin PWM PST, 12 V",
-    buyingNotes: ["Good low-cost default", "PST cabling can simplify multi-fan wiring"],
+    buyingNotes: [
+      "Good low-cost default",
+      "PST cabling can simplify multi-fan wiring",
+    ],
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x050807,
       bladeColor: 0x49525a,
       hubColor: 0x919a96,
-      accentColor: 0x253a38,
-      bladeOpacity: 0.84,
-    },
+      accentColor: 0x253a38,    },
   },
   {
     id: "arctic-p12-pwm-pst",
     label: "ARCTIC P12 PWM PST",
-    detail: "120 mm pressure-optimized PWM fan used by several compact printable CR box builds.",
+    detail:
+      "120 mm pressure-optimized PWM fan used by several compact printable CR box builds.",
     diameter: 120,
     source: "ARCTIC P12 PWM PST",
     productUrl: "https://www.arctic.de/en/P12-PWM-PST/ACFAN00120A",
     powerNote: "4-pin PWM PST, 12 V",
-    buyingNotes: ["Good compact printable-box fan", "PST cabling can simplify six-fan wiring"],
+    buyingNotes: [
+      "Good compact printable-box fan",
+      "PST cabling can simplify six-fan wiring",
+    ],
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x050807,
       bladeColor: 0x49525a,
       hubColor: 0x919a96,
-      accentColor: 0x253a38,
-      bladeOpacity: 0.84,
-    },
+      accentColor: 0x253a38,    },
   },
   {
     id: "cleanairkits-mobius-120p",
     label: "Cooler Master Mobius 120P",
-    detail: "CleanAirKits Luggable Ultra style: high-pressure 120 mm Mobius fan family.",
+    detail:
+      "CleanAirKits Luggable Ultra style: high-pressure 120 mm Mobius fan family.",
     diameter: 120,
     source: "CleanAirKits Luggables / Cooler Master Mobius 120P",
-    productUrl: "https://www.coolermaster.com/en-global/products/mobius-120p-argb/",
+    productUrl:
+      "https://www.coolermaster.com/en-global/products/mobius-120p-argb/",
     powerNote: "4-pin PWM, 12 V",
-    buyingNotes: ["Matches the Luggable Ultra fan size", "Black retail or ARGB versions may vary by region"],
+    buyingNotes: [
+      "Matches the Luggable Ultra fan size",
+      "Black retail or ARGB versions may vary by region",
+    ],
     appearance: {
       frameColor: 0x080d11,
       ringColor: 0x151c22,
       bladeColor: 0x202b33,
       hubColor: 0x8a969c,
-      accentColor: 0x50b8ff,
-      bladeOpacity: 0.88,
-    },
+      accentColor: 0x50b8ff,    },
   },
   {
     id: "noctua-nf-a14",
     label: "Noctua NF-A14 PWM",
-    detail: "Premium quiet 140 mm option with Noctua's recognizable beige frame and brown blades.",
+    detail:
+      "Premium quiet 140 mm option with Noctua's recognizable beige frame and brown blades.",
     diameter: 140,
     source: "Noctua NF-A14 PWM",
     productUrl: "https://noctua.at/en/nf-a14-pwm",
     powerNote: "4-pin PWM, 12 V",
-    buyingNotes: ["Premium acoustic choice", "Color is intentionally visible in the preview"],
+    buyingNotes: [
+      "Premium acoustic choice",
+      "Color is intentionally visible in the preview",
+    ],
     appearance: {
       frameColor: 0xd6bd8d,
       ringColor: 0xb79a67,
       bladeColor: 0x6b3b25,
       hubColor: 0xe2cda4,
-      accentColor: 0x8f5b35,
-      bladeOpacity: 0.92,
-      previewCadModel: {
+      accentColor: 0x8f5b35,      previewCadModel: {
         type: "noctua-nf-a14-public-cad",
         sourceUrl: "https://www.noctua.at/en/3d-cad-models",
         assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
@@ -389,15 +410,16 @@ export const fanProductPresets: readonly FanProductPreset[] = [
     diameter: 140,
     source: "User supplied fan",
     powerNote: "Check the fan datasheet",
-    buyingNotes: ["Verify screw spacing before cutting", "Check voltage and current draw"],
+    buyingNotes: [
+      "Verify screw spacing before cutting",
+      "Check voltage and current draw",
+    ],
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x060a09,
       bladeColor: 0x657179,
       hubColor: 0x9aa39f,
-      accentColor: 0x3c6f61,
-      bladeOpacity: 0.84,
-    },
+      accentColor: 0x3c6f61,    },
   },
 ];
 
@@ -504,7 +526,8 @@ export const previewMaterialColorPresets = [
   { id: "forest-green", label: "Green", color: 0x1f6f56 },
 ] as const;
 
-export type PreviewMaterialColorPreset = (typeof previewMaterialColorPresets)[number];
+export type PreviewMaterialColorPreset =
+  (typeof previewMaterialColorPresets)[number];
 export type PreviewMaterialColorId = PreviewMaterialColorPreset["id"];
 
 const defaultPreviewMaterialColorId: PreviewMaterialColorId = "matte-black";
@@ -515,7 +538,8 @@ export type CutSheetPreviewOptions = {
 };
 
 export const customDonutFilterPresetId: DonutFilterPresetId = "custom";
-export const defaultDonutFilterPresetId: PresetDonutFilterId = "silentnight-92-reference";
+export const defaultDonutFilterPresetId: PresetDonutFilterId =
+  "silentnight-92-reference";
 
 // #######################################
 // Donut Filter Presets
@@ -525,9 +549,11 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
   {
     id: "silentnight-92-reference",
     label: "Silentnight-style 92 mm cartridge",
-    detail: "Compact round HEPA cartridge used by the OpenSCAD reference adapter.",
+    detail:
+      "Compact round HEPA cartridge used by the OpenSCAD reference adapter.",
     source: "OpenSCAD reference dimensions",
-    measurementNote: "The reference script uses a 92 mm center hole; measure the cartridge before printing.",
+    measurementNote:
+      "The reference script uses a 92 mm center hole; measure the cartridge before printing.",
     settings: {
       outerDiameter: 125,
       length: 150,
@@ -541,9 +567,12 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     label: "Levoit Core Mini",
     detail: "Small round replacement filter cartridge.",
     source: "Levoit Core Mini-RF listing",
-    sourceUrl: "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
-    productUrl: "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
-    measurementNote: "Outer size is from published listings; center hole is a starter value and should be measured.",
+    sourceUrl:
+      "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
+    productUrl:
+      "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
+    measurementNote:
+      "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
       outerDiameter: 159,
       length: 135,
@@ -559,7 +588,8 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     source: "Levoit Core 200S-RF listings",
     sourceUrl: "https://device.report/levoit/core-200s-rf",
     productUrl: "https://levoit.com/products/core-200s-p-replacement-filter",
-    measurementNote: "Outer size is from published listings; center hole is a starter value and should be measured.",
+    measurementNote:
+      "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
       outerDiameter: 183,
       length: 145,
@@ -573,9 +603,12 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     label: "Levoit Core 300",
     detail: "Larger round replacement filter cartridge.",
     source: "Levoit Core 300-RF listings",
-    sourceUrl: "https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/",
-    productUrl: "https://levoit.com/products/core300-air-purifier-replacement-filter",
-    measurementNote: "Outer size is from published listings; center hole is a starter value and should be measured.",
+    sourceUrl:
+      "https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/",
+    productUrl:
+      "https://levoit.com/products/core300-air-purifier-replacement-filter",
+    measurementNote:
+      "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
       outerDiameter: 193,
       length: 147,
@@ -587,9 +620,11 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
   {
     id: "custom",
     label: "Custom measured round filter",
-    detail: "Use calipers and enter the exact outside diameter, length, and center-hole diameter.",
+    detail:
+      "Use calipers and enter the exact outside diameter, length, and center-hole diameter.",
     source: "User supplied measurements",
-    measurementNote: "Measure the center hole carefully; that dimension controls whether the adaptor actually seats.",
+    measurementNote:
+      "Measure the center hole carefully; that dimension controls whether the adaptor actually seats.",
     settings: {
       outerDiameter: 125,
       length: 150,
@@ -601,7 +636,8 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
 ];
 
 export const defaultPrintDesignId: PrintDesignId = "nukit-open-air";
-export const defaultThreeDimensionalPrintDesignId: PrintDesignId = "nukit-tempest";
+export const defaultThreeDimensionalPrintDesignId: PrintDesignId =
+  "nukit-tempest";
 
 // #######################################
 // Print Design Presets
@@ -611,7 +647,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-open-air",
     label: "Nukit Open Air",
-    detail: "3D-printable Nukit enclosure split into bed-sized panels with dovetail lap keys for glued seams.",
+    detail:
+      "3D-printable Nukit enclosure split into bed-sized panels with dovetail lap keys for glued seams.",
     source: "FilterBoxBuilder browser generator",
     license: "Generated from this project",
     releaseVisibility: "public",
@@ -639,9 +676,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-tempest",
     label: "Nukit Tempest",
-    detail:
-      "Parametric Tempest printable housing with selectable 1-filter, 2-filter, and 4-side-filter arrangements.",
-    source: "Tempest OpenSCAD reference port",
+    detail: "Parametric Tempest printable housing",
+    source: "",
     license: "Generated from this project",
     releaseVisibility: "public",
     implementation: {
@@ -664,9 +700,11 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "donut-hepa-adapter",
     label: "Donut HEPA fan adaptor",
-    detail: "Self-scaling round-filter adaptor for a PC fan, with optional press-fit blanking cap and printed fan guard.",
+    detail:
+      "Self-scaling round-filter adaptor for a PC fan, with optional press-fit blanking cap and printed fan guard.",
     source: "Donut HEPA OpenSCAD reference",
-    license: "Reference script published in the video description; generated geometry is parametric in this app",
+    license:
+      "Reference script published in the video description; generated geometry is parametric in this app",
     releaseVisibility: "internal",
     implementation: {
       type: "donut-filter-adapter",
@@ -696,7 +734,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "static-cr-16x20-140",
     label: "Static CR 16x20 140 mm kit",
-    detail: "Curated fixed Printables design for 16x20x1 filters and five 140 mm PC fans.",
+    detail:
+      "Curated fixed Printables design for 16x20x1 filters and five 140 mm PC fans.",
     source: "Printables static reference",
     sourceUrl: staticPrintReferences["static-cr-16x20-140"].sourceUrl,
     license: "CC-BY",
@@ -722,7 +761,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "static-cr-14x20-base",
     label: "Static CR 14x20 reference",
-    detail: "Curated fixed Printables design with STEP source for a Corsi-Rosenthal filter housing.",
+    detail:
+      "Curated fixed Printables design with STEP source for a Corsi-Rosenthal filter housing.",
     source: "Printables static reference",
     sourceUrl: staticPrintReferences["static-cr-14x20-base"].sourceUrl,
     license: "CC-BY",
@@ -750,9 +790,11 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "static-modular-20x20-reference",
     label: "Static modular 20x20 reference",
-    detail: "External fixed Printables reference for a modular 20x20 air-filter frame.",
+    detail:
+      "External fixed Printables reference for a modular 20x20 air-filter frame.",
     source: "Printables external reference",
-    sourceUrl: staticPrintReferences["static-modular-20x20-reference"].sourceUrl,
+    sourceUrl:
+      staticPrintReferences["static-modular-20x20-reference"].sourceUrl,
     license: "CC-BY-NC-SA",
     licenseUrl: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
     releaseVisibility: "internal",
@@ -775,33 +817,45 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   },
 ];
 
-export const publicPrintDesignPresets: readonly PrintDesignPreset[] = printDesignPresets.filter(isPublicPrintDesignPreset);
-export const publicThreeDimensionalPrintDesignPresets: readonly PrintDesignPreset[] = publicPrintDesignPresets.filter(
-  isPublicThreeDimensionalPrintDesignPreset,
-);
+export const publicPrintDesignPresets: readonly PrintDesignPreset[] =
+  printDesignPresets.filter(isPublicPrintDesignPreset);
+export const publicThreeDimensionalPrintDesignPresets: readonly PrintDesignPreset[] =
+  publicPrintDesignPresets.filter(isPublicThreeDimensionalPrintDesignPreset);
 
 // #######################################
 // Public Release Presets
 // #######################################
 
-export function isPublicThreeDimensionalPrintDesignId(id: PrintDesignId): boolean {
-  return publicThreeDimensionalPrintDesignPresets.some((preset) => preset.id === id);
+export function isPublicThreeDimensionalPrintDesignId(
+  id: PrintDesignId,
+): boolean {
+  return publicThreeDimensionalPrintDesignPresets.some(
+    (preset) => preset.id === id,
+  );
 }
 
 function isPublicPrintDesignPreset(preset: PrintDesignPreset): boolean {
   return preset.releaseVisibility === "public";
 }
 
-function isPublicThreeDimensionalPrintDesignPreset(preset: PrintDesignPreset): boolean {
+function isPublicThreeDimensionalPrintDesignPreset(
+  preset: PrintDesignPreset,
+): boolean {
   return !isLaserDerivedPrintDesignPreset(preset);
 }
 
 function rawFilterCountForPrintDesign(preset: PrintDesignPreset): FilterCount {
-  if (isLaserDerivedPrintDesignPreset(preset) || isStaticReferencePrintDesignPreset(preset)) {
+  if (
+    isLaserDerivedPrintDesignPreset(preset) ||
+    isStaticReferencePrintDesignPreset(preset)
+  ) {
     return preset.implementation.defaults.filterCount;
   }
   if (isTempestPrintDesignPreset(preset)) {
-    return preset.implementation.defaults.arrangement === "single-horizontal-top-filter" ? 1 : 2;
+    return preset.implementation.defaults.arrangement ===
+      "single-horizontal-top-filter"
+      ? 1
+      : 2;
   }
   if (isDonutFilterAdapterPrintDesignPreset(preset)) {
     return 1;
@@ -993,7 +1047,10 @@ export type BuildSummary = {
   fabrication: BuildFabricationSummary;
 };
 
-export type PurifierInput = RawPurifierSettings | PurifierSettings | PurifierDraft;
+export type PurifierInput =
+  | RawPurifierSettings
+  | PurifierSettings
+  | PurifierDraft;
 
 // #######################################
 // Defaults
@@ -1029,7 +1086,8 @@ export const defaultSettings: RawPurifierSettings = {
   fingerSpaceMultiplier: defaultCutJointSettings.finger.spaceMultiplier,
   fingerPlayMultiplier: defaultCutJointSettings.finger.playMultiplier,
   fingerHoleWidthMultiplier: defaultCutJointSettings.finger.holeWidthMultiplier,
-  fingerHoleOffsetMultiplier: defaultCutJointSettings.finger.holeOffsetMultiplier,
+  fingerHoleOffsetMultiplier:
+    defaultCutJointSettings.finger.holeOffsetMultiplier,
   dovetailSizeMultiplier: defaultCutJointSettings.dovetail.sizeMultiplier,
   dovetailDepthMultiplier: defaultCutJointSettings.dovetail.depthMultiplier,
   dovetailTaper: defaultCutJointSettings.dovetail.taper,
@@ -1057,18 +1115,37 @@ export const defaultSettings: RawPurifierSettings = {
 // ##############################
 
 export function normalizeSettings(input: PurifierInput): PurifierSettings {
-  const raw = isStructuredSettings(input) ? toRawSettings(input) : isPurifierDraft(input) ? serializePurifierDraft(input) : input;
+  const raw = isStructuredSettings(input)
+    ? toRawSettings(input)
+    : isPurifierDraft(input)
+      ? serializePurifierDraft(input)
+      : input;
   const printDesign = findPrintDesignPreset(raw.printDesign);
   const preset = findFilterPreset(raw.filterPreset);
-  const dimensions = normalizeFilterDimensions(preset.id === customFilterPresetId ? rawFilterDimensions(raw) : preset.dimensions);
+  const dimensions = normalizeFilterDimensions(
+    preset.id === customFilterPresetId
+      ? rawFilterDimensions(raw)
+      : preset.dimensions,
+  );
   const materialThickness = clamp(raw.materialThickness, 1.5, 9);
   const fanProductPreset = findFanProductPreset(raw.fanPreset);
-  const fanDiameter = fanProductPreset.id === customFanProductPresetId ? raw.fanDiameter : fanProductPreset.diameter;
+  const fanDiameter =
+    fanProductPreset.id === customFanProductPresetId
+      ? raw.fanDiameter
+      : fanProductPreset.diameter;
   const fanSpec = findFanSpec(fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
   const workingDepth = dimensions.depth - materialThickness;
-  const chamberHeight = fanSpec.diameter + 2 + filterCount * (dimensions.thickness + materialThickness);
-  const rim = clampRimForGeometry(raw.rim, dimensions.width, workingDepth, chamberHeight);
+  const chamberHeight =
+    fanSpec.diameter +
+    2 +
+    filterCount * (dimensions.thickness + materialThickness);
+  const rim = clampRimForGeometry(
+    raw.rim,
+    dimensions.width,
+    workingDepth,
+    chamberHeight,
+  );
   const filter = createFilterSelection(preset.id, dimensions);
   const fan: FanConfiguration = {
     spec: fanSpec,
@@ -1080,7 +1157,9 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       bottom: fanCountRequestFromRawSetting(raw.fansBottom),
     },
   };
-  const frameConstruction: FilterFrameConstruction = raw.splitFrames ? { type: "split-rails" } : { type: "full-panels" };
+  const frameConstruction: FilterFrameConstruction = raw.splitFrames
+    ? { type: "split-rails" }
+    : { type: "full-panels" };
   const cutting: CuttingSettings = {
     materialThickness,
     rim,
@@ -1114,11 +1193,19 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
 // Raw Settings
 // ##############################
 
-export function normalizeRawSettings(input: RawPurifierSettings): RawPurifierSettings {
+export function normalizeRawSettings(
+  input: RawPurifierSettings,
+): RawPurifierSettings {
   const normalized = toRawSettings(normalizeSettings(input));
-  const tempestArrangement = canonicalTempestArrangement(input.tempestArrangement);
+  const tempestArrangement = canonicalTempestArrangement(
+    input.tempestArrangement,
+  );
   const donutFilter = normalizeDonutFilterSettings(input);
-  const donutCapRim = normalizeDonutCapRim(input, donutFilter.outerDiameter, donutFilter.holeDiameter);
+  const donutCapRim = normalizeDonutCapRim(
+    input,
+    donutFilter.outerDiameter,
+    donutFilter.holeDiameter,
+  );
   const donutFilterPreset = findDonutFilterPreset(input.donutFilterPreset);
   return canonicalizePrintDesignRawSettings({
     ...normalized,
@@ -1137,14 +1224,18 @@ export function normalizeRawSettings(input: RawPurifierSettings): RawPurifierSet
 // Draft Settings
 // ##############################
 
-export function normalizePurifierDraft(input: RawPurifierSettings | PurifierDraft): PurifierDraft {
+export function normalizePurifierDraft(
+  input: RawPurifierSettings | PurifierDraft,
+): PurifierDraft {
   if (!isPurifierDraft(input)) {
     return createPurifierDraft(input);
   }
   return createPurifierDraft(serializePurifierDraft(input));
 }
 
-export function createPurifierDraft(input: RawPurifierSettings | PurifierDraft): PurifierDraft {
+export function createPurifierDraft(
+  input: RawPurifierSettings | PurifierDraft,
+): PurifierDraft {
   if (isPurifierDraft(input)) {
     return input;
   }
@@ -1168,7 +1259,9 @@ export function createPurifierDraft(input: RawPurifierSettings | PurifierDraft):
   };
 }
 
-export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSettings {
+export function serializePurifierDraft(
+  draft: PurifierDraft,
+): RawPurifierSettings {
   const base: RawPurifierSettings = {
     ...defaultSettings,
     printDesign: printDesignIdForPurifierDraft(draft),
@@ -1182,7 +1275,8 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
     fingerSpaceMultiplier: draft.cutting.joints.finger.spaceMultiplier,
     fingerPlayMultiplier: draft.cutting.joints.finger.playMultiplier,
     fingerHoleWidthMultiplier: draft.cutting.joints.finger.holeWidthMultiplier,
-    fingerHoleOffsetMultiplier: draft.cutting.joints.finger.holeOffsetMultiplier,
+    fingerHoleOffsetMultiplier:
+      draft.cutting.joints.finger.holeOffsetMultiplier,
     dovetailSizeMultiplier: draft.cutting.joints.dovetail.sizeMultiplier,
     dovetailDepthMultiplier: draft.cutting.joints.dovetail.depthMultiplier,
     dovetailTaper: draft.cutting.joints.dovetail.taper,
@@ -1198,7 +1292,10 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
     autoRotate: draft.preview.enclosure.autoRotate,
     cameraPreset: draft.preview.enclosure.cameraPreset,
     labels: draft.preview.cutSheet.showLabels,
-    referenceScale: draft.preview.cutSheet.referenceScale.type === "enabled" ? draft.preview.cutSheet.referenceScale.length : 0,
+    referenceScale:
+      draft.preview.cutSheet.referenceScale.type === "enabled"
+        ? draft.preview.cutSheet.referenceScale.length
+        : 0,
   };
 
   if (draft.design.type === "laser-derived-printable-kit") {
@@ -1243,7 +1340,8 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
       ...base,
       ...serializedFilterFields(draft.design.filter),
       tempestArrangement: draft.design.arrangement,
-      filters: draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
+      filters:
+        draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
       fansLeft: fanBanks.left,
       fansRight: fanBanks.right,
@@ -1264,7 +1362,9 @@ export function serializePurifierDraft(draft: PurifierDraft): RawPurifierSetting
   });
 }
 
-export function printDesignIdForPurifierDraft(draft: PurifierDraft): PrintDesignId {
+export function printDesignIdForPurifierDraft(
+  draft: PurifierDraft,
+): PrintDesignId {
   return draft.design.printDesign;
 }
 
@@ -1283,12 +1383,18 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
   const filterDimensions = filterSelectionDimensions(input.filter);
   const base: RawPurifierSettings = {
     printDesign: input.printDesign.id,
-    filterPreset: input.filter.type === "preset" ? input.filter.presetId : customFilterPresetId,
+    filterPreset:
+      input.filter.type === "preset"
+        ? input.filter.presetId
+        : customFilterPresetId,
     filterWidth: filterDimensions.width,
     filterDepth: filterDimensions.depth,
     filterThickness: filterDimensions.thickness,
     rim: input.cutting.rim,
-    fanPreset: input.fan.productSelection.type === "preset" ? input.fan.productSelection.presetId : customFanProductPresetId,
+    fanPreset:
+      input.fan.productSelection.type === "preset"
+        ? input.fan.productSelection.presetId
+        : customFanProductPresetId,
     fanDiameter: input.fan.spec.diameter,
     filters: input.filterCount,
     splitFrames: input.frameConstruction.type === "split-rails",
@@ -1311,7 +1417,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fingerSpaceMultiplier: input.cutting.joints.finger.spaceMultiplier,
     fingerPlayMultiplier: input.cutting.joints.finger.playMultiplier,
     fingerHoleWidthMultiplier: input.cutting.joints.finger.holeWidthMultiplier,
-    fingerHoleOffsetMultiplier: input.cutting.joints.finger.holeOffsetMultiplier,
+    fingerHoleOffsetMultiplier:
+      input.cutting.joints.finger.holeOffsetMultiplier,
     dovetailSizeMultiplier: input.cutting.joints.dovetail.sizeMultiplier,
     dovetailDepthMultiplier: input.cutting.joints.dovetail.depthMultiplier,
     dovetailTaper: input.cutting.joints.dovetail.taper,
@@ -1327,7 +1434,10 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     autoRotate: input.preview.enclosure.autoRotate,
     cameraPreset: input.preview.enclosure.cameraPreset,
     labels: input.preview.cutSheet.showLabels,
-    referenceScale: input.preview.cutSheet.referenceScale.type === "enabled" ? input.preview.cutSheet.referenceScale.length : 0,
+    referenceScale:
+      input.preview.cutSheet.referenceScale.type === "enabled"
+        ? input.preview.cutSheet.referenceScale.length
+        : 0,
   };
 
   if (input.design.type === "laser-derived-printable-kit") {
@@ -1371,7 +1481,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...base,
       ...serializedFilterFields(input.design.filter),
       tempestArrangement: input.design.arrangement,
-      filters: input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
+      filters:
+        input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
       fansLeft: fanBanks.left,
       fansRight: fanBanks.right,
@@ -1395,12 +1506,19 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
 // Catalog Lookup Helpers
 // #######################################
 
-export function findPrintDesignPreset(id: PrintDesignId | string | null): PrintDesignPreset {
-  return printDesignPresets.find((preset) => preset.id === id) ?? requiredPrintDesignPreset(defaultPrintDesignId);
+export function findPrintDesignPreset(
+  id: PrintDesignId | string | null,
+): PrintDesignPreset {
+  return (
+    printDesignPresets.find((preset) => preset.id === id) ??
+    requiredPrintDesignPreset(defaultPrintDesignId)
+  );
 }
 
 export function isDonutFilterPrintDesignId(id: PrintDesignId): boolean {
-  return findPrintDesignPreset(id).implementation.type === "donut-filter-adapter";
+  return (
+    findPrintDesignPreset(id).implementation.type === "donut-filter-adapter"
+  );
 }
 
 export function isTempestPrintDesignId(id: PrintDesignId): boolean {
@@ -1411,38 +1529,56 @@ export function isStaticReferencePrintDesignId(id: PrintDesignId): boolean {
   return findPrintDesignPreset(id).implementation.type === "static-reference";
 }
 
-export function isLaserDerivedPrintDesignPreset(preset: PrintDesignPreset): preset is LaserDerivedPrintDesignPreset {
+export function isLaserDerivedPrintDesignPreset(
+  preset: PrintDesignPreset,
+): preset is LaserDerivedPrintDesignPreset {
   return preset.implementation.type === "laser-derived-printable-kit";
 }
 
-export function isDonutFilterAdapterPrintDesignPreset(preset: PrintDesignPreset): preset is DonutFilterAdapterPrintDesignPreset {
+export function isDonutFilterAdapterPrintDesignPreset(
+  preset: PrintDesignPreset,
+): preset is DonutFilterAdapterPrintDesignPreset {
   return preset.implementation.type === "donut-filter-adapter";
 }
 
-export function isTempestPrintDesignPreset(preset: PrintDesignPreset): preset is TempestPrintDesignPreset {
+export function isTempestPrintDesignPreset(
+  preset: PrintDesignPreset,
+): preset is TempestPrintDesignPreset {
   return preset.implementation.type === "tempest";
 }
 
-export function isStaticReferencePrintDesignPreset(preset: PrintDesignPreset): preset is StaticReferencePrintDesignPreset {
+export function isStaticReferencePrintDesignPreset(
+  preset: PrintDesignPreset,
+): preset is StaticReferencePrintDesignPreset {
   return preset.implementation.type === "static-reference";
 }
 
-export function staticPrintReferenceForPreset(preset: PrintDesignPreset): StaticPrintReference | undefined {
-  return preset.implementation.type === "static-reference" ? preset.implementation.reference : undefined;
+export function staticPrintReferenceForPreset(
+  preset: PrintDesignPreset,
+): StaticPrintReference | undefined {
+  return preset.implementation.type === "static-reference"
+    ? preset.implementation.reference
+    : undefined;
 }
 
-export function defaultFilterPresetForPrintDesign(preset: PrintDesignPreset): FilterPresetId {
+export function defaultFilterPresetForPrintDesign(
+  preset: PrintDesignPreset,
+): FilterPresetId {
   return preset.implementation.defaults.filterPreset;
 }
 
-export function defaultFanPresetForPrintDesign(preset: PrintDesignPreset): FanProductPresetId {
+export function defaultFanPresetForPrintDesign(
+  preset: PrintDesignPreset,
+): FanProductPresetId {
   return preset.implementation.defaults.fanPreset;
 }
 
 export function staticReferenceDefaultsForPreset(
   preset: PrintDesignPreset,
 ): StaticReferencePrintDesignDefaults | undefined {
-  return preset.implementation.type === "static-reference" ? preset.implementation.defaults : undefined;
+  return preset.implementation.type === "static-reference"
+    ? preset.implementation.defaults
+    : undefined;
 }
 
 function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
@@ -1453,39 +1589,67 @@ function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
   return preset;
 }
 
-function requiredDonutFilterDefaults(preset: PrintDesignPreset): DonutFilterSettings {
+function requiredDonutFilterDefaults(
+  preset: PrintDesignPreset,
+): DonutFilterSettings {
   if (preset.implementation.type !== "donut-filter-adapter") {
-    throw new Error(`requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`);
+    throw new Error(
+      `requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`,
+    );
   }
   return preset.implementation.defaults.filter;
 }
 
-export function findDonutFilterPreset(id: DonutFilterPresetId | string | null): DonutFilterPreset {
-  return donutFilterPresets.find((preset) => preset.id === id) ?? findPresetDonutFilter(defaultDonutFilterPresetId);
+export function findDonutFilterPreset(
+  id: DonutFilterPresetId | string | null,
+): DonutFilterPreset {
+  return (
+    donutFilterPresets.find((preset) => preset.id === id) ??
+    findPresetDonutFilter(defaultDonutFilterPresetId)
+  );
 }
 
-export function findPresetDonutFilter(id: PresetDonutFilterId): PresetDonutFilter {
-  const preset = donutFilterPresets.find((entry): entry is PresetDonutFilter => entry.id === id && isPresetDonutFilterId(entry.id));
+export function findPresetDonutFilter(
+  id: PresetDonutFilterId,
+): PresetDonutFilter {
+  const preset = donutFilterPresets.find(
+    (entry): entry is PresetDonutFilter =>
+      entry.id === id && isPresetDonutFilterId(entry.id),
+  );
   if (preset === undefined) {
     throw new Error(`findPresetDonutFilter: Missing preset round filter ${id}`);
   }
   return preset;
 }
 
-export function findPreviewMaterialColorPreset(id: PreviewMaterialColorId | string | null | undefined): PreviewMaterialColorPreset {
-  return previewMaterialColorPresets.find((preset) => preset.id === id) ?? requiredPreviewMaterialColorPreset(defaultPreviewMaterialColorId);
+export function findPreviewMaterialColorPreset(
+  id: PreviewMaterialColorId | string | null | undefined,
+): PreviewMaterialColorPreset {
+  return (
+    previewMaterialColorPresets.find((preset) => preset.id === id) ??
+    requiredPreviewMaterialColorPreset(defaultPreviewMaterialColorId)
+  );
 }
 
 export function findFanSpec(diameter: FanDiameter): FanSpec {
-  return fanSpecs.find((spec) => spec.diameter === diameter) ?? fanSpecs[fanSpecs.length - 1];
+  return (
+    fanSpecs.find((spec) => spec.diameter === diameter) ??
+    fanSpecs[fanSpecs.length - 1]
+  );
 }
 
 export function findFanProductPreset(id: FanProductPresetId): FanProductPreset {
-  return fanProductPresets.find((preset) => preset.id === id) ?? findPresetFanProduct(defaultFanProductPresetId);
+  return (
+    fanProductPresets.find((preset) => preset.id === id) ??
+    findPresetFanProduct(defaultFanProductPresetId)
+  );
 }
 
 export function findPresetFanProduct(id: PresetFanProductId): PresetFanProduct {
-  const preset = fanProductPresets.find((entry): entry is PresetFanProduct => entry.id === id && isPresetFanProductId(entry.id));
+  const preset = fanProductPresets.find(
+    (entry): entry is PresetFanProduct =>
+      entry.id === id && isPresetFanProductId(entry.id),
+  );
   if (preset === undefined) {
     throw new Error(`findPresetFanProduct: Missing fan product ${id}`);
   }
@@ -1496,7 +1660,10 @@ export function findPresetFanProduct(id: PresetFanProductId): PresetFanProduct {
 // Preset Application
 // #######################################
 
-export function applyFilterPreset(settings: RawPurifierSettings, presetId: FilterPresetId): RawPurifierSettings {
+export function applyFilterPreset(
+  settings: RawPurifierSettings,
+  presetId: FilterPresetId,
+): RawPurifierSettings {
   const preset = findFilterPreset(presetId);
   if (preset.id === customFilterPresetId) {
     return {
@@ -1514,7 +1681,10 @@ export function applyFilterPreset(settings: RawPurifierSettings, presetId: Filte
   };
 }
 
-export function applyFanProductPreset(settings: RawPurifierSettings, presetId: FanProductPresetId): RawPurifierSettings {
+export function applyFanProductPreset(
+  settings: RawPurifierSettings,
+  presetId: FanProductPresetId,
+): RawPurifierSettings {
   const preset = findFanProductPreset(presetId);
   if (preset.id === customFanProductPresetId) {
     return {
@@ -1530,7 +1700,10 @@ export function applyFanProductPreset(settings: RawPurifierSettings, presetId: F
   };
 }
 
-export function applyDonutFilterPreset(settings: RawPurifierSettings, presetId: DonutFilterPresetId): RawPurifierSettings {
+export function applyDonutFilterPreset(
+  settings: RawPurifierSettings,
+  presetId: DonutFilterPresetId,
+): RawPurifierSettings {
   const preset = findDonutFilterPreset(presetId);
   if (preset.id === customDonutFilterPresetId) {
     return {
@@ -1573,13 +1746,25 @@ export function applyTempestArrangementDefaults(
   arrangement: TempestArrangementPreset,
 ): RawPurifierSettings {
   const arrangedSettings = applyTempestArrangement(settings, arrangement);
-  return applyFilterPreset(arrangedSettings, defaultFilterPresetForTempestArrangement(arrangedSettings.tempestArrangement));
+  return applyFilterPreset(
+    arrangedSettings,
+    defaultFilterPresetForTempestArrangement(
+      arrangedSettings.tempestArrangement,
+    ),
+  );
 }
 
-export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: PrintDesignId): RawPurifierSettings {
+export function applyPrintDesignPreset(
+  settings: RawPurifierSettings,
+  presetId: PrintDesignId,
+): RawPurifierSettings {
   const preset = findPrintDesignPreset(presetId);
-  const filterPreset = findFilterPreset(defaultFilterPresetForPrintDesign(preset));
-  const fanPreset = findFanProductPreset(defaultFanPresetForPrintDesign(preset));
+  const filterPreset = findFilterPreset(
+    defaultFilterPresetForPrintDesign(preset),
+  );
+  const fanPreset = findFanProductPreset(
+    defaultFanPresetForPrintDesign(preset),
+  );
   const base = {
     ...settings,
     printDesign: preset.id,
@@ -1600,8 +1785,13 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
         };
 
   if (preset.implementation.type === "donut-filter-adapter") {
-    const donutPreset = findDonutFilterPreset(preset.implementation.defaults.donutFilterPreset);
-    const donutFilter = donutPreset.id === customDonutFilterPresetId ? requiredDonutFilterDefaults(preset) : donutPreset.settings;
+    const donutPreset = findDonutFilterPreset(
+      preset.implementation.defaults.donutFilterPreset,
+    );
+    const donutFilter =
+      donutPreset.id === customDonutFilterPresetId
+        ? requiredDonutFilterDefaults(preset)
+        : donutPreset.settings;
     return {
       ...withRecommendedFilter,
       filterPreset: customFilterPresetId,
@@ -1628,7 +1818,9 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
   }
 
   if (preset.implementation.type === "tempest") {
-    const fanBanks = tempestRawFanBanksForArrangement(preset.implementation.defaults.arrangement);
+    const fanBanks = tempestRawFanBanksForArrangement(
+      preset.implementation.defaults.arrangement,
+    );
     return {
       ...withRecommendedFilter,
       tempestArrangement: preset.implementation.defaults.arrangement,
@@ -1674,10 +1866,18 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
 
   return {
     ...withRecommendedFilter,
-    fansLeft: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.left),
-    fansRight: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.right),
-    fansTop: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.top),
-    fansBottom: fanCountRequestToRawSetting(preset.implementation.defaults.fanBanks.bottom),
+    fansLeft: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.left,
+    ),
+    fansRight: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.right,
+    ),
+    fansTop: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.top,
+    ),
+    fansBottom: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.bottom,
+    ),
     donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -1696,8 +1896,12 @@ export function applyPrintDesignPreset(settings: RawPurifierSettings, presetId: 
 // URL Settings
 // #######################################
 
-export function encodeSettings(input: RawPurifierSettings | PurifierDraft): string {
-  const settings = isPurifierDraft(input) ? serializePurifierDraft(input) : input;
+export function encodeSettings(
+  input: RawPurifierSettings | PurifierDraft,
+): string {
+  const settings = isPurifierDraft(input)
+    ? serializePurifierDraft(input)
+    : input;
   const params = new URLSearchParams();
   params.set("printDesign", settings.printDesign);
   params.set("filterPreset", settings.filterPreset);
@@ -1717,22 +1921,52 @@ export function encodeSettings(input: RawPurifierSettings | PurifierDraft): stri
   }
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("donutFilterPreset", settings.donutFilterPreset);
-  params.set("donutFilterOuterDiameter", formatNumber(settings.donutFilterOuterDiameter));
+  params.set(
+    "donutFilterOuterDiameter",
+    formatNumber(settings.donutFilterOuterDiameter),
+  );
   params.set("donutFilterLength", formatNumber(settings.donutFilterLength));
-  params.set("donutFilterHoleDiameter", formatNumber(settings.donutFilterHoleDiameter));
-  params.set("donutAdapterInsertLength", formatNumber(settings.donutAdapterInsertLength));
+  params.set(
+    "donutFilterHoleDiameter",
+    formatNumber(settings.donutFilterHoleDiameter),
+  );
+  params.set(
+    "donutAdapterInsertLength",
+    formatNumber(settings.donutAdapterInsertLength),
+  );
   params.set("donutCapRim", formatNumber(settings.donutCapRim));
   params.set("donutCapEnabled", String(settings.donutCapEnabled));
   params.set("screwHoleDiameter", formatNumber(settings.screwHoleDiameter));
   params.set("materialThickness", formatNumber(settings.materialThickness));
   params.set("kerfFit", formatNumber(settings.kerfFit));
-  params.set("fingerWidthMultiplier", formatNumber(settings.fingerWidthMultiplier));
-  params.set("fingerSpaceMultiplier", formatNumber(settings.fingerSpaceMultiplier));
-  params.set("fingerPlayMultiplier", formatNumber(settings.fingerPlayMultiplier));
-  params.set("fingerHoleWidthMultiplier", formatNumber(settings.fingerHoleWidthMultiplier));
-  params.set("fingerHoleOffsetMultiplier", formatNumber(settings.fingerHoleOffsetMultiplier));
-  params.set("dovetailSizeMultiplier", formatNumber(settings.dovetailSizeMultiplier));
-  params.set("dovetailDepthMultiplier", formatNumber(settings.dovetailDepthMultiplier));
+  params.set(
+    "fingerWidthMultiplier",
+    formatNumber(settings.fingerWidthMultiplier),
+  );
+  params.set(
+    "fingerSpaceMultiplier",
+    formatNumber(settings.fingerSpaceMultiplier),
+  );
+  params.set(
+    "fingerPlayMultiplier",
+    formatNumber(settings.fingerPlayMultiplier),
+  );
+  params.set(
+    "fingerHoleWidthMultiplier",
+    formatNumber(settings.fingerHoleWidthMultiplier),
+  );
+  params.set(
+    "fingerHoleOffsetMultiplier",
+    formatNumber(settings.fingerHoleOffsetMultiplier),
+  );
+  params.set(
+    "dovetailSizeMultiplier",
+    formatNumber(settings.dovetailSizeMultiplier),
+  );
+  params.set(
+    "dovetailDepthMultiplier",
+    formatNumber(settings.dovetailDepthMultiplier),
+  );
   params.set("dovetailTaper", formatNumber(settings.dovetailTaper));
   params.set("showFilterMedia", String(settings.showFilterMedia));
   params.set("showFans", String(settings.showFans));
@@ -1751,37 +1985,103 @@ export function encodeSettings(input: RawPurifierSettings | PurifierDraft): stri
 }
 
 export function decodeSettings(search: string): RawPurifierSettings {
-  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const params = new URLSearchParams(
+    search.startsWith("?") ? search.slice(1) : search,
+  );
   const printDesign = readPrintDesign(params);
   const filterPreset = readFilterPreset(params);
-  const fanDiameter = readFanDiameter(params, ["fanDiameter", "fan_diameter"], defaultSettings.fanDiameter);
+  const fanDiameter = readFanDiameter(
+    params,
+    ["fanDiameter", "fan_diameter"],
+    defaultSettings.fanDiameter,
+  );
   const fanPreset = readFanProductPreset(params, fanDiameter);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
     printDesign,
     filterPreset,
-    filterWidth: readNumber(params, ["filterWidth", "x"], defaultSettings.filterWidth),
-    filterDepth: readNumber(params, ["filterDepth", "y"], defaultSettings.filterDepth),
-    filterThickness: readNumber(params, ["filterThickness", "filter_height"], defaultSettings.filterThickness),
+    filterWidth: readNumber(
+      params,
+      ["filterWidth", "x"],
+      defaultSettings.filterWidth,
+    ),
+    filterDepth: readNumber(
+      params,
+      ["filterDepth", "y"],
+      defaultSettings.filterDepth,
+    ),
+    filterThickness: readNumber(
+      params,
+      ["filterThickness", "filter_height"],
+      defaultSettings.filterThickness,
+    ),
     rim: readNumber(params, "rim", defaultSettings.rim),
     fanPreset,
     fanDiameter,
     filters: readFilterCount(params, "filters", defaultSettings.filters),
-    splitFrames: readBoolean(params, ["splitFrames", "split_frames"], defaultSettings.splitFrames),
-    fansLeft: readInteger(params, ["fansLeft", "fans_left"], defaultSettings.fansLeft),
-    fansRight: readInteger(params, ["fansRight", "fans_right"], defaultSettings.fansRight),
-    fansTop: readInteger(params, ["fansTop", "fans_top"], defaultSettings.fansTop),
-    fansBottom: readInteger(params, ["fansBottom", "fans_bottom"], defaultSettings.fansBottom),
+    splitFrames: readBoolean(
+      params,
+      ["splitFrames", "split_frames"],
+      defaultSettings.splitFrames,
+    ),
+    fansLeft: readInteger(
+      params,
+      ["fansLeft", "fans_left"],
+      defaultSettings.fansLeft,
+    ),
+    fansRight: readInteger(
+      params,
+      ["fansRight", "fans_right"],
+      defaultSettings.fansRight,
+    ),
+    fansTop: readInteger(
+      params,
+      ["fansTop", "fans_top"],
+      defaultSettings.fansTop,
+    ),
+    fansBottom: readInteger(
+      params,
+      ["fansBottom", "fans_bottom"],
+      defaultSettings.fansBottom,
+    ),
     tempestArrangement: readTempestArrangement(params),
     donutFilterPreset: readDonutFilterPreset(params),
-    donutFilterOuterDiameter: readNumber(params, "donutFilterOuterDiameter", defaultSettings.donutFilterOuterDiameter),
-    donutFilterLength: readNumber(params, "donutFilterLength", defaultSettings.donutFilterLength),
-    donutFilterHoleDiameter: readNumber(params, "donutFilterHoleDiameter", defaultSettings.donutFilterHoleDiameter),
-    donutAdapterInsertLength: readNumber(params, "donutAdapterInsertLength", defaultSettings.donutAdapterInsertLength),
+    donutFilterOuterDiameter: readNumber(
+      params,
+      "donutFilterOuterDiameter",
+      defaultSettings.donutFilterOuterDiameter,
+    ),
+    donutFilterLength: readNumber(
+      params,
+      "donutFilterLength",
+      defaultSettings.donutFilterLength,
+    ),
+    donutFilterHoleDiameter: readNumber(
+      params,
+      "donutFilterHoleDiameter",
+      defaultSettings.donutFilterHoleDiameter,
+    ),
+    donutAdapterInsertLength: readNumber(
+      params,
+      "donutAdapterInsertLength",
+      defaultSettings.donutAdapterInsertLength,
+    ),
     donutCapRim: readNumber(params, "donutCapRim", defaultSettings.donutCapRim),
-    donutCapEnabled: readBoolean(params, "donutCapEnabled", defaultSettings.donutCapEnabled),
-    screwHoleDiameter: readNumber(params, ["screwHoleDiameter", "screw_holes"], defaultSettings.screwHoleDiameter),
-    materialThickness: readNumber(params, ["materialThickness", "thickness"], defaultSettings.materialThickness),
+    donutCapEnabled: readBoolean(
+      params,
+      "donutCapEnabled",
+      defaultSettings.donutCapEnabled,
+    ),
+    screwHoleDiameter: readNumber(
+      params,
+      ["screwHoleDiameter", "screw_holes"],
+      defaultSettings.screwHoleDiameter,
+    ),
+    materialThickness: readNumber(
+      params,
+      ["materialThickness", "thickness"],
+      defaultSettings.materialThickness,
+    ),
     kerfFit: readNumber(params, ["kerfFit", "burn"], defaultSettings.kerfFit),
     fingerWidthMultiplier: readNumber(
       params,
@@ -1818,23 +2118,68 @@ export function decodeSettings(search: string): RawPurifierSettings {
       ["dovetailDepthMultiplier", "DoveTail_depth"],
       defaultSettings.dovetailDepthMultiplier,
     ),
-    dovetailTaper: readNumber(params, ["dovetailTaper", "DoveTail_angle"], defaultSettings.dovetailTaper),
-    showFilterMedia: readBoolean(params, "showFilterMedia", defaultSettings.showFilterMedia),
+    dovetailTaper: readNumber(
+      params,
+      ["dovetailTaper", "DoveTail_angle"],
+      defaultSettings.dovetailTaper,
+    ),
+    showFilterMedia: readBoolean(
+      params,
+      "showFilterMedia",
+      defaultSettings.showFilterMedia,
+    ),
     showFans: readBoolean(params, "showFans", defaultSettings.showFans),
-    showFilterFrame: readBoolean(params, "showFilterFrame", defaultSettings.showFilterFrame),
-    explodedView: readBoolean(params, "explodedView", defaultSettings.explodedView),
-    showDimensions: readBoolean(params, "showDimensions", defaultSettings.showDimensions),
-    showBananaScale: readBoolean(params, "showBananaScale", defaultSettings.showBananaScale),
-    showPrintSeams: readBoolean(params, "showPrintSeams", defaultSettings.showPrintSeams),
-    showPreviewEdges: readBoolean(params, "showPreviewEdges", defaultSettings.showPreviewEdges),
+    showFilterFrame: readBoolean(
+      params,
+      "showFilterFrame",
+      defaultSettings.showFilterFrame,
+    ),
+    explodedView: readBoolean(
+      params,
+      "explodedView",
+      defaultSettings.explodedView,
+    ),
+    showDimensions: readBoolean(
+      params,
+      "showDimensions",
+      defaultSettings.showDimensions,
+    ),
+    showBananaScale: readBoolean(
+      params,
+      "showBananaScale",
+      defaultSettings.showBananaScale,
+    ),
+    showPrintSeams: readBoolean(
+      params,
+      "showPrintSeams",
+      defaultSettings.showPrintSeams,
+    ),
+    showPreviewEdges: readBoolean(
+      params,
+      "showPreviewEdges",
+      defaultSettings.showPreviewEdges,
+    ),
     previewMaterialColor: readPreviewMaterialColor(params),
     autoRotate: readBoolean(params, "autoRotate", defaultSettings.autoRotate),
-    cameraPreset: readCameraPreset(params, "cameraPreset", defaultSettings.cameraPreset),
+    cameraPreset: readCameraPreset(
+      params,
+      "cameraPreset",
+      defaultSettings.cameraPreset,
+    ),
     labels: readBoolean(params, "labels", defaultSettings.labels),
-    referenceScale: readNumber(params, ["referenceScale", "reference"], defaultSettings.referenceScale),
+    referenceScale: readNumber(
+      params,
+      ["referenceScale", "reference"],
+      defaultSettings.referenceScale,
+    ),
   };
-  const parsedWithDonutPreset = applyDonutUrlPresetAndMeasurements(params, parsed);
-  return normalizeRawSettings(applyPrintDesignUrlDefaults(params, parsedWithDonutPreset, printDesign));
+  const parsedWithDonutPreset = applyDonutUrlPresetAndMeasurements(
+    params,
+    parsed,
+  );
+  return normalizeRawSettings(
+    applyPrintDesignUrlDefaults(params, parsedWithDonutPreset, printDesign),
+  );
 }
 
 export function decodePurifierDraftSettings(search: string): PurifierDraft {
@@ -1911,8 +2256,13 @@ function createConfiguredPrintDesign(input: {
 // Preview Construction
 // ##############################
 
-function createPreviewSettings(raw: RawPurifierSettings, referenceScale: ReferenceScale): PreviewSettings {
-  const cameraPreset = cameraPresets.includes(raw.cameraPreset) ? raw.cameraPreset : defaultSettings.cameraPreset;
+function createPreviewSettings(
+  raw: RawPurifierSettings,
+  referenceScale: ReferenceScale,
+): PreviewSettings {
+  const cameraPreset = cameraPresets.includes(raw.cameraPreset)
+    ? raw.cameraPreset
+    : defaultSettings.cameraPreset;
   const enclosure: EnclosurePreviewOptions = {
     showFilterMedia: raw.showFilterMedia,
     showFans: raw.showFans,
@@ -1945,11 +2295,16 @@ function isStructuredSettings(input: PurifierInput): input is PurifierSettings {
   return "filter" in input && "fan" in input && "cutting" in input;
 }
 
-function isPurifierDraft(input: PurifierInput | RawPurifierSettings | PurifierDraft): input is PurifierDraft {
+function isPurifierDraft(
+  input: PurifierInput | RawPurifierSettings | PurifierDraft,
+): input is PurifierDraft {
   return "fan" in input && "presetId" in input.fan;
 }
 
-function createPurifierDesignDraft(configuration: PurifierSettings, raw: RawPurifierSettings): PurifierDesignDraft {
+function createPurifierDesignDraft(
+  configuration: PurifierSettings,
+  raw: RawPurifierSettings,
+): PurifierDesignDraft {
   if (configuration.design.type === "laser-derived-printable-kit") {
     return {
       type: "laser-derived-printable-kit",
@@ -1995,7 +2350,9 @@ function createPurifierDesignDraft(configuration: PurifierSettings, raw: RawPuri
   };
 }
 
-function serializedFilterFields(filter: FilterSelection): Pick<
+function serializedFilterFields(
+  filter: FilterSelection,
+): Pick<
   RawPurifierSettings,
   "filterPreset" | "filterWidth" | "filterDepth" | "filterThickness"
 > {
@@ -2025,7 +2382,9 @@ function rawFilterDimensions(settings: RawPurifierSettings): FilterDimensions {
   };
 }
 
-function normalizeFilterDimensions(dimensions: FilterDimensions): FilterDimensions {
+function normalizeFilterDimensions(
+  dimensions: FilterDimensions,
+): FilterDimensions {
   return {
     width: clamp(dimensions.width, 120, 900),
     depth: clamp(dimensions.depth, 120, 900),
@@ -2033,16 +2392,26 @@ function normalizeFilterDimensions(dimensions: FilterDimensions): FilterDimensio
   };
 }
 
-function normalizeDonutFilterSettings(settings: RawPurifierSettings): DonutFilterSettings {
+function normalizeDonutFilterSettings(
+  settings: RawPurifierSettings,
+): DonutFilterSettings {
   const outerDiameter = clamp(settings.donutFilterOuterDiameter, 70, 420);
   const length = clamp(settings.donutFilterLength, 35, 520);
-  const holeDiameter = clamp(settings.donutFilterHoleDiameter, 18, Math.max(20, outerDiameter - 8));
+  const holeDiameter = clamp(
+    settings.donutFilterHoleDiameter,
+    18,
+    Math.max(20, outerDiameter - 8),
+  );
   const capRim = normalizeDonutCapRim(settings, outerDiameter, holeDiameter);
   return {
     outerDiameter,
     length,
     holeDiameter,
-    insertLength: clamp(settings.donutAdapterInsertLength, 2, Math.min(60, length)),
+    insertLength: clamp(
+      settings.donutAdapterInsertLength,
+      2,
+      Math.min(60, length),
+    ),
     cap: settings.donutCapEnabled
       ? {
           type: "printed-cap",
@@ -2057,7 +2426,11 @@ function normalizeDonutCapRim(
   outerDiameter: Millimeters,
   holeDiameter: Millimeters,
 ): Millimeters {
-  return clamp(settings.donutCapRim, 0, Math.max(0, (outerDiameter - holeDiameter) / 2));
+  return clamp(
+    settings.donutCapRim,
+    0,
+    Math.max(0, (outerDiameter - holeDiameter) / 2),
+  );
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
@@ -2081,7 +2454,10 @@ function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
 // Selection Helpers
 // ##############################
 
-function createFilterSelection(presetId: FilterPresetId, dimensions: FilterDimensions): FilterSelection {
+function createFilterSelection(
+  presetId: FilterPresetId,
+  dimensions: FilterDimensions,
+): FilterSelection {
   if (isPresetFilterId(presetId)) {
     return {
       type: "preset",
@@ -2094,7 +2470,9 @@ function createFilterSelection(presetId: FilterPresetId, dimensions: FilterDimen
   };
 }
 
-function createFanProductSelection(presetId: FanProductPresetId): FanProductSelection {
+function createFanProductSelection(
+  presetId: FanProductPresetId,
+): FanProductSelection {
   if (isPresetFanProductId(presetId)) {
     return {
       type: "preset",
@@ -2112,15 +2490,21 @@ function createFanProductSelection(presetId: FanProductPresetId): FanProductSele
 // Print Design Canonicalization
 // #######################################
 
-function canonicalizePrintDesignRawSettings(settings: RawPurifierSettings): RawPurifierSettings {
+function canonicalizePrintDesignRawSettings(
+  settings: RawPurifierSettings,
+): RawPurifierSettings {
   if (isTempestPrintDesignId(settings.printDesign)) {
     return applyTempestArrangement(settings, settings.tempestArrangement);
   }
   return settings;
 }
 
-function canonicalTempestArrangement(value: TempestArrangementPreset | string | null | undefined): TempestArrangementPreset {
-  const found = tempestArrangementPresets.find((arrangement) => arrangement === value);
+function canonicalTempestArrangement(
+  value: TempestArrangementPreset | string | null | undefined,
+): TempestArrangementPreset {
+  const found = tempestArrangementPresets.find(
+    (arrangement) => arrangement === value,
+  );
   return found ?? defaultSettings.tempestArrangement;
 }
 
@@ -2128,28 +2512,41 @@ function canonicalTempestArrangement(value: TempestArrangementPreset | string | 
 // Shared Type Guards and Converters
 // ##############################
 
-function isPresetDonutFilterId(id: DonutFilterPresetId): id is PresetDonutFilterId {
+function isPresetDonutFilterId(
+  id: DonutFilterPresetId,
+): id is PresetDonutFilterId {
   return id !== customDonutFilterPresetId;
 }
 
-function isPresetFanProductId(id: FanProductPresetId): id is PresetFanProductId {
+function isPresetFanProductId(
+  id: FanProductPresetId,
+): id is PresetFanProductId {
   return id !== customFanProductPresetId;
 }
 
-function requiredPreviewMaterialColorPreset(id: PreviewMaterialColorId): PreviewMaterialColorPreset {
+function requiredPreviewMaterialColorPreset(
+  id: PreviewMaterialColorId,
+): PreviewMaterialColorPreset {
   const preset = previewMaterialColorPresets.find((entry) => entry.id === id);
   if (preset === undefined) {
-    throw new Error(`requiredPreviewMaterialColorPreset: Missing preview color ${id}`);
+    throw new Error(
+      `requiredPreviewMaterialColorPreset: Missing preview color ${id}`,
+    );
   }
   return preset;
 }
 
 export function fanCountRequestFromRawSetting(value: number): FanCountRequest {
-  const clamped = clampInteger(value, automaticFanCount, fixedFanCountOptions[fixedFanCountOptions.length - 1]);
+  const clamped = clampInteger(
+    value,
+    automaticFanCount,
+    fixedFanCountOptions[fixedFanCountOptions.length - 1],
+  );
   if (clamped === automaticFanCount) {
     return { type: "auto" };
   }
-  const fixedCount = fixedFanCountOptions.find((count) => count === clamped) ?? 0;
+  const fixedCount =
+    fixedFanCountOptions.find((count) => count === clamped) ?? 0;
   return { type: "fixed", count: fixedCount };
 }
 
@@ -2157,7 +2554,9 @@ export function fanCountRequestToRawSetting(request: FanCountRequest): number {
   return request.type === "auto" ? automaticFanCount : request.count;
 }
 
-function tempestRawFanBanksForArrangement(arrangement: TempestArrangementPreset): FanBanks<number> {
+function tempestRawFanBanksForArrangement(
+  arrangement: TempestArrangementPreset,
+): FanBanks<number> {
   if (arrangement === "four-side-filter-tower") {
     return {
       left: 0,
@@ -2191,7 +2590,11 @@ function referenceScaleFromNumber(value: number): ReferenceScale {
 // Primitive Readers
 // ##############################
 
-function readNumber(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
+function readNumber(
+  params: URLSearchParams,
+  key: string | readonly string[],
+  fallback: number,
+): number {
   const value = readParam(params, key);
   if (value === null) {
     return fallback;
@@ -2204,11 +2607,19 @@ function readNumber(params: URLSearchParams, key: string | readonly string[], fa
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function readInteger(params: URLSearchParams, key: string | readonly string[], fallback: number): number {
+function readInteger(
+  params: URLSearchParams,
+  key: string | readonly string[],
+  fallback: number,
+): number {
   return Math.trunc(readNumber(params, key, fallback));
 }
 
-function readBoolean(params: URLSearchParams, key: string | readonly string[], fallback: boolean): boolean {
+function readBoolean(
+  params: URLSearchParams,
+  key: string | readonly string[],
+  fallback: boolean,
+): boolean {
   const value = readParam(params, key);
   if (value === null) {
     return fallback;
@@ -2222,7 +2633,11 @@ function readBoolean(params: URLSearchParams, key: string | readonly string[], f
   return fallback;
 }
 
-function readFanDiameter(params: URLSearchParams, key: string | readonly string[], fallback: FanDiameter): FanDiameter {
+function readFanDiameter(
+  params: URLSearchParams,
+  key: string | readonly string[],
+  fallback: FanDiameter,
+): FanDiameter {
   const parsed = Number(readParam(params, key));
   const found = fanDiameters.find((diameter) => diameter === parsed);
   return found ?? fallback;
@@ -2232,13 +2647,17 @@ function readFanDiameter(params: URLSearchParams, key: string | readonly string[
 // Preset Readers
 // ##############################
 
-function readFanProductPreset(params: URLSearchParams, fanDiameter: FanDiameter): FanProductPresetId {
+function readFanProductPreset(
+  params: URLSearchParams,
+  fanDiameter: FanDiameter,
+): FanProductPresetId {
   const value = params.get("fanPreset");
   const found = fanProductPresetIds.find((preset) => preset === value);
   if (found !== undefined) {
     return found;
   }
-  return fanDiameter === findFanProductPreset(defaultSettings.fanPreset).diameter
+  return fanDiameter ===
+    findFanProductPreset(defaultSettings.fanPreset).diameter
     ? defaultSettings.fanPreset
     : customFanProductPresetId;
 }
@@ -2271,7 +2690,9 @@ function readDonutFilterPreset(params: URLSearchParams): DonutFilterPresetId {
   return defaultSettings.donutFilterPreset;
 }
 
-function readPreviewMaterialColor(params: URLSearchParams): PreviewMaterialColorId {
+function readPreviewMaterialColor(
+  params: URLSearchParams,
+): PreviewMaterialColorId {
   return findPreviewMaterialColorPreset(params.get("previewMaterialColor")).id;
 }
 
@@ -2311,15 +2732,21 @@ function applyDonutUrlPresetAndMeasurements(
     donutFilterOuterDiameter: params.has("donutFilterOuterDiameter")
       ? parsed.donutFilterOuterDiameter
       : presetSettings.donutFilterOuterDiameter,
-    donutFilterLength: params.has("donutFilterLength") ? parsed.donutFilterLength : presetSettings.donutFilterLength,
+    donutFilterLength: params.has("donutFilterLength")
+      ? parsed.donutFilterLength
+      : presetSettings.donutFilterLength,
     donutFilterHoleDiameter: params.has("donutFilterHoleDiameter")
       ? parsed.donutFilterHoleDiameter
       : presetSettings.donutFilterHoleDiameter,
     donutAdapterInsertLength: params.has("donutAdapterInsertLength")
       ? parsed.donutAdapterInsertLength
       : presetSettings.donutAdapterInsertLength,
-    donutCapRim: params.has("donutCapRim") ? parsed.donutCapRim : presetSettings.donutCapRim,
-    donutCapEnabled: params.has("donutCapEnabled") ? parsed.donutCapEnabled : presetSettings.donutCapEnabled,
+    donutCapRim: params.has("donutCapRim")
+      ? parsed.donutCapRim
+      : presetSettings.donutCapRim,
+    donutCapEnabled: params.has("donutCapEnabled")
+      ? parsed.donutCapEnabled
+      : presetSettings.donutCapEnabled,
   };
 }
 
@@ -2327,17 +2754,27 @@ function applyDonutUrlPresetAndMeasurements(
 // Filter Count URL Reader
 // ##############################
 
-function readFilterCount(params: URLSearchParams, key: string, fallback: FilterCount): FilterCount {
+function readFilterCount(
+  params: URLSearchParams,
+  key: string,
+  fallback: FilterCount,
+): FilterCount {
   const parsed = Number(params.get(key));
   return parsed === 1 || parsed === 2 ? parsed : fallback;
 }
 
-function readTempestArrangement(params: URLSearchParams): TempestArrangementPreset {
+function readTempestArrangement(
+  params: URLSearchParams,
+): TempestArrangementPreset {
   return canonicalTempestArrangement(params.get("tempestArrangement"));
 }
 
-function defaultFilterPresetForTempestArrangement(arrangement: TempestArrangementPreset): FilterPresetId {
-  return defaultFilterPresetByTempestArrangement[canonicalTempestArrangement(arrangement)];
+function defaultFilterPresetForTempestArrangement(
+  arrangement: TempestArrangementPreset,
+): FilterPresetId {
+  return defaultFilterPresetByTempestArrangement[
+    canonicalTempestArrangement(arrangement)
+  ];
 }
 
 // ##############################
@@ -2363,37 +2800,68 @@ function applyPrintDesignUrlDefaults(
     hasAnyParam(params, ["filterWidth", "x"]) ||
     hasAnyParam(params, ["filterDepth", "y"]) ||
     hasAnyParam(params, ["filterThickness", "filter_height"]);
-  const hasFanInputs = params.has("fanPreset") || hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
-  const hasDonutFilterInputs = params.has("donutFilterPreset") || hasDonutFilterMeasurementParams(params);
+  const hasFanInputs =
+    params.has("fanPreset") ||
+    hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
+  const hasDonutFilterInputs =
+    params.has("donutFilterPreset") || hasDonutFilterMeasurementParams(params);
 
   return {
     ...parsed,
     filterPreset: hasFilterInputs ? parsed.filterPreset : defaults.filterPreset,
     filterWidth: hasFilterInputs ? parsed.filterWidth : defaults.filterWidth,
     filterDepth: hasFilterInputs ? parsed.filterDepth : defaults.filterDepth,
-    filterThickness: hasFilterInputs ? parsed.filterThickness : defaults.filterThickness,
+    filterThickness: hasFilterInputs
+      ? parsed.filterThickness
+      : defaults.filterThickness,
     fanPreset: hasFanInputs ? parsed.fanPreset : defaults.fanPreset,
     fanDiameter: hasFanInputs ? parsed.fanDiameter : defaults.fanDiameter,
     filters: params.has("filters") ? parsed.filters : defaults.filters,
-    splitFrames: hasAnyParam(params, ["splitFrames", "split_frames"]) ? parsed.splitFrames : defaults.splitFrames,
-    fansLeft: hasAnyParam(params, ["fansLeft", "fans_left"]) ? parsed.fansLeft : defaults.fansLeft,
-    fansRight: hasAnyParam(params, ["fansRight", "fans_right"]) ? parsed.fansRight : defaults.fansRight,
-    fansTop: hasAnyParam(params, ["fansTop", "fans_top"]) ? parsed.fansTop : defaults.fansTop,
-    fansBottom: hasAnyParam(params, ["fansBottom", "fans_bottom"]) ? parsed.fansBottom : defaults.fansBottom,
-    tempestArrangement: params.has("tempestArrangement") ? parsed.tempestArrangement : defaults.tempestArrangement,
-    donutFilterPreset: hasDonutFilterInputs ? parsed.donutFilterPreset : defaults.donutFilterPreset,
-    donutFilterOuterDiameter: hasDonutFilterInputs || params.has("donutFilterOuterDiameter")
-      ? parsed.donutFilterOuterDiameter
-      : defaults.donutFilterOuterDiameter,
-    donutFilterLength: hasDonutFilterInputs || params.has("donutFilterLength") ? parsed.donutFilterLength : defaults.donutFilterLength,
-    donutFilterHoleDiameter: hasDonutFilterInputs || params.has("donutFilterHoleDiameter")
-      ? parsed.donutFilterHoleDiameter
-      : defaults.donutFilterHoleDiameter,
-    donutAdapterInsertLength: hasDonutFilterInputs || params.has("donutAdapterInsertLength")
-      ? parsed.donutAdapterInsertLength
-      : defaults.donutAdapterInsertLength,
-    donutCapRim: hasDonutFilterInputs || params.has("donutCapRim") ? parsed.donutCapRim : defaults.donutCapRim,
-    donutCapEnabled: hasDonutFilterInputs || params.has("donutCapEnabled") ? parsed.donutCapEnabled : defaults.donutCapEnabled,
+    splitFrames: hasAnyParam(params, ["splitFrames", "split_frames"])
+      ? parsed.splitFrames
+      : defaults.splitFrames,
+    fansLeft: hasAnyParam(params, ["fansLeft", "fans_left"])
+      ? parsed.fansLeft
+      : defaults.fansLeft,
+    fansRight: hasAnyParam(params, ["fansRight", "fans_right"])
+      ? parsed.fansRight
+      : defaults.fansRight,
+    fansTop: hasAnyParam(params, ["fansTop", "fans_top"])
+      ? parsed.fansTop
+      : defaults.fansTop,
+    fansBottom: hasAnyParam(params, ["fansBottom", "fans_bottom"])
+      ? parsed.fansBottom
+      : defaults.fansBottom,
+    tempestArrangement: params.has("tempestArrangement")
+      ? parsed.tempestArrangement
+      : defaults.tempestArrangement,
+    donutFilterPreset: hasDonutFilterInputs
+      ? parsed.donutFilterPreset
+      : defaults.donutFilterPreset,
+    donutFilterOuterDiameter:
+      hasDonutFilterInputs || params.has("donutFilterOuterDiameter")
+        ? parsed.donutFilterOuterDiameter
+        : defaults.donutFilterOuterDiameter,
+    donutFilterLength:
+      hasDonutFilterInputs || params.has("donutFilterLength")
+        ? parsed.donutFilterLength
+        : defaults.donutFilterLength,
+    donutFilterHoleDiameter:
+      hasDonutFilterInputs || params.has("donutFilterHoleDiameter")
+        ? parsed.donutFilterHoleDiameter
+        : defaults.donutFilterHoleDiameter,
+    donutAdapterInsertLength:
+      hasDonutFilterInputs || params.has("donutAdapterInsertLength")
+        ? parsed.donutAdapterInsertLength
+        : defaults.donutAdapterInsertLength,
+    donutCapRim:
+      hasDonutFilterInputs || params.has("donutCapRim")
+        ? parsed.donutCapRim
+        : defaults.donutCapRim,
+    donutCapEnabled:
+      hasDonutFilterInputs || params.has("donutCapEnabled")
+        ? parsed.donutCapEnabled
+        : defaults.donutCapEnabled,
     rim: params.has("rim") ? parsed.rim : defaults.rim,
     materialThickness: hasAnyParam(params, ["materialThickness", "thickness"])
       ? parsed.materialThickness
@@ -2408,7 +2876,11 @@ function applyPrintDesignUrlDefaults(
 // Fallback Readers
 // ##############################
 
-function readCameraPreset(params: URLSearchParams, key: string, fallback: CameraPreset): CameraPreset {
+function readCameraPreset(
+  params: URLSearchParams,
+  key: string,
+  fallback: CameraPreset,
+): CameraPreset {
   const value = params.get(key);
   const found = cameraPresets.find((preset) => preset === value);
   return found ?? fallback;
@@ -2420,7 +2892,10 @@ function readPrintDesign(params: URLSearchParams): PrintDesignId {
   return found ?? defaultSettings.printDesign;
 }
 
-function readParam(params: URLSearchParams, key: string | readonly string[]): string | null {
+function readParam(
+  params: URLSearchParams,
+  key: string | readonly string[],
+): string | null {
   const keys = Array.isArray(key) ? key : [key];
   for (const entry of keys) {
     const values = params.getAll(entry);
@@ -2432,7 +2907,10 @@ function readParam(params: URLSearchParams, key: string | readonly string[]): st
   return null;
 }
 
-function hasAnyParam(params: URLSearchParams, keys: readonly string[]): boolean {
+function hasAnyParam(
+  params: URLSearchParams,
+  keys: readonly string[],
+): boolean {
   return keys.some((key) => params.has(key));
 }
 
@@ -2452,5 +2930,7 @@ function clampInteger(value: number, min: number, max: number): number {
 }
 
 function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }

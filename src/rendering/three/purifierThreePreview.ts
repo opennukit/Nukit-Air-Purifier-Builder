@@ -287,7 +287,7 @@ const fanPreviewFrontDepth = 0.018;
 const fanPreviewRearDepth = 0.047;
 const fanPreviewFrontDepthMillimeters = fanPreviewFrontDepth / sceneScale;
 const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
-const tempestPreviewFanWallInset = 0.8 * sceneScale;
+const previewFanWallInset = 0.8 * sceneScale;
 const filterMediaPreviewClearanceMillimeters = 3;
 const filterMediaPreviewSurfaceGapMillimeters = 2;
 const bananaReferenceLength = 180 * sceneScale;
@@ -809,18 +809,21 @@ export class PurifierThreePreview {
 
     const fanRadius = (settings.fan.spec.diameter / 2) * sceneScale;
     if (pose.installedPartLayout === "source-side-fans") {
-      const fanY = 0;
-      const fanZ = -fanRadius * 0.12;
+      // The assembled body sits in z ∈ [0, height] (its near face is the z = 0 plane),
+      // so "inside the case" is +z. Recess each fan into the body the same way Tempest
+      // wall fans are inset, rather than leaving it proud of the outer surface.
+      const bodyNearFace: PreviewInteriorPlane = { axis: "z", coordinate: 0, insideSign: 1, inset: previewFanWallInset };
       const centerSpacing = Math.min(assetWidth / 4, fanRadius * 2.08);
       for (const x of [-1.5, -0.5, 0.5, 1.5].map((multiplier) => multiplier * centerSpacing)) {
-        const position = staticReferencePurchasedPartPosition(new Vector3(x, fanY, fanZ), explosion);
         const fan = createFan({
           axis: "z",
-          position,
+          position: new Vector3(x, 0, 0),
           radius: fanRadius,
           appearance: settings.fan.productSelection.product.appearance,
         });
         fan.name = "static-reference-installed-side-fan";
+        fan.position.z += previewInteriorShiftForBounds(new Box3().setFromObject(fan), bodyNearFace);
+        fan.position.copy(staticReferencePurchasedPartPosition(fan.position.clone(), explosion));
         collectFanRotors(fan, this.fanRotors);
         target.add(fan);
       }
@@ -2157,7 +2160,7 @@ function tempestWallInteriorPlane(model: TempestModel, pose: TempestPrintablePos
     axis,
     coordinate: vectorAxisValue(sceneFacePoint, axis),
     insideSign,
-    inset: tempestPreviewFanWallInset,
+    inset: previewFanWallInset,
   };
 }
 
@@ -3368,18 +3371,13 @@ function addProceduralFanRotor(rotor: Group, radius: number, appearance: FanAppe
   );
   rotor.add(hub);
 
+  // Fan blades are opaque plastic; rendering them solid (not translucent) avoids
+  // both the transparent-sort vanish and bright-background bleed-through at grazing angles.
   const bladeMaterial = new MeshStandardMaterial({
     color: appearance.bladeColor,
     roughness: 0.62,
     metalness: 0.04,
-    transparent: true,
-    opacity: appearance.bladeOpacity,
     side: DoubleSide,
-    // The 7 blade meshes share one origin (rotation-only), so Three.js cannot
-    // order them in the transparent pass; leaving depthWrite on let mis-ordered
-    // blades cull each other and vanish at some angles. Match the other
-    // transparent materials in this file and skip depth writes.
-    depthWrite: false,
   });
   for (let index = 0; index < 7; index += 1) {
     const blade = new Mesh(createBladeGeometry(radius), bladeMaterial);
