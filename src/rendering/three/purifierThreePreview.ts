@@ -1275,18 +1275,18 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const { material, filterBoxes } = matchTopology(model.topology, {
-      sandwich: () => ({
+    const { material, filterBoxes } = matchTopology(model.filterLayout, {
+      sandwich: (filterLayout) => ({
         material: createFilterMediaMaterial(0.61),
         filterBoxes: tempestHorizontalFilterBoxes(
           model,
-          expectSandwichFilterLayout(model.filterLayout),
+          filterLayout,
           expectSandwichArrangementFilter(model.settings.arrangement),
         ),
       }),
-      quad: () => ({
+      quad: (filterLayout) => ({
         material: createFilterMediaMaterial(0.69),
-        filterBoxes: tempestTowerFilterBoxes(model, expectQuadFilterLayout(model.filterLayout)),
+        filterBoxes: tempestTowerFilterBoxes(model, filterLayout),
       }),
     });
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
@@ -1298,15 +1298,13 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
-    matchTopology(model.topology, {
-      sandwich: () => {
-        const fanLayout = expectSandwichFanLayout(model.fanLayout);
+    matchTopology(model.fanLayout, {
+      sandwich: (fanLayout) => {
         for (const wall of tempestPreviewWalls) {
           this.addTempestWallFans(model, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance);
         }
       },
-      quad: () => {
-        const fanLayout = expectQuadFanLayout(model.fanLayout);
+      quad: (fanLayout) => {
         const topFanCenterZ = tempestTowerTopFanCenterZ(model);
         for (const x of fanLayout.positionsX) {
           for (const y of fanLayout.positionsY) {
@@ -2241,20 +2239,8 @@ function tempestTowerTopFanCenterZ(model: TempestModel): number {
 }
 
 // planForArrangement returns a topology-consistent triple; once the model's
-// topology has matched, these narrow the flat layout fields without re-validating.
-function expectSandwichFilterLayout(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
-}
-
+// topology has matched, this narrows the flat layout fields without re-validating.
 function expectQuadFilterLayout(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
-}
-
-function expectSandwichFanLayout(layout: TempestModel["fanLayout"]): Extract<TempestModel["fanLayout"], { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
-}
-
-function expectQuadFanLayout(layout: TempestModel["fanLayout"]): Extract<TempestModel["fanLayout"], { readonly topology: "quad" }> {
   return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 

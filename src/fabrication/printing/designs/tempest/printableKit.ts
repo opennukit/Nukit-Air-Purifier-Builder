@@ -16,7 +16,7 @@ import {
   type TempestPrintablePose,
 } from "@/domain/designs/tempest/model";
 import type { TempestSettings } from "@/domain/designs/tempest/shared";
-import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
+import { matchTopology } from "@/domain/designs/tempest/topology";
 import {
   findPrintVolumePreset,
   printBedFitForPart,
@@ -281,13 +281,10 @@ function positionChannelsFrom(positionBase: number): readonly number[] {
 // #######################################
 
 function estimateFeatureCount(model: TempestModel): number {
-  const fanLayout = model.fanLayout;
-  return matchTopology(model.topology, {
-    quad: () =>
-      (fanLayout.topology === "quad" ? fanLayout.fanCount : assertNever(fanLayout.topology as never)) * fanOpeningAndScrewFeatureCount + 9,
-    sandwich: () => {
-      const walls = fanLayout.topology === "sandwich" ? fanLayout.walls : assertNever(fanLayout.topology as never);
-      const fanHoleCount = Object.values(walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);
+  return matchTopology(model.fanLayout, {
+    quad: (fanLayout) => fanLayout.fanCount * fanOpeningAndScrewFeatureCount + 9,
+    sandwich: (fanLayout) => {
+      const fanHoleCount = Object.values(fanLayout.walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);
       return fanHoleCount + (model.cordPassThrough.type === "none" ? 0 : 1);
     },
   });

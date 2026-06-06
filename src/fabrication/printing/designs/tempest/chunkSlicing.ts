@@ -95,10 +95,9 @@ function grillBandsInPose(model: TempestModel, pose: TempestPrintablePose, radiu
 // Fan-grill centres in source (model) coordinates. Wall positions are local to
 // each wall, so they are mapped through the same placement the geometry uses.
 function grillCentresSource(model: TempestModel): GrillCentre[] {
-  const { box, frame, fanLayout, filterLayout } = model;
-  return matchTopology(model.topology, {
-    sandwich: () => {
-      const sandwichFans = fanLayout.topology === "sandwich" ? fanLayout : assertNever(fanLayout.topology as never);
+  const { box, frame, filterLayout } = model;
+  return matchTopology(model.fanLayout, {
+    sandwich: (sandwichFans) => {
       const z = frame.outsideFlangeThickness + sandwichFans.localVerticalCenter;
       const wall = frame.wallThickness / 2;
       return [
@@ -108,13 +107,12 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
         ...sandwichFans.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
       ];
     },
-    quad: () => {
-      const quadFans = fanLayout.topology === "quad" ? fanLayout : assertNever(fanLayout.topology as never);
-      const quadFilter = filterLayout.topology === "quad" ? filterLayout : assertNever(filterLayout.topology as never);
+    quad: (quadFans) => {
       // A single box-exhaust opening needs no seam avoidance.
       if (quadFans.topExhaust === "single-box-fan") {
         return [];
       }
+      const quadFilter = filterLayout.topology === "quad" ? filterLayout : assertNever(filterLayout.topology as never);
       const z = box.height - quadFilter.topPlateThickness / 2;
       return quadFans.positionsX.flatMap((x) => quadFans.positionsY.map((y): GrillCentre => [x, y, z]));
     },

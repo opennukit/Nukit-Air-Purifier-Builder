@@ -59,24 +59,15 @@ function finalModel<Solid, Region>(
   ]);
 }
 
-// Pick the recipe named by the model's topology.
+// Pick the recipe named by the model's filter topology, which narrows the layout
+// arm for that handler. planForArrangement built filterLayout and fanLayout from
+// the same topology, so the fan arm agrees; expectSandwichFans/expectQuadFans
+// prove that to the type system until TempestModel itself is a union.
 function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
-  return matchTopology(model.topology, {
-    sandwich: () => assembleSandwich(ctx, model, expectSandwichFilters(model.filterLayout), expectSandwichFans(model.fanLayout)),
-    quad: () => assembleQuad(ctx, model, expectQuadFilters(model.filterLayout), expectQuadFans(model.fanLayout)),
+  return matchTopology(model.filterLayout, {
+    sandwich: (filterLayout) => assembleSandwich(ctx, model, filterLayout, expectSandwichFans(model.fanLayout)),
+    quad: (filterLayout) => assembleQuad(ctx, model, filterLayout, expectQuadFans(model.fanLayout)),
   });
-}
-
-// planForArrangement returns a topology-consistent triple, so once the model's
-// topology tag has matched, the layout arms are known. These guards prove the
-// dead branch unreachable to the type system without re-validating caller input
-// (unlike the deleted layout.ts throws, which guarded against real mismatches).
-function expectSandwichFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
-}
-
-function expectQuadFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {

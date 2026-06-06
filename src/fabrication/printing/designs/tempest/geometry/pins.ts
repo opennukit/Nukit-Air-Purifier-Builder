@@ -56,9 +56,8 @@ export function pinHoles<Solid, Region>(
     return [];
   }
 
-  return matchTopology(model.topology, {
-    sandwich: () => {
-      const filterLayout = expectSandwichFilters(model.filterLayout);
+  return matchTopology(model.filterLayout, {
+    sandwich: (filterLayout) => {
       const fanLayout = expectSandwichFans(model.fanLayout);
       const candidates = pinCandidatesSandwich(ctx, model, filterLayout, chunkGrid, pin);
       if (candidates.length === 0) {
@@ -69,19 +68,11 @@ export function pinHoles<Solid, Region>(
       const candidateGeometry = unionAll(ctx, candidates);
       return [fanZones.length === 0 ? candidateGeometry : ctx.modeling.booleans.subtract(candidateGeometry, unionAll(ctx, fanZones))];
     },
-    quad: () => {
-      const candidates = pinCandidatesQuad(ctx, model, expectQuadFilters(model.filterLayout), chunkGrid, pin);
+    quad: (filterLayout) => {
+      const candidates = pinCandidatesQuad(ctx, model, filterLayout, chunkGrid, pin);
       return candidates.length === 0 ? [] : [unionAll(ctx, candidates)];
     },
   });
-}
-
-function expectSandwichFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
-  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
-}
-
-function expectQuadFilters(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
-  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 function expectSandwichFans(layout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "sandwich" }> {
