@@ -99,6 +99,7 @@ import {
   type TempestWall,
   type TempestWallFanLayout,
 } from "@/domain/designs/tempest/model";
+import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 import {
   createTempestPrintableKitFromLayout,
@@ -1274,53 +1275,62 @@ export class PurifierThreePreview {
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
-    const filterMaterial = createFilterMediaMaterial(model.filterLayout.topology === "sandwich" ? 0.61 : 0.69);
+    const { material, filterBoxes } = matchTopology(model.topology, {
+      sandwich: () => ({
+        material: createFilterMediaMaterial(0.61),
+        filterBoxes: tempestHorizontalFilterBoxes(model, expectSandwichFilterLayout(model.filterLayout)),
+      }),
+      quad: () => ({
+        material: createFilterMediaMaterial(0.69),
+        filterBoxes: tempestTowerFilterBoxes(model, expectQuadFilterLayout(model.filterLayout)),
+      }),
+    });
     const edgeMaterial = createFilterMediaEdgeMaterial(0.36);
-    const filterBoxes =
-      model.filterLayout.topology === "sandwich"
-        ? tempestHorizontalFilterBoxes(model, model.filterLayout)
-        : tempestTowerFilterBoxes(model, model.filterLayout);
-
     for (const [index, box] of filterBoxes.entries()) {
       this.modelGroup.add(
-        createTempestPreviewBox(box, pose, filterMaterial, edgeMaterial, `tempest-filter-${index}`, showPreviewEdges),
+        createTempestPreviewBox(box, pose, material, edgeMaterial, `tempest-filter-${index}`, showPreviewEdges),
       );
     }
   }
 
   private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
-    if (model.fanLayout.topology === "sandwich") {
-      for (const wall of tempestPreviewWalls) {
-        this.addTempestWallFans(model, pose, model.fanLayout.walls[wall], fanAppearance);
-      }
-      return;
-    }
-
-    const topFanCenterZ = tempestTowerTopFanCenterZ(model);
-    for (const x of model.fanLayout.positionsX) {
-      for (const y of model.fanLayout.positionsY) {
-        const fan = createFan({
-          axis: tempestCsgAxisToSceneAxis("z", pose),
-          position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
-          radius: (model.settings.fan.diameter / 2) * sceneScale,
-          appearance: fanAppearance,
-        });
-        collectFanRotors(fan, this.fanRotors);
-        this.modelGroup.add(fan);
-      }
-    }
+    matchTopology(model.topology, {
+      sandwich: () => {
+        const fanLayout = expectSandwichFanLayout(model.fanLayout);
+        for (const wall of tempestPreviewWalls) {
+          this.addTempestWallFans(model, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance);
+        }
+      },
+      quad: () => {
+        const fanLayout = expectQuadFanLayout(model.fanLayout);
+        const topFanCenterZ = tempestTowerTopFanCenterZ(model);
+        for (const x of fanLayout.positionsX) {
+          for (const y of fanLayout.positionsY) {
+            const fan = createFan({
+              axis: tempestCsgAxisToSceneAxis("z", pose),
+              position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
+              radius: (model.settings.fan.diameter / 2) * sceneScale,
+              appearance: fanAppearance,
+            });
+            collectFanRotors(fan, this.fanRotors);
+            this.modelGroup.add(fan);
+          }
+        }
+      },
+    });
   }
 
   private addTempestWallFans(
     model: TempestModel,
     pose: TempestPrintablePose,
     layout: TempestWallFanLayout,
+    localVerticalCenter: number,
     fanAppearance: FanAppearance,
   ): void {
     for (const position of layout.positionsAlongWall) {
       const fan = createFan({
         axis: tempestCsgAxisToSceneAxis(tempestWallNormalAxis(layout.wall), pose),
-        position: tempestCsgPointToScene(tempestWallInteriorFanCenter(model, layout.wall, position), pose),
+        position: tempestCsgPointToScene(tempestWallInteriorFanCenter(model, layout.wall, position, localVerticalCenter), pose),
         radius: (model.settings.fan.diameter / 2) * sceneScale,
         appearance: fanAppearance,
       });
@@ -1995,10 +2005,12 @@ function tempestHorizontalFilterBoxes(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): readonly TempestCsgBox[] {
-  const filter = model.settings.arrangement.type === "four-side-filter-tower" ? null : model.settings.arrangement.filter;
-  if (filter === null) {
+  // Reached only from the sandwich preview arm, so the arrangement is a sandwich
+  // one carrying footprint dimensions.
+  if (model.settings.arrangement.type === "four-side-filter-tower") {
     return [];
   }
+  const filter = model.settings.arrangement.filter;
   const inset = filterMediaPreviewClearanceMillimeters;
   const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
   return filterLayout.filters.map((layer) => ({
@@ -2019,10 +2031,7 @@ function tempestTowerFilterBoxes(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): readonly TempestCsgBox[] {
-  const filter = model.settings.arrangement.type === "four-side-filter-tower" ? model.settings.arrangement.filter : null;
-  if (filter === null) {
-    return [];
-  }
+  const filter = filterLayout.filter; // carried on the quad layout
   const inset = filterMediaPreviewClearanceMillimeters;
   const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
   const faceWidth = visualFilterMediaDimension(filter.faceWidth);
@@ -2130,8 +2139,13 @@ function tempestWallNormalAxis(wall: TempestWall): FanAxis {
   return wall === "front" || wall === "back" ? "y" : "x";
 }
 
-function tempestWallInteriorFanCenter(model: TempestModel, wall: TempestWall, positionAlongWall: number): TempestCsgPoint {
-  const z = model.frame.outsideFlangeThickness + horizontalTempestFanLayout(model).localVerticalCenter;
+function tempestWallInteriorFanCenter(
+  model: TempestModel,
+  wall: TempestWall,
+  positionAlongWall: number,
+  localVerticalCenter: number,
+): TempestCsgPoint {
+  const z = model.frame.outsideFlangeThickness + localVerticalCenter;
   if (wall === "front") {
     return { x: positionAlongWall, y: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, z };
   }
@@ -2221,18 +2235,28 @@ function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
   return vector.z;
 }
 
+// Reached only from the quad fan preview arm, so the filter layout is the quad
+// arm carrying the top-plate thickness.
 function tempestTowerTopFanCenterZ(model: TempestModel): number {
-  if (model.filterLayout.topology !== "quad") {
-    return model.box.height - model.frame.outsideFlangeThickness - fanPreviewRearDepthMillimeters;
-  }
-  return model.box.height - model.filterLayout.topPlateThickness - fanPreviewRearDepthMillimeters;
+  return model.box.height - expectQuadFilterLayout(model.filterLayout).topPlateThickness - fanPreviewRearDepthMillimeters;
 }
 
-function horizontalTempestFanLayout(model: TempestModel): Extract<TempestModel["fanLayout"], { readonly topology: "sandwich" }> {
-  if (model.fanLayout.topology !== "sandwich") {
-    throw new Error("horizontalTempestFanLayout: Expected horizontal Tempest fan layout");
-  }
-  return model.fanLayout;
+// planForArrangement returns a topology-consistent triple; once the model's
+// topology has matched, these narrow the flat layout fields without re-validating.
+function expectSandwichFilterLayout(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function expectQuadFilterLayout(layout: TempestFilterLayout): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
+  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
+}
+
+function expectSandwichFanLayout(layout: TempestModel["fanLayout"]): Extract<TempestModel["fanLayout"], { readonly topology: "sandwich" }> {
+  return layout.topology === "sandwich" ? layout : assertNever(layout.topology as never);
+}
+
+function expectQuadFanLayout(layout: TempestModel["fanLayout"]): Extract<TempestModel["fanLayout"], { readonly topology: "quad" }> {
+  return layout.topology === "quad" ? layout : assertNever(layout.topology as never);
 }
 
 const tempestPreviewWalls: readonly TempestWall[] = ["front", "back", "left", "right"];

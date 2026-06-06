@@ -13,6 +13,7 @@ import {
   type PurifierSettings,
 } from "@/domain/purifier/airPurifier";
 import { createTempestModel, type TempestFanLayout } from "@/domain/designs/tempest/model";
+import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import type { CutPanel } from "@/fabrication/laser/cutGeometry";
 import { createAirPurifierCutSheet, resolveFanCount } from "@/fabrication/laser/panels";
@@ -169,13 +170,11 @@ function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans
 }
 
 function resolvedTempestFanCount(fanLayout: TempestFanLayout): number {
-  if (fanLayout.topology === "quad") {
-    return fanLayout.fanCount;
-  }
-  return (
-    fanLayout.walls.front.actualCount +
-    fanLayout.walls.back.actualCount +
-    fanLayout.walls.left.actualCount +
-    fanLayout.walls.right.actualCount
-  );
+  return matchTopology(fanLayout.topology, {
+    quad: () => (fanLayout.topology === "quad" ? fanLayout.fanCount : assertNever(fanLayout.topology as never)),
+    sandwich: () => {
+      const walls = fanLayout.topology === "sandwich" ? fanLayout.walls : assertNever(fanLayout.topology as never);
+      return walls.front.actualCount + walls.back.actualCount + walls.left.actualCount + walls.right.actualCount;
+    },
+  });
 }
