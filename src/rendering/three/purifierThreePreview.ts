@@ -2233,7 +2233,15 @@ function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
 // The sandwich preview filter media comes from the input arrangement's footprint
 // filter, which a sandwich-topology model always carries.
 function expectSandwichArrangementFilter(arrangement: TempestModel["settings"]["arrangement"]): TempestHorizontalFilterSize {
-  return arrangement.type !== "four-side-filter-tower" ? arrangement.filter : assertNever(arrangement.type as never);
+  switch (arrangement.type) {
+    case "single-horizontal-top-filter":
+    case "dual-horizontal-sandwich":
+      return arrangement.filter;
+    case "four-side-filter-tower":
+      throw new Error("expectSandwichArrangementFilter: quad arrangement in sandwich preview");
+    default:
+      return assertNever(arrangement);
+  }
 }
 
 const tempestPreviewWalls: readonly TempestWall[] = ["front", "back", "left", "right"];

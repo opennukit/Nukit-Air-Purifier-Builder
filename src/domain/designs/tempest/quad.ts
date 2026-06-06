@@ -34,10 +34,15 @@ const CORD_TOWER_MIN_EDGE_MM = 2;
 type QuadArrangement = Extract<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>;
 
 function expectQuadArrangement(arrangement: TempestFilterArrangement): QuadArrangement {
-  if (arrangement.type !== "four-side-filter-tower") {
-    return assertNever(arrangement.type as never);
+  switch (arrangement.type) {
+    case "four-side-filter-tower":
+      return arrangement;
+    case "single-horizontal-top-filter":
+    case "dual-horizontal-sandwich":
+      throw new Error("expectQuadArrangement: sandwich arrangement reached the quad plan");
+    default:
+      return assertNever(arrangement);
   }
-  return arrangement;
 }
 
 function towerStructuralOffset(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
