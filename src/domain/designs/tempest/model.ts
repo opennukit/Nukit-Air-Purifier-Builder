@@ -356,6 +356,24 @@ export type TempestResolvedRenderTarget =
       readonly moveToOrigin: boolean;
     };
 
+// How the printable output is oriented on the bed: kept as-modelled, or stood
+// upright (the dual-filter sandwich prints best on its side).
+export type TempestPrintableEnvelope = {
+  readonly width: Millimeters;
+  readonly depth: Millimeters;
+  readonly height: Millimeters;
+};
+
+export type TempestPrintablePose =
+  | {
+      readonly type: "source";
+      readonly envelope: TempestPrintableEnvelope;
+    }
+  | {
+      readonly type: "upright-dual-filter";
+      readonly envelope: TempestPrintableEnvelope;
+    };
+
 export type TempestModel = {
   readonly settings: TempestSettings;
   readonly topology: TempestTopology;
@@ -364,6 +382,7 @@ export type TempestModel = {
   readonly filterLayout: TempestFilterLayout;
   readonly fanLayout: TempestFanLayout;
   readonly cordPassThrough: TempestCordPassThroughPlacement;
+  readonly printablePose: TempestPrintablePose;
   readonly chunkGrid: TempestChunkGrid;
   readonly renderTarget: TempestResolvedRenderTarget;
 };
@@ -472,6 +491,7 @@ export function createTempestModel(settings: TempestSettings = defaultTempestSet
     filterLayout,
     fanLayout,
     cordPassThrough,
+    printablePose: plan.pose(box, filterLayout),
     chunkGrid,
     renderTarget: resolveRenderTarget(safeSettings.renderTarget, chunkGrid),
   };
@@ -489,6 +509,7 @@ export type TempestModelPlan = {
     box: TempestBoxEnvelope,
     filterLayout: TempestFilterLayout,
   ) => TempestCordPassThroughPlacement;
+  readonly pose: (box: TempestBoxEnvelope, filterLayout: TempestFilterLayout) => TempestPrintablePose;
 };
 
 // The ONLY place an arrangement preset maps to a topology after the settings

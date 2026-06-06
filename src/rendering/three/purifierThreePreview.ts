@@ -95,6 +95,7 @@ import {
   createTempestModel,
   type TempestFilterLayout,
   type TempestModel,
+  type TempestPrintablePose,
   type TempestWall,
   type TempestWallFanLayout,
 } from "@/domain/designs/tempest/model";
@@ -103,7 +104,6 @@ import {
   createTempestPrintableKitFromLayout,
   createTempestPrintablePose,
   createTempestSettingsFromLayout,
-  type TempestPrintablePose,
 } from "@/fabrication/printing/designs/tempest/printableKit";
 import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
 

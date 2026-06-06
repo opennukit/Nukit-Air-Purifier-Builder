@@ -17,6 +17,7 @@ import {
   type TempestHorizontalFilterLayer,
   type TempestHorizontalFlangeLayer,
   type TempestModelPlan,
+  type TempestPrintablePose,
   type TempestSettings,
   type TempestWall,
   type TempestWallFanLayout,
@@ -255,10 +256,26 @@ export function createSandwichCordPlacement(
   };
 }
 
+// A two-filter sandwich prints best stood upright; a single-filter sandwich
+// stays as-modelled. Count-based, not tag-based — both are sandwich topology.
+export function createSandwichPose(box: TempestBoxEnvelope, filterLayout: TempestFilterLayout): TempestPrintablePose {
+  if (expectSandwichFilterLayout(filterLayout).filterCount === 2) {
+    return {
+      type: "upright-dual-filter",
+      envelope: { width: box.width, depth: box.height, height: box.depth },
+    };
+  }
+  return {
+    type: "source",
+    envelope: { width: box.width, depth: box.depth, height: box.height },
+  };
+}
+
 export const sandwichPlan: TempestModelPlan = {
   topology: "sandwich",
   box: createSandwichBox,
   filterLayout: createSandwichFilterLayout,
   fanLayout: createSandwichFanLayout,
   cordPlacement: (settings, box) => createSandwichCordPlacement(settings, box),
+  pose: createSandwichPose,
 };

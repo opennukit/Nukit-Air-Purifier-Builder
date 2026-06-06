@@ -13,6 +13,7 @@ import {
   defaultTempestSettings,
   type TempestChunkGrid,
   type TempestModel,
+  type TempestPrintablePose,
   type TempestSettings,
 } from "@/domain/designs/tempest/model";
 import {
@@ -50,22 +51,6 @@ type ChunkAddress = {
   readonly y: number;
   readonly z: number;
 };
-
-export type TempestPrintableEnvelope = {
-  readonly width: number;
-  readonly depth: number;
-  readonly height: number;
-};
-
-export type TempestPrintablePose =
-  | {
-      readonly type: "source";
-      readonly envelope: TempestPrintableEnvelope;
-    }
-  | {
-      readonly type: "upright-dual-filter";
-      readonly envelope: TempestPrintableEnvelope;
-    };
 
 const epsilon = 0.05;
 // One fan cutout is five CSG features: the opening plus its four corner screw holes.
@@ -211,24 +196,7 @@ function createChunkPart(
 // #######################################
 
 export function createTempestPrintablePose(model: TempestModel): TempestPrintablePose {
-  if (model.settings.arrangement.type === "dual-horizontal-sandwich") {
-    return {
-      type: "upright-dual-filter",
-      envelope: {
-        width: model.box.width,
-        depth: model.box.height,
-        height: model.box.depth,
-      },
-    };
-  }
-  return {
-    type: "source",
-    envelope: {
-      width: model.box.width,
-      depth: model.box.depth,
-      height: model.box.height,
-    },
-  };
+  return model.printablePose;
 }
 
 function applyTempestPrintablePose(geometry: Geom3, pose: TempestPrintablePose): Geom3 {

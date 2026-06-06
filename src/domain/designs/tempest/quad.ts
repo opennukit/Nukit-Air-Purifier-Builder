@@ -14,6 +14,7 @@ import {
   type TempestFrameModel,
   type TempestFrameSettings,
   type TempestModelPlan,
+  type TempestPrintablePose,
   type TempestQuadWallRect,
   type TempestSettings,
   type TempestTowerFilterPocket,
@@ -228,10 +229,19 @@ function quadCordCorner(cord: Extract<TempestCordPassThrough, { readonly type: "
   return { x: usesHighX ? "max" : "min", y: usesHighY ? "max" : "min" };
 }
 
+// The tower always prints as-modelled.
+export function createQuadPose(box: TempestBoxEnvelope): TempestPrintablePose {
+  return {
+    type: "source",
+    envelope: { width: box.width, depth: box.depth, height: box.height },
+  };
+}
+
 export const quadPlan: TempestModelPlan = {
   topology: "quad",
   box: createQuadBox,
   filterLayout: createQuadFilterLayout,
   fanLayout: createQuadFanLayout,
   cordPlacement: (settings, _box, filterLayout) => createQuadCordPlacement(settings, filterLayout),
+  pose: (box) => createQuadPose(box),
 };

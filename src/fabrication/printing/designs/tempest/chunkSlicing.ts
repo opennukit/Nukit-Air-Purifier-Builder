@@ -1,5 +1,4 @@
-import type { TempestChunkGrid, TempestModel } from "@/domain/designs/tempest/model";
-import type { TempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
+import type { TempestChunkGrid, TempestModel, TempestPrintablePose } from "@/domain/designs/tempest/model";
 
 // #######################################
 // Feature-Aware Print-Chunk Slicing

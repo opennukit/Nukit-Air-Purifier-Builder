@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createTempestModel, defaultTempestSettings, type TempestModel } from "@/domain/designs/tempest/model";
-import { createTempestPrintablePose, type TempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
+import { createTempestModel, defaultTempestSettings, type TempestModel, type TempestPrintablePose } from "@/domain/designs/tempest/model";
+import { createTempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
 import { featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 
 const bed = { width: 256, depth: 256, height: 256 };
