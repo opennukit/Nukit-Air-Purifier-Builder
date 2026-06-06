@@ -1,4 +1,5 @@
-import type { TempestChunkGrid, TempestFilterLayout, TempestModel, TempestWall } from "@/domain/designs/tempest/model";
+import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel, TempestWall } from "@/domain/designs/tempest/model";
+import { assertNever } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
@@ -65,6 +66,16 @@ function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: Tem
     : assemblyHorizontal(ctx, model, model.filterLayout);
 }
 
+// The quad recipe runs only for a quad-topology model, so its fan layout is the
+// quad arm. planForArrangement guarantees the two tags agree; this proves the
+// dead branch unreachable to the type system without re-validating caller input.
+function expectQuadFanLayout(fanLayout: TempestFanLayout): Extract<TempestFanLayout, { readonly topology: "quad" }> {
+  if (fanLayout.topology !== "quad") {
+    return assertNever(fanLayout.topology as never);
+  }
+  return fanLayout;
+}
+
 // #######################################
 // Recipe: 4-filter side-filter tower
 // #######################################
@@ -116,7 +127,7 @@ function assemblyTower<Solid, Region>(
         ),
       ];
     }),
-    ...towerFanGrid(ctx, model, filterLayout), // 5. top fan grid (or single box-fan exhaust)
+    ...towerFanGrid(ctx, model, filterLayout, expectQuadFanLayout(model.fanLayout)), // 5. top fan grid (or single box-fan exhaust)
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
   ]);
 }

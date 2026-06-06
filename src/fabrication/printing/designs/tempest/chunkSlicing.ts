@@ -107,7 +107,7 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
     ];
   }
   // Tower top grid. A single box-exhaust opening needs no seam avoidance.
-  if ((model.settings.fan.topExhaust ?? "fan-grid") === "single-box-fan") {
+  if (fanLayout.topExhaust === "single-box-fan") {
     return [];
   }
   const topPlate = model.filterLayout.topology === "quad" ? model.filterLayout.topPlateThickness : 0;

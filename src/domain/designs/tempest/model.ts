@@ -287,6 +287,7 @@ export type TempestFanLayout =
       readonly bodyDepth: Millimeters;
       readonly screwPitch: Millimeters;
       readonly minimumCenterFromEdge: Millimeters;
+      readonly topExhaust: TempestTowerTopExhaust; // resolved from the optional fan setting, total here
       readonly columns: number;
       readonly rows: number;
       readonly positionsX: readonly Millimeters[];
@@ -844,6 +845,7 @@ function createFanLayout(settings: TempestSettings, box: TempestBoxEnvelope, fil
       bodyDepth,
       screwPitch,
       minimumCenterFromEdge,
+      topExhaust: settings.fan.topExhaust ?? "fan-grid",
       columns: positionsX.length,
       rows: positionsY.length,
       positionsX,

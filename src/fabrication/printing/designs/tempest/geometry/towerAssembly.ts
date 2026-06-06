@@ -1,4 +1,5 @@
 import type {
+  TempestFanLayout,
   TempestFilterLayout,
   TempestModel,
   TempestPlanarAxis,
@@ -166,25 +167,21 @@ export function towerFanGrid<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): Solid[] {
-  if ((model.settings.fan.topExhaust ?? "fan-grid") === "single-box-fan") {
+  if (fanLayout.topExhaust === "single-box-fan") {
     return towerBoxExhaustCuts(ctx, model, filterLayout);
   }
-  if (model.fanLayout.topology !== "quad") {
-    return [];
-  }
-  return model.fanLayout.positionsX.flatMap((x) =>
-    model.fanLayout.topology === "quad"
-      ? model.fanLayout.positionsY.map((y) =>
-          fanPatternCut(
-            ctx,
-            model,
-            "z",
-            [x, y, model.box.height - filterLayout.topPlateThickness / 2],
-            filterLayout.topPlateThickness + 2 * EPSILON_LIP,
-          ),
-        )
-      : [],
+  return fanLayout.positionsX.flatMap((x) =>
+    fanLayout.positionsY.map((y) =>
+      fanPatternCut(
+        ctx,
+        model,
+        "z",
+        [x, y, model.box.height - filterLayout.topPlateThickness / 2],
+        filterLayout.topPlateThickness + 2 * EPSILON_LIP,
+      ),
+    ),
   );
 }
 
