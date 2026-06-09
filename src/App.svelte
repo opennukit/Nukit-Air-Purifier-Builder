@@ -25,13 +25,9 @@
     customDonutFilterPresetId,
     defaultThreeDimensionalPrintDesignId,
     donutFilterPresets,
-    findDonutFilterPreset,
-    isDonutFilterPrintDesignId,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
     isTempestPrintDesignId,
-    staticReferenceDefaultsForPreset,
-    staticPrintReferenceForPreset,
     type PrintDesignId,
     type TempestArrangementPreset,
   } from "@/domain/purifier/designPresets";
@@ -42,13 +38,7 @@
     fixedFanCountOptions,
     type PresetFanProduct,
   } from "@/domain/purifier/fanProducts";
-  import {
-    customFilterPresetId,
-    filterPresets,
-    findFilterPreset,
-  } from "@/domain/purifier/filter";
-  import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
-  import { createTempestModel } from "@/domain/designs/tempest/model";
+  import { customFilterPresetId, filterPresets } from "@/domain/purifier/filter";
   import {
     advancedJointControls,
     donutFilterDimensionControls,
@@ -94,6 +84,13 @@
     type GeneratedPrintSheetPlanCacheEntry,
   } from "@/app/printSheetPlans";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
+  import { staticReferenceFilesUrl } from "@/app/externalLinks";
+  import {
+    createPreviewSummaryItems,
+    createPurchaseListItems,
+    type PurchaseListItem,
+    type SummaryItem,
+  } from "@/app/summaries";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -131,8 +128,6 @@
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
   import { createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
-  import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
-  import type { StaticPrintEstimate } from "@/resources/static-print-references/references";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
@@ -142,16 +137,6 @@
   // #######################################
 
   type FabricationMethod = ExportFormat;
-  type SummaryItem = {
-    readonly label: string;
-    readonly value: string;
-  };
-  type PurchaseListItem = {
-    readonly category: string;
-    readonly label: string;
-    readonly detail: string;
-    readonly url?: string;
-  };
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
   // #######################################
@@ -486,271 +471,6 @@
   }
 
   // #######################################
-  // Summaries and Diagnostics
-  // #######################################
-
-  // ##############################
-  // Preview Summary
-  // ##############################
-
-  function createPreviewSummaryItems(
-    currentLayout: LayoutResult,
-    currentPreviewMode: PreviewMode,
-    currentFabricationMethod: FabricationMethod,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-    currentGeneratedPlan: PrintableSheetPlan | null,
-  ): readonly SummaryItem[] {
-    if (currentPreviewMode === "print-sheets") {
-      if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
-        const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
-        return [
-          { label: "Print plates", value: findPrintVolumePreset(currentPrintVolumePresetId).label },
-          { label: "Source STLs", value: String(reference?.platePreviewAssets.length ?? 0) },
-          ...staticPrintEstimateSummaryItems(reference?.printEstimate),
-          { label: "License", value: currentLayout.configuration.printDesign.license },
-          { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
-        ];
-      }
-      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
-      if (isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
-        return [
-          { label: "Print plates", value: String(plan.sheets.length) },
-          { label: "Print chunks", value: String(plan.kit.summary.partCount) },
-          { label: "Split model", value: String(plan.kit.summary.splitPanelCount) },
-          { label: "Bed", value: plan.kit.preset.label },
-        ];
-      }
-      return [
-        { label: "Print plates", value: String(plan.sheets.length) },
-        { label: "Panel tiles", value: String(plan.kit.summary.panelTileCount) },
-        { label: "Glue keys", value: String(plan.kit.summary.glueKeyCount) },
-        { label: "Split panels", value: String(plan.kit.summary.splitPanelCount) },
-        { label: "Bed", value: plan.kit.preset.label },
-      ];
-    }
-
-    if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
-      return [
-        { label: "Design", value: currentLayout.configuration.printDesign.label },
-        { label: "Type", value: "Curated static" },
-        { label: "Files", value: reference?.fileSummary ?? "Original source files" },
-        ...staticPrintEstimateSummaryItems(reference?.printEstimate),
-        { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
-      ];
-    }
-
-    if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
-      const model = createDonutFilterModel(currentLayout);
-      return [
-        { label: "Design", value: currentLayout.configuration.printDesign.label },
-        {
-          label: "Filter",
-          value: `${formatMillimeters(model.filter.outerDiameter)} dia x ${formatMillimeters(model.filter.length)}`,
-        },
-        { label: "Center hole", value: formatMillimeters(model.filter.holeDiameter) },
-        { label: "Fan", value: `${model.fanSize} mm` },
-        { label: "Print parts", value: String(plan.kit.summary.partCount) },
-        { label: "Bed", value: plan.kit.preset.label },
-      ];
-    }
-
-    if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
-      const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
-      return [
-        { label: "Design", value: currentLayout.configuration.printDesign.label },
-        { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
-        { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
-        { label: "Print chunks", value: String(plan.kit.summary.partCount) },
-        { label: "Bed", value: plan.kit.preset.label },
-      ];
-    }
-
-    const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
-    return [
-      { label: "Panels", value: String(cutPanelSummary.panelCount) },
-      { label: "Chamber height", value: formatMillimeters(currentLayout.summary.chamberHeight) },
-      { label: "Working depth", value: formatMillimeters(currentLayout.summary.workingDepth) },
-      { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
-      {
-        label: "Sheet",
-        value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
-      },
-    ];
-  }
-
-  // ##############################
-  // Static Print Estimates
-  // ##############################
-
-  function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefined): readonly SummaryItem[] {
-    if (estimate === undefined) {
-      return [];
-    }
-    return [
-      { label: "Filament", value: `${formatKilograms(estimate.estimatedFilamentKilograms)} @ ${estimate.assumptions.infillPercent}%` },
-      { label: "Print time", value: `${formatHourRange(estimate.printTimeHours)} h` },
-    ];
-  }
-
-  // #######################################
-  // Purchase List
-  // #######################################
-
-  // ##############################
-  // Required Items
-  // ##############################
-
-  function createPurchaseListItems(
-    currentLayout: LayoutResult,
-    currentFabricationMethod: FabricationMethod,
-    currentSettings: RawPurifierSettings,
-  ): readonly PurchaseListItem[] {
-    if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
-      if (reference === undefined) {
-        return [];
-      }
-      const staticDefaults = staticReferenceDefaultsForPreset(currentLayout.configuration.printDesign);
-      if (staticDefaults === undefined) {
-        return [];
-      }
-      const fanProduct = findFanProductPreset(currentSettings.fanPreset);
-      const fanCount = staticDefaults.fanCount;
-      const filterPreset = findFilterPreset(currentSettings.filterPreset);
-      const filterCount = staticDefaults.filterCount;
-      return [
-        {
-          category: "Source files",
-          label: currentLayout.configuration.printDesign.label,
-          detail: reference.fileSummary,
-          url: staticReferenceFilesUrl(currentLayout),
-        },
-        ...staticPrintEstimatePurchaseItems(reference.printEstimate),
-        {
-          category: "Filters",
-          label: `${filterCount} x ${filterPreset.label}`,
-          detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)} each`,
-          url: webSearchUrl(`${filterPreset.label} air filter`),
-        },
-        {
-          category: "Fans",
-          label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-          detail: fanProduct.label,
-          url: fanProduct.productUrl,
-        },
-        {
-          category: "Power",
-          label: "12 V fan power",
-          detail: `PWM power supply or fan hub sized for ${fanCount} ${fanProduct.label} fans`,
-          url: webSearchUrl(`${fanProduct.label} 12V PWM fan power supply hub`),
-        },
-        {
-          category: "License",
-          label: currentLayout.configuration.printDesign.license,
-          detail: reference.usePolicy.note,
-          url: currentLayout.configuration.printDesign.licenseUrl,
-        },
-      ];
-    }
-
-    const fanProduct = findFanProductPreset(currentSettings.fanPreset);
-    const fanCount = configuredFanCountFor(currentLayout, currentFabricationMethod);
-    const baseItems: PurchaseListItem[] = [
-      {
-        category: "Fans",
-        label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-        detail: fanProduct.label,
-        url: fanProduct.productUrl,
-      },
-      {
-        category: "Power",
-        label: "12 V fan power",
-        detail: "PWM power supply or fan hub sized for the fan current",
-        url: webSearchUrl(`${fanProduct.label} 12V PWM fan power supply hub`),
-      },
-    ];
-
-    if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const preset = findDonutFilterPreset(currentSettings.donutFilterPreset);
-      return [
-        {
-          category: "Filter",
-          label: "Round HEPA filter",
-          detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
-          url: preset.productUrl ?? webSearchUrl(`${preset.label} replacement filter`),
-        },
-        ...baseItems,
-        {
-          category: "Seal",
-          label: "Foam gasket tape",
-          detail: "Optional seal between adaptor, fan, and filter",
-          url: webSearchUrl("foam gasket tape air purifier filter adapter"),
-        },
-      ];
-    }
-
-    const filterPreset = findFilterPreset(currentSettings.filterPreset);
-    return [
-      {
-        category: "Filter",
-        label: filterPreset.label,
-        detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`,
-        url: webSearchUrl(`${filterPreset.label} air filter`),
-      },
-      ...baseItems,
-    ];
-  }
-
-  // ##############################
-  // Static Reference Items
-  // ##############################
-
-  function staticPrintEstimatePurchaseItems(estimate: StaticPrintEstimate | undefined): readonly PurchaseListItem[] {
-    if (estimate === undefined) {
-      return [];
-    }
-    return [
-      {
-        category: "Filament",
-        label: `${estimate.recommendedSpoolCount} x 1 kg ${estimate.assumptions.material}`,
-        detail: `${formatKilograms(estimate.estimatedFilamentKilograms)} used at ${estimate.assumptions.infillPercent}% infill; about ${formatUsd(staticPrintUsedFilamentCostUsd(estimate))} used or ${formatUsd(staticPrintSpoolBudgetUsd(estimate))} with margin`,
-        url: webSearchUrl("1 kg PLA PETG filament spool"),
-      },
-      {
-        category: "Print time",
-        label: `About ${formatHourRange(estimate.printTimeHours)} h`,
-        detail: `${estimate.assumptions.nozzleMm} mm nozzle, ${estimate.assumptions.layerHeightMm} mm layers, ${estimate.assumptions.wallThicknessMm} mm walls. ${estimate.note}`,
-      },
-    ];
-  }
-
-  function staticPrintUsedFilamentCostUsd(estimate: StaticPrintEstimate): number {
-    return estimate.estimatedFilamentKilograms * estimate.filamentCostUsdPerKilogram;
-  }
-
-  function staticPrintSpoolBudgetUsd(estimate: StaticPrintEstimate): number {
-    return estimate.recommendedSpoolCount * estimate.filamentCostUsdPerKilogram;
-  }
-
-  function staticReferenceFilesUrl(currentLayout: LayoutResult): string {
-    const sourceUrl =
-      staticPrintReferenceForPreset(currentLayout.configuration.printDesign)?.sourceUrl ??
-      currentLayout.configuration.printDesign.sourceUrl;
-    if (sourceUrl === undefined) {
-      return "https://www.printables.com/";
-    }
-    return sourceUrl.endsWith("/files") ? sourceUrl : `${sourceUrl}/files`;
-  }
-
-  function webSearchUrl(query: string): string {
-    const params = new URLSearchParams({ q: query });
-    return `https://www.google.com/search?${params.toString()}`;
-  }
-
-  // #######################################
   // Export and Dialog Actions
   // #######################################
 
@@ -939,59 +659,6 @@
 
   function previewMaterialColorLabel(color: PreviewMaterialColorPreset): string {
     return `${color.label} preview color`;
-  }
-
-  function tempestArrangementLabel(arrangement: string): string {
-    if (arrangement === "single-horizontal-top-filter") {
-      return "Single horizontal filter";
-    }
-    if (arrangement === "four-side-filter-tower") {
-      return "Four-filter tower";
-    }
-    return "Dual horizontal filters";
-  }
-
-  function configuredFanCountFor(currentLayout: LayoutResult, currentFabricationMethod: FabricationMethod): number {
-    if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
-      return staticReferenceDefaultsForPreset(currentLayout.configuration.printDesign)?.fanCount ?? 0;
-    }
-    if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-      return currentLayout.configuration.design.type === "donut-filter-adapter" ? currentLayout.configuration.design.fan.count : 0;
-    }
-    return totalConfiguredFans(currentLayout.summary.fans);
-  }
-
-  function totalConfiguredFans(fans: LayoutResult["summary"]["fans"]): number {
-    if (fans.type === "wall-banks") {
-      return fans.resolvedFans.left + fans.resolvedFans.right + fans.resolvedFans.top + fans.resolvedFans.bottom;
-    }
-    return fans.fanCount;
-  }
-
-  function requireCutPanelFabricationSummary(
-    currentLayout: LayoutResult,
-    caller: string,
-  ): Extract<LayoutResult["summary"]["fabrication"], { readonly type: "cut-panel-source" }> {
-    if (currentLayout.summary.fabrication.type !== "cut-panel-source") {
-      throw new Error(`${caller}: ${currentLayout.configuration.printDesign.label} does not have cut-panel fabrication`);
-    }
-    return currentLayout.summary.fabrication;
-  }
-
-  function formatKilograms(value: number): string {
-    return `${trimNumber(value)} kg`;
-  }
-
-  function formatUsd(value: number): string {
-    return `$${trimNumber(value)}`;
-  }
-
-  function formatHourRange(range: StaticPrintEstimate["printTimeHours"]): string {
-    return `${trimNumber(range.min)}-${trimNumber(range.max)}`;
-  }
-
-  function trimNumber(value: number): string {
-    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
   }
 
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
