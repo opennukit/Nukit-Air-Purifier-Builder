@@ -805,7 +805,7 @@ Panel Grids
   grid-column: 2;
 }
 
-.purchase-section {
+.parts-list-section {
   grid-column: 1 / -1;
 }
 
@@ -1121,10 +1121,10 @@ Preset Cards
 }
 
 /* ##############################
-Purchase List
+Parts List
 ############################## */
 
-.purchase-list-card {
+.parts-list-card {
   display: grid;
   gap: 10px;
   margin: 0 0 10px;
@@ -1135,25 +1135,25 @@ Purchase List
   line-height: 1.25;
 }
 
-.purchase-list-heading {
+.parts-list-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
 }
 
-.purchase-list-heading strong {
+.parts-list-heading strong {
   color: var(--ink);
   font-size: 1rem;
 }
 
-.purchase-list-heading span {
+.parts-list-heading span {
   color: var(--muted);
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.purchase-list-card ul {
+.parts-list-card ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
@@ -1162,7 +1162,7 @@ Purchase List
   list-style: none;
 }
 
-.purchase-list-row {
+.parts-list-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -1172,17 +1172,17 @@ Purchase List
   border-top: 1px solid var(--line-soft);
 }
 
-.purchase-list-row:first-child {
+.parts-list-row:first-child {
   border-top: 0;
 }
 
-.purchase-list-row div {
+.parts-list-row div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.purchase-list-row small {
+.parts-list-row small {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 850;
@@ -1190,14 +1190,14 @@ Purchase List
   text-transform: uppercase;
 }
 
-.purchase-list-row strong {
+.parts-list-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
   font-size: 0.86rem;
   font-weight: 850;
 }
 
-.purchase-list-row > a {
+.parts-list-row > a {
   display: grid;
   min-height: 30px;
   place-items: center;
@@ -1211,16 +1211,16 @@ Purchase List
   white-space: nowrap;
 }
 
-.purchase-list-row > a:hover {
+.parts-list-row > a:hover {
   background: var(--accent-wash);
 }
 
-.purchase-list-row > a:focus-visible {
+.parts-list-row > a:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-.purchase-list-row span {
+.parts-list-row span {
   color: var(--muted);
   font-weight: 750;
   overflow-wrap: anywhere;
@@ -1270,7 +1270,7 @@ Conditional Visibility
 }
 
 /* #######################################
-Parts and Purchase Cards
+Parts and Info Cards
 ####################################### */
 
 /* ##############################
@@ -1854,12 +1854,12 @@ Narrow Control Stack
 
   .parts-section,
   .geometry-section,
-  .purchase-section {
+  .parts-list-section {
     grid-column: auto;
     grid-row: auto;
   }
 
-  .purchase-list-card ul {
+  .parts-list-card ul {
     grid-template-columns: 1fr;
   }
 

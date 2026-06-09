@@ -1,11 +1,10 @@
 // Derives the read-only listings shown beside the preview: the summary grid
-// under the preview stage and the purchase list, both computed from the
+// under the preview stage and the parts list, both computed from the
 // current layout, fabrication method, and settings snapshot.
 
 import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import {
-  findDonutFilterPreset,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
@@ -13,10 +12,10 @@ import {
   staticReferenceDefaultsForPreset,
 } from "@/domain/purifier/designPresets";
 import { findFanProductPreset } from "@/domain/purifier/fanProducts";
-import { findFilterPreset } from "@/domain/purifier/filter";
+import { customFilterPresetId, findFilterPreset, type FilterPreset } from "@/domain/purifier/filter";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
-import { staticReferenceFilesUrl, webSearchUrl } from "@/app/externalLinks";
+import { staticReferenceFilesUrl } from "@/app/externalLinks";
 import { requireGeneratedPrintSheetPlan } from "@/app/printSheetPlans";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -33,7 +32,9 @@ export type SummaryItem = {
   readonly label: string;
   readonly value: string;
 };
-export type PurchaseListItem = {
+// Describes what this design needs as neutral quantities and measured
+// dimensions; urls appear only on source-file and license attribution rows.
+export type PartsListItem = {
   readonly category: string;
   readonly label: string;
   readonly detail: string;
@@ -143,14 +144,14 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 }
 
 // ##############################
-// Purchase List
+// Parts List
 // ##############################
 
-export function createPurchaseListItems(
+export function createPartsListItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
   currentSettings: RawPurifierSettings,
-): readonly PurchaseListItem[] {
+): readonly PartsListItem[] {
   if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
     if (reference === undefined) {
@@ -171,23 +172,21 @@ export function createPurchaseListItems(
         detail: reference.fileSummary,
         url: staticReferenceFilesUrl(currentLayout),
       },
-      ...staticPrintEstimatePurchaseItems(reference.printEstimate),
+      ...staticPrintEstimatePartsItems(reference.printEstimate),
       {
         category: "Filters",
-        label: `${filterCount} x ${filterPreset.label}`,
-        detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)} each`,
-        url: webSearchUrl(`${filterPreset.label} air filter`),
+        label: `${filterCount} x ${rectangularFilterSize(currentSettings)}`,
+        detail: filterNominalDetail(filterPreset),
       },
       {
         category: "Fans",
         label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-        detail: fanProduct.label,
+        detail: fanProduct.powerNote,
       },
       {
         category: "Power",
         label: "12 V fan power",
-        detail: `PWM power supply or fan hub sized for ${fanCount} ${fanProduct.label} fans`,
-        url: webSearchUrl(`${fanProduct.label} 12V PWM fan power supply hub`),
+        detail: `PWM power supply or fan hub sized for ${fanCount} fans`,
       },
       {
         category: "License",
@@ -200,35 +199,31 @@ export function createPurchaseListItems(
 
   const fanProduct = findFanProductPreset(currentSettings.fanPreset);
   const fanCount = configuredFanCountFor(currentLayout, currentFabricationMethod);
-  const baseItems: PurchaseListItem[] = [
+  const baseItems: PartsListItem[] = [
     {
       category: "Fans",
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-      detail: fanProduct.label,
+      detail: fanProduct.powerNote,
     },
     {
       category: "Power",
       label: "12 V fan power",
       detail: "PWM power supply or fan hub sized for the fan current",
-      url: webSearchUrl(`${fanProduct.label} 12V PWM fan power supply hub`),
     },
   ];
 
   if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-    const preset = findDonutFilterPreset(currentSettings.donutFilterPreset);
     return [
       {
         category: "Filter",
         label: "Round HEPA filter",
         detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
-        url: webSearchUrl(`${preset.label} replacement filter`),
       },
       ...baseItems,
       {
         category: "Seal",
         label: "Foam gasket tape",
         detail: "Optional seal between adaptor, fan, and filter",
-        url: webSearchUrl("foam gasket tape air purifier filter adapter"),
       },
     ];
   }
@@ -237,15 +232,22 @@ export function createPurchaseListItems(
   return [
     {
       category: "Filter",
-      label: filterPreset.label,
-      detail: `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`,
-      url: webSearchUrl(`${filterPreset.label} air filter`),
+      label: rectangularFilterSize(currentSettings),
+      detail: filterNominalDetail(filterPreset),
     },
     ...baseItems,
   ];
 }
 
-function staticPrintEstimatePurchaseItems(estimate: StaticPrintEstimate | undefined): readonly PurchaseListItem[] {
+function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
+  return `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`;
+}
+
+function filterNominalDetail(preset: FilterPreset): string {
+  return preset.id === customFilterPresetId ? "User measured dimensions" : `${preset.nominalSize} nominal size`;
+}
+
+function staticPrintEstimatePartsItems(estimate: StaticPrintEstimate | undefined): readonly PartsListItem[] {
   if (estimate === undefined) {
     return [];
   }
@@ -254,7 +256,6 @@ function staticPrintEstimatePurchaseItems(estimate: StaticPrintEstimate | undefi
       category: "Filament",
       label: `${estimate.recommendedSpoolCount} x 1 kg ${estimate.assumptions.material}`,
       detail: `${formatKilograms(estimate.estimatedFilamentKilograms)} used at ${estimate.assumptions.infillPercent}% infill; about ${formatUsd(staticPrintUsedFilamentCostUsd(estimate))} used or ${formatUsd(staticPrintSpoolBudgetUsd(estimate))} with margin`,
-      url: webSearchUrl("1 kg PLA PETG filament spool"),
     },
     {
       category: "Print time",

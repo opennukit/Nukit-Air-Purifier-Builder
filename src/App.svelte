@@ -82,9 +82,9 @@
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, filterPresetOptionLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
+    createPartsListItems,
     createPreviewSummaryItems,
-    createPurchaseListItems,
-    type PurchaseListItem,
+    type PartsListItem,
     type SummaryItem,
   } from "@/app/summaries";
   import type { PreviewMode } from "@/app/workbench/previewMode";
@@ -172,7 +172,7 @@
   let exportDiagnostics: readonly BuildDiagnostic[] = [];
   let exportReadiness: BuildDiagnostic = summarizeBuildReadiness(layout);
   let previewSummaryItems: readonly SummaryItem[] = [];
-  let purchaseItems: readonly PurchaseListItem[] = [];
+  let partsItems: readonly PartsListItem[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
   let activePrintSeamPlan: PrintableSheetPlan | null = null;
@@ -217,7 +217,7 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: purchaseItems = createPurchaseListItems(layout, fabricationMethod, settings);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
@@ -1288,22 +1288,22 @@
               </section>
             {/if}
 
-            <section class="control-section purchase-section">
-              <div class="purchase-list-card" id="purchaseList">
-                <div class="purchase-list-heading">
-                  <strong>Purchase list</strong>
-                  <span>{fabricationMethod === "print-3mf" ? "Buy parts" : "Cut and build"}</span>
+            <section class="control-section parts-list-section">
+              <div class="parts-list-card" id="partsList">
+                <div class="parts-list-heading">
+                  <strong>What you need</strong>
+                  <span>{fabricationMethod === "print-3mf" ? "Print and assemble" : "Cut and build"}</span>
                 </div>
                 <ul>
-                  {#each purchaseItems as item}
-                    <li class="purchase-list-row">
+                  {#each partsItems as item}
+                    <li class="parts-list-row">
                       <div>
                         <small>{item.category}</small>
                         <strong>{item.label}</strong>
                         <span>{item.detail}</span>
                       </div>
                       {#if item.url !== undefined}
-                        <a href={item.url} target="_blank" rel="noreferrer">Find</a>
+                        <a href={item.url} target="_blank" rel="noreferrer">Open</a>
                       {/if}
                     </li>
                   {/each}
