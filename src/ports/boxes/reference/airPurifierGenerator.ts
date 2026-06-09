@@ -17,11 +17,11 @@ import { Boxes } from "@/ports/boxes/reference/boxes";
 import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";
 import {
   normalizeSettings,
-  type FanCountRequest,
   type FilterFrameConstruction,
   type PurifierInput,
   type PurifierSettings,
 } from "@/domain/purifier/airPurifier";
+import type { FanCountRequest } from "@/domain/purifier/fanProducts";
 
 type FingerHoleCutRequest =
   | {

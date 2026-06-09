@@ -5,7 +5,6 @@ import {
   applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
-  customFanProductPresetId,
   decodeSettings,
   defaultSettings,
   encodeSettings,
@@ -18,6 +17,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/airPurifier";
+import { customFanProductPresetId } from "@/domain/purifier/fanProducts";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";

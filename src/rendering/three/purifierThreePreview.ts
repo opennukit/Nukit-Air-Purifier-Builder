@@ -44,8 +44,8 @@ import {
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
-  type FanAppearance,
 } from "@/domain/purifier/airPurifier";
+import type { FanAppearance } from "@/domain/purifier/fanProducts";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import {

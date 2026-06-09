@@ -12,7 +12,7 @@ import {
   Object3D,
   TorusGeometry,
 } from "three";
-import type { FanAppearance } from "@/domain/purifier/airPurifier";
+import type { FanAppearance } from "@/domain/purifier/fanProducts";
 import type {
   FanCadPreviewAsset,
   FanCadPreviewMesh,
