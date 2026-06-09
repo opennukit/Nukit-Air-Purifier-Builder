@@ -1121,6 +1121,9 @@
                   <p class="eyebrow">Parts</p>
                   <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
                 </div>
+                <p class="section-note">
+                  Preset dimensions are best effort. Get your filters and fans first, measure them, then enter the real numbers here.
+                </p>
                 <div data-generated-part-controls>
                   {#if !isDonutControlsActive}
                     <div data-rectangular-filter-controls>
@@ -1405,6 +1408,36 @@
             </section>
           </div>
         {/if}
+
+        <!-- #######################################
+        Guides
+        ####################################### -->
+
+        <section class="guides-card" aria-label="Guides">
+          <strong>Guides</strong>
+          <ul>
+            <li>
+              <a href="https://itsairborne.com/choosing-a-pc-fan-for-an-air-purifier-the-only-fans-guide-feaf497af20c" target="_blank" rel="noreferrer">
+                Choosing a PC fan for an air purifier
+              </a>
+            </li>
+            <li>
+              <a href="https://itsairborne.com/untangling-the-electronics-in-a-pc-fan-air-purifier-33f36b5834e1" target="_blank" rel="noreferrer">
+                Untangling the electronics in a PC fan air purifier
+              </a>
+            </li>
+            <li>
+              <a href="https://itsairborne.com/building-a-pc-fan-corsi-rosenthal-box-68e7cd1ca570" target="_blank" rel="noreferrer">
+                Building a PC-fan Corsi-Rosenthal box
+              </a>
+            </li>
+            <li>
+              <a href="https://itsairborne.com/pc-fan-corsi-rosenthal-guide-a611dabf7e0c" target="_blank" rel="noreferrer">
+                PC-fan Corsi-Rosenthal guide
+              </a>
+            </li>
+          </ul>
+        </section>
       </aside>
     </section>
   </section>

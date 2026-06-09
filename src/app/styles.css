@@ -1226,6 +1226,56 @@ Parts List
   overflow-wrap: anywhere;
 }
 
+/* ##############################
+Section Notes and Guides
+############################## */
+
+.section-note {
+  margin: -2px 0 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.guides-card {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line-medium);
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+.guides-card strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.guides-card ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guides-card a {
+  color: var(--accent-strong);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.guides-card a:hover {
+  text-decoration: underline;
+}
+
+.guides-card a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .filter-preset-card a,
 .fan-preset-card a,
 .print-design-card a {
