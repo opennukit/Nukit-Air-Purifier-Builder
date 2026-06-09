@@ -1,5 +1,5 @@
 import type { CrossSection, Manifold } from "manifold-3d";
-import { manifoldKernel, track } from "@/fabrication/printing/modeling/manifoldKernel";
+import { manifoldKernel, requireGeometryArena, track } from "@/fabrication/printing/modeling/manifoldKernel";
 import type { JoinCorners, ModelingApi, Vec2, Vec3 } from "@/fabrication/printing/modeling/modelingApi";
 
 // #######################################
@@ -230,7 +230,14 @@ export type ManifoldMeshData = {
   readonly triVerts: Uint32Array;
 };
 
+// ARENA_LIFETIME: meshData calls getMesh() on a live WASM handle, so it is only
+// sound while that handle's owning arena is open — i.e. INSIDE the
+// `withGeometryArena` call that built `geometry` (see manifoldKernel.ts). Calling
+// it after the arena exits is a use-after-free of a freed handle. The
+// requireGeometryArena guard makes that coupling a checked precondition rather
+// than a convention: extract meshes inside the arena, never after it closes.
 export function meshData(geometry: Geom3): ManifoldMeshData {
+  requireGeometryArena("meshData");
   const mesh = geometry.getMesh();
   return {
     numProp: mesh.numProp,

@@ -53,14 +53,25 @@ export function manifoldKernel(): ManifoldToplevel {
 // Geometry Disposal Arena
 // #######################################
 
+// Returns the currently open arena, or throws if none is. Operating on a WASM
+// handle — creating one (`track`) or reading one back out (`meshData`) — is only
+// sound while the arena that owns the handle is live, so both gate on this single
+// query rather than each inlining the null check. Returning the arena (instead of
+// asserting void) carries the non-null proof forward in the type, so callers need
+// no cast. The caller name is woven into the message so the failure points at the
+// operation, not at this helper.
+export function requireGeometryArena(callerName: string): WasmDisposable[] {
+  if (activeArena === null) {
+    throw new Error(`${callerName}: no active geometry arena; run inside withGeometryArena()`);
+  }
+  return activeArena;
+}
+
 // Records a freshly created WASM geometry value so the enclosing arena can free
 // it. Building geometry outside an arena is a programming error: the value would
 // leak the WASM heap, so this surfaces it loudly rather than failing silently.
 export function track<T extends WasmDisposable>(value: T): T {
-  if (activeArena === null) {
-    throw new Error("track: no active geometry arena; build geometry inside withGeometryArena()");
-  }
-  activeArena.push(value);
+  requireGeometryArena("track").push(value);
   return value;
 }
 
