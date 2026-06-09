@@ -15,7 +15,6 @@
     applyFanProductPreset,
     applyFilterPreset,
     applyTempestArrangementDefaults,
-    defaultSettings,
     previewMaterialColorPresets,
     type PreviewMaterialColorId,
     type PreviewMaterialColorPreset,
@@ -31,27 +30,22 @@
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
     isTempestPrintDesignId,
-    publicThreeDimensionalPrintDesignPresets,
     staticReferenceDefaultsForPreset,
     staticPrintReferenceForPreset,
-    type DonutFilterPresetId,
     type PrintDesignId,
     type TempestArrangementPreset,
   } from "@/domain/purifier/designPresets";
   import {
     automaticFanCount,
     customFanProductPresetId,
-    fanProductPresets,
     findFanProductPreset,
     fixedFanCountOptions,
-    type FanProductPresetId,
     type PresetFanProduct,
   } from "@/domain/purifier/fanProducts";
   import {
     customFilterPresetId,
     filterPresets,
     findFilterPreset,
-    type FilterPresetId,
   } from "@/domain/purifier/filter";
   import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
   import { createTempestModel } from "@/domain/designs/tempest/model";
@@ -81,6 +75,16 @@
     type FanDiameterSelection,
     type RecommendedFanDiameter,
   } from "@/app/controls/fanSelection";
+  import {
+    readCheckboxInput,
+    readDonutFilterPresetControlValue,
+    readFanCountControlValue,
+    readFanProductPresetControlValue,
+    readFilterPresetControlValue,
+    readNumberInput,
+    readPrintDesignControlValue,
+    requireSelect,
+  } from "@/app/controls/inputReaders";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -465,68 +469,6 @@
   // #######################################
   // Control Input Readers
   // #######################################
-
-  function readFilterPresetControlValue(event: Event): FilterPresetId {
-    const preset = filterPresets.find((entry) => entry.id === requireSelect(event, "readFilterPresetControlValue").value);
-    return preset?.id ?? defaultSettings.filterPreset;
-  }
-
-  function readDonutFilterPresetControlValue(event: Event): DonutFilterPresetId {
-    return findDonutFilterPreset(requireSelect(event, "readDonutFilterPresetControlValue").value).id;
-  }
-
-  function readFanProductPresetControlValue(event: Event): FanProductPresetId {
-    const preset = fanProductPresets.find((entry) => entry.id === requireSelect(event, "readFanProductPresetControlValue").value);
-    return preset?.id ?? defaultSettings.fanPreset;
-  }
-
-  function readPrintDesignControlValue(event: Event): PrintDesignId {
-    const preset = publicThreeDimensionalPrintDesignPresets.find((entry) => entry.id === requireSelect(event, "readPrintDesignControlValue").value);
-    return preset?.id ?? defaultThreeDimensionalPrintDesignId;
-  }
-
-  function readFanCountControlValue(event: Event): number {
-    const parsed = Number(requireSelect(event, "readFanCountControlValue").value);
-    return Number.isFinite(parsed) ? parsed : automaticFanCount;
-  }
-
-  function readNumberInput(event: Event, fallback: number): number {
-    const value = requireInputOrSelect(event, "readNumberInput").value.trim();
-    if (value.length === 0) {
-      return fallback;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function readCheckboxInput(event: Event): boolean {
-    const input = requireInput(event, "readCheckboxInput");
-    return input.checked;
-  }
-
-  function requireSelect(event: Event, context: string): HTMLSelectElement {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLSelectElement)) {
-      throw new Error(`${context}: Expected select event target`);
-    }
-    return target;
-  }
-
-  function requireInput(event: Event, context: string): HTMLInputElement {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLInputElement)) {
-      throw new Error(`${context}: Expected input event target`);
-    }
-    return target;
-  }
-
-  function requireInputOrSelect(event: Event, context: string): HTMLInputElement | HTMLSelectElement {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
-      throw new Error(`${context}: Expected input or select event target`);
-    }
-    return target;
-  }
 
   // #######################################
   // View Availability
