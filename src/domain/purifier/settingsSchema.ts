@@ -118,6 +118,10 @@ export type PurifierSettingsFieldFallbacks = {
 export const createPurifierSettingsFieldsSchema = (
   fallbacks: PurifierSettingsFieldFallbacks,
 ) =>
+  // `satisfies` proves the hand-listed shape parses EVERY field the fallbacks
+  // declare (and nothing extra). Without it, adding a field to
+  // PurifierSettingsFieldFallbacks but forgetting it here would compile yet
+  // silently drop that URL param at the boundary.
   z.object({
     filterWidth: zNumberField(fallbacks.filterWidth),
     filterDepth: zNumberField(fallbacks.filterDepth),
@@ -161,7 +165,7 @@ export const createPurifierSettingsFieldsSchema = (
     autoRotate: zBooleanField(fallbacks.autoRotate),
     labels: zBooleanField(fallbacks.labels),
     referenceScale: zNumberField(fallbacks.referenceScale),
-  });
+  } satisfies { [K in keyof PurifierSettingsFieldFallbacks]: z.ZodType });
 
 export type ParsedPurifierSettingsFields = z.infer<
   ReturnType<typeof createPurifierSettingsFieldsSchema>
