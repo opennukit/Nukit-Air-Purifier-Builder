@@ -85,6 +85,14 @@
     readPrintDesignControlValue,
     requireSelect,
   } from "@/app/controls/inputReaders";
+  import {
+    createActiveAssemblyPrintSeamPlan,
+    createActivePrintSheetPlan,
+    createGeneratedPrintSheetPlanFromLayout,
+    generatedPrintSheetPlanCacheKey,
+    requireGeneratedPrintSheetPlan,
+    type GeneratedPrintSheetPlanCacheEntry,
+  } from "@/app/printSheetPlans";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -114,7 +122,6 @@
   import { evaluateBuildDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import {
-    createPrintableSheetPlanFromKit,
     exportFormats as fabricationMethods,
     findPrintVolumePreset,
     printVolumePresets,
@@ -122,7 +129,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignKit, createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
   import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
   import type { StaticPrintEstimate } from "@/resources/static-print-references/references";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
@@ -146,11 +153,6 @@
   };
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
-  type GeneratedPrintSheetPlanCacheEntry = {
-    readonly key: string;
-    readonly plan: PrintableSheetPlan;
-  };
-
   // #######################################
   // Control Metadata
   // #######################################
@@ -990,27 +992,6 @@
   // Print Sheet Plans
   // ##############################
 
-  function createActivePrintSheetPlan(
-    currentLayout: LayoutResult,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-    currentGeneratedPlan: PrintableSheetPlan | null,
-  ): PrintSheetThreePreviewPlan {
-    if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
-      const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
-      if (reference === undefined) {
-        throw new Error("createActivePrintSheetPlan: Static reference design is missing source file metadata");
-      }
-      const preset = findPrintVolumePreset(currentPrintVolumePresetId);
-      return {
-        type: "static-reference",
-        reference,
-        bed: preset.bed,
-        bedLabel: preset.label,
-      };
-    }
-    return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActivePrintSheetPlan");
-  }
-
   function createCurrentGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
@@ -1025,81 +1006,6 @@
     }
     const plan = createGeneratedPrintSheetPlanFromLayout(currentLayout, currentPrintVolumePresetId);
     generatedPrintSheetPlanCache = { key: cacheKey, plan };
-    return plan;
-  }
-
-  function generatedPrintSheetPlanCacheKey(
-    rawSettings: RawPurifierSettings,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-  ): string {
-    return JSON.stringify({
-      printVolumePresetId: currentPrintVolumePresetId,
-      printDesign: rawSettings.printDesign,
-      filterPreset: rawSettings.filterPreset,
-      filterWidth: rawSettings.filterWidth,
-      filterDepth: rawSettings.filterDepth,
-      filterThickness: rawSettings.filterThickness,
-      rim: rawSettings.rim,
-      fanPreset: rawSettings.fanPreset,
-      fanDiameter: rawSettings.fanDiameter,
-      filters: rawSettings.filters,
-      splitFrames: rawSettings.splitFrames,
-      fansLeft: rawSettings.fansLeft,
-      fansRight: rawSettings.fansRight,
-      fansTop: rawSettings.fansTop,
-      fansBottom: rawSettings.fansBottom,
-      tempestArrangement: rawSettings.tempestArrangement,
-      donutFilterPreset: rawSettings.donutFilterPreset,
-      donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
-      donutFilterLength: rawSettings.donutFilterLength,
-      donutFilterHoleDiameter: rawSettings.donutFilterHoleDiameter,
-      donutAdapterInsertLength: rawSettings.donutAdapterInsertLength,
-      donutCapRim: rawSettings.donutCapRim,
-      donutCapEnabled: rawSettings.donutCapEnabled,
-      screwHoleDiameter: rawSettings.screwHoleDiameter,
-      materialThickness: rawSettings.materialThickness,
-      kerfFit: rawSettings.kerfFit,
-      fingerWidthMultiplier: rawSettings.fingerWidthMultiplier,
-      fingerSpaceMultiplier: rawSettings.fingerSpaceMultiplier,
-      fingerPlayMultiplier: rawSettings.fingerPlayMultiplier,
-      fingerHoleWidthMultiplier: rawSettings.fingerHoleWidthMultiplier,
-      fingerHoleOffsetMultiplier: rawSettings.fingerHoleOffsetMultiplier,
-      dovetailSizeMultiplier: rawSettings.dovetailSizeMultiplier,
-      dovetailDepthMultiplier: rawSettings.dovetailDepthMultiplier,
-      dovetailTaper: rawSettings.dovetailTaper,
-    });
-  }
-
-  function createGeneratedPrintSheetPlanFromLayout(
-    currentLayout: LayoutResult,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-  ): PrintableSheetPlan {
-    return createPrintableSheetPlanFromKit(createPrintDesignKit(currentLayout, currentPrintVolumePresetId));
-  }
-
-  function createActiveAssemblyPrintSeamPlan(
-    currentLayout: LayoutResult,
-    currentPreviewMode: PreviewMode,
-    currentFabricationMethod: FabricationMethod,
-    currentSettings: RawPurifierSettings,
-    currentGeneratedPlan: PrintableSheetPlan | null,
-  ): PrintableSheetPlan | null {
-    if (
-      currentPreviewMode !== "enclosure" ||
-      currentFabricationMethod !== "print-3mf" ||
-      !currentSettings.showPrintSeams ||
-      isTempestPrintDesignId(currentLayout.configuration.printDesign.id) ||
-      isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
-    ) {
-      return null;
-    }
-    return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActiveAssemblyPrintSeamPlan");
-  }
-
-  function requireGeneratedPrintSheetPlan(plan: PrintableSheetPlan | null, context: string): PrintableSheetPlan {
-    if (plan === null) {
-      throw new Error(`${context}: Expected generated print sheet plan`);
-    }
     return plan;
   }
 
