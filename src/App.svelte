@@ -135,11 +135,6 @@
   type FabricationMethod = ExportFormat;
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
-  // #######################################
-  // Control Metadata
-  // #######################################
-
-  const initialUrlParams = new URLSearchParams(window.location.search);
 
   // #######################################
   // Svelte State
@@ -149,6 +144,7 @@
   // Initial Session
   // ##############################
 
+  const initialUrlParams = new URLSearchParams(window.location.search);
   const initialSession = normalizeWorkbenchSession(
     decodePurifierDraftSettings(window.location.search),
     decodeWorkbenchState(initialUrlParams),
@@ -449,10 +445,6 @@
   function setPrintVolume(event: Event): void {
     setWorkbenchState(withPrintVolumePreset(workbenchState, findPrintVolumePreset(requireSelect(event, "setPrintVolume").value).id));
   }
-
-  // #######################################
-  // Control Input Readers
-  // #######################################
 
   // #######################################
   // View Availability
