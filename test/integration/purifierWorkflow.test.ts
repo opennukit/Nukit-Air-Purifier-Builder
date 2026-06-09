@@ -1,15 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
+  decodeSettings,
+  encodeSettings,
+  normalizeSettings,
+} from "@/domain/purifier/airPurifier";
+import {
   applyFanProductPreset,
   applyFilterPreset,
   applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
-  decodeSettings,
   defaultSettings,
-  encodeSettings,
-  normalizeSettings,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/settingsModel";
 import {
   donutFilterPresets,
   findDonutFilterPreset,

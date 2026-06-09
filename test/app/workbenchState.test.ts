@@ -11,7 +11,7 @@ import {
   normalizeWorkbenchSession,
   normalizeWorkbenchStateForSettings,
 } from "@/app/workbench/workbenchViewModel";
-import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/airPurifier";
+import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
 
 describe("Workbench state", () => {
   test("decodes print-sheet preview as print fabrication", () => {

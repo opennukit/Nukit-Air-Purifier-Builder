@@ -1,23 +1,25 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
   import {
-    applyDonutFilterPreset,
-    applyFanProductPreset,
-    applyFilterPreset,
-    applyTempestArrangementDefaults,
     decodePurifierDraftSettings,
-    defaultSettings,
     encodeSettings,
     formatMillimeters,
     normalizePurifierDraft,
     printDesignIdForPurifierDraft,
-    previewMaterialColorPresets,
     serializePurifierDraft,
+  } from "@/domain/purifier/airPurifier";
+  import {
+    applyDonutFilterPreset,
+    applyFanProductPreset,
+    applyFilterPreset,
+    applyTempestArrangementDefaults,
+    defaultSettings,
+    previewMaterialColorPresets,
     type PreviewMaterialColorId,
     type PreviewMaterialColorPreset,
     type PurifierDraft,
     type RawPurifierSettings,
-  } from "@/domain/purifier/airPurifier";
+  } from "@/domain/purifier/settingsModel";
   import {
     customDonutFilterPresetId,
     defaultThreeDimensionalPrintDesignId,

@@ -2,7 +2,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { defaultSettings, encodeSettings } from "@/domain/purifier/airPurifier";
+import { encodeSettings } from "@/domain/purifier/airPurifier";
+import { defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 
 const upstreamRoot = process.env.BOXES_PY_PATH ?? "/tmp/boxes.py";

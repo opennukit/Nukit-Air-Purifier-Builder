@@ -1,11 +1,13 @@
 import {
-  applyPrintDesignPreset,
   normalizePurifierDraft,
   printDesignIdForPurifierDraft,
   serializePurifierDraft,
+} from "@/domain/purifier/airPurifier";
+import {
+  applyPrintDesignPreset,
   type PurifierDraft,
   type RawPurifierSettings,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/settingsModel";
 import type { PrintDesignId } from "@/domain/purifier/designPresets";
 
 export type PrintDesignSettingsMemory = Readonly<Partial<Record<PrintDesignId, PurifierDraft>>>;

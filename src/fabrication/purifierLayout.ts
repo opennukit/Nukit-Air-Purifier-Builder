@@ -3,15 +3,17 @@ import {
   normalizeSettings,
   normalizePurifierDraft,
   serializePurifierDraft,
-  type BuildFabricationSummary,
-  type BuildSummary,
-  type BuildFanSummary,
-  type ConfiguredPrintDesign,
-  type PurifierDraft,
-  type RawPurifierSettings,
-  type ResolvedFanBanks,
-  type PurifierSettings,
 } from "@/domain/purifier/airPurifier";
+import type {
+  BuildFabricationSummary,
+  BuildSummary,
+  BuildFanSummary,
+  ConfiguredPrintDesign,
+  PurifierDraft,
+  RawPurifierSettings,
+  ResolvedFanBanks,
+  PurifierSettings,
+} from "@/domain/purifier/settingsModel";
 import { createTempestModel, type TempestFanLayout } from "@/domain/designs/tempest/model";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";

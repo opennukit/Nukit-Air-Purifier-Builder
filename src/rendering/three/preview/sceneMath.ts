@@ -1,5 +1,5 @@
 import { Box3, Group, Vector3 } from "three";
-import type { CameraPreset } from "@/domain/purifier/airPurifier";
+import type { CameraPreset } from "@/domain/purifier/settingsModel";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,

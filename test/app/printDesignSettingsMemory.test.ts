@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { serializePurifierDraft } from "@/domain/purifier/airPurifier";
 import {
   applyPrintDesignPreset,
   applyTempestArrangement,
   defaultSettings,
-  serializePurifierDraft,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/settingsModel";
 import {
   createPrintDesignSettingsMemory,
   rememberPrintDesignSettings,

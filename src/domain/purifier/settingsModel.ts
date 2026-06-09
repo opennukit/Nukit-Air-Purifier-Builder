@@ -1,0 +1,773 @@
+// Purifier settings model: the raw, structured, and draft settings types,
+// camera and preview-material vocabulary, the default settings, and the
+// preset-application functions that rewrite raw settings when the user picks
+// a filter, fan, donut filter, tempest arrangement, or print design preset.
+
+
+import {
+  customDonutFilterPresetId,
+  defaultDonutFilterPresetId,
+  defaultFanPresetForPrintDesign,
+  defaultFilterPresetByTempestArrangement,
+  defaultFilterPresetForPrintDesign,
+  defaultPrintDesignId,
+  findDonutFilterPreset,
+  findPrintDesignPreset,
+  isDonutFilterAdapterPrintDesignPreset,
+  isLaserDerivedPrintDesignPreset,
+  isStaticReferencePrintDesignPreset,
+  isTempestPrintDesignPreset,
+  tempestArrangementPresets,
+  type DonutCap,
+  type DonutFilterAdapterPrintDesignPreset,
+  type DonutFilterPresetId,
+  type DonutFilterSettings,
+  type FilterCount,
+  type LaserDerivedPrintDesignPreset,
+  type PrintDesignId,
+  type PrintDesignPreset,
+  type StaticReferencePrintDesignPreset,
+  type TempestArrangementPreset,
+  type TempestPrintDesignPreset,
+} from "@/domain/purifier/designPresets";
+import {
+  automaticFanCount,
+  customFanProductPresetId,
+  defaultFanProductPresetId,
+  findFanProductPreset,
+  fixedFanCountOptions,
+  type FanBanks,
+  type FanConfiguration,
+  type FanCountRequest,
+  type FanDiameter,
+  type FanProductPresetId,
+  type FixedFanCount,
+  type SingleFanConfiguration,
+} from "@/domain/purifier/fanProducts";
+import {
+  customFilterPresetId,
+  findFilterPreset,
+  type FilterPresetId,
+  type FilterSelection,
+} from "@/domain/purifier/filter";
+import {
+  defaultCutJointSettings,
+  type CutJointSettings,
+  type ReferenceScale,
+} from "@/fabrication/laser/cutSettings";
+import type { Millimeters } from "@/domain/units";
+import type {
+  StaticPrintReferenceCapabilities,
+  StaticPrintReference,
+} from "@/resources/static-print-references/references";
+
+// #######################################
+// Product Vocabulary
+// #######################################
+
+// ##############################
+// Preview and Fan Count Types
+// ##############################
+
+export const cameraPresets = ["official", "front", "side", "top"] as const;
+
+export type CameraPreset = (typeof cameraPresets)[number];
+
+// #######################################
+// Build Configuration
+// #######################################
+
+// ##############################
+// Fan Summary
+// ##############################
+
+export type ResolvedFanBanks = FanBanks<number>;
+
+export type BuildFanSummary =
+  | {
+      readonly type: "wall-banks";
+      readonly resolvedFans: ResolvedFanBanks;
+    }
+  | {
+      readonly type: "donut-filter-adapter";
+      readonly fanCount: FixedFanCount;
+    }
+  | {
+      readonly type: "tempest";
+      readonly arrangement: TempestArrangementPreset;
+      readonly fanCount: number;
+    }
+  | {
+      readonly type: "static-reference";
+      readonly fanCount: number;
+    };
+
+// ##############################
+// Cutting and Preview
+// ##############################
+
+export type FilterFrameConstruction =
+  | {
+      type: "split-rails";
+    }
+  | {
+      type: "full-panels";
+    };
+
+export type CuttingSettings = {
+  materialThickness: Millimeters;
+  rim: Millimeters;
+  screwHoleDiameter: Millimeters;
+  kerfFit: Millimeters;
+  labels: boolean;
+  referenceScale: ReferenceScale;
+  joints: JointSettings;
+};
+
+export type JointSettings = CutJointSettings;
+
+export type PreviewSettings = {
+  readonly enclosure: EnclosurePreviewOptions;
+  readonly cutSheet: CutSheetPreviewOptions;
+};
+
+export type EnclosurePreviewOptions = {
+  readonly showFilterMedia: boolean;
+  readonly showFans: boolean;
+  readonly showFilterFrame: boolean;
+  readonly explodedView: boolean;
+  readonly showDimensions: boolean;
+  readonly showBananaScale: boolean;
+  readonly showPrintSeams: boolean;
+  readonly showPreviewEdges: boolean;
+  readonly materialColor: PreviewMaterialColorId;
+  readonly autoRotate: boolean;
+  readonly cameraPreset: CameraPreset;
+};
+
+export const previewMaterialColorPresets = [
+  { id: "matte-black", label: "Black", color: 0x111817 },
+  { id: "matte-gray", label: "Gray", color: 0x82858a },
+  { id: "warm-white", label: "White", color: 0xf3f0e6 },
+  { id: "natural-tan", label: "Tan", color: 0xc7965a },
+  { id: "forest-green", label: "Green", color: 0x1f6f56 },
+] as const;
+
+export type PreviewMaterialColorPreset =
+  (typeof previewMaterialColorPresets)[number];
+export type PreviewMaterialColorId = PreviewMaterialColorPreset["id"];
+
+const defaultPreviewMaterialColorId: PreviewMaterialColorId = "matte-black";
+
+export type CutSheetPreviewOptions = {
+  readonly showLabels: boolean;
+  readonly referenceScale: ReferenceScale;
+};
+
+// #######################################
+// Settings Model
+// #######################################
+
+export type RawPurifierSettings = {
+  printDesign: PrintDesignId;
+  filterPreset: FilterPresetId;
+  filterWidth: Millimeters;
+  filterDepth: Millimeters;
+  filterThickness: Millimeters;
+  rim: Millimeters;
+  fanPreset: FanProductPresetId;
+  fanDiameter: FanDiameter;
+  filters: FilterCount;
+  splitFrames: boolean;
+  fansLeft: number;
+  fansRight: number;
+  fansTop: number;
+  fansBottom: number;
+  tempestArrangement: TempestArrangementPreset;
+  donutFilterPreset: DonutFilterPresetId;
+  donutFilterOuterDiameter: Millimeters;
+  donutFilterLength: Millimeters;
+  donutFilterHoleDiameter: Millimeters;
+  donutAdapterInsertLength: Millimeters;
+  donutCapRim: Millimeters;
+  donutCapEnabled: boolean;
+  screwHoleDiameter: Millimeters;
+  materialThickness: Millimeters;
+  kerfFit: Millimeters;
+  fingerWidthMultiplier: number;
+  fingerSpaceMultiplier: number;
+  fingerPlayMultiplier: number;
+  fingerHoleWidthMultiplier: number;
+  fingerHoleOffsetMultiplier: number;
+  dovetailSizeMultiplier: number;
+  dovetailDepthMultiplier: number;
+  dovetailTaper: number;
+  showFilterMedia: boolean;
+  showFans: boolean;
+  showFilterFrame: boolean;
+  explodedView: boolean;
+  showDimensions: boolean;
+  showBananaScale: boolean;
+  showPrintSeams: boolean;
+  showPreviewEdges: boolean;
+  previewMaterialColor: PreviewMaterialColorId;
+  autoRotate: boolean;
+  cameraPreset: CameraPreset;
+  labels: boolean;
+  referenceScale: Millimeters;
+};
+
+export type PurifierFanDraft = {
+  readonly presetId: FanProductPresetId;
+  readonly diameter: FanDiameter;
+};
+
+export type PurifierCuttingDraft = {
+  readonly materialThickness: Millimeters;
+  readonly rim: Millimeters;
+  readonly screwHoleDiameter: Millimeters;
+  readonly kerfFit: Millimeters;
+  readonly joints: JointSettings;
+};
+
+export type LaserDerivedPrintDesignDraft = {
+  readonly type: "laser-derived-printable-kit";
+  readonly printDesign: LaserDerivedPrintDesignPreset["id"];
+  readonly preset: LaserDerivedPrintDesignPreset;
+  readonly filter: FilterSelection;
+  readonly filterCount: FilterCount;
+  readonly fanBanks: FanBanks<FanCountRequest>;
+  readonly frameConstruction: FilterFrameConstruction;
+};
+
+export type DonutFilterAdapterPrintDesignDraft = {
+  readonly type: "donut-filter-adapter";
+  readonly printDesign: DonutFilterAdapterPrintDesignPreset["id"];
+  readonly preset: DonutFilterAdapterPrintDesignPreset;
+  readonly donutFilterPreset: DonutFilterPresetId;
+  readonly filter: DonutFilterSettings;
+  readonly fanCount: FixedFanCount;
+};
+
+export type TempestPrintDesignDraft = {
+  readonly type: "tempest";
+  readonly printDesign: TempestPrintDesignPreset["id"];
+  readonly preset: TempestPrintDesignPreset;
+  readonly arrangement: TempestArrangementPreset;
+  readonly filter: FilterSelection;
+};
+
+export type StaticReferencePrintDesignDraft = {
+  readonly type: "static-reference";
+  readonly printDesign: StaticReferencePrintDesignPreset["id"];
+  readonly preset: StaticReferencePrintDesignPreset;
+  readonly reference: StaticPrintReference;
+  readonly capabilities: StaticPrintReferenceCapabilities;
+  readonly filter: FilterSelection;
+  readonly filterCount: FilterCount;
+  readonly fanCount: number;
+};
+
+export type PurifierDesignDraft =
+  | LaserDerivedPrintDesignDraft
+  | DonutFilterAdapterPrintDesignDraft
+  | TempestPrintDesignDraft
+  | StaticReferencePrintDesignDraft;
+
+export type PurifierDraft = {
+  readonly design: PurifierDesignDraft;
+  readonly fan: PurifierFanDraft;
+  readonly cutting: PurifierCuttingDraft;
+  readonly preview: PreviewSettings;
+};
+
+export type ConfiguredPrintDesign =
+  | {
+      readonly type: "laser-derived-printable-kit";
+      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly filter: FilterSelection;
+      readonly filterCount: FilterCount;
+      readonly fanBanks: FanBanks<FanCountRequest>;
+      readonly frameConstruction: FilterFrameConstruction;
+    }
+  | {
+      readonly type: "donut-filter-adapter";
+      readonly preset: DonutFilterAdapterPrintDesignPreset;
+      readonly donutFilterPreset: DonutFilterPresetId;
+      readonly filter: DonutFilterSettings;
+      readonly fan: SingleFanConfiguration;
+    }
+  | {
+      readonly type: "tempest";
+      readonly preset: TempestPrintDesignPreset;
+      readonly arrangement: TempestArrangementPreset;
+      readonly filter: FilterSelection;
+    }
+  | {
+      readonly type: "static-reference";
+      readonly preset: StaticReferencePrintDesignPreset;
+      readonly reference: StaticPrintReference;
+      readonly capabilities: StaticPrintReferenceCapabilities;
+      readonly filter: FilterSelection;
+      readonly filterCount: FilterCount;
+      readonly fanCount: number;
+    };
+
+export type PurifierSettings = {
+  printDesign: PrintDesignPreset;
+  design: ConfiguredPrintDesign;
+  filter: FilterSelection;
+  filterCount: FilterCount;
+  fan: FanConfiguration;
+  frameConstruction: FilterFrameConstruction;
+  cutting: CuttingSettings;
+  preview: PreviewSettings;
+};
+
+export type BuildFabricationSummary =
+  | {
+      readonly type: "cut-panel-source";
+      readonly panelCount: number;
+      readonly sheetWidth: number;
+      readonly sheetHeight: number;
+    }
+  | {
+      readonly type: "generated-print-design";
+      readonly designType: "donut-filter-adapter" | "tempest";
+    }
+  | {
+      readonly type: "static-print-reference";
+      readonly sourceFileCount: number;
+      readonly localPlatePreviewCount: number;
+    };
+
+export type BuildSummary = {
+  chamberHeight: number;
+  workingDepth: number;
+  fans: BuildFanSummary;
+  fabrication: BuildFabricationSummary;
+};
+
+export type PurifierInput =
+  | RawPurifierSettings
+  | PurifierSettings
+  | PurifierDraft;
+
+// #######################################
+// Defaults
+// #######################################
+
+export const defaultSettings: RawPurifierSettings = {
+  printDesign: defaultPrintDesignId,
+  filterPreset: "merv13-20x25x1",
+  filterWidth: 622.3,
+  filterDepth: 495.3,
+  filterThickness: 19.1,
+  rim: 30,
+  fanPreset: defaultFanProductPresetId,
+  fanDiameter: 140,
+  filters: 2,
+  splitFrames: true,
+  fansLeft: automaticFanCount,
+  fansRight: automaticFanCount,
+  fansTop: 0,
+  fansBottom: 0,
+  tempestArrangement: "dual-horizontal-sandwich",
+  donutFilterPreset: defaultDonutFilterPresetId,
+  donutFilterOuterDiameter: 125,
+  donutFilterLength: 150,
+  donutFilterHoleDiameter: 92,
+  donutAdapterInsertLength: 10,
+  donutCapRim: 10,
+  donutCapEnabled: true,
+  screwHoleDiameter: 5,
+  materialThickness: 6,
+  kerfFit: 0.1,
+  fingerWidthMultiplier: defaultCutJointSettings.finger.widthMultiplier,
+  fingerSpaceMultiplier: defaultCutJointSettings.finger.spaceMultiplier,
+  fingerPlayMultiplier: defaultCutJointSettings.finger.playMultiplier,
+  fingerHoleWidthMultiplier: defaultCutJointSettings.finger.holeWidthMultiplier,
+  fingerHoleOffsetMultiplier:
+    defaultCutJointSettings.finger.holeOffsetMultiplier,
+  dovetailSizeMultiplier: defaultCutJointSettings.dovetail.sizeMultiplier,
+  dovetailDepthMultiplier: defaultCutJointSettings.dovetail.depthMultiplier,
+  dovetailTaper: defaultCutJointSettings.dovetail.taper,
+  showFilterMedia: true,
+  showFans: true,
+  showFilterFrame: true,
+  explodedView: false,
+  showDimensions: false,
+  showBananaScale: false,
+  showPrintSeams: false,
+  showPreviewEdges: false,
+  previewMaterialColor: defaultPreviewMaterialColorId,
+  autoRotate: true,
+  cameraPreset: "official",
+  labels: true,
+  referenceScale: 100,
+};
+
+
+// #######################################
+// Catalog Lookup Helpers
+// #######################################
+
+function requiredDonutFilterDefaults(
+  preset: PrintDesignPreset,
+): DonutFilterSettings {
+  if (preset.implementation.type !== "donut-filter-adapter") {
+    throw new Error(
+      `requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`,
+    );
+  }
+  return preset.implementation.defaults.filter;
+}
+
+export function findPreviewMaterialColorPreset(
+  id: PreviewMaterialColorId | string | null | undefined,
+): PreviewMaterialColorPreset {
+  return (
+    previewMaterialColorPresets.find((preset) => preset.id === id) ??
+    requiredPreviewMaterialColorPreset(defaultPreviewMaterialColorId)
+  );
+}
+
+// #######################################
+// Preset Application
+// #######################################
+
+export function applyFilterPreset(
+  settings: RawPurifierSettings,
+  presetId: FilterPresetId,
+): RawPurifierSettings {
+  const preset = findFilterPreset(presetId);
+  if (preset.id === customFilterPresetId) {
+    return {
+      ...settings,
+      filterPreset: customFilterPresetId,
+    };
+  }
+
+  return {
+    ...settings,
+    filterPreset: preset.id,
+    filterWidth: preset.dimensions.width,
+    filterDepth: preset.dimensions.depth,
+    filterThickness: preset.dimensions.thickness,
+  };
+}
+
+export function applyFanProductPreset(
+  settings: RawPurifierSettings,
+  presetId: FanProductPresetId,
+): RawPurifierSettings {
+  const preset = findFanProductPreset(presetId);
+  if (preset.id === customFanProductPresetId) {
+    return {
+      ...settings,
+      fanPreset: customFanProductPresetId,
+    };
+  }
+
+  return {
+    ...settings,
+    fanPreset: preset.id,
+    fanDiameter: preset.diameter,
+  };
+}
+
+export function applyDonutFilterPreset(
+  settings: RawPurifierSettings,
+  presetId: DonutFilterPresetId,
+): RawPurifierSettings {
+  const preset = findDonutFilterPreset(presetId);
+  if (preset.id === customDonutFilterPresetId) {
+    return {
+      ...settings,
+      donutFilterPreset: customDonutFilterPresetId,
+    };
+  }
+
+  return {
+    ...settings,
+    donutFilterPreset: preset.id,
+    donutFilterOuterDiameter: preset.settings.outerDiameter,
+    donutFilterLength: preset.settings.length,
+    donutFilterHoleDiameter: preset.settings.holeDiameter,
+    donutAdapterInsertLength: preset.settings.insertLength,
+    donutCapRim: donutCapRawRim(preset.settings.cap),
+    donutCapEnabled: preset.settings.cap.type === "printed-cap",
+  };
+}
+
+export function applyTempestArrangement(
+  settings: RawPurifierSettings,
+  arrangement: TempestArrangementPreset,
+): RawPurifierSettings {
+  const canonicalArrangement = canonicalTempestArrangement(arrangement);
+  const fanBanks = tempestRawFanBanksForArrangement(canonicalArrangement);
+  return {
+    ...settings,
+    tempestArrangement: canonicalArrangement,
+    filters: canonicalArrangement === "single-horizontal-top-filter" ? 1 : 2,
+    fansLeft: fanBanks.left,
+    fansRight: fanBanks.right,
+    fansTop: fanBanks.top,
+    fansBottom: fanBanks.bottom,
+  };
+}
+
+export function applyTempestArrangementDefaults(
+  settings: RawPurifierSettings,
+  arrangement: TempestArrangementPreset,
+): RawPurifierSettings {
+  const arrangedSettings = applyTempestArrangement(settings, arrangement);
+  return applyFilterPreset(
+    arrangedSettings,
+    defaultFilterPresetForTempestArrangement(
+      arrangedSettings.tempestArrangement,
+    ),
+  );
+}
+
+export function applyPrintDesignPreset(
+  settings: RawPurifierSettings,
+  presetId: PrintDesignId,
+): RawPurifierSettings {
+  const preset = findPrintDesignPreset(presetId);
+  const filterPreset = findFilterPreset(
+    defaultFilterPresetForPrintDesign(preset),
+  );
+  const fanPreset = findFanProductPreset(
+    defaultFanPresetForPrintDesign(preset),
+  );
+  const base = {
+    ...settings,
+    printDesign: preset.id,
+    filters: rawFilterCountForPrintDesign(preset),
+    fanPreset: fanPreset.id,
+    fanDiameter: fanPreset.diameter,
+  };
+
+  const withRecommendedFilter =
+    filterPreset.id === customFilterPresetId
+      ? base
+      : {
+          ...base,
+          filterPreset: filterPreset.id,
+          filterWidth: filterPreset.dimensions.width,
+          filterDepth: filterPreset.dimensions.depth,
+          filterThickness: filterPreset.dimensions.thickness,
+        };
+
+  if (preset.implementation.type === "donut-filter-adapter") {
+    const donutPreset = findDonutFilterPreset(
+      preset.implementation.defaults.donutFilterPreset,
+    );
+    const donutFilter =
+      donutPreset.id === customDonutFilterPresetId
+        ? requiredDonutFilterDefaults(preset)
+        : donutPreset.settings;
+    return {
+      ...withRecommendedFilter,
+      filterPreset: customFilterPresetId,
+      filterWidth: donutFilter.outerDiameter,
+      filterDepth: donutFilter.length,
+      filterThickness: donutFilter.holeDiameter,
+      filters: 1,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: 0,
+      fansBottom: 0,
+      donutFilterPreset: donutPreset.id,
+      donutFilterOuterDiameter: donutFilter.outerDiameter,
+      donutFilterLength: donutFilter.length,
+      donutFilterHoleDiameter: donutFilter.holeDiameter,
+      donutAdapterInsertLength: donutFilter.insertLength,
+      donutCapRim: donutCapRawRim(donutFilter.cap),
+      donutCapEnabled: donutFilter.cap.type === "printed-cap",
+      splitFrames: preset.implementation.defaults.splitFrames,
+      rim: defaultSettings.rim,
+      materialThickness: preset.implementation.defaults.materialThickness,
+      screwHoleDiameter: preset.implementation.defaults.screwHoleDiameter,
+    };
+  }
+
+  if (preset.implementation.type === "tempest") {
+    const fanBanks = tempestRawFanBanksForArrangement(
+      preset.implementation.defaults.arrangement,
+    );
+    return {
+      ...withRecommendedFilter,
+      tempestArrangement: preset.implementation.defaults.arrangement,
+      filters: rawFilterCountForPrintDesign(preset),
+      fansLeft: fanBanks.left,
+      fansRight: fanBanks.right,
+      fansTop: fanBanks.top,
+      fansBottom: fanBanks.bottom,
+      donutFilterPreset: defaultSettings.donutFilterPreset,
+      donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
+      donutFilterLength: defaultSettings.donutFilterLength,
+      donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
+      donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
+      donutCapRim: defaultSettings.donutCapRim,
+      donutCapEnabled: defaultSettings.donutCapEnabled,
+      splitFrames: true,
+      rim: preset.implementation.defaults.rim,
+      materialThickness: preset.implementation.defaults.materialThickness,
+      screwHoleDiameter: preset.implementation.defaults.screwHoleDiameter,
+    };
+  }
+
+  if (preset.implementation.type === "static-reference") {
+    return {
+      ...withRecommendedFilter,
+      fansLeft: 0,
+      fansRight: 0,
+      fansTop: preset.implementation.defaults.fanCount,
+      fansBottom: 0,
+      donutFilterPreset: defaultSettings.donutFilterPreset,
+      donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
+      donutFilterLength: defaultSettings.donutFilterLength,
+      donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
+      donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
+      donutCapRim: defaultSettings.donutCapRim,
+      donutCapEnabled: defaultSettings.donutCapEnabled,
+      splitFrames: preset.implementation.defaults.splitFrames,
+      rim: defaultSettings.rim,
+      materialThickness: defaultSettings.materialThickness,
+      screwHoleDiameter: defaultSettings.screwHoleDiameter,
+    };
+  }
+
+  return {
+    ...withRecommendedFilter,
+    fansLeft: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.left,
+    ),
+    fansRight: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.right,
+    ),
+    fansTop: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.top,
+    ),
+    fansBottom: fanCountRequestToRawSetting(
+      preset.implementation.defaults.fanBanks.bottom,
+    ),
+    donutFilterPreset: defaultSettings.donutFilterPreset,
+    donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
+    donutFilterLength: defaultSettings.donutFilterLength,
+    donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
+    donutAdapterInsertLength: defaultSettings.donutAdapterInsertLength,
+    donutCapRim: defaultSettings.donutCapRim,
+    donutCapEnabled: defaultSettings.donutCapEnabled,
+    splitFrames: preset.implementation.defaults.splitFrames,
+    rim: defaultSettings.rim,
+    materialThickness: defaultSettings.materialThickness,
+    screwHoleDiameter: defaultSettings.screwHoleDiameter,
+  };
+}
+
+// #######################################
+// Shared Helpers
+// #######################################
+
+function rawFilterCountForPrintDesign(preset: PrintDesignPreset): FilterCount {
+  if (
+    isLaserDerivedPrintDesignPreset(preset) ||
+    isStaticReferencePrintDesignPreset(preset)
+  ) {
+    return preset.implementation.defaults.filterCount;
+  }
+  if (isTempestPrintDesignPreset(preset)) {
+    return preset.implementation.defaults.arrangement ===
+      "single-horizontal-top-filter"
+      ? 1
+      : 2;
+  }
+  if (isDonutFilterAdapterPrintDesignPreset(preset)) {
+    return 1;
+  }
+  return defaultSettings.filters;
+}
+
+export function canonicalTempestArrangement(
+  value: TempestArrangementPreset | string | null | undefined,
+): TempestArrangementPreset {
+  const found = tempestArrangementPresets.find(
+    (arrangement) => arrangement === value,
+  );
+  return found ?? defaultSettings.tempestArrangement;
+}
+
+function defaultFilterPresetForTempestArrangement(
+  arrangement: TempestArrangementPreset,
+): FilterPresetId {
+  return defaultFilterPresetByTempestArrangement[
+    canonicalTempestArrangement(arrangement)
+  ];
+}
+
+function requiredPreviewMaterialColorPreset(
+  id: PreviewMaterialColorId,
+): PreviewMaterialColorPreset {
+  const preset = previewMaterialColorPresets.find((entry) => entry.id === id);
+  if (preset === undefined) {
+    throw new Error(
+      `requiredPreviewMaterialColorPreset: Missing preview color ${id}`,
+    );
+  }
+  return preset;
+}
+
+export function fanCountRequestFromRawSetting(value: number): FanCountRequest {
+  const clamped = clampInteger(
+    value,
+    automaticFanCount,
+    fixedFanCountOptions[fixedFanCountOptions.length - 1],
+  );
+  if (clamped === automaticFanCount) {
+    return { type: "auto" };
+  }
+  const fixedCount =
+    fixedFanCountOptions.find((count) => count === clamped) ?? 0;
+  return { type: "fixed", count: fixedCount };
+}
+
+export function fanCountRequestToRawSetting(request: FanCountRequest): number {
+  return request.type === "auto" ? automaticFanCount : request.count;
+}
+
+export function tempestRawFanBanksForArrangement(
+  arrangement: TempestArrangementPreset,
+): FanBanks<number> {
+  if (arrangement === "four-side-filter-tower") {
+    return {
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    };
+  }
+  return {
+    left: automaticFanCount,
+    right: automaticFanCount,
+    top: 0,
+    bottom: 0,
+  };
+}
+
+export function donutCapRawRim(cap: DonutCap): Millimeters {
+  return cap.type === "printed-cap" ? cap.rim : defaultSettings.donutCapRim;
+}
+
+export function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.trunc(clamp(value, min, max));
+}

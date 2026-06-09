@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
-  applyPrintDesignPreset,
-  applyTempestArrangement,
   createPurifierDraft,
   decodePurifierDraftSettings,
-  defaultSettings,
   normalizeSettings,
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
+import {
+  applyPrintDesignPreset,
+  applyTempestArrangement,
+  defaultSettings,
+} from "@/domain/purifier/settingsModel";
 
 describe("Purifier draft model", () => {
   test("keeps donut filter dimensions in the donut design variant", () => {

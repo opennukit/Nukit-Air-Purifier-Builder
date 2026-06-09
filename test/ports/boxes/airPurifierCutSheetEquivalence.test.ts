@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defaultSettings } from "@/domain/purifier/airPurifier";
+import { defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";

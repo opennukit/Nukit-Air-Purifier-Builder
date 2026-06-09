@@ -3,7 +3,7 @@ import {
   defaultTempestSettings,
   defaultTempestTowerFilter,
 } from "@/domain/designs/tempest/model";
-import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/airPurifier";
+import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";

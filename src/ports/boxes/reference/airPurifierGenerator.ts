@@ -15,12 +15,12 @@
 
 import { Boxes } from "@/ports/boxes/reference/boxes";
 import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";
-import {
-  normalizeSettings,
-  type FilterFrameConstruction,
-  type PurifierInput,
-  type PurifierSettings,
-} from "@/domain/purifier/airPurifier";
+import { normalizeSettings } from "@/domain/purifier/airPurifier";
+import type {
+  FilterFrameConstruction,
+  PurifierInput,
+  PurifierSettings,
+} from "@/domain/purifier/settingsModel";
 import type { FanCountRequest } from "@/domain/purifier/fanProducts";
 
 type FingerHoleCutRequest =

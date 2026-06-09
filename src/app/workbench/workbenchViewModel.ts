@@ -1,12 +1,14 @@
 import {
-  applyPrintDesignPreset,
   normalizePurifierDraft,
   normalizeRawSettings,
   printDesignIdForPurifierDraft,
   serializePurifierDraft,
+} from "@/domain/purifier/airPurifier";
+import {
+  applyPrintDesignPreset,
   type PurifierDraft,
   type RawPurifierSettings,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/settingsModel";
 import {
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,

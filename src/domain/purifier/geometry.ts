@@ -1,4 +1,4 @@
-import type { PurifierSettings } from "@/domain/purifier/airPurifier";
+import type { PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
 import { filterSelectionDimensions, type FilterDimensions } from "@/domain/purifier/filter";
 

@@ -1,6 +1,6 @@
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
-import { findPreviewMaterialColorPreset } from "@/domain/purifier/airPurifier";
+import { findPreviewMaterialColorPreset } from "@/domain/purifier/settingsModel";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,

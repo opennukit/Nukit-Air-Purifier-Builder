@@ -38,7 +38,7 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { findPreviewMaterialColorPreset } from "@/domain/purifier/airPurifier";
+import { findPreviewMaterialColorPreset } from "@/domain/purifier/settingsModel";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
