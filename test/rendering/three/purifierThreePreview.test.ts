@@ -3,8 +3,8 @@ import { Box3, BufferGeometry, Float32BufferAttribute, Vector3 } from "three";
 import {
   createPrintableMeshContourEdgeGeometry,
   proceduralFanFrameOuterSize,
-  previewInteriorShiftForBounds,
 } from "@/rendering/three/purifierThreePreview";
+import { previewInteriorShiftForBounds } from "@/rendering/three/preview/sceneMath";
 
 describe("Purifier 3D preview", () => {
   test("uses only printable part bounding contours for generated mesh line overlays", () => {

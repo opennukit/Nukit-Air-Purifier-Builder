@@ -53,7 +53,6 @@ import {
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
-  type CameraPreset,
   type FanAppearance,
 } from "@/domain/purifier/airPurifier";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -76,14 +75,10 @@ import {
   type AssemblyPanelPart,
   type DimensionGuide,
   type DimensionMeasurement,
-  type MillimeterVector3,
-  type Vector3Tuple,
 } from "@/fabrication/assemblyModel";
 import type { AssemblyLineCue } from "@/fabrication/assemblyModel";
 import {
   createDonutFilterModel,
-  donutAdapterTotalHeight,
-  donutCapTotalHeight,
   type DonutFilterCap,
   type DonutFilterModel,
 } from "@/domain/designs/donut-filter/model";
@@ -111,6 +106,27 @@ import {
   setActiveAppearance,
 } from "@/rendering/three/preview/appearance";
 import {
+  createCutMarkMaterial,
+  createFilterMediaEdgeMaterial,
+  createFilterMediaMaterial,
+  createGroundShadowTexture,
+  createPrintedPartEdgeMaterial,
+  createPrintedPartMaterial,
+  createStudioBackdropTexture,
+  createWoodMaterial,
+} from "@/rendering/three/preview/materials";
+import {
+  cameraPosition,
+  cameraViewScale,
+  clamp,
+  dominantVectorAxis,
+  explodeGeneratedPreviewChildrenFromCenter,
+  previewInteriorShiftForBounds,
+  toSceneOffset,
+  toScenePosition,
+  vectorAxisValue,
+} from "@/rendering/three/preview/sceneMath";
+import {
   bananaReferenceLength,
   bananaReferenceRadius,
   bananaScaleAssetUrl,
@@ -118,22 +134,16 @@ import {
   dimensionLabelHoverScale,
   dimensionLabelNormalScale,
   dimensionLabelOffsetMultiplier,
-  dimensionPreviewFramingMultiplier,
   edgeColor,
   fanPreviewFrontDepth,
   fanPreviewFrontDepthMillimeters,
   fanPreviewRearDepth,
   fanPreviewRearDepthMillimeters,
   fanRotorAngularVelocity,
-  filterColor,
   filterMediaPreviewClearanceMillimeters,
   filterMediaPreviewSurfaceGapMillimeters,
-  generatedPreviewExplodeDistance,
-  generatedPreviewZoom,
-  generatedPreviewZoomReferenceMillimeters,
   groundY,
   homePreviewRotationX,
-  minimumLargeModelPreviewZoom,
   oneMeterCubeSize,
   panelCutOverlayLift,
   panelPrintSeamOverlayLift,
@@ -142,11 +152,9 @@ import {
   recessedMillimeterFilterMediaThickness,
   sceneScale,
   staticReferenceExplodeDistance,
-  staticReferencePreviewZoom,
   staticReferenceSceneScale,
   visualAssemblyBoxSize,
   visualFilterMediaDimension,
-  woodColor,
   type CameraPose,
   type FanAxis,
   type FanCadPreviewAsset,
@@ -2032,36 +2040,6 @@ function tempestWallInteriorProbePoint(model: TempestModel, wall: TempestWall): 
   return { ...point, x: point.x - 1 };
 }
 
-export function previewInteriorShiftForBounds(bounds: Box3, plane: PreviewInteriorPlane): number {
-  const target = plane.coordinate + plane.insideSign * plane.inset;
-  const outsideEdge = vectorAxisValue(plane.insideSign > 0 ? bounds.min : bounds.max, plane.axis);
-  const shift = target - outsideEdge;
-  return plane.insideSign > 0 ? Math.max(0, shift) : Math.min(0, shift);
-}
-
-function dominantVectorAxis(vector: Vector3): FanAxis {
-  const x = Math.abs(vector.x);
-  const y = Math.abs(vector.y);
-  const z = Math.abs(vector.z);
-  if (x >= y && x >= z) {
-    return "x";
-  }
-  if (y >= z) {
-    return "y";
-  }
-  return "z";
-}
-
-function vectorAxisValue(vector: Vector3, axis: FanAxis): number {
-  if (axis === "x") {
-    return vector.x;
-  }
-  if (axis === "y") {
-    return vector.y;
-  }
-  return vector.z;
-}
-
 // The sandwich preview filter media comes from the input arrangement's footprint
 // filter, which a sandwich-topology model always carries.
 function expectSandwichArrangementFilter(arrangement: TempestModel["settings"]["arrangement"]): TempestHorizontalFilterSize {
@@ -2706,290 +2684,6 @@ function setDimensionLabelState(sprite: Sprite, isHovered: boolean): void {
 }
 
 // #######################################
-// Materials and Textures
-// #######################################
-
-function createCutMarkMaterial(opacity: number): Material {
-  return new MeshBasicMaterial({
-    color: burnColor,
-    transparent: true,
-    opacity,
-    side: DoubleSide,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  });
-}
-
-function createWoodMaterial(): Material {
-  return new MeshStandardMaterial({
-    color: woodColor,
-    map: createWoodTexture(),
-    roughness: 0.72,
-    metalness: 0.02,
-  });
-}
-
-type PrintedPartMaterialOptions = {
-  readonly color: number;
-  readonly roughness: number;
-  readonly metalness: number;
-};
-
-function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshStandardMaterial {
-  // Driven by the active appearance preset (Appearance Lab) rather than the
-  // per-part roughness/metalness, so every printed surface shares one look.
-  const surface = activeAppearance();
-  const base = {
-    color: options.color,
-    roughness: surface.roughness,
-    metalness: surface.metalness,
-    flatShading: surface.normals === "flat",
-    envMapIntensity: surface.envMapIntensity ?? 1,
-  };
-  if (surface.kind === "physical") {
-    return new MeshPhysicalMaterial({
-      ...base,
-      clearcoat: surface.clearcoat ?? 0,
-      clearcoatRoughness: surface.clearcoatRoughness ?? 0,
-    });
-  }
-  return new MeshStandardMaterial(base);
-}
-
-function createFilterMediaMaterial(opacity: number): Material {
-  return new MeshPhysicalMaterial({
-    color: filterColor,
-    map: createFilterTexture(),
-    roughness: 0.52,
-    transparent: true,
-    opacity,
-    side: DoubleSide,
-    depthWrite: false,
-  });
-}
-
-function createPrintedPartEdgeMaterial(partColor: number, opacity: number): LineBasicMaterial {
-  return new LineBasicMaterial({
-    color: relativeLuminance(partColor) < 0.42 ? 0x9fb6aa : 0x1c2722,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-  });
-}
-
-function createFilterMediaEdgeMaterial(opacity: number): LineBasicMaterial {
-  return new LineBasicMaterial({
-    color: 0x6d7d68,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-  });
-}
-
-function relativeLuminance(color: number): number {
-  const red = ((color >> 16) & 0xff) / 255;
-  const green = ((color >> 8) & 0xff) / 255;
-  const blue = (color & 0xff) / 255;
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function createWoodTexture(): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("createWoodTexture: Could not create canvas context");
-  }
-
-  context.fillStyle = "#c7965a";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  for (let y = 0; y < canvas.height; y += 4) {
-    const alpha = y % 16 === 0 ? 0.12 : 0.055;
-    context.strokeStyle = `rgba(68, 42, 19, ${alpha})`;
-    context.beginPath();
-    context.moveTo(0, y + Math.sin(y * 0.17) * 1.8);
-    context.lineTo(canvas.width, y + Math.cos(y * 0.11) * 1.6);
-    context.stroke();
-  }
-
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-function createFilterTexture(): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("createFilterTexture: Could not create canvas context");
-  }
-
-  context.fillStyle = "#eef1e6";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  // A faint fine grid (horizontal + vertical cross lines) reads as filter mesh —
-  // visible enough to feel like a filter, light enough not to overpower the housing.
-  context.strokeStyle = "rgba(108, 119, 110, 0.13)";
-  context.lineWidth = 1;
-  for (let y = 0; y < canvas.height; y += 6) {
-    context.beginPath();
-    context.moveTo(0, y + 0.5);
-    context.lineTo(canvas.width, y + 0.5);
-    context.stroke();
-  }
-  for (let x = 0; x < canvas.width; x += 6) {
-    context.beginPath();
-    context.moveTo(x + 0.5, 0);
-    context.lineTo(x + 0.5, canvas.height);
-    context.stroke();
-  }
-
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-function createStudioBackdropTexture(): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 4;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("createStudioBackdropTexture: Could not create canvas context");
-  }
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#f1efe9");
-  gradient.addColorStop(1, "#ddd9d0");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-// A soft round contact shadow — fake but cheap, and reads cleanly on the light
-// backdrop where a real cast shadow would be fussy to tune.
-function createGroundShadowTexture(): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("createGroundShadowTexture: Could not create canvas context");
-  }
-  const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gradient.addColorStop(0, "rgba(28, 32, 30, 0.30)");
-  gradient.addColorStop(0.55, "rgba(28, 32, 30, 0.13)");
-  gradient.addColorStop(1, "rgba(28, 32, 30, 0)");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-// #######################################
-// Camera and Scene Math
-// #######################################
-
-function toScenePosition(position: Vector3Tuple, explodeDirection: Vector3Tuple, exploded: boolean): Vector3 {
-  const explodeDistance = exploded ? 72 : 0;
-  return new Vector3(
-    (position[0] + explodeDirection[0] * explodeDistance) * sceneScale,
-    (position[1] + explodeDirection[1] * explodeDistance) * sceneScale,
-    (position[2] + explodeDirection[2] * explodeDistance) * sceneScale,
-  );
-}
-
-function toSceneOffset(offset: MillimeterVector3): Vector3 {
-  return new Vector3(offset[0] * sceneScale, offset[1] * sceneScale, offset[2] * sceneScale);
-}
-
-function explodeGeneratedPreviewChildrenFromCenter(group: Group, exploded: boolean): void {
-  if (!exploded || group.children.length === 0) {
-    return;
-  }
-
-  const modelBounds = new Box3().setFromObject(group);
-  if (modelBounds.isEmpty()) {
-    return;
-  }
-
-  const modelCenter = modelBounds.getCenter(new Vector3());
-  const totalChildren = group.children.length;
-  group.children.forEach((child, index) => {
-    const childBounds = new Box3().setFromObject(child);
-    if (childBounds.isEmpty()) {
-      return;
-    }
-
-    const direction = childBounds.getCenter(new Vector3()).sub(modelCenter);
-    if (direction.lengthSq() < 0.000001) {
-      direction.copy(radialFallbackExplodeDirection(index, totalChildren));
-    }
-
-    child.position.add(direction.normalize().multiplyScalar(generatedPreviewExplodeDistance));
-  });
-}
-
-function radialFallbackExplodeDirection(index: number, total: number): Vector3 {
-  const angle = (Math.PI * 2 * index) / Math.max(1, total);
-  return new Vector3(Math.cos(angle), 0.35, Math.sin(angle));
-}
-
-function cameraPosition(preset: CameraPreset, maxDimension: number): Vector3 {
-  if (preset === "front") {
-    return new Vector3(0, maxDimension * 0.45, -maxDimension * 2.45);
-  }
-  if (preset === "side") {
-    return new Vector3(maxDimension * 2.45, maxDimension * 0.52, 0);
-  }
-  if (preset === "top") {
-    return new Vector3(0.001, maxDimension * 2.8, 0.001);
-  }
-  return new Vector3(maxDimension * 1.75, maxDimension * 1.05, maxDimension * 2.05);
-}
-
-function cameraViewScale(layout: LayoutResult): number {
-  const dimensionFraming = layout.configuration.preview.enclosure.showDimensions ? dimensionPreviewFramingMultiplier : 1;
-  return (modelViewScale(layout) / previewZoomForLayout(layout)) * dimensionFraming;
-}
-
-function previewZoomForLayout(layout: LayoutResult): number {
-  if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
-    return staticReferencePreviewZoom;
-  }
-
-  const largestPhysicalDimension = previewLargestPhysicalDimensionMillimeters(layout);
-  const sizeRatio = Math.max(1, largestPhysicalDimension / generatedPreviewZoomReferenceMillimeters);
-  return clamp(generatedPreviewZoom / sizeRatio, minimumLargeModelPreviewZoom, generatedPreviewZoom);
-}
-
-function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): number {
-  const settings = layout.configuration;
-  if (isDonutFilterPrintDesignId(settings.printDesign.id)) {
-    const model = createDonutFilterModel(layout);
-    return Math.max(
-      model.filter.length + donutAdapterTotalHeight(model) + donutCapTotalHeight(model),
-      model.filter.outerDiameter,
-      model.fanSize,
-    );
-  }
-
-  return Math.max(
-    filterSelectionDimensions(settings.filter).width,
-    layout.summary.workingDepth,
-    layout.summary.chamberHeight,
-  );
-}
-
-// #######################################
 // Static Reference Preview
 // #######################################
 
@@ -3116,46 +2810,6 @@ function staticReferenceAssembledPreviewPose(layout: LayoutResult): StaticRefere
   };
 }
 
-function modelViewScale(layout: LayoutResult): number {
-  const settings = layout.configuration;
-  const scalePadding = settings.preview.enclosure.showBananaScale ? oneMeterCubeSize * 0.72 : 0;
-  if (isStaticReferencePrintDesignId(settings.printDesign.id)) {
-    const reference = staticPrintReferenceForPreset(settings.printDesign);
-    if (reference !== undefined && staticPrintReferenceHasAssembledPreview(reference)) {
-      return (reference.previewMaxDimensionMm ?? 540) * sceneScale * 1.35 + scalePadding;
-    }
-    const assetCount = reference?.previewAssets.length ?? 1;
-    const columns = Math.max(1, Math.ceil(Math.sqrt(assetCount * 0.8)));
-    const rows = Math.max(1, Math.ceil(assetCount / columns));
-    const gridSpan = Math.max(columns, rows);
-    return (
-      (reference?.previewMaxDimensionMm ?? 560) *
-        Math.max(1.35, gridSpan * 0.55) *
-        staticReferenceSceneScale +
-      scalePadding
-    );
-  }
-  if (isDonutFilterPrintDesignId(settings.printDesign.id)) {
-    const model = createDonutFilterModel(layout);
-    const baseScale =
-      Math.max(
-        model.filter.length + donutAdapterTotalHeight(model) + donutCapTotalHeight(model),
-        model.filter.outerDiameter,
-        model.fanSize,
-      ) *
-      sceneScale *
-      1.25;
-    return baseScale + scalePadding;
-  }
-  return (
-    Math.max(
-      filterSelectionDimensions(settings.filter).width,
-      layout.summary.workingDepth,
-      layout.summary.chamberHeight,
-    ) * sceneScale
-  ) + scalePadding;
-}
-
 function staticReferencePreviewAssets(reference: StaticPrintReference): readonly StaticPrintPreviewAsset[] {
   if (staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "single-source-asset") {
     return [reference.assembledPreview.asset];
@@ -3164,10 +2818,6 @@ function staticReferencePreviewAssets(reference: StaticPrintReference): readonly
     return reference.assembledPreview.assets;
   }
   return reference.previewAssets;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 // #######################################
