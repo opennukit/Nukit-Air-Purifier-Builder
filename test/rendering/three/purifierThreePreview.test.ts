@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Box3, BufferGeometry, Float32BufferAttribute, Vector3 } from "three";
-import {
-  createPrintableMeshContourEdgeGeometry,
-  proceduralFanFrameOuterSize,
-} from "@/rendering/three/purifierThreePreview";
+import { createPrintableMeshContourEdgeGeometry } from "@/rendering/three/purifierThreePreview";
+import { proceduralFanFrameOuterSize } from "@/rendering/three/preview/fanModels";
 import { previewInteriorShiftForBounds } from "@/rendering/three/preview/sceneMath";
 
 describe("Purifier 3D preview", () => {
