@@ -41,7 +41,6 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   printableMeshToBufferGeometry,
@@ -65,8 +64,6 @@ import {
 } from "@/rendering/three/staticPrintAssets";
 import {
   staticPrintReferenceHasAssembledPreview,
-  type StaticPrintPreviewAsset,
-  type StaticPrintReference,
 } from "@/resources/static-print-references/references";
 import {
   createAssemblyModel,
@@ -127,9 +124,19 @@ import {
   vectorAxisValue,
 } from "@/rendering/three/preview/sceneMath";
 import {
+  createBananaScaleReference,
+  createOneMeterScaleCube,
+  disposeMaterial,
+} from "@/rendering/three/preview/scaleReferences";
+import {
+  disposeLoadedStaticPrintAssets,
+  staticReferenceAssembledPreviewPose,
+  staticReferenceBoardExplodeOffset,
+  staticReferencePreviewAssets,
+  staticReferencePurchasedPartPosition,
+} from "@/rendering/three/preview/staticReference";
+import {
   bananaReferenceLength,
-  bananaReferenceRadius,
-  bananaScaleAssetUrl,
   burnColor,
   dimensionLabelHoverScale,
   dimensionLabelNormalScale,
@@ -151,7 +158,6 @@ import {
   previewFanWallInset,
   recessedMillimeterFilterMediaThickness,
   sceneScale,
-  staticReferenceExplodeDistance,
   staticReferenceSceneScale,
   visualAssemblyBoxSize,
   visualFilterMediaDimension,
@@ -1631,213 +1637,6 @@ export class PurifierThreePreview {
 }
 
 // #######################################
-// Loaded Asset Disposal
-// #######################################
-
-function disposeLoadedStaticPrintAssets(assets: readonly LoadedStaticPrintAsset[]): void {
-  for (const asset of assets) {
-    asset.geometry.dispose();
-  }
-}
-
-// #######################################
-// Scale References
-// #######################################
-
-function createBananaScaleReference(): Group {
-  const group = new Group();
-  group.name = "banana-for-scale";
-
-  const placeholder = createBananaScaleBoundsPlaceholder();
-  group.add(placeholder);
-
-  void loadBananaScaleAsset()
-    .then((asset) => {
-      if (group.userData["disposedPreviewObject"] === true) {
-        return;
-      }
-      group.remove(placeholder);
-      disposeMeshResources(placeholder);
-      group.add(createNormalizedBananaScaleAsset(asset));
-    })
-    .catch(() => {
-      if (group.userData["disposedPreviewObject"] === true) {
-        return;
-      }
-      placeholder.material.opacity = 0.16;
-      placeholder.material.color.set(0xf5c84b);
-    });
-
-  return group;
-}
-
-function createBananaScaleBoundsPlaceholder(): Mesh<BoxGeometry, MeshBasicMaterial> {
-  const placeholder = new Mesh(
-    new BoxGeometry(bananaReferenceLength, bananaReferenceRadius * 1.8, bananaReferenceRadius * 2.6),
-    new MeshBasicMaterial({
-      color: 0xf5c84b,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    }),
-  );
-  placeholder.name = "banana-scale-bounds-placeholder";
-  placeholder.position.y = (bananaReferenceRadius * 1.8) / 2;
-  return placeholder;
-}
-
-let bananaScaleAssetPromise: Promise<Object3D> | null = null;
-
-function loadBananaScaleAsset(): Promise<Object3D> {
-  bananaScaleAssetPromise ??= new GLTFLoader().loadAsync(bananaScaleAssetUrl).then((gltf) => gltf.scene);
-  return bananaScaleAssetPromise;
-}
-
-function createNormalizedBananaScaleAsset(asset: Object3D): Object3D {
-  const clone = cloneObjectWithOwnMeshResources(asset);
-  const rawSize = new Box3().setFromObject(clone).getSize(new Vector3());
-  if (rawSize.z >= rawSize.x && rawSize.z >= rawSize.y) {
-    clone.rotation.y = Math.PI / 2;
-  } else if (rawSize.y >= rawSize.x && rawSize.y >= rawSize.z) {
-    clone.rotation.z = -Math.PI / 2;
-  }
-  clone.rotation.x += 0.04;
-  clone.updateWorldMatrix(true, true);
-
-  const initialBounds = new Box3().setFromObject(clone);
-  const initialSize = initialBounds.getSize(new Vector3());
-  const scale = bananaReferenceLength / Math.max(initialSize.x, 0.001);
-  clone.scale.setScalar(scale);
-  clone.updateWorldMatrix(true, true);
-
-  const scaledBounds = new Box3().setFromObject(clone);
-  const scaledCenter = scaledBounds.getCenter(new Vector3());
-  clone.position.sub(new Vector3(scaledCenter.x, scaledBounds.min.y, scaledCenter.z));
-  clone.traverse((child) => {
-    if (child instanceof Mesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-
-  return clone;
-}
-
-function createOneMeterScaleCube(): Group {
-  const group = new Group();
-  group.name = "one-meter-scale-cube";
-
-  const geometry = new BoxGeometry(oneMeterCubeSize, oneMeterCubeSize, oneMeterCubeSize);
-  const material = new MeshStandardMaterial({
-    color: 0xdad3bc,
-    roughness: 0.68,
-    metalness: 0.02,
-    transparent: true,
-    opacity: 0.16,
-  });
-  const cube = new Mesh(geometry, material);
-  cube.name = "one-meter-scale-cube-body";
-  cube.position.y = oneMeterCubeSize / 2;
-  cube.castShadow = true;
-  cube.receiveShadow = true;
-  group.add(cube);
-
-  const edges = new LineSegments(
-    new EdgesGeometry(geometry),
-    new LineBasicMaterial({ color: 0x4f584e, transparent: true, opacity: 0.82 }),
-  );
-  edges.position.copy(cube.position);
-  group.add(edges);
-  for (const label of createOneMeterCubeFaceLabels()) {
-    group.add(label);
-  }
-
-  return group;
-}
-
-function createOneMeterCubeFaceLabels(): Object3D[] {
-  const label = createScaleLabelTexture("1 m cube");
-  const material = new MeshBasicMaterial({
-    map: label,
-    transparent: true,
-    depthWrite: false,
-    side: DoubleSide,
-  });
-  const width = oneMeterCubeSize * 0.88;
-  const height = oneMeterCubeSize * 0.18;
-  const faceInset = 0.006;
-  const frontLabel = new Mesh(new PlaneGeometry(width, height), material.clone());
-  frontLabel.name = "one-meter-scale-cube-front-label";
-  frontLabel.position.set(0, oneMeterCubeSize * 0.62, oneMeterCubeSize / 2 + faceInset);
-
-  const rightLabel = new Mesh(new PlaneGeometry(width, height), material.clone());
-  rightLabel.name = "one-meter-scale-cube-side-label";
-  rightLabel.rotation.y = Math.PI / 2;
-  rightLabel.position.set(oneMeterCubeSize / 2 + faceInset, oneMeterCubeSize * 0.62, 0);
-
-  return [frontLabel, rightLabel];
-}
-
-function createScaleLabelTexture(text: string): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 224;
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("createScaleLabelTexture: Could not create canvas context");
-  }
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "rgba(255, 253, 246, 0.9)";
-  roundRect(context, 28, 28, 968, 168, 44);
-  context.fill();
-  context.strokeStyle = "rgba(31, 111, 86, 0.72)";
-  context.lineWidth = 8;
-  roundRect(context, 28, 28, 968, 168, 44);
-  context.stroke();
-  context.fillStyle = "#111817";
-  context.font = "900 118px Inter, Arial, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
-  context.beginPath();
-  context.moveTo(x + radius, y);
-  context.arcTo(x + width, y, x + width, y + height, radius);
-  context.arcTo(x + width, y + height, x, y + height, radius);
-  context.arcTo(x, y + height, x, y, radius);
-  context.arcTo(x, y, x + width, y, radius);
-  context.closePath();
-}
-
-function cloneObjectWithOwnMeshResources(object: Object3D): Object3D {
-  const clone = object.clone(true);
-  clone.traverse((child) => {
-    if (child instanceof Mesh) {
-      child.geometry = child.geometry.clone();
-      child.material = cloneMaterial(child.material);
-    }
-  });
-  return clone;
-}
-
-function cloneMaterial(material: Material | Material[]): Material | Material[] {
-  if (Array.isArray(material)) {
-    return material.map((entry) => entry.clone());
-  }
-  return material.clone();
-}
-
-function disposeMeshResources(mesh: Mesh): void {
-  mesh.geometry.dispose();
-  disposeMaterial(mesh.material, new Set());
-}
-
-// #######################################
 // Tempest Preview Purchased Parts
 // #######################################
 
@@ -2684,143 +2483,6 @@ function setDimensionLabelState(sprite: Sprite, isHovered: boolean): void {
 }
 
 // #######################################
-// Static Reference Preview
-// #######################################
-
-function staticReferenceBoardExplodeOffset(
-  geometry: BufferGeometry,
-  assembly: LoadedStaticPrintAssembly,
-  exploded: boolean,
-): Vector3 {
-  if (!exploded) {
-    return new Vector3(0, 0, 0);
-  }
-
-  const bounds = staticReferenceGeometryBounds(geometry);
-  const direction = staticReferenceBoardExplodeDirection(bounds, assembly);
-  return direction.multiplyScalar(staticReferenceExplodeDistance);
-}
-
-function staticReferenceBoardExplodeDirection(bounds: Box3, assembly: LoadedStaticPrintAssembly): Vector3 {
-  const center = bounds.getCenter(new Vector3());
-  const halfFootprintWidth = assembly.footprintWidth / 2;
-  const halfFootprintDepth = assembly.footprintDepth / 2;
-  const halfHeight = assembly.height / 2;
-  const locationDirection = new Vector3(
-    normalizedStaticReferenceDistance(center.x, halfFootprintWidth),
-    normalizedStaticReferenceDistance(center.y, halfFootprintDepth),
-    normalizedStaticReferenceDistance(center.z - halfHeight, halfHeight),
-  );
-
-  if (locationDirection.lengthSq() > 0.01) {
-    return locationDirection.normalize();
-  }
-
-  const verticalDirection = center.z >= halfHeight ? 1 : -1;
-  return new Vector3(0, 0, verticalDirection);
-}
-
-function normalizedStaticReferenceDistance(value: number, halfExtent: number): number {
-  if (halfExtent <= 0.001) {
-    return 0;
-  }
-  return value / halfExtent;
-}
-
-function staticReferencePurchasedPartPosition(
-  position: Vector3,
-  explosion: StaticReferencePurchasedPartExplosion,
-): Vector3 {
-  if (!explosion.exploded || explosion.assembly === undefined) {
-    return position;
-  }
-  return position.add(staticReferenceNearestBoardExplodeOffset(position, explosion.assembly));
-}
-
-function staticReferenceNearestBoardExplodeOffset(position: Vector3, assembly: LoadedStaticPrintAssembly): Vector3 {
-  const sourcePoint = position.clone().multiplyScalar(1 / sceneScale);
-  let nearestOffset = new Vector3(0, 0, 0);
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  for (const asset of assembly.assets) {
-    const bounds = staticReferenceGeometryBounds(asset.geometry);
-    const distance = squaredDistanceToBox(sourcePoint, bounds);
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearestOffset = staticReferenceBoardExplodeOffset(asset.geometry, assembly, true);
-    }
-  }
-
-  return nearestOffset;
-}
-
-function squaredDistanceToBox(point: Vector3, bounds: Box3): number {
-  const dx = distanceOutsideRange(point.x, bounds.min.x, bounds.max.x);
-  const dy = distanceOutsideRange(point.y, bounds.min.y, bounds.max.y);
-  const dz = distanceOutsideRange(point.z, bounds.min.z, bounds.max.z);
-  return dx * dx + dy * dy + dz * dz;
-}
-
-function distanceOutsideRange(value: number, min: number, max: number): number {
-  if (value < min) {
-    return min - value;
-  }
-  if (value > max) {
-    return value - max;
-  }
-  return 0;
-}
-
-function staticReferenceGeometryBounds(geometry: BufferGeometry): Box3 {
-  geometry.computeBoundingBox();
-  const bounds = geometry.boundingBox;
-  if (bounds === null) {
-    return new Box3();
-  }
-  return bounds.clone();
-}
-
-function staticReferenceAssembledPreviewPose(layout: LayoutResult): StaticReferenceAssembledPreviewPose {
-  const orientation = staticPrintReferenceForPreset(layout.configuration.printDesign)?.assembledPreviewOrientation ?? "source";
-  if (orientation === "fan-panel-up") {
-    return {
-      meshRotationX: Math.PI,
-      rotateWholePreview: false,
-      installedPartLayout: "fan-panel-up",
-    };
-  }
-  if (orientation === "source-fans-up") {
-    return {
-      meshRotationX: Math.PI / 2,
-      rotateWholePreview: true,
-      installedPartLayout: "source-side-fans",
-    };
-  }
-  if (orientation === "source-side-fans") {
-    return {
-      meshRotationX: 0,
-      rotateWholePreview: false,
-      installedPartLayout: "source-side-fans",
-    };
-  }
-  return {
-    meshRotationX: -Math.PI / 2,
-    rotateWholePreview: false,
-    installedPartLayout: "source-front",
-  };
-}
-
-function staticReferencePreviewAssets(reference: StaticPrintReference): readonly StaticPrintPreviewAsset[] {
-  if (staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "single-source-asset") {
-    return [reference.assembledPreview.asset];
-  }
-  if (staticPrintReferenceHasAssembledPreview(reference) && reference.assembledPreview?.type === "source-part-set") {
-    return reference.assembledPreview.assets;
-  }
-  return reference.previewAssets;
-}
-
-// #######################################
 // Fan Models
 // #######################################
 
@@ -3273,30 +2935,4 @@ function createBladeGeometry(radius: number): BufferGeometry {
 
 function radiusToChordAngle(radius: number, radialProgress: number): number {
   return (0.34 - radialProgress * 0.16) * Math.max(0.74, Math.min(1.25, radius / 0.26));
-}
-
-function disposeMaterial(material: Material | Material[], seenMaterials: Set<Material>): void {
-  if (Array.isArray(material)) {
-    for (const entry of material) {
-      disposeSingleMaterial(entry, seenMaterials);
-    }
-    return;
-  }
-  disposeSingleMaterial(material, seenMaterials);
-}
-
-function disposeSingleMaterial(material: Material, seenMaterials: Set<Material>): void {
-  if (seenMaterials.has(material)) {
-    return;
-  }
-  seenMaterials.add(material);
-  if (
-    material instanceof MeshBasicMaterial ||
-    material instanceof MeshStandardMaterial ||
-    material instanceof MeshPhysicalMaterial ||
-    material instanceof SpriteMaterial
-  ) {
-    material.map?.dispose();
-  }
-  material.dispose();
 }
