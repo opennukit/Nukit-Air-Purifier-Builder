@@ -56,6 +56,22 @@
   } from "@/domain/purifier/filter";
   import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
   import { createTempestModel } from "@/domain/designs/tempest/model";
+  import {
+    advancedJointControls,
+    donutFilterDimensionControls,
+    fanPlacementControls,
+    filterDimensionControls,
+    generatedGeometryControls,
+    nukitPanelFitControls,
+    parametricPrintDesignPresets,
+    staticPrintDesignPresets,
+    tempestArrangementOptions,
+    type BooleanSettingName,
+    type DonutNumberSettingName,
+    type FanCountSettingName,
+    type FilterDimensionName,
+    type NumericSettingName,
+  } from "@/app/controls/controlMetadata";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -105,30 +121,10 @@
   // #######################################
 
   type FabricationMethod = ExportFormat;
-  type NumericSettingName = {
-    [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends number ? Key : never;
-  }[keyof RawPurifierSettings];
-  type BooleanSettingName = {
-    [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends boolean ? Key : never;
-  }[keyof RawPurifierSettings];
-  type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
-  type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
   type RecommendedFanDiameter = Extract<FanDiameter, 120 | 140>;
   type FanDiameterSelection = RecommendedFanDiameter | "custom";
   type RecommendedFanProductPreset = PresetFanProduct & {
     readonly diameter: RecommendedFanDiameter;
-  };
-  type DonutNumberSettingName =
-    | "donutFilterOuterDiameter"
-    | "donutFilterLength"
-    | "donutFilterHoleDiameter"
-    | "donutAdapterInsertLength"
-    | "donutCapRim";
-  type NumberControl<Name extends NumericSettingName> = {
-    readonly name: Name;
-    readonly label: string;
-    readonly suffix: string;
-    readonly step: string;
   };
   type SummaryItem = {
     readonly label: string;
@@ -152,51 +148,6 @@
   // #######################################
 
   const initialUrlParams = new URLSearchParams(window.location.search);
-  const parametricPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter(
-    (preset) => !isStaticReferencePrintDesignId(preset.id),
-  );
-  const staticPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter((preset) =>
-    isStaticReferencePrintDesignId(preset.id),
-  );
-  const fanPlacementControls: readonly { readonly name: FanCountSettingName; readonly label: string }[] = [
-    { name: "fansLeft", label: "Left" },
-    { name: "fansRight", label: "Right" },
-    { name: "fansTop", label: "Top" },
-    { name: "fansBottom", label: "Bottom" },
-  ];
-  const filterDimensionControls: readonly NumberControl<FilterDimensionName>[] = [
-    { name: "filterWidth", label: "Filter width", suffix: "mm", step: "1" },
-    { name: "filterDepth", label: "Filter depth", suffix: "mm", step: "1" },
-    { name: "filterThickness", label: "Filter thickness", suffix: "mm", step: "0.1" },
-  ];
-  const donutFilterDimensionControls: readonly NumberControl<DonutNumberSettingName>[] = [
-    { name: "donutFilterOuterDiameter", label: "Outer diameter", suffix: "mm", step: "1" },
-    { name: "donutFilterLength", label: "Length", suffix: "mm", step: "1" },
-    { name: "donutFilterHoleDiameter", label: "Center hole", suffix: "mm", step: "0.1" },
-  ];
-  const generatedGeometryControls: readonly NumberControl<NumericSettingName>[] = [
-    { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },
-    { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1" },
-  ];
-  const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[] = [
-    { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
-    { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01" },
-  ];
-  const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
-    { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },
-    { name: "fingerSpaceMultiplier", label: "Finger space", suffix: "x", step: "0.1" },
-    { name: "fingerHoleWidthMultiplier", label: "Slot width", suffix: "x", step: "0.05" },
-    { name: "fingerHoleOffsetMultiplier", label: "Slot offset", suffix: "x", step: "0.05" },
-    { name: "fingerPlayMultiplier", label: "Finger play", suffix: "x", step: "0.05" },
-    { name: "dovetailSizeMultiplier", label: "Dovetail size", suffix: "x", step: "0.1" },
-    { name: "dovetailDepthMultiplier", label: "Dovetail depth", suffix: "x", step: "0.05" },
-    { name: "dovetailTaper", label: "Dovetail taper", suffix: "0-80", step: "1" },
-  ];
-  const tempestArrangementOptions: readonly { readonly id: TempestArrangementPreset; readonly label: string }[] = [
-    { id: "single-horizontal-top-filter", label: "1 top filter" },
-    { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
-    { id: "four-side-filter-tower", label: "4 side filters" },
-  ];
   const recommendedFanDiameterOptions: readonly RecommendedFanDiameter[] = [120, 140];
   const defaultRecommendedFanDiameter: RecommendedFanDiameter = 140;
   const recommendedFanProductPresets: readonly RecommendedFanProductPreset[] = fanProductPresets.filter(
