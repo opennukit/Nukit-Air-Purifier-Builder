@@ -5,11 +5,7 @@
     printDesignIdForPurifierDraft,
     serializePurifierDraft,
   } from "@/domain/purifier/airPurifier";
-  import {
-    decodePurifierDraftSettings,
-    encodeSettings,
-    formatMillimeters,
-  } from "@/domain/purifier/settingsCodec";
+  import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
     applyDonutFilterPreset,
     applyFanProductPreset,
@@ -17,7 +13,6 @@
     applyTempestArrangementDefaults,
     previewMaterialColorPresets,
     type PreviewMaterialColorId,
-    type PreviewMaterialColorPreset,
     type PurifierDraft,
     type RawPurifierSettings,
   } from "@/domain/purifier/settingsModel";
@@ -85,6 +80,7 @@
   } from "@/app/printSheetPlans";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
+  import { fabricationMethodLabel, filterPresetOptionLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
     createPreviewSummaryItems,
     createPurchaseListItems,
@@ -466,10 +462,6 @@
     return isPublicThreeDimensionalPrintDesignId(printDesign) ? printDesign : defaultThreeDimensionalPrintDesignId;
   }
 
-  function swatchColor(color: number): string {
-    return `#${color.toString(16).padStart(6, "0")}`;
-  }
-
   // #######################################
   // Export and Dialog Actions
   // #######################################
@@ -636,29 +628,6 @@
     const plan = createGeneratedPrintSheetPlanFromLayout(currentLayout, currentPrintVolumePresetId);
     generatedPrintSheetPlanCache = { key: cacheKey, plan };
     return plan;
-  }
-
-  // #######################################
-  // Labels and Formatting
-  // #######################################
-
-  function fabricationMethodLabel(method: FabricationMethod): string {
-    return method === "print-3mf" ? "3D print" : "Laser cut";
-  }
-
-  function filterPresetOptionLabel(preset: (typeof filterPresets)[number]): string {
-    if (preset.id === customFilterPresetId) {
-      return `${preset.label} - enter exact dimensions`;
-    }
-    return `${preset.label} - ${formatFilterDimensions(preset.dimensions)}`;
-  }
-
-  function formatFilterDimensions(dimensions: (typeof filterPresets)[number]["dimensions"]): string {
-    return `${formatMillimeters(dimensions.width)} x ${formatMillimeters(dimensions.depth)} x ${formatMillimeters(dimensions.thickness)}`;
-  }
-
-  function previewMaterialColorLabel(color: PreviewMaterialColorPreset): string {
-    return `${color.label} preview color`;
   }
 
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
