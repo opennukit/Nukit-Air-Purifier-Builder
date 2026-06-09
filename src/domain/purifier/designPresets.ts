@@ -70,7 +70,6 @@ export type DonutFilterPreset = {
   readonly label: string;
   readonly detail: string;
   readonly source: string;
-  readonly sourceUrl?: string;
   readonly measurementNote: string;
   readonly settings: DonutFilterSettings;
 };
@@ -228,9 +227,9 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     id: "levoit-core-mini",
     label: "Levoit Core Mini",
     detail: "Small round replacement filter cartridge.",
+    // Dimension provenance: Levoit Core Mini-RF replacement filter listing
+    // (https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white).
     source: "Levoit Core Mini-RF listing",
-    sourceUrl:
-      "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
@@ -245,8 +244,9 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     id: "levoit-core-200s",
     label: "Levoit Core 200S",
     detail: "Medium round replacement filter cartridge.",
+    // Dimension provenance: Levoit Core 200S-RF listings
+    // (https://device.report/levoit/core-200s-rf).
     source: "Levoit Core 200S-RF listings",
-    sourceUrl: "https://device.report/levoit/core-200s-rf",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
@@ -261,9 +261,9 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     id: "levoit-core-300",
     label: "Levoit Core 300",
     detail: "Larger round replacement filter cartridge.",
+    // Dimension provenance: Levoit Core 300-RF listings
+    // (https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/).
     source: "Levoit Core 300-RF listings",
-    sourceUrl:
-      "https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
