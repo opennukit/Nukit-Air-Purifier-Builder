@@ -1,4 +1,9 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
+import {
+  createPurifierSettingsFieldsSchema,
+  type ParsedPurifierSettingsFields,
+  type PurifierSettingsFieldInputs,
+} from "@/domain/purifier/settingsSchema";
 import type { Millimeters } from "@/domain/units";
 import {
   customFilterPresetId,
@@ -1996,181 +2001,21 @@ export function decodeSettings(search: string): RawPurifierSettings {
     defaultSettings.fanDiameter,
   );
   const fanPreset = readFanProductPreset(params, fanDiameter);
+  const fields = parsePurifierSettingsFields(params);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
+    ...fields,
     printDesign,
     filterPreset,
-    filterWidth: readNumber(
-      params,
-      ["filterWidth", "x"],
-      defaultSettings.filterWidth,
-    ),
-    filterDepth: readNumber(
-      params,
-      ["filterDepth", "y"],
-      defaultSettings.filterDepth,
-    ),
-    filterThickness: readNumber(
-      params,
-      ["filterThickness", "filter_height"],
-      defaultSettings.filterThickness,
-    ),
-    rim: readNumber(params, "rim", defaultSettings.rim),
     fanPreset,
     fanDiameter,
-    filters: readFilterCount(params, "filters", defaultSettings.filters),
-    splitFrames: readBoolean(
-      params,
-      ["splitFrames", "split_frames"],
-      defaultSettings.splitFrames,
-    ),
-    fansLeft: readInteger(
-      params,
-      ["fansLeft", "fans_left"],
-      defaultSettings.fansLeft,
-    ),
-    fansRight: readInteger(
-      params,
-      ["fansRight", "fans_right"],
-      defaultSettings.fansRight,
-    ),
-    fansTop: readInteger(
-      params,
-      ["fansTop", "fans_top"],
-      defaultSettings.fansTop,
-    ),
-    fansBottom: readInteger(
-      params,
-      ["fansBottom", "fans_bottom"],
-      defaultSettings.fansBottom,
-    ),
     tempestArrangement: readTempestArrangement(params),
     donutFilterPreset: readDonutFilterPreset(params),
-    donutFilterOuterDiameter: readNumber(
-      params,
-      "donutFilterOuterDiameter",
-      defaultSettings.donutFilterOuterDiameter,
-    ),
-    donutFilterLength: readNumber(
-      params,
-      "donutFilterLength",
-      defaultSettings.donutFilterLength,
-    ),
-    donutFilterHoleDiameter: readNumber(
-      params,
-      "donutFilterHoleDiameter",
-      defaultSettings.donutFilterHoleDiameter,
-    ),
-    donutAdapterInsertLength: readNumber(
-      params,
-      "donutAdapterInsertLength",
-      defaultSettings.donutAdapterInsertLength,
-    ),
-    donutCapRim: readNumber(params, "donutCapRim", defaultSettings.donutCapRim),
-    donutCapEnabled: readBoolean(
-      params,
-      "donutCapEnabled",
-      defaultSettings.donutCapEnabled,
-    ),
-    screwHoleDiameter: readNumber(
-      params,
-      ["screwHoleDiameter", "screw_holes"],
-      defaultSettings.screwHoleDiameter,
-    ),
-    materialThickness: readNumber(
-      params,
-      ["materialThickness", "thickness"],
-      defaultSettings.materialThickness,
-    ),
-    kerfFit: readNumber(params, ["kerfFit", "burn"], defaultSettings.kerfFit),
-    fingerWidthMultiplier: readNumber(
-      params,
-      ["fingerWidthMultiplier", "FingerJoint_finger"],
-      defaultSettings.fingerWidthMultiplier,
-    ),
-    fingerSpaceMultiplier: readNumber(
-      params,
-      ["fingerSpaceMultiplier", "FingerJoint_space"],
-      defaultSettings.fingerSpaceMultiplier,
-    ),
-    fingerPlayMultiplier: readNumber(
-      params,
-      ["fingerPlayMultiplier", "FingerJoint_play"],
-      defaultSettings.fingerPlayMultiplier,
-    ),
-    fingerHoleWidthMultiplier: readNumber(
-      params,
-      ["fingerHoleWidthMultiplier", "FingerJoint_width"],
-      defaultSettings.fingerHoleWidthMultiplier,
-    ),
-    fingerHoleOffsetMultiplier: readNumber(
-      params,
-      ["fingerHoleOffsetMultiplier", "FingerJoint_edge_width"],
-      defaultSettings.fingerHoleOffsetMultiplier,
-    ),
-    dovetailSizeMultiplier: readNumber(
-      params,
-      ["dovetailSizeMultiplier", "DoveTail_size"],
-      defaultSettings.dovetailSizeMultiplier,
-    ),
-    dovetailDepthMultiplier: readNumber(
-      params,
-      ["dovetailDepthMultiplier", "DoveTail_depth"],
-      defaultSettings.dovetailDepthMultiplier,
-    ),
-    dovetailTaper: readNumber(
-      params,
-      ["dovetailTaper", "DoveTail_angle"],
-      defaultSettings.dovetailTaper,
-    ),
-    showFilterMedia: readBoolean(
-      params,
-      "showFilterMedia",
-      defaultSettings.showFilterMedia,
-    ),
-    showFans: readBoolean(params, "showFans", defaultSettings.showFans),
-    showFilterFrame: readBoolean(
-      params,
-      "showFilterFrame",
-      defaultSettings.showFilterFrame,
-    ),
-    explodedView: readBoolean(
-      params,
-      "explodedView",
-      defaultSettings.explodedView,
-    ),
-    showDimensions: readBoolean(
-      params,
-      "showDimensions",
-      defaultSettings.showDimensions,
-    ),
-    showBananaScale: readBoolean(
-      params,
-      "showBananaScale",
-      defaultSettings.showBananaScale,
-    ),
-    showPrintSeams: readBoolean(
-      params,
-      "showPrintSeams",
-      defaultSettings.showPrintSeams,
-    ),
-    showPreviewEdges: readBoolean(
-      params,
-      "showPreviewEdges",
-      defaultSettings.showPreviewEdges,
-    ),
     previewMaterialColor: readPreviewMaterialColor(params),
-    autoRotate: readBoolean(params, "autoRotate", defaultSettings.autoRotate),
     cameraPreset: readCameraPreset(
       params,
       "cameraPreset",
       defaultSettings.cameraPreset,
-    ),
-    labels: readBoolean(params, "labels", defaultSettings.labels),
-    referenceScale: readNumber(
-      params,
-      ["referenceScale", "reference"],
-      defaultSettings.referenceScale,
     ),
   };
   const parsedWithDonutPreset = applyDonutUrlPresetAndMeasurements(
@@ -2590,49 +2435,6 @@ function referenceScaleFromNumber(value: number): ReferenceScale {
 // Primitive Readers
 // ##############################
 
-function readNumber(
-  params: URLSearchParams,
-  key: string | readonly string[],
-  fallback: number,
-): number {
-  const value = readParam(params, key);
-  if (value === null) {
-    return fallback;
-  }
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return fallback;
-  }
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function readInteger(
-  params: URLSearchParams,
-  key: string | readonly string[],
-  fallback: number,
-): number {
-  return Math.trunc(readNumber(params, key, fallback));
-}
-
-function readBoolean(
-  params: URLSearchParams,
-  key: string | readonly string[],
-  fallback: boolean,
-): boolean {
-  const value = readParam(params, key);
-  if (value === null) {
-    return fallback;
-  }
-  if (value === "true" || value === "1") {
-    return true;
-  }
-  if (value === "false" || value === "0") {
-    return false;
-  }
-  return fallback;
-}
-
 function readFanDiameter(
   params: URLSearchParams,
   key: string | readonly string[],
@@ -2748,19 +2550,6 @@ function applyDonutUrlPresetAndMeasurements(
       ? parsed.donutCapEnabled
       : presetSettings.donutCapEnabled,
   };
-}
-
-// ##############################
-// Filter Count URL Reader
-// ##############################
-
-function readFilterCount(
-  params: URLSearchParams,
-  key: string,
-  fallback: FilterCount,
-): FilterCount {
-  const parsed = Number(params.get(key));
-  return parsed === 1 || parsed === 2 ? parsed : fallback;
 }
 
 function readTempestArrangement(
@@ -2905,6 +2694,84 @@ function readParam(
     }
   }
   return null;
+}
+
+// ##############################
+// Schema-Parsed Field Inputs
+// ##############################
+
+// Canonical field name -> the URL param key(s) it reads, newest-name first then
+// legacy aliases. readParam already collapses multi-key + last-value, mirroring
+// the per-field reads decodeSettings used to do by hand.
+const purifierSettingsFieldKeys: Record<
+  keyof PurifierSettingsFieldInputs,
+  string | readonly string[]
+> = {
+  filterWidth: ["filterWidth", "x"],
+  filterDepth: ["filterDepth", "y"],
+  filterThickness: ["filterThickness", "filter_height"],
+  rim: "rim",
+  filters: "filters",
+  splitFrames: ["splitFrames", "split_frames"],
+  fansLeft: ["fansLeft", "fans_left"],
+  fansRight: ["fansRight", "fans_right"],
+  fansTop: ["fansTop", "fans_top"],
+  fansBottom: ["fansBottom", "fans_bottom"],
+  donutFilterOuterDiameter: "donutFilterOuterDiameter",
+  donutFilterLength: "donutFilterLength",
+  donutFilterHoleDiameter: "donutFilterHoleDiameter",
+  donutAdapterInsertLength: "donutAdapterInsertLength",
+  donutCapRim: "donutCapRim",
+  donutCapEnabled: "donutCapEnabled",
+  screwHoleDiameter: ["screwHoleDiameter", "screw_holes"],
+  materialThickness: ["materialThickness", "thickness"],
+  kerfFit: ["kerfFit", "burn"],
+  fingerWidthMultiplier: ["fingerWidthMultiplier", "FingerJoint_finger"],
+  fingerSpaceMultiplier: ["fingerSpaceMultiplier", "FingerJoint_space"],
+  fingerPlayMultiplier: ["fingerPlayMultiplier", "FingerJoint_play"],
+  fingerHoleWidthMultiplier: ["fingerHoleWidthMultiplier", "FingerJoint_width"],
+  fingerHoleOffsetMultiplier: [
+    "fingerHoleOffsetMultiplier",
+    "FingerJoint_edge_width",
+  ],
+  dovetailSizeMultiplier: ["dovetailSizeMultiplier", "DoveTail_size"],
+  dovetailDepthMultiplier: ["dovetailDepthMultiplier", "DoveTail_depth"],
+  dovetailTaper: ["dovetailTaper", "DoveTail_angle"],
+  showFilterMedia: "showFilterMedia",
+  showFans: "showFans",
+  showFilterFrame: "showFilterFrame",
+  explodedView: "explodedView",
+  showDimensions: "showDimensions",
+  showBananaScale: "showBananaScale",
+  showPrintSeams: "showPrintSeams",
+  showPreviewEdges: "showPreviewEdges",
+  autoRotate: "autoRotate",
+  labels: "labels",
+  referenceScale: ["referenceScale", "reference"],
+};
+
+const purifierSettingsFieldsSchema =
+  createPurifierSettingsFieldsSchema(defaultSettings);
+
+function parsePurifierSettingsFields(
+  params: URLSearchParams,
+): ParsedPurifierSettingsFields {
+  const inputs: PurifierSettingsFieldInputs = {};
+  for (const [field, key] of Object.entries(purifierSettingsFieldKeys) as [
+    keyof PurifierSettingsFieldInputs,
+    string | readonly string[],
+  ][]) {
+    // readFilterCount historically read the first value via params.get; every
+    // other field used readParam's last-value semantics. Preserve that split.
+    const value =
+      field === "filters"
+        ? params.get("filters")
+        : readParam(params, key);
+    if (value !== null) {
+      inputs[field] = value;
+    }
+  }
+  return purifierSettingsFieldsSchema.parse(inputs);
 }
 
 function hasAnyParam(
