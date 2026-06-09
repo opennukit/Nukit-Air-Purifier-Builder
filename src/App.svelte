@@ -44,7 +44,6 @@
     fanProductPresets,
     findFanProductPreset,
     fixedFanCountOptions,
-    type FanDiameter,
     type FanProductPresetId,
     type PresetFanProduct,
   } from "@/domain/purifier/fanProducts";
@@ -72,6 +71,16 @@
     type FilterDimensionName,
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
+  import {
+    defaultFanProductPresetForRecommendedDiameter,
+    defaultRecommendedFanDiameter,
+    fanDiameterSelectionForSettings,
+    fanProductOptionsForSelection,
+    isRecommendedFanProductPreset,
+    recommendedFanDiameterOptions,
+    type FanDiameterSelection,
+    type RecommendedFanDiameter,
+  } from "@/app/controls/fanSelection";
   import type { PreviewMode } from "@/app/workbench/previewMode";
   import {
     createPrintDesignSettingsMemory,
@@ -121,11 +130,6 @@
   // #######################################
 
   type FabricationMethod = ExportFormat;
-  type RecommendedFanDiameter = Extract<FanDiameter, 120 | 140>;
-  type FanDiameterSelection = RecommendedFanDiameter | "custom";
-  type RecommendedFanProductPreset = PresetFanProduct & {
-    readonly diameter: RecommendedFanDiameter;
-  };
   type SummaryItem = {
     readonly label: string;
     readonly value: string;
@@ -148,11 +152,6 @@
   // #######################################
 
   const initialUrlParams = new URLSearchParams(window.location.search);
-  const recommendedFanDiameterOptions: readonly RecommendedFanDiameter[] = [120, 140];
-  const defaultRecommendedFanDiameter: RecommendedFanDiameter = 140;
-  const recommendedFanProductPresets: readonly RecommendedFanProductPreset[] = fanProductPresets.filter(
-    isRecommendedFanProductPreset,
-  );
 
   // #######################################
   // Svelte State
@@ -489,47 +488,6 @@
   function readFanCountControlValue(event: Event): number {
     const parsed = Number(requireSelect(event, "readFanCountControlValue").value);
     return Number.isFinite(parsed) ? parsed : automaticFanCount;
-  }
-
-  function isRecommendedFanDiameter(diameter: FanDiameter): diameter is RecommendedFanDiameter {
-    return diameter === 120 || diameter === 140;
-  }
-
-  function isRecommendedFanProductPreset(preset: { readonly id: FanProductPresetId; readonly diameter: FanDiameter }): preset is RecommendedFanProductPreset {
-    return preset.id !== customFanProductPresetId && isRecommendedFanDiameter(preset.diameter);
-  }
-
-  function fanDiameterSelectionForSettings(currentSettings: RawPurifierSettings): FanDiameterSelection {
-    if (currentSettings.fanPreset === customFanProductPresetId && !isRecommendedFanDiameter(currentSettings.fanDiameter)) {
-      return "custom";
-    }
-    const fanProduct = findFanProductPreset(currentSettings.fanPreset);
-    if (isRecommendedFanProductPreset(fanProduct)) {
-      return fanProduct.diameter;
-    }
-    if (isRecommendedFanDiameter(currentSettings.fanDiameter)) {
-      return currentSettings.fanDiameter;
-    }
-    return defaultRecommendedFanDiameter;
-  }
-
-  function recommendedFanProductPresetsForDiameter(diameter: RecommendedFanDiameter): readonly RecommendedFanProductPreset[] {
-    return recommendedFanProductPresets.filter((preset) => preset.diameter === diameter);
-  }
-
-  function fanProductOptionsForSelection(selection: FanDiameterSelection): readonly PresetFanProduct[] {
-    if (selection === "custom") {
-      return [];
-    }
-    return recommendedFanProductPresetsForDiameter(selection);
-  }
-
-  function defaultFanProductPresetForRecommendedDiameter(diameter: RecommendedFanDiameter): RecommendedFanProductPreset {
-    const preset = recommendedFanProductPresetsForDiameter(diameter)[0];
-    if (preset === undefined) {
-      throw new Error(`defaultFanProductPresetForRecommendedDiameter: Missing ${diameter} mm fan preset`);
-    }
-    return preset;
   }
 
   function readNumberInput(event: Event, fallback: number): number {
