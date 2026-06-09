@@ -1,5 +1,4 @@
 import {
-  ACESFilmicToneMapping,
   PMREMGenerator,
   Texture,
   Box3,
@@ -14,7 +13,6 @@ import {
   Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
-  AmbientLight,
   GridHelper,
   Group,
   LineBasicMaterial,
@@ -42,7 +40,6 @@ import {
   Vector2,
   WebGLRenderer,
 } from "three";
-import type { ToneMapping } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -79,7 +76,6 @@ import {
   type AssemblyPanelPart,
   type DimensionGuide,
   type DimensionMeasurement,
-  type MillimeterSize3,
   type MillimeterVector3,
   type Vector3Tuple,
 } from "@/fabrication/assemblyModel";
@@ -107,208 +103,65 @@ import {
   createTempestSettingsFromLayout,
 } from "@/fabrication/printing/designs/tempest/printableKit";
 import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
-
-// #######################################
-// Appearance Lab (temporary surface/lighting experiment)
-// #######################################
-// A throwaway set of material + lighting "looks" to flip between in a floating
-// selector and pick the nicest surface. Once chosen, drop the rest and inline the
-// winner. Each preset drives the printed-part material, the lighting rig, an
-// optional IBL environment, and tone mapping.
-
-type PrintedSurfaceSpec = {
-  readonly kind: "standard" | "physical";
-  readonly normals: "flat" | "creased";
-  readonly roughness: number;
-  readonly metalness: number;
-  readonly clearcoat?: number;
-  readonly clearcoatRoughness?: number;
-  readonly envMapIntensity?: number;
-};
-
-type AppearancePreset = {
-  readonly id: string;
-  readonly label: string;
-  readonly surface: PrintedSurfaceSpec;
-  readonly environment: "room" | "none";
-  readonly toneMapping: ToneMapping;
-  readonly exposure: number;
-  readonly lights: () => Object3D[];
-};
-
-function directionalLight(intensity: number, position: readonly [number, number, number], color = 0xffffff): DirectionalLight {
-  const light = new DirectionalLight(color, intensity);
-  light.position.set(position[0], position[1], position[2]);
-  return light;
-}
-
-const APPEARANCE_PRESETS: readonly AppearancePreset[] = [
-  {
-    id: "studio",
-    label: "Studio matte",
-    // The product look: a matte creased-normal surface, a dominant world-fixed key
-    // (which casts the floor shadow), a soft opposing fill, a uniform ambient, and a
-    // faint IBL accent. The key being clearly directional is intentional — its cast
-    // shadow on the floor is the cue that the box is fixed and the camera orbits it.
-    surface: { kind: "standard", normals: "creased", roughness: 0.68, metalness: 0, envMapIntensity: 0.3 },
-    environment: "room",
-    toneMapping: ACESFilmicToneMapping,
-    exposure: 0.72,
-    lights: () => [
-      new AmbientLight(0xffffff, 0.35),
-      directionalLight(1.15, [3, 4.5, 2.5]),
-      directionalLight(0.4, [-2.5, 2, -3.2], 0xeef2ff),
-    ],
-  },
-];
-
-const DEFAULT_APPEARANCE_PRESET_ID = "studio";
-// Smooth shading within faces but crisp at dihedral angles >= this, so box edges
-// and chamfers stay sharp while grills and rounded corners read smooth.
-const CREASE_ANGLE_RADIANS = (40 * Math.PI) / 180;
-
-let activeAppearance: PrintedSurfaceSpec = APPEARANCE_PRESETS[0].surface;
-
-// #######################################
-// Preview Model
-// #######################################
-
-// ##############################
-// Fan Preview Data
-// ##############################
-
-type FanAxis = "x" | "y" | "z";
-
-type FanPlacement = {
-  axis: FanAxis;
-  position: Vector3;
-  radius: number;
-};
-
-type TempestCsgPoint = {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-};
-
-type TempestCsgBox = {
-  readonly min: TempestCsgPoint;
-  readonly size: TempestCsgPoint;
-};
-
-export type PreviewInteriorPlane = {
-  readonly axis: FanAxis;
-  readonly coordinate: number;
-  readonly insideSign: -1 | 1;
-  readonly inset: number;
-};
-
-type FanCadPreviewAsset = {
-  readonly schema: "filterboxbuilder-fan-cad-preview-v1";
-  readonly usage: "preview-only-purchased-part-visual";
-  readonly unit: "millimeter";
-  readonly nominalDiameter: number;
-  readonly bounds: {
-    readonly center: readonly [number, number, number];
-  };
-  readonly meshes: readonly FanCadPreviewMesh[];
-};
-
-type FanCadPreviewMesh = {
-  readonly name: string;
-  readonly color?: readonly [number, number, number];
-  readonly position: readonly number[];
-  readonly index: readonly number[];
-};
-
-type LoadedFanCadModel = {
-  readonly nominalDiameter: number;
-  readonly meshes: readonly LoadedFanCadMesh[];
-};
-
-type LoadedFanCadMesh = {
-  readonly name: string;
-  readonly geometry: BufferGeometry;
-  readonly color: number;
-  readonly isRotor: boolean;
-};
-
-// ##############################
-// Camera and Seam Data
-// ##############################
-
-type CameraPose = {
-  readonly offsetFromTarget: Vector3;
-  readonly viewScale: number;
-};
-
-type PanelPrintSeam = {
-  readonly orientation: "vertical" | "horizontal";
-  readonly offset: number;
-  readonly start: number;
-  readonly end: number;
-};
-
-// ##############################
-// Design Preview Metrics
-// ##############################
-
-type StaticReferenceAssembledPreviewPose = {
-  readonly meshRotationX: number;
-  readonly rotateWholePreview: boolean;
-  readonly installedPartLayout: "source-front" | "source-side-fans" | "fan-panel-up";
-};
-
-type StaticReferenceAssemblyMetrics = {
-  readonly footprintWidth: number;
-  readonly footprintDepth: number;
-  readonly height: number;
-};
-
-type StaticReferencePurchasedPartExplosion = {
-  readonly exploded: boolean;
-  readonly assembly?: LoadedStaticPrintAssembly;
-};
-
-// ##############################
-// Scene Constants
-// ##############################
-
-const sceneScale = 1 / 260;
-const staticReferenceSceneScale = sceneScale * 0.72;
-const woodColor = 0xc7965a;
-const edgeColor = 0x4f3822;
-const burnColor = 0x2b1a0f;
-const filterColor = 0xeef1e6;
-const groundY = -0.58;
-const homePreviewRotationX = -Math.PI / 2;
-const panelCutOverlayLift = 1.4 * sceneScale;
-const panelPrintSeamOverlayLift = 2.1 * sceneScale;
-const fanPreviewFrontDepth = 0.018;
-const fanPreviewRearDepth = 0.047;
-const fanPreviewFrontDepthMillimeters = fanPreviewFrontDepth / sceneScale;
-const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
-const previewFanWallInset = 0.8 * sceneScale;
-const filterMediaPreviewClearanceMillimeters = 3;
-const filterMediaPreviewSurfaceGapMillimeters = 2;
-const bananaReferenceLength = 180 * sceneScale;
-const bananaReferenceRadius = 14 * sceneScale;
-const oneMeterCubeSize = 1000 * sceneScale;
-const staticReferenceExplodeDistance = 46 * sceneScale;
-const generatedPreviewExplodeDistance = 72 * sceneScale;
-const bananaScaleAssetUrl = "/vendor/scale-reference/banana/banana.glb";
-const dimensionLabelNormalScale = new Vector3(1.37, 0.367, 1);
-const dimensionLabelHoverScale = new Vector3(1.9, 0.51, 1);
-const dimensionLabelOffsetMultiplier = 1.18;
-const dimensionPreviewFramingMultiplier = 1.2;
-const staticReferencePreviewZoom = 1.52;
-const generatedPreviewZoom = 1.5;
-const generatedPreviewZoomReferenceMillimeters = 360;
-const minimumLargeModelPreviewZoom = 0.85;
-const previewControlClearanceTargetOffset = 0.1;
-// Local +Y is the exhaust/back side of the fan, which faces outside the purifier.
-// Positive Y rotation reads as slow clockwise motion from that outside view.
-const fanRotorAngularVelocity = 0.9;
+import {
+  APPEARANCE_PRESETS,
+  CREASE_ANGLE_RADIANS,
+  DEFAULT_APPEARANCE_PRESET_ID,
+  activeAppearance,
+  setActiveAppearance,
+} from "@/rendering/three/preview/appearance";
+import {
+  bananaReferenceLength,
+  bananaReferenceRadius,
+  bananaScaleAssetUrl,
+  burnColor,
+  dimensionLabelHoverScale,
+  dimensionLabelNormalScale,
+  dimensionLabelOffsetMultiplier,
+  dimensionPreviewFramingMultiplier,
+  edgeColor,
+  fanPreviewFrontDepth,
+  fanPreviewFrontDepthMillimeters,
+  fanPreviewRearDepth,
+  fanPreviewRearDepthMillimeters,
+  fanRotorAngularVelocity,
+  filterColor,
+  filterMediaPreviewClearanceMillimeters,
+  filterMediaPreviewSurfaceGapMillimeters,
+  generatedPreviewExplodeDistance,
+  generatedPreviewZoom,
+  generatedPreviewZoomReferenceMillimeters,
+  groundY,
+  homePreviewRotationX,
+  minimumLargeModelPreviewZoom,
+  oneMeterCubeSize,
+  panelCutOverlayLift,
+  panelPrintSeamOverlayLift,
+  previewControlClearanceTargetOffset,
+  previewFanWallInset,
+  recessedMillimeterFilterMediaThickness,
+  sceneScale,
+  staticReferenceExplodeDistance,
+  staticReferencePreviewZoom,
+  staticReferenceSceneScale,
+  visualAssemblyBoxSize,
+  visualFilterMediaDimension,
+  woodColor,
+  type CameraPose,
+  type FanAxis,
+  type FanCadPreviewAsset,
+  type FanCadPreviewMesh,
+  type FanPlacement,
+  type LoadedFanCadMesh,
+  type LoadedFanCadModel,
+  type PanelPrintSeam,
+  type PreviewInteriorPlane,
+  type StaticReferenceAssembledPreviewPose,
+  type StaticReferenceAssemblyMetrics,
+  type StaticReferencePurchasedPartExplosion,
+  type TempestCsgBox,
+  type TempestCsgPoint,
+} from "@/rendering/three/preview/previewData";
 
 // #######################################
 // Preview Class
@@ -448,7 +301,7 @@ export class PurifierThreePreview {
       return;
     }
     const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === presetId) ?? APPEARANCE_PRESETS[0];
-    activeAppearance = preset.surface;
+    setActiveAppearance(preset.surface);
     this.lightGroup.clear();
     let shadowAssigned = false;
     for (const light of preset.lights()) {
@@ -1976,27 +1829,6 @@ function disposeMeshResources(mesh: Mesh): void {
   disposeMaterial(mesh.material, new Set());
 }
 
-function visualAssemblyBoxSize(part: AssemblyBoxPart): MillimeterSize3 {
-  if (part.role !== "filter-media") {
-    return part.size;
-  }
-
-  const [width, height, depth] = part.size;
-  return [
-    visualFilterMediaDimension(width),
-    visualFilterMediaDimension(height),
-    visualFilterMediaDimension(depth),
-  ];
-}
-
-function visualFilterMediaDimension(size: number): number {
-  return Math.max(1, size - filterMediaPreviewClearanceMillimeters * 2, size * 0.72);
-}
-
-function recessedMillimeterFilterMediaThickness(size: number): number {
-  return Math.max(1, size - filterMediaPreviewSurfaceGapMillimeters * 2);
-}
-
 // #######################################
 // Tempest Preview Purchased Parts
 // #######################################
@@ -2607,7 +2439,7 @@ function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
   // Grills and rounded corners read smooth while box edges stay crisp; the flat
   // preset keeps averaged normals (its material's flatShading ignores them anyway).
   const shading: PrintableMeshShading =
-    activeAppearance.normals === "creased"
+    activeAppearance().normals === "creased"
       ? { type: "creased", creaseAngleRadians: CREASE_ANGLE_RADIANS }
       : { type: "averaged" };
   return printableMeshToBufferGeometry(mesh, { scale: sceneScale, offset: [0, 0, 0] }, shading);
@@ -2908,7 +2740,7 @@ type PrintedPartMaterialOptions = {
 function createPrintedPartMaterial(options: PrintedPartMaterialOptions): MeshStandardMaterial {
   // Driven by the active appearance preset (Appearance Lab) rather than the
   // per-part roughness/metalness, so every printed surface shares one look.
-  const surface = activeAppearance;
+  const surface = activeAppearance();
   const base = {
     color: options.color,
     roughness: surface.roughness,
