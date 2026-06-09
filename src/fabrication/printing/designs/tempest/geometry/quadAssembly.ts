@@ -6,7 +6,7 @@ import type {
 } from "@/domain/designs/tempest/model";
 import { tempestWalls, type TempestPlanarAxis, type TempestWall, type TempestWallMap } from "@/domain/designs/tempest/shared";
 import type { GeometryContext } from "./context";
-import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP } from "./context";
+import { CORD_CYLINDER_SEGMENTS, CSG_SEGMENTS, EPSILON_LIP } from "./context";
 import {
   cuboidFromMinSize,
   cylinderAlong,
@@ -18,6 +18,13 @@ import { fanPatternCut, towerOpening2d } from "./patterns2d";
 // Box-fan top exhaust.
 const BOX_FAN_TIE_RADIUS_FLOOR_MM = 0.001; // never let a zero screw-hole diameter collapse the tie hole
 const BOX_FAN_TIE_PAIR_DIVISOR = 8; // tie holes sit ±(min open span / this) either side of each corner
+
+// Internal fillets are deliberate strength features: the air chamber's vertical
+// corners are rounded so the wall junctions meet in a fillet instead of a sharp
+// stress riser. Only vertical-axis fillets (rounded in XY, swept along Z) are
+// used — they print support-free. Exterior edges stay CHAMFERED on purpose:
+// fillets print poorly on outside edges with thick layers and would need support.
+const INTERNAL_FILLET_RADIUS_MM = 3;
 
 // Places the 45° corner bevel one outer-wall thickness clear of the nearest air.
 // The closest void to the corner is the filter pocket, whose near-corner edge sits
@@ -37,18 +44,33 @@ export function towerCornerChamfer(maxChamfer: number, structuralOffset: number,
 // 4 Filter Tower Assembly
 // #######################################
 
+// The central air-chamber void, its four vertical corners rounded so the inner
+// wall junctions carry an internal fillet (see INTERNAL_FILLET_RADIUS_MM). The
+// radius is clamped to the side openings' corner clearance: each outlet cut's
+// chamfer flare ends `rim - chamferSize` from the chamber corner, so a radius at
+// or below that can never touch an opening.
 export function towerAirChamber<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid {
-  return cuboidFromMinSize(
-    ctx,
-    filterLayout.airChamber.xMin,
-    filterLayout.airChamber.yMin,
-    filterLayout.airChamber.zMin - EPSILON_LIP,
-    filterLayout.airChamber.xMax - filterLayout.airChamber.xMin,
-    filterLayout.airChamber.yMax - filterLayout.airChamber.yMin,
-    filterLayout.airChamber.zMax - filterLayout.airChamber.zMin + 2 * EPSILON_LIP,
+  const { primitives, transforms, extrusions } = ctx.modeling;
+  const chamber = filterLayout.airChamber;
+  const width = chamber.xMax - chamber.xMin;
+  const depth = chamber.yMax - chamber.yMin;
+  const openingCornerClearance = model.frame.rim - model.frame.chamferSize;
+  const filletRadius = Math.max(0, Math.min(INTERNAL_FILLET_RADIUS_MM, openingCornerClearance, width / 2, depth / 2));
+  return transforms.translate(
+    [chamber.xMin, chamber.yMin, chamber.zMin - EPSILON_LIP],
+    extrusions.extrudeLinear(
+      { height: chamber.zMax - chamber.zMin + 2 * EPSILON_LIP },
+      primitives.roundedRectangle({
+        center: [width / 2, depth / 2],
+        size: [Math.max(0.001, width), Math.max(0.001, depth)],
+        roundRadius: filletRadius,
+        segments: CSG_SEGMENTS,
+      }),
+    ),
   );
 }
 

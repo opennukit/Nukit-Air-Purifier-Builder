@@ -74,8 +74,10 @@ function assembly<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: Tem
 // #######################################
 
 // Built top to bottom:
-//   1. Start with the outer box, corners chamfered.
-//   2. Hollow out the central air chamber.
+//   1. Start with the outer box, corners chamfered. (Exterior edges are always
+//      chamfers, never fillets — fillets on outside edges print poorly with
+//      thick layers; internal vertical fillets are fine and added for strength.)
+//   2. Hollow out the central air chamber, its vertical corners filleted.
 //   3. Carve the four filter pockets, one per wall.
 //   4. Cut each wall's inlet (outer) and outlet (inner) opening.
 //   5. Cut the top exhaust: a fan grid or a single box-fan opening.
@@ -101,7 +103,7 @@ function assembleQuad<Solid, Region>(
 
   // 2-6. Subtract every void from the box.
   return subtractAll(ctx, outerBox, [
-    towerAirChamber(ctx, filterLayout), // 2. central air chamber
+    towerAirChamber(ctx, model, filterLayout), // 2. central air chamber, vertical corners filleted for strength
     ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, filterLayout.wallRects[wallName])), // 3. four filter pockets
     // 4. each wall's inlet (outer face -> flange) and outlet (filter -> chamber) opening
     ...tempestWalls.flatMap((wallName) => {
