@@ -228,12 +228,11 @@ export function createPartsListItems(
     ];
   }
 
-  const filterPreset = findFilterPreset(currentSettings.filterPreset);
   return [
     {
       category: "Filter",
       label: rectangularFilterSize(currentSettings),
-      detail: filterNominalDetail(filterPreset),
+      detail: "Measured width x depth x thickness",
     },
     ...baseItems,
   ];
