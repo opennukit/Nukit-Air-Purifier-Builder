@@ -333,7 +333,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-tempest",
     label: "Nukit Tempest",
-    detail: "Parametric Tempest printable housing",
+    detail: "",
     source: "",
     license: "Generated from this project",
     releaseVisibility: "public",

@@ -115,19 +115,28 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("uses fan product presets for product help, cut hole size, and encoded URLs", () => {
-    const mobiusSettings = applyFanProductPreset(defaultSettings, "cleanairkits-mobius-120p");
-    const layout = createLayout(mobiusSettings);
+    const presetSettings = applyFanProductPreset(defaultSettings, "arctic-p12-pwm-pst");
+    const layout = createLayout(presetSettings);
     const fanPanel = requiredFanPanel(layout);
     const fanCut = requiredCircleCut(fanPanel, "fan");
     const encoded = encodeSettings(layout.rawSettings);
     const decoded = decodeSettings(encoded);
 
-    expect(layout.rawSettings.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(layout.rawSettings.fanPreset).toBe("arctic-p12-pwm-pst");
     expect(layout.rawSettings.fanDiameter).toBe(120);
     expect(layout.configuration.fan.productSelection.type).toBe("preset");
-    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x50b8ff);
+    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x253a38);
     expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
-    expect(decoded.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(decoded.fanDiameter).toBe(120);
+  });
+
+  test("decodes share URLs carrying a removed fan preset id to a safe fallback", () => {
+    // "cleanairkits-mobius-120p" was removed from the preset list; old shared
+    // URLs must keep working. Unknown ids fall back by diameter: 120 mm is not
+    // the default preset's diameter, so the decode lands on a custom fan.
+    const decoded = decodeSettings("fanPreset=cleanairkits-mobius-120p&fanDiameter=120");
+    expect(decoded.fanPreset).toBe("custom");
     expect(decoded.fanDiameter).toBe(120);
   });
 

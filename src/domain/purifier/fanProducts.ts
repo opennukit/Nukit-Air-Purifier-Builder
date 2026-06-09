@@ -76,7 +76,6 @@ export type FanPreviewCadModel = {
 export const fanProductPresetIds = [
   "nukit-arctic-p14",
   "arctic-p12-pwm-pst",
-  "cleanairkits-mobius-120p",
   "noctua-nf-a14",
   "custom",
 ] as const;
@@ -130,18 +129,6 @@ export const fanProductPresets: readonly FanProductPreset[] = [
       bladeColor: 0x49525a,
       hubColor: 0x919a96,
       accentColor: 0x253a38,    },
-  },
-  {
-    id: "cleanairkits-mobius-120p",
-    label: "120 mm — high-pressure ring",
-    diameter: 120,
-    powerNote: "4-pin PWM, 12 V",
-    appearance: {
-      frameColor: 0x080d11,
-      ringColor: 0x151c22,
-      bladeColor: 0x202b33,
-      hubColor: 0x8a969c,
-      accentColor: 0x50b8ff,    },
   },
   {
     id: "noctua-nf-a14",

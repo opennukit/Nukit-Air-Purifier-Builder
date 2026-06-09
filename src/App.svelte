@@ -967,19 +967,25 @@
                     {/if}
                   </select>
                 </label>
-                <div class="print-design-card" id="printDesignDetail">
-                  <strong>{activePrintDesignPreset.detail}</strong>
-                  {#if activeStaticPrintReference !== undefined}
-                    <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
-                    <small>{activeStaticPrintReference.usePolicy.note}</small>
-                  {/if}
-                  <small>
-                    {activePrintDesignPreset.source}
-                    {#if activePrintDesignPreset.sourceUrl !== undefined}
-                      <a href={activePrintDesignPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
+                {#if activePrintDesignPreset.detail !== "" || activePrintDesignPreset.source !== "" || activeStaticPrintReference !== undefined}
+                  <div class="print-design-card" id="printDesignDetail">
+                    {#if activePrintDesignPreset.detail !== ""}
+                      <strong>{activePrintDesignPreset.detail}</strong>
                     {/if}
-                  </small>
-                </div>
+                    {#if activeStaticPrintReference !== undefined}
+                      <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
+                      <small>{activeStaticPrintReference.usePolicy.note}</small>
+                    {/if}
+                    {#if activePrintDesignPreset.source !== "" || activePrintDesignPreset.sourceUrl !== undefined}
+                      <small>
+                        {activePrintDesignPreset.source}
+                        {#if activePrintDesignPreset.sourceUrl !== undefined}
+                          <a href={activePrintDesignPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
+                        {/if}
+                      </small>
+                    {/if}
+                  </div>
+                {/if}
               </section>
             {/if}
 
