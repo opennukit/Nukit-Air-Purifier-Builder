@@ -10,7 +10,6 @@ import {
   DirectionalLight,
   DoubleSide,
   EdgesGeometry,
-  Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
   GridHelper,
@@ -31,7 +30,6 @@ import {
   Raycaster,
   Scene,
   Shape,
-  ShapeGeometry,
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
@@ -42,10 +40,6 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import {
-  printableMeshToBufferGeometry,
-  type PrintableMeshShading,
-} from "@/rendering/three/printableMeshGeometry";
 import {
   findPreviewMaterialColorPreset,
   isDonutFilterPrintDesignId,
@@ -69,7 +63,6 @@ import {
   createAssemblyModel,
   formatDimension,
   type AssemblyBoxPart,
-  type AssemblyPanelPart,
   type DimensionGuide,
   type DimensionMeasurement,
 } from "@/fabrication/assemblyModel";
@@ -81,25 +74,20 @@ import {
 } from "@/domain/designs/donut-filter/model";
 import {
   createTempestModel,
-  type TempestFilterLayout,
   type TempestModel,
   type TempestPrintablePose,
   type TempestWallFanLayout,
 } from "@/domain/designs/tempest/model";
-import type { TempestHorizontalFilterSize, TempestWall } from "@/domain/designs/tempest/shared";
-import { assertNever, matchTopology } from "@/domain/designs/tempest/topology";
-import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
+import { matchTopology } from "@/domain/designs/tempest/topology";
 import {
   createTempestPrintableKitFromLayout,
   createTempestPrintablePose,
   createTempestSettingsFromLayout,
 } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
+import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
 import {
   APPEARANCE_PRESETS,
-  CREASE_ANGLE_RADIANS,
   DEFAULT_APPEARANCE_PRESET_ID,
-  activeAppearance,
   setActiveAppearance,
 } from "@/rendering/three/preview/appearance";
 import {
@@ -116,14 +104,30 @@ import {
   cameraPosition,
   cameraViewScale,
   clamp,
-  dominantVectorAxis,
   explodeGeneratedPreviewChildrenFromCenter,
   previewInteriorShiftForBounds,
   toSceneOffset,
   toScenePosition,
-  vectorAxisValue,
 } from "@/rendering/three/preview/sceneMath";
 import { collectFanRotors, createFan } from "@/rendering/three/preview/fanModels";
+import {
+  createPanelGroup,
+  createPanelPrintSeams,
+  createPreviewEdges,
+  createPrintableMeshPreviewGroup,
+} from "@/rendering/three/preview/panelMeshes";
+import {
+  createTempestPreviewBox,
+  expectSandwichArrangementFilter,
+  moveTempestFanInsideWall,
+  tempestCsgAxisToSceneAxis,
+  tempestCsgPointToScene,
+  tempestHorizontalFilterBoxes,
+  tempestPreviewWalls,
+  tempestTowerFilterBoxes,
+  tempestWallInteriorFanCenter,
+  tempestWallNormalAxis,
+} from "@/rendering/three/preview/tempestParts";
 import {
   createBananaScaleReference,
   createOneMeterScaleCube,
@@ -143,34 +147,21 @@ import {
   dimensionLabelNormalScale,
   dimensionLabelOffsetMultiplier,
   edgeColor,
-  fanPreviewFrontDepth,
-  fanPreviewFrontDepthMillimeters,
-  fanPreviewRearDepth,
   fanPreviewRearDepthMillimeters,
   fanRotorAngularVelocity,
-  filterMediaPreviewClearanceMillimeters,
-  filterMediaPreviewSurfaceGapMillimeters,
   groundY,
   homePreviewRotationX,
   oneMeterCubeSize,
-  panelCutOverlayLift,
-  panelPrintSeamOverlayLift,
   previewControlClearanceTargetOffset,
   previewFanWallInset,
-  recessedMillimeterFilterMediaThickness,
   sceneScale,
   staticReferenceSceneScale,
   visualAssemblyBoxSize,
-  visualFilterMediaDimension,
   type CameraPose,
-  type FanAxis,
-  type PanelPrintSeam,
   type PreviewInteriorPlane,
   type StaticReferenceAssembledPreviewPose,
   type StaticReferenceAssemblyMetrics,
   type StaticReferencePurchasedPartExplosion,
-  type TempestCsgBox,
-  type TempestCsgPoint,
 } from "@/rendering/three/preview/previewData";
 
 // #######################################
@@ -1633,564 +1624,6 @@ export class PurifierThreePreview {
 }
 
 // #######################################
-// Tempest Preview Purchased Parts
-// #######################################
-
-function tempestHorizontalFilterBoxes(
-  model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
-  filter: TempestHorizontalFilterSize,
-): readonly TempestCsgBox[] {
-  const inset = filterMediaPreviewClearanceMillimeters;
-  const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
-  return filterLayout.filters.map((layer) => ({
-    min: {
-      x: model.frame.wallThickness + inset,
-      y: model.frame.wallThickness + inset,
-      z: layer.zBottom + surfaceGap,
-    },
-    size: {
-      x: visualFilterMediaDimension(filter.footprintWidth),
-      y: visualFilterMediaDimension(filter.footprintDepth),
-      z: recessedMillimeterFilterMediaThickness(filter.thickness),
-    },
-  }));
-}
-
-function tempestTowerFilterBoxes(
-  model: TempestModel,
-  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
-): readonly TempestCsgBox[] {
-  const filter = filterLayout.filter; // carried on the quad layout
-  const inset = filterMediaPreviewClearanceMillimeters;
-  const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
-  const faceWidth = visualFilterMediaDimension(filter.faceWidth);
-  const faceHeight = visualFilterMediaDimension(filter.faceHeight);
-  const filterThickness = recessedMillimeterFilterMediaThickness(filter.thickness);
-  const z = filterLayout.bottomPlateThickness + inset;
-  return [
-    {
-      min: { x: filterLayout.structuralOffset + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
-      size: { x: faceWidth, y: filterThickness, z: faceHeight },
-    },
-    {
-      min: {
-        x: filterLayout.structuralOffset + inset,
-        y: model.box.depth - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
-        z,
-      },
-      size: { x: faceWidth, y: filterThickness, z: faceHeight },
-    },
-    {
-      min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + inset, z },
-      size: { x: filterThickness, y: faceWidth, z: faceHeight },
-    },
-    {
-      min: {
-        x: model.box.width - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
-        y: filterLayout.structuralOffset + inset,
-        z,
-      },
-      size: { x: filterThickness, y: faceWidth, z: faceHeight },
-    },
-  ];
-}
-
-function createTempestPreviewBox(
-  box: TempestCsgBox,
-  pose: TempestPrintablePose,
-  material: Material,
-  edgeMaterial: Material,
-  name: string,
-  showPreviewEdges: boolean,
-): Group {
-  const bounds = new Box3().setFromPoints(tempestCsgBoxCorners(box).map((point) => tempestCsgPointToScene(point, pose)));
-  const size = bounds.getSize(new Vector3());
-  const center = bounds.getCenter(new Vector3());
-  const geometry = new BoxGeometry(size.x, size.y, size.z);
-  const mesh = new Mesh(geometry, material);
-  mesh.name = name;
-  mesh.position.copy(center);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-
-  const group = new Group();
-  group.add(mesh);
-  if (showPreviewEdges) {
-    const edges = createPreviewEdges(geometry, edgeMaterial);
-    edges.position.copy(center);
-    group.add(edges);
-  }
-  return group;
-}
-
-function tempestCsgBoxCorners(box: TempestCsgBox): readonly TempestCsgPoint[] {
-  const x1 = box.min.x + box.size.x;
-  const y1 = box.min.y + box.size.y;
-  const z1 = box.min.z + box.size.z;
-  return [
-    { x: box.min.x, y: box.min.y, z: box.min.z },
-    { x: x1, y: box.min.y, z: box.min.z },
-    { x: box.min.x, y: y1, z: box.min.z },
-    { x: x1, y: y1, z: box.min.z },
-    { x: box.min.x, y: box.min.y, z: z1 },
-    { x: x1, y: box.min.y, z: z1 },
-    { x: box.min.x, y: y1, z: z1 },
-    { x: x1, y: y1, z: z1 },
-  ];
-}
-
-function tempestCsgPointToScene(point: TempestCsgPoint, pose: TempestPrintablePose): Vector3 {
-  const posedPoint =
-    pose.type === "upright-dual-filter"
-      ? {
-          x: point.x,
-          y: pose.envelope.depth - point.z,
-          z: point.y,
-        }
-      : point;
-  return new Vector3(posedPoint.x * sceneScale, posedPoint.z * sceneScale, posedPoint.y * sceneScale);
-}
-
-function tempestCsgAxisToSceneAxis(axis: FanAxis, pose: TempestPrintablePose): FanAxis {
-  if (pose.type === "upright-dual-filter") {
-    return axis;
-  }
-  if (axis === "y") {
-    return "z";
-  }
-  if (axis === "z") {
-    return "y";
-  }
-  return "x";
-}
-
-function tempestWallNormalAxis(wall: TempestWall): FanAxis {
-  return wall === "front" || wall === "back" ? "y" : "x";
-}
-
-function tempestWallInteriorFanCenter(
-  model: TempestModel,
-  wall: TempestWall,
-  positionAlongWall: number,
-  localVerticalCenter: number,
-): TempestCsgPoint {
-  const z = model.frame.outsideFlangeThickness + localVerticalCenter;
-  if (wall === "front") {
-    return { x: positionAlongWall, y: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, z };
-  }
-  if (wall === "back") {
-    return { x: positionAlongWall, y: model.box.depth - model.frame.wallThickness - fanPreviewRearDepthMillimeters, z };
-  }
-  if (wall === "left") {
-    return { x: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, y: positionAlongWall, z };
-  }
-  return { x: model.box.width - model.frame.wallThickness - fanPreviewRearDepthMillimeters, y: positionAlongWall, z };
-}
-
-function moveTempestFanInsideWall(fan: Group, model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): void {
-  const bounds = new Box3().setFromObject(fan);
-  const plane = tempestWallInteriorPlane(model, pose, wall);
-  fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
-}
-
-function tempestWallInteriorPlane(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): PreviewInteriorPlane {
-  const facePoint = tempestWallInteriorFacePoint(model, wall);
-  const sceneFacePoint = tempestCsgPointToScene(facePoint, pose);
-  const insideDirection = tempestCsgPointToScene(tempestWallInteriorProbePoint(model, wall), pose).sub(sceneFacePoint);
-  const axis = dominantVectorAxis(insideDirection);
-  const insideSign = vectorAxisValue(insideDirection, axis) >= 0 ? 1 : -1;
-  return {
-    axis,
-    coordinate: vectorAxisValue(sceneFacePoint, axis),
-    insideSign,
-    inset: previewFanWallInset,
-  };
-}
-
-function tempestWallInteriorFacePoint(model: TempestModel, wall: TempestWall): TempestCsgPoint {
-  if (wall === "front") {
-    return { x: 0, y: model.frame.wallThickness, z: 0 };
-  }
-  if (wall === "back") {
-    return { x: 0, y: model.box.depth - model.frame.wallThickness, z: 0 };
-  }
-  if (wall === "left") {
-    return { x: model.frame.wallThickness, y: 0, z: 0 };
-  }
-  return { x: model.box.width - model.frame.wallThickness, y: 0, z: 0 };
-}
-
-function tempestWallInteriorProbePoint(model: TempestModel, wall: TempestWall): TempestCsgPoint {
-  const point = tempestWallInteriorFacePoint(model, wall);
-  if (wall === "front") {
-    return { ...point, y: point.y + 1 };
-  }
-  if (wall === "back") {
-    return { ...point, y: point.y - 1 };
-  }
-  if (wall === "left") {
-    return { ...point, x: point.x + 1 };
-  }
-  return { ...point, x: point.x - 1 };
-}
-
-// The sandwich preview filter media comes from the input arrangement's footprint
-// filter, which a sandwich-topology model always carries.
-function expectSandwichArrangementFilter(arrangement: TempestModel["settings"]["arrangement"]): TempestHorizontalFilterSize {
-  switch (arrangement.type) {
-    case "single-horizontal-top-filter":
-    case "dual-horizontal-sandwich":
-      return arrangement.filter;
-    case "four-side-filter-tower":
-      throw new Error("expectSandwichArrangementFilter: quad arrangement in sandwich preview");
-    default:
-      return assertNever(arrangement);
-  }
-}
-
-const tempestPreviewWalls: readonly TempestWall[] = ["front", "back", "left", "right"];
-
-// #######################################
-// Generated Panel Meshes
-// #######################################
-
-function createPreviewEdges(geometry: BufferGeometry, material: Material, name?: string): LineSegments {
-  const edges = new LineSegments(new EdgesGeometry(geometry), material);
-  if (name !== undefined) {
-    edges.name = name;
-  }
-  edges.renderOrder = 4;
-  return edges;
-}
-
-function createPreviewContourEdges(geometry: BufferGeometry, material: Material, name?: string): LineSegments {
-  const edges = new LineSegments(createPrintableMeshContourEdgeGeometry(geometry), material);
-  if (name !== undefined) {
-    edges.name = name;
-  }
-  edges.renderOrder = 4;
-  return edges;
-}
-
-export function createPrintableMeshContourEdgeGeometry(source: BufferGeometry): BufferGeometry {
-  source.computeBoundingBox();
-  const bounds = source.boundingBox;
-  if (bounds === null || bounds.isEmpty()) {
-    return new BufferGeometry();
-  }
-
-  const { min, max } = bounds;
-  const corners = [
-    new Vector3(min.x, min.y, min.z),
-    new Vector3(max.x, min.y, min.z),
-    new Vector3(max.x, max.y, min.z),
-    new Vector3(min.x, max.y, min.z),
-    new Vector3(min.x, min.y, max.z),
-    new Vector3(max.x, min.y, max.z),
-    new Vector3(max.x, max.y, max.z),
-    new Vector3(min.x, max.y, max.z),
-  ] as const;
-  const edges = [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 0],
-    [4, 5],
-    [5, 6],
-    [6, 7],
-    [7, 4],
-    [0, 4],
-    [1, 5],
-    [2, 6],
-    [3, 7],
-  ] as const;
-  const positions: number[] = [];
-  for (const [start, end] of edges) {
-    positions.push(corners[start].x, corners[start].y, corners[start].z);
-    positions.push(corners[end].x, corners[end].y, corners[end].z);
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  return geometry;
-}
-
-function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: number): number {
-  const [rx, ry, rz] = part.rotation;
-  const localPositiveNormal = new Vector3(0, 0, 1).applyEuler(new Euler(rx, ry, rz));
-  const assembledPosition = new Vector3(part.position[0], part.position[1], part.position[2]);
-  const localPositiveNormalPointsOutward = localPositiveNormal.dot(assembledPosition) > 0;
-  const panelHalfThickness = (materialThickness * sceneScale) / 2;
-  return localPositiveNormalPointsOutward
-    ? -(panelHalfThickness + fanPreviewRearDepth)
-    : panelHalfThickness + fanPreviewFrontDepth;
-}
-
-function createPanelGroup(
-  part: AssemblyPanelPart,
-  materialThickness: number,
-  showFans: boolean,
-  fanAppearance: FanAppearance,
-  exploded: boolean,
-  material: Material,
-  edgeMaterial: Material,
-  cutMarkMaterial: Material,
-  screwMarkMaterial: Material,
-  printSeams: readonly PanelPrintSeam[],
-  printSeamMaterial: Material,
-): Group {
-  const panel = part.panel;
-  const group = new Group();
-  const geometry = createPanelGeometry(panel, materialThickness);
-  const mesh = new Mesh(geometry, material);
-  mesh.name = panel.id;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
-
-  const edges = createPreviewEdges(geometry, edgeMaterial);
-  group.add(edges);
-
-  group.add(createPanelCutMarkGroup(panel, materialThickness, cutMarkMaterial, screwMarkMaterial));
-  if (printSeams.length > 0) {
-    group.add(createPanelPrintSeamGroup(panel, materialThickness, printSeams, printSeamMaterial));
-  }
-
-  if (showFans) {
-    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
-    for (const cut of panel.cuts) {
-      if (cut.type === "circle" && cut.role === "fan") {
-        group.add(
-          createFan({
-            axis: "z",
-            position: new Vector3(
-              (cut.cx - panel.assemblyCenter.x) * sceneScale,
-              (cut.cy - panel.assemblyCenter.y) * sceneScale,
-              fanCenterZ,
-            ),
-            radius: cut.radius * sceneScale,
-            appearance: fanAppearance,
-          }),
-        );
-      }
-    }
-  }
-
-  const [rx, ry, rz] = part.rotation;
-  group.position.copy(toScenePosition(part.position, part.explodeDirection, exploded));
-  group.rotation.set(rx, ry, rz);
-
-  return group;
-}
-
-function createPanelPrintSeams(plan: PrintableSheetPlan | null): Map<string, readonly PanelPrintSeam[]> {
-  const seamMap = new Map<string, PanelPrintSeam[]>();
-  if (plan === null) {
-    return seamMap;
-  }
-
-  const seen = new Set<string>();
-  for (const sheet of plan.sheets) {
-    for (const placement of sheet.placements) {
-      const source = placement.part.sourceTile;
-      if (source === undefined) {
-        continue;
-      }
-      for (const seam of seamsForTile(source)) {
-        const key = `${source.panelId}:${seam.orientation}:${seam.offset.toFixed(4)}:${seam.start.toFixed(4)}:${seam.end.toFixed(4)}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        const panelSeams = seamMap.get(source.panelId) ?? [];
-        panelSeams.push(seam);
-        seamMap.set(source.panelId, panelSeams);
-      }
-    }
-  }
-  return seamMap;
-}
-
-function seamsForTile(tile: PrintableTileSource): readonly PanelPrintSeam[] {
-  const seams: PanelPrintSeam[] = [];
-  if (tile.columnIndex < tile.columnCount - 1) {
-    seams.push({
-      orientation: "vertical",
-      offset: tile.x1,
-      start: tile.y0,
-      end: tile.y1,
-    });
-  }
-  if (tile.rowIndex < tile.rowCount - 1) {
-    seams.push({
-      orientation: "horizontal",
-      offset: tile.y1,
-      start: tile.x0,
-      end: tile.x1,
-    });
-  }
-  return seams;
-}
-
-function createPanelPrintSeamGroup(
-  panel: CutPanel,
-  materialThickness: number,
-  printSeams: readonly PanelPrintSeam[],
-  material: Material,
-): LineSegments {
-  const positions: number[] = [];
-  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelPrintSeamOverlayLift;
-
-  for (const seam of printSeams) {
-    if (seam.orientation === "vertical") {
-      positions.push(
-        (seam.offset - panel.assemblyCenter.x) * sceneScale,
-        (seam.start - panel.assemblyCenter.y) * sceneScale,
-        z,
-        (seam.offset - panel.assemblyCenter.x) * sceneScale,
-        (seam.end - panel.assemblyCenter.y) * sceneScale,
-        z,
-      );
-    } else {
-      positions.push(
-        (seam.start - panel.assemblyCenter.x) * sceneScale,
-        (seam.offset - panel.assemblyCenter.y) * sceneScale,
-        z,
-        (seam.end - panel.assemblyCenter.x) * sceneScale,
-        (seam.offset - panel.assemblyCenter.y) * sceneScale,
-        z,
-      );
-    }
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  return new LineSegments(geometry, material);
-}
-
-function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
-  const shape = new Shape();
-  panel.outline.forEach((point, index) => {
-    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
-    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
-    if (index === 0) {
-      shape.moveTo(x, y);
-    } else {
-      shape.lineTo(x, y);
-    }
-  });
-  shape.closePath();
-
-  for (const cut of panel.cuts) {
-    const hole = createHolePath(cut, panel);
-    if (hole !== null) {
-      shape.holes.push(hole);
-    }
-  }
-
-  const depth = Math.max(materialThickness * sceneScale, 0.012);
-  const geometry = new ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: false,
-    curveSegments: 24,
-    steps: 1,
-  });
-  geometry.translate(0, 0, -depth / 2);
-  return geometry;
-}
-
-function createPanelCutMarkGroup(
-  panel: CutPanel,
-  materialThickness: number,
-  cutMarkMaterial: Material,
-  screwMarkMaterial: Material,
-): Group {
-  const group = new Group();
-  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelCutOverlayLift;
-
-  for (const cut of panel.cuts) {
-    if (cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
-      const mark = new Mesh(createRectFaceGeometry(cut, panel), cutMarkMaterial);
-      mark.position.z = z;
-      group.add(mark);
-    } else if (cut.type === "circle" && cut.role === "screw") {
-      const mark = new Mesh(new CircleGeometry(cut.radius * sceneScale, 20), screwMarkMaterial);
-      mark.position.set((cut.cx - panel.assemblyCenter.x) * sceneScale, (cut.cy - panel.assemblyCenter.y) * sceneScale, z);
-      group.add(mark);
-    }
-  }
-
-  return group;
-}
-
-function createRectFaceGeometry(cut: RectCut, panel: CutPanel): ShapeGeometry {
-  const left = (cut.x - panel.assemblyCenter.x) * sceneScale;
-  const right = (cut.x + cut.width - panel.assemblyCenter.x) * sceneScale;
-  const top = (cut.y - panel.assemblyCenter.y) * sceneScale;
-  const bottom = (cut.y + cut.height - panel.assemblyCenter.y) * sceneScale;
-  const shape = new Shape();
-  shape.moveTo(left, top);
-  shape.lineTo(left, bottom);
-  shape.lineTo(right, bottom);
-  shape.lineTo(right, top);
-  shape.closePath();
-  return new ShapeGeometry(shape);
-}
-
-function createHolePath(cut: CutFeature, panel: CutPanel): Path | null {
-  if (cut.type === "circle") {
-    const path = new Path();
-    path.absellipse(
-      (cut.cx - panel.assemblyCenter.x) * sceneScale,
-      (cut.cy - panel.assemblyCenter.y) * sceneScale,
-      cut.radius * sceneScale,
-      cut.radius * sceneScale,
-      0,
-      Math.PI * 2,
-      true,
-    );
-    return path;
-  }
-
-  return createRectHolePath(cut, panel);
-}
-
-function createRectHolePath(cut: RectCut, panel: CutPanel): Path | null {
-  if (cut.width <= 0 || cut.height <= 0) {
-    return null;
-  }
-
-  const left = (cut.x - panel.assemblyCenter.x) * sceneScale;
-  const right = (cut.x + cut.width - panel.assemblyCenter.x) * sceneScale;
-  const top = (cut.y - panel.assemblyCenter.y) * sceneScale;
-  const bottom = (cut.y + cut.height - panel.assemblyCenter.y) * sceneScale;
-  const radius = Math.min(cut.radius * sceneScale, Math.abs(right - left) / 2, Math.abs(bottom - top) / 2);
-  const path = new Path();
-
-  if (radius <= 0) {
-    path.moveTo(left, top);
-    path.lineTo(left, bottom);
-    path.lineTo(right, bottom);
-    path.lineTo(right, top);
-    path.closePath();
-    return path;
-  }
-
-  path.moveTo(left + radius, top);
-  path.lineTo(right - radius, top);
-  path.quadraticCurveTo(right, top, right, top + radius);
-  path.lineTo(right, bottom - radius);
-  path.quadraticCurveTo(right, bottom, right - radius, bottom);
-  path.lineTo(left + radius, bottom);
-  path.quadraticCurveTo(left, bottom, left, bottom - radius);
-  path.lineTo(left, top + radius);
-  path.quadraticCurveTo(left, top, left + radius, top);
-  path.closePath();
-  return path;
-}
-
-// #######################################
 // Assembly Cues and Dimensions
 // #######################################
 
@@ -2205,41 +1638,6 @@ function createSeamGroup(seams: readonly AssemblyLineCue[], material: Material):
     line.name = seam.id;
     group.add(line);
   }
-  return group;
-}
-
-function createPrintableMeshGeometry(mesh: PrintableMesh): BufferGeometry {
-  // Grills and rounded corners read smooth while box edges stay crisp; the flat
-  // preset keeps averaged normals (its material's flatShading ignores them anyway).
-  const shading: PrintableMeshShading =
-    activeAppearance().normals === "creased"
-      ? { type: "creased", creaseAngleRadians: CREASE_ANGLE_RADIANS }
-      : { type: "averaged" };
-  return printableMeshToBufferGeometry(mesh, { scale: sceneScale, offset: [0, 0, 0] }, shading);
-}
-
-function createPrintableMeshPreviewGroup(
-  mesh: PrintableMesh,
-  material: Material,
-  edgeMaterial: Material,
-  name: string,
-  showPreviewEdges: boolean,
-): Group {
-  const geometry = createPrintableMeshGeometry(mesh);
-  const group = new Group();
-  group.name = `${name}-group`;
-
-  const body = new Mesh(geometry, material);
-  body.name = name;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  group.add(body);
-
-  if (showPreviewEdges) {
-    const edges = createPreviewContourEdges(geometry, edgeMaterial, `${name}-edges`);
-    group.add(edges);
-  }
-
   return group;
 }
 
