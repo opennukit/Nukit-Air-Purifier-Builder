@@ -1,13 +1,12 @@
 import {
-  booleans,
+  type Geom2,
   type Geom3,
   manifoldModeling,
   meshData,
   POSITION_PROP_COUNT,
-  primitives,
-  transforms,
 } from "@/fabrication/printing/modeling/manifoldOps";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
+import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geometry/context";
 import {
   createTempestModel,
   defaultTempestSettings,
@@ -25,7 +24,12 @@ import {
   type PrintablePart,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import { buildTempestGeometry } from "@/fabrication/printing/designs/tempest/geometry";
+import {
+  buildTempestGeometry,
+  type ChunkBounds,
+  clipPrintChunk,
+  posePrintableAssembly,
+} from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -53,7 +57,6 @@ type ChunkAddress = {
   readonly z: number;
 };
 
-const epsilon = 0.05;
 // One fan cutout is five CSG features: the opening plus its four corner screw holes.
 const fanOpeningAndScrewFeatureCount = 5;
 
@@ -70,13 +73,17 @@ export function createTempestPrintableKit(
   const pose = createTempestPrintablePose(model);
   const chunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
   // Every Manifold value the build allocates is freed when this arena exits;
-  // the returned parts carry only extracted plain-data meshes.
+  // the returned parts carry only extracted plain-data meshes. The posing and
+  // chunk-clipping run through the same ModelingApi seam as the parametric shape
+  // (geometry/chunking.ts); only mesh extraction below is Manifold-bound.
   const parts = withGeometryArena(() => {
-    const assembly = applyTempestPrintablePose(
-      createFinalAssemblyGeometry(model, sourceChunkGridForPose(pose, chunkGrid)),
+    const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
+    const assembly = posePrintableAssembly(
+      ctx,
       pose,
+      createFinalAssemblyGeometry(model, sourceChunkGridForPose(pose, chunkGrid)),
     );
-    return createChunkParts(model, chunkGrid, assembly);
+    return createChunkParts(ctx, model, chunkGrid, assembly);
   });
   const featureCount = estimateFeatureCount(model);
 
@@ -132,13 +139,18 @@ function settingsForPresetBed(settings: TempestSettings, presetId: PrintVolumePr
 // Chunk Parts
 // #######################################
 
-function createChunkParts(model: TempestModel, chunkGrid: TempestChunkGrid, assembly: Geom3): PrintablePart[] {
+function createChunkParts(
+  ctx: GeometryContext<Geom3, Geom2>,
+  model: TempestModel,
+  chunkGrid: TempestChunkGrid,
+  assembly: Geom3,
+): PrintablePart[] {
   const parts: PrintablePart[] = [];
   const featureCount = estimateFeatureCount(model);
   for (let z = 0; z < chunkGrid.countZ; z += 1) {
     for (let y = 0; y < chunkGrid.countY; y += 1) {
       for (let x = 0; x < chunkGrid.countX; x += 1) {
-        const part = createChunkPart(chunkGrid, assembly, { x, y, z }, featureCount);
+        const part = createChunkPart(ctx, chunkGrid, assembly, { x, y, z }, featureCount);
         if (part.mesh.vertices.length > 0) {
           parts.push(part);
         }
@@ -149,46 +161,42 @@ function createChunkParts(model: TempestModel, chunkGrid: TempestChunkGrid, asse
 }
 
 function createChunkPart(
+  ctx: GeometryContext<Geom3, Geom2>,
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
   address: ChunkAddress,
   featureCount: number,
 ): PrintablePart {
-  const origin = {
-    x: chunkGrid.boundariesX[address.x],
-    y: chunkGrid.boundariesY[address.y],
-    z: chunkGrid.boundariesZ[address.z],
-  };
-  const size = {
-    x: chunkGrid.boundariesX[address.x + 1] - origin.x,
-    y: chunkGrid.boundariesY[address.y + 1] - origin.y,
-    z: chunkGrid.boundariesZ[address.z + 1] - origin.z,
-  };
-  const chunkBox = cuboidFromMinSize(
-    origin.x - epsilon,
-    origin.y - epsilon,
-    origin.z - epsilon,
-    size.x + 2 * epsilon,
-    size.y + 2 * epsilon,
-    size.z + 2 * epsilon,
-  );
-  const roughChunkGeometry = transforms.translate(
-    [-origin.x, -origin.y, -origin.z],
-    booleans.intersect(assembly, chunkBox),
-  );
-  const exactChunkBox = cuboidFromMinSize(0, 0, 0, size.x, size.y, size.z);
-  const chunkGeometry = booleans.intersect(roughChunkGeometry, exactChunkBox);
+  const bounds = chunkBoundsAt(chunkGrid, address);
+  const [width, depth, height] = bounds.size;
   return {
     id: `tempest-chunk-${address.x}-${address.y}-${address.z}`,
     name: `Tempest chunk ${address.x},${address.y},${address.z}`,
     kind: "tempest-print-chunk",
     sourcePanelId: "tempest-parametric-csg",
-    width: roundMillimeters(size.x),
-    depth: roundMillimeters(size.y),
-    height: roundMillimeters(size.z),
+    width: roundMillimeters(width),
+    depth: roundMillimeters(depth),
+    height: roundMillimeters(height),
     cutFeatureCount: featureCount,
     printCriticalCutFeatureCount: featureCount,
-    mesh: manifoldGeometryToPrintableMesh(chunkGeometry),
+    mesh: manifoldGeometryToPrintableMesh(clipPrintChunk(ctx, assembly, bounds)),
+  };
+}
+
+// The chunk's min corner and true extent, read straight off the grid boundaries
+// for the given address. ChunkBounds is the kernel-agnostic shape clipPrintChunk
+// consumes, so the cutting math lives behind the seam, not here.
+function chunkBoundsAt(chunkGrid: TempestChunkGrid, address: ChunkAddress): ChunkBounds {
+  const originX = chunkGrid.boundariesX[address.x];
+  const originY = chunkGrid.boundariesY[address.y];
+  const originZ = chunkGrid.boundariesZ[address.z];
+  return {
+    origin: [originX, originY, originZ],
+    size: [
+      chunkGrid.boundariesX[address.x + 1] - originX,
+      chunkGrid.boundariesY[address.y + 1] - originY,
+      chunkGrid.boundariesZ[address.z + 1] - originZ,
+    ],
   };
 }
 
@@ -198,16 +206,6 @@ function createChunkPart(
 
 export function createTempestPrintablePose(model: TempestModel): TempestPrintablePose {
   return model.printablePose;
-}
-
-function applyTempestPrintablePose(geometry: Geom3, pose: TempestPrintablePose): Geom3 {
-  if (pose.type === "source") {
-    return geometry;
-  }
-  return transforms.translate(
-    [0, pose.envelope.depth, 0],
-    transforms.rotateX(Math.PI / 2, geometry),
-  );
 }
 
 // #######################################
@@ -293,13 +291,6 @@ function estimateFeatureCount(model: TempestModel): number {
 // #######################################
 // Primitive Helpers
 // #######################################
-
-function cuboidFromMinSize(x: number, y: number, z: number, width: number, depth: number, height: number): Geom3 {
-  return primitives.cuboid({
-    center: [x + width / 2, y + depth / 2, z + height / 2],
-    size: [Math.max(0.001, width), Math.max(0.001, depth), Math.max(0.001, height)],
-  });
-}
 
 function roundVertex(vertex: MeshVertex): MeshVertex {
   return {
