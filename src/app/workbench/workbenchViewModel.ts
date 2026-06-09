@@ -1,5 +1,13 @@
 import {
   applyPrintDesignPreset,
+  normalizePurifierDraft,
+  normalizeRawSettings,
+  printDesignIdForPurifierDraft,
+  serializePurifierDraft,
+  type PurifierDraft,
+  type RawPurifierSettings,
+} from "@/domain/purifier/airPurifier";
+import {
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
@@ -7,18 +15,12 @@ import {
   isStaticReferencePrintDesignPreset,
   isPublicThreeDimensionalPrintDesignId,
   isTempestPrintDesignPreset,
-  normalizePurifierDraft,
-  normalizeRawSettings,
-  printDesignIdForPurifierDraft,
-  serializePurifierDraft,
   type DonutFilterAdapterPrintDesignPreset,
   type LaserDerivedPrintDesignPreset,
-  type PurifierDraft,
   type PrintDesignPreset,
-  type RawPurifierSettings,
   type StaticReferencePrintDesignPreset,
   type TempestPrintDesignPreset,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/designPresets";
 import { staticPrintReferenceHasPlatePreview, type StaticPrintReference } from "@/resources/static-print-references/references";
 import {
   fabricationMethodForWorkbenchState,

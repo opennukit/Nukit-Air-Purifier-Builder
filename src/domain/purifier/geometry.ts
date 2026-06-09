@@ -1,4 +1,5 @@
-import type { FilterCount, PurifierSettings } from "@/domain/purifier/airPurifier";
+import type { PurifierSettings } from "@/domain/purifier/airPurifier";
+import type { FilterCount } from "@/domain/purifier/designPresets";
 import { filterSelectionDimensions, type FilterDimensions } from "@/domain/purifier/filter";
 
 export type FilterFrameFace = "inner" | "outer";

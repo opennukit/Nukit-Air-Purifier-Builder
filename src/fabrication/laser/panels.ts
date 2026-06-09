@@ -1,4 +1,5 @@
-import type { FilterCount, PurifierSettings } from "@/domain/purifier/airPurifier";
+import type { PurifierSettings } from "@/domain/purifier/airPurifier";
+import type { FilterCount } from "@/domain/purifier/designPresets";
 import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fanProducts";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";

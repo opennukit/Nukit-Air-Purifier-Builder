@@ -1,11 +1,11 @@
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
+import { findPreviewMaterialColorPreset } from "@/domain/purifier/airPurifier";
 import {
-  findPreviewMaterialColorPreset,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/designPresets";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   createPrintableKit,

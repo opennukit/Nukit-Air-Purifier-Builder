@@ -1,5 +1,5 @@
 import { Box3, BufferGeometry, Vector3 } from "three";
-import { staticPrintReferenceForPreset } from "@/domain/purifier/airPurifier";
+import { staticPrintReferenceForPreset } from "@/domain/purifier/designPresets";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type {
   LoadedStaticPrintAsset,

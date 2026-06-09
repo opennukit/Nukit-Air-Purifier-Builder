@@ -38,13 +38,13 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { findPreviewMaterialColorPreset } from "@/domain/purifier/airPurifier";
 import {
-  findPreviewMaterialColorPreset,
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/designPresets";
 import type { FanAppearance } from "@/domain/purifier/fanProducts";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";

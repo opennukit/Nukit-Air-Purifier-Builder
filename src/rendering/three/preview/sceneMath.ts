@@ -1,10 +1,10 @@
 import { Box3, Group, Vector3 } from "three";
+import type { CameraPreset } from "@/domain/purifier/airPurifier";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
   staticPrintReferenceForPreset,
-  type CameraPreset,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/designPresets";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { staticPrintReferenceHasAssembledPreview } from "@/resources/static-print-references/references";

@@ -8,15 +8,17 @@ import {
   decodeSettings,
   defaultSettings,
   encodeSettings,
+  normalizeSettings,
+} from "@/domain/purifier/airPurifier";
+import {
   donutFilterPresets,
   findDonutFilterPreset,
   isStaticReferencePrintDesignId,
-  normalizeSettings,
   printDesignPresets,
   publicPrintDesignPresets,
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
-} from "@/domain/purifier/airPurifier";
+} from "@/domain/purifier/designPresets";
 import { customFanProductPresetId } from "@/domain/purifier/fanProducts";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";

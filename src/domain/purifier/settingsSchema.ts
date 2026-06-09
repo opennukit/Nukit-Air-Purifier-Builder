@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { FilterCount } from "@/domain/purifier/airPurifier";
+import type { FilterCount } from "@/domain/purifier/designPresets";
 
 // #######################################
 // URL Param Field Parsing
