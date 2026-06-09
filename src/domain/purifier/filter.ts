@@ -39,7 +39,6 @@ export type FilterPreset = {
   id: FilterPresetId;
   label: string;
   detail: string;
-  examples: readonly string[];
   nominalSize: string;
   source: string;
   dimensions: FilterDimensions;
@@ -56,7 +55,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-20x20x2",
     label: "20x20x2 MERV 13",
     detail: "20x20x2 MERV 13",
-    examples: ["Nukit", "Tempest Pro"],
     nominalSize: "20 x 20 x 2 in",
     source: "Nukit / standard HVAC actual size",
     dimensions: { width: 498, depth: 496, thickness: 46.77 },
@@ -65,7 +63,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-20x25x1",
     label: "20x25x1 MERV 13",
     detail: "20x25x1 MERV 13",
-    examples: ["Luggable XL Ultra"],
     nominalSize: "20 x 25 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 622.3, depth: 495.3, thickness: 19.1 },
@@ -74,7 +71,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-16x16x1",
     label: "16x16x1 MERV 13",
     detail: "16x16x1 MERV 13",
-    examples: ["Modular Corsi-Rosenthal box"],
     nominalSize: "16 x 16 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 393.7, depth: 393.7, thickness: 19.1 },
@@ -83,7 +79,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-14x20x1",
     label: "14x20x1 MERV 13",
     detail: "14x20x1 MERV 13",
-    examples: ["Static CR 14x20 reference"],
     nominalSize: "14 x 20 x 1 in",
     source: "Standard HVAC actual size / Filtrete 14x20x1",
     dimensions: { width: 495.3, depth: 342.9, thickness: 19.1 },
@@ -92,7 +87,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-16x20x1",
     label: "16x20x1 MERV 13",
     detail: "16x20x1 MERV 13",
-    examples: ["Corsi-Rosenthal printed box"],
     nominalSize: "16 x 20 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 495.3, depth: 393.7, thickness: 19.1 },
@@ -101,7 +95,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-16x25x1",
     label: "16x25x1 MERV 13",
     detail: "16x25x1 MERV 13",
-    examples: ["Luggable", "Luggable Ultra"],
     nominalSize: "16 x 25 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 622.3, depth: 393.7, thickness: 19.1 },
@@ -110,7 +103,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "merv13-20x20x1",
     label: "20x20x1 MERV 13",
     detail: "20x20x1 MERV 13",
-    examples: ["Common square HVAC filter"],
     nominalSize: "20 x 20 x 1 in",
     source: "Standard HVAC actual size",
     dimensions: { width: 495.3, depth: 495.3, thickness: 19.1 },
@@ -119,7 +111,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "ikea-fornuftig",
     label: "IKEA FORNUFTIG",
     detail: "IKEA FORNUFTIG",
-    examples: ["FÖRNUFTIG"],
     nominalSize: "15.25 x 9.75 x 0.75 in",
     source: "IKEA published replacement filter size",
     dimensions: { width: 387.4, depth: 247.7, thickness: 19.1 },
@@ -128,7 +119,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "ikea-starkvind",
     label: "IKEA STARKVIND",
     detail: "IKEA STARKVIND",
-    examples: ["STARKVIND"],
     nominalSize: "14.5 x 11.5 x 1.5 in",
     source: "IKEA published replacement filter size",
     dimensions: { width: 368.3, depth: 292.1, thickness: 38.1 },
@@ -137,7 +127,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "ikea-uppatvind",
     label: "IKEA UPPATVIND",
     detail: "IKEA UPPATVIND",
-    examples: ["UPPÅTVIND"],
     nominalSize: "9.875 x 7.875 x 1 in",
     source: "IKEA published replacement filter size",
     dimensions: { width: 250.8, depth: 200, thickness: 25.4 },
@@ -146,7 +135,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "air-fanta-compatible",
     label: "Air Fanta compatible",
     detail: "Air Fanta compatible replacement filter",
-    examples: ["Nukit Tempest 4 side filters"],
     nominalSize: "29 x 29 x 2.5 cm",
     source: "Supplied Air Fanta compatible filter pack dimensions",
     dimensions: { width: 290, depth: 290, thickness: 25 },
@@ -155,7 +143,6 @@ export const filterPresets: readonly FilterPreset[] = [
     id: "custom",
     label: "Custom measured filter",
     detail: "Enter exact dimensions",
-    examples: ["Custom build"],
     nominalSize: "Measured",
     source: "User supplied dimensions",
     dimensions: { width: 498, depth: 496, thickness: 46.77 },
