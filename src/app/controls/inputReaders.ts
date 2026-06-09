@@ -4,23 +4,11 @@
 
 import {
   defaultThreeDimensionalPrintDesignId,
-  findDonutFilterPreset,
   publicThreeDimensionalPrintDesignPresets,
-  type DonutFilterPresetId,
   type PrintDesignId,
 } from "@/domain/purifier/designPresets";
 import { automaticFanCount, fanProductPresets, type FanProductPresetId } from "@/domain/purifier/fanProducts";
-import { filterPresets, type FilterPresetId } from "@/domain/purifier/filter";
 import { defaultSettings } from "@/domain/purifier/settingsModel";
-
-export function readFilterPresetControlValue(event: Event): FilterPresetId {
-  const preset = filterPresets.find((entry) => entry.id === requireSelect(event, "readFilterPresetControlValue").value);
-  return preset?.id ?? defaultSettings.filterPreset;
-}
-
-export function readDonutFilterPresetControlValue(event: Event): DonutFilterPresetId {
-  return findDonutFilterPreset(requireSelect(event, "readDonutFilterPresetControlValue").value).id;
-}
 
 export function readFanProductPresetControlValue(event: Event): FanProductPresetId {
   const preset = fanProductPresets.find((entry) => entry.id === requireSelect(event, "readFanProductPresetControlValue").value);

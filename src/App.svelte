@@ -7,9 +7,7 @@
   } from "@/domain/purifier/airPurifier";
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
-    applyDonutFilterPreset,
     applyFanProductPreset,
-    applyFilterPreset,
     applyTempestArrangementDefaults,
     previewMaterialColorPresets,
     type PreviewMaterialColorId,
@@ -19,7 +17,6 @@
   import {
     customDonutFilterPresetId,
     defaultThreeDimensionalPrintDesignId,
-    donutFilterPresets,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
     isTempestPrintDesignId,
@@ -33,7 +30,7 @@
     fixedFanCountOptions,
     type PresetFanProduct,
   } from "@/domain/purifier/fanProducts";
-  import { customFilterPresetId, filterPresets } from "@/domain/purifier/filter";
+  import { customFilterPresetId } from "@/domain/purifier/filter";
   import {
     advancedJointControls,
     donutFilterDimensionControls,
@@ -62,10 +59,8 @@
   } from "@/app/controls/fanSelection";
   import {
     readCheckboxInput,
-    readDonutFilterPresetControlValue,
     readFanCountControlValue,
     readFanProductPresetControlValue,
-    readFilterPresetControlValue,
     readNumberInput,
     readPrintDesignControlValue,
     requireSelect,
@@ -80,7 +75,7 @@
   } from "@/app/printSheetPlans";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
-  import { fabricationMethodLabel, filterPresetOptionLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
+  import { fabricationMethodLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
     createPartsListItems,
     createPreviewSummaryItems,
@@ -331,14 +326,6 @@
   // ##############################
   // Form Control Updates
   // ##############################
-
-  function updateFilterPreset(event: Event): void {
-    commitSettings(applyFilterPreset(settings, readFilterPresetControlValue(event)));
-  }
-
-  function updateDonutFilterPreset(event: Event): void {
-    commitSettings(applyDonutFilterPreset(settings, readDonutFilterPresetControlValue(event)));
-  }
 
   function updateFanPreset(event: Event): void {
     commitSettings(applyFanProductPreset(settings, readFanProductPresetControlValue(event)));
@@ -1122,56 +1109,34 @@
                   <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
                 </div>
                 <p class="section-note">
-                  Preset dimensions are best effort. Get your filters and fans first, measure them, then enter the real numbers here.
+                  Get your filter and fans first, measure them, then enter the numbers here.
                 </p>
                 <div data-generated-part-controls>
                   {#if !isDonutControlsActive}
                     <div data-rectangular-filter-controls>
-                      <div class="field-with-info">
-                        <label class="field">
-                          <span>Filter</span>
-                          <select name="filterPreset" onchange={updateFilterPreset}>
-                            {#each filterPresets as preset}
-                              <option value={preset.id} selected={settings.filterPreset === preset.id}>{filterPresetOptionLabel(preset)}</option>
-                            {/each}
-                          </select>
-                        </label>
-                      </div>
-                      {#if settings.filterPreset === customFilterPresetId}
                       <div class="custom-dimensions" data-custom-filter-dimensions>
-                          {#each filterDimensionControls as control}
-                            <label class="field">
-                              <span>{control.label}</span>
-                              <span class="input-shell">
-                                <input
-                                  type="number"
-                                  name={control.name}
-                                  step={control.step}
-                                  inputmode="decimal"
-                                  value={settings[control.name]}
-                                  onchange={(event) => updateFilterDimension(control.name, event)}
-                                />
-                                <small>{control.suffix}</small>
-                              </span>
-                            </label>
-                          {/each}
-                        </div>
-                      {/if}
+                        {#each filterDimensionControls as control}
+                          <label class="field">
+                            <span>{control.label}</span>
+                            <span class="input-shell">
+                              <input
+                                type="number"
+                                name={control.name}
+                                step={control.step}
+                                inputmode="decimal"
+                                value={settings[control.name]}
+                                onchange={(event) => updateFilterDimension(control.name, event)}
+                              />
+                              <small>{control.suffix}</small>
+                            </span>
+                          </label>
+                        {/each}
+                      </div>
                     </div>
                   {/if}
 
                   {#if isDonutControlsActive}
                     <div class="donut-filter-controls" data-donut-filter-controls>
-                      <div class="field-with-info">
-                        <label class="field">
-                          <span>Round filter</span>
-                          <select name="donutFilterPreset" onchange={updateDonutFilterPreset}>
-                            {#each donutFilterPresets as preset}
-                              <option value={preset.id} selected={settings.donutFilterPreset === preset.id}>{preset.label}</option>
-                            {/each}
-                          </select>
-                        </label>
-                      </div>
                       <div class="donut-filter-dimensions">
                         {#each donutFilterDimensionControls as control}
                           <label class="field">
