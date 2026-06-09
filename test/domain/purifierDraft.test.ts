@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   createPurifierDraft,
-  decodePurifierDraftSettings,
   normalizeSettings,
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
+import { decodePurifierDraftSettings } from "@/domain/purifier/settingsCodec";
 import {
   applyPrintDesignPreset,
   applyTempestArrangement,

@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  decodeSettings,
-  encodeSettings,
-  normalizeSettings,
-} from "@/domain/purifier/airPurifier";
+import { normalizeSettings } from "@/domain/purifier/airPurifier";
+import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import {
   applyFanProductPreset,
   applyFilterPreset,

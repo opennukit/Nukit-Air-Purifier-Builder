@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
   import {
-    decodePurifierDraftSettings,
-    encodeSettings,
-    formatMillimeters,
     normalizePurifierDraft,
     printDesignIdForPurifierDraft,
     serializePurifierDraft,
   } from "@/domain/purifier/airPurifier";
+  import {
+    decodePurifierDraftSettings,
+    encodeSettings,
+    formatMillimeters,
+  } from "@/domain/purifier/settingsCodec";
   import {
     applyDonutFilterPreset,
     applyFanProductPreset,
