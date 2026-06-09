@@ -67,7 +67,7 @@ export const filterPresets: readonly FilterPreset[] = [
     detail: "20x25x1 MERV 13",
     examples: ["Luggable XL Ultra"],
     nominalSize: "20 x 25 x 1 in",
-    source: "CleanAirKits / standard HVAC actual size",
+    source: "Standard HVAC actual size",
     dimensions: { width: 622.3, depth: 495.3, thickness: 19.1 },
   },
   {
@@ -103,7 +103,7 @@ export const filterPresets: readonly FilterPreset[] = [
     detail: "16x25x1 MERV 13",
     examples: ["Luggable", "Luggable Ultra"],
     nominalSize: "16 x 25 x 1 in",
-    source: "CleanAirKits / standard HVAC actual size",
+    source: "Standard HVAC actual size",
     dimensions: { width: 622.3, depth: 393.7, thickness: 19.1 },
   },
   {

@@ -182,7 +182,6 @@ export function createPurchaseListItems(
         category: "Fans",
         label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
         detail: fanProduct.label,
-        url: fanProduct.productUrl,
       },
       {
         category: "Power",
@@ -206,7 +205,6 @@ export function createPurchaseListItems(
       category: "Fans",
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
       detail: fanProduct.label,
-      url: fanProduct.productUrl,
     },
     {
       category: "Power",
@@ -223,7 +221,7 @@ export function createPurchaseListItems(
         category: "Filter",
         label: "Round HEPA filter",
         detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
-        url: preset.productUrl ?? webSearchUrl(`${preset.label} replacement filter`),
+        url: webSearchUrl(`${preset.label} replacement filter`),
       },
       ...baseItems,
       {

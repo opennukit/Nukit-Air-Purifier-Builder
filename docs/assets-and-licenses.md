@@ -13,7 +13,7 @@ The app code is GPL-3.0. Some browser preview assets have their own upstream sou
 
 - `public/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json`
 - Source: Noctua public CAD model page, `https://www.noctua.at/en/3d-cad-models`.
-- Purpose: preview-only visualization for the Noctua NF-A14 fan preset.
+- Purpose: preview-only visualization for the "140 mm — beige/brown" fan preset (Noctua NF-A14 public CAD).
 - The exported 3MF intentionally does not embed this CAD asset.
 
 ## Scale Reference Assets

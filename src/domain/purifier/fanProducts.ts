@@ -70,6 +70,9 @@ export type FanPreviewCadModel = {
   readonly usage: "preview-only";
 };
 
+// Preset ids are persisted in share URLs (settingsCodec round-trips them),
+// so they must stay stable even though the display labels are generic
+// visual descriptors rather than product names.
 export const fanProductPresetIds = [
   "nukit-arctic-p14",
   "arctic-p12-pwm-pst",
@@ -85,12 +88,8 @@ export type PresetFanProductId = Exclude<FanProductPresetId, "custom">;
 export type FanProductPreset = {
   readonly id: FanProductPresetId;
   readonly label: string;
-  readonly detail: string;
   readonly diameter: FanDiameter;
-  readonly source: string;
-  readonly productUrl?: string;
   readonly powerNote: string;
-  readonly buyingNotes: readonly string[];
   readonly appearance: FanAppearance;
 };
 
@@ -105,20 +104,14 @@ export const defaultFanProductPresetId: PresetFanProductId = "nukit-arctic-p14";
 // Fan Product Presets
 // #######################################
 
+// Each preset drives preview appearance only (frame/blade/hub colors, body
+// depth, CAD silhouette); none of them is a product recommendation.
 export const fanProductPresets: readonly FanProductPreset[] = [
   {
     id: "nukit-arctic-p14",
-    label: "ARCTIC P14 PWM PST",
-    detail:
-      "Nukit baseline recommendation: black 140 mm pressure-optimized PWM fan with PST daisy-chain cabling.",
+    label: "140 mm — black, 4-pin PWM",
     diameter: 140,
-    source: "Nukit README / ARCTIC P14 PWM PST",
-    productUrl: "https://www.arctic.de/en/P14-PWM-PST/ACFAN00125A",
-    powerNote: "4-pin PWM PST, 12 V",
-    buyingNotes: [
-      "Good low-cost default",
-      "PST cabling can simplify multi-fan wiring",
-    ],
+    powerNote: "4-pin PWM, 12 V",
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x050807,
@@ -128,17 +121,9 @@ export const fanProductPresets: readonly FanProductPreset[] = [
   },
   {
     id: "arctic-p12-pwm-pst",
-    label: "ARCTIC P12 PWM PST",
-    detail:
-      "120 mm pressure-optimized PWM fan used by several compact printable CR box builds.",
+    label: "120 mm — black, 4-pin PWM",
     diameter: 120,
-    source: "ARCTIC P12 PWM PST",
-    productUrl: "https://www.arctic.de/en/P12-PWM-PST/ACFAN00120A",
-    powerNote: "4-pin PWM PST, 12 V",
-    buyingNotes: [
-      "Good compact printable-box fan",
-      "PST cabling can simplify six-fan wiring",
-    ],
+    powerNote: "4-pin PWM, 12 V",
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x050807,
@@ -148,18 +133,9 @@ export const fanProductPresets: readonly FanProductPreset[] = [
   },
   {
     id: "cleanairkits-mobius-120p",
-    label: "Cooler Master Mobius 120P",
-    detail:
-      "CleanAirKits Luggable Ultra style: high-pressure 120 mm Mobius fan family.",
+    label: "120 mm — high-pressure ring",
     diameter: 120,
-    source: "CleanAirKits Luggables / Cooler Master Mobius 120P",
-    productUrl:
-      "https://www.coolermaster.com/en-global/products/mobius-120p-argb/",
     powerNote: "4-pin PWM, 12 V",
-    buyingNotes: [
-      "Matches the Luggable Ultra fan size",
-      "Black retail or ARGB versions may vary by region",
-    ],
     appearance: {
       frameColor: 0x080d11,
       ringColor: 0x151c22,
@@ -169,17 +145,11 @@ export const fanProductPresets: readonly FanProductPreset[] = [
   },
   {
     id: "noctua-nf-a14",
-    label: "Noctua NF-A14 PWM",
-    detail:
-      "Premium quiet 140 mm option with Noctua's recognizable beige frame and brown blades.",
+    label: "140 mm — beige/brown",
     diameter: 140,
-    source: "Noctua NF-A14 PWM",
-    productUrl: "https://noctua.at/en/nf-a14-pwm",
     powerNote: "4-pin PWM, 12 V",
-    buyingNotes: [
-      "Premium acoustic choice",
-      "Color is intentionally visible in the preview",
-    ],
+    // Preview colors and silhouette come from the bundled NF-A14 public CAD
+    // model; sourceUrl below is asset attribution, not a recommendation.
     appearance: {
       frameColor: 0xd6bd8d,
       ringColor: 0xb79a67,
@@ -196,14 +166,8 @@ export const fanProductPresets: readonly FanProductPreset[] = [
   {
     id: "custom",
     label: "Custom fan",
-    detail: "Use a generic fan size and enter the diameter separately.",
     diameter: 140,
-    source: "User supplied fan",
     powerNote: "Check the fan datasheet",
-    buyingNotes: [
-      "Verify screw spacing before cutting",
-      "Check voltage and current draw",
-    ],
     appearance: {
       frameColor: 0x111817,
       ringColor: 0x060a09,

@@ -11,7 +11,6 @@ import {
 } from "@/domain/purifier/settingsModel";
 import {
   donutFilterPresets,
-  findDonutFilterPreset,
   isStaticReferencePrintDesignId,
   printDesignPresets,
   publicPrintDesignPresets,
@@ -728,7 +727,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
 
     expect(donutFilterPresets.map((preset) => preset.id)).toContain("levoit-core-300");
-    expect(findDonutFilterPreset("levoit-core-300").productUrl ?? "").toContain("core300");
     expect(levoitCore300.donutFilterOuterDiameter).toBe(193);
     expect(levoitCore300.donutFilterLength).toBe(147);
     expect(levoitCore300.donutFilterHoleDiameter).toBe(120);

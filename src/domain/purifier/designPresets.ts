@@ -71,7 +71,6 @@ export type DonutFilterPreset = {
   readonly detail: string;
   readonly source: string;
   readonly sourceUrl?: string;
-  readonly productUrl?: string;
   readonly measurementNote: string;
   readonly settings: DonutFilterSettings;
 };
@@ -232,8 +231,6 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     source: "Levoit Core Mini-RF listing",
     sourceUrl:
       "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
-    productUrl:
-      "https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
@@ -250,7 +247,6 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     detail: "Medium round replacement filter cartridge.",
     source: "Levoit Core 200S-RF listings",
     sourceUrl: "https://device.report/levoit/core-200s-rf",
-    productUrl: "https://levoit.com/products/core-200s-p-replacement-filter",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
@@ -268,8 +264,6 @@ export const donutFilterPresets: readonly DonutFilterPreset[] = [
     source: "Levoit Core 300-RF listings",
     sourceUrl:
       "https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/",
-    productUrl:
-      "https://levoit.com/products/core300-air-purifier-replacement-filter",
     measurementNote:
       "Outer size is from published listings; center hole is a starter value and should be measured.",
     settings: {
