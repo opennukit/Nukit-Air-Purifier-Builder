@@ -32,13 +32,19 @@ import type {
 // Fan Assembly
 // ##############################
 
-export function createFan({ axis, position, radius, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
+export function createFan({ axis, position, radius, facing, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
   const fan = new Group();
   fan.position.copy(position);
+  // The bare fan model faces +y; the rotation maps that onto the requested axis
+  // and direction. "axis-negative" mirrors the mapping so the front face points
+  // the other way along the same axis.
+  const flip = facing === "axis-negative";
   if (axis === "x") {
-    fan.rotation.z = -Math.PI / 2;
+    fan.rotation.z = flip ? Math.PI / 2 : -Math.PI / 2;
   } else if (axis === "z") {
-    fan.rotation.x = Math.PI / 2;
+    fan.rotation.x = flip ? -Math.PI / 2 : Math.PI / 2;
+  } else if (flip) {
+    fan.rotation.z = Math.PI;
   }
 
   if (appearance.previewCadModel?.type === "noctua-nf-a14-public-cad") {

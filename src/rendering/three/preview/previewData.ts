@@ -15,10 +15,16 @@ import type { LoadedStaticPrintAssembly } from "@/rendering/three/staticPrintAss
 
 export type FanAxis = "x" | "y" | "z";
 
+// Which way the fan's front face points along its axis. The procedural fan is
+// depth-symmetric so this never showed; the asymmetric CAD silhouette pokes
+// through the wall when a fan faces the wrong way (e.g. tempest back vs front).
+export type FanFacing = "axis-positive" | "axis-negative";
+
 export type FanPlacement = {
   axis: FanAxis;
   position: Vector3;
   radius: number;
+  facing?: FanFacing;
 };
 
 export type TempestCsgPoint = {

@@ -126,6 +126,7 @@ import {
   tempestHorizontalFilterBoxes,
   tempestPreviewWalls,
   tempestTowerFilterBoxes,
+  tempestWallFanFacing,
   tempestWallInteriorFanCenter,
   tempestWallNormalAxis,
 } from "@/rendering/three/preview/tempestParts";
@@ -1184,6 +1185,7 @@ export class PurifierThreePreview {
         axis: tempestCsgAxisToSceneAxis(tempestWallNormalAxis(layout.wall), pose),
         position: tempestCsgPointToScene(tempestWallInteriorFanCenter(model, layout.wall, position, localVerticalCenter), pose),
         radius: (model.settings.fan.diameter / 2) * sceneScale,
+        facing: tempestWallFanFacing(model, pose, layout.wall),
         appearance: fanAppearance,
       });
       moveTempestFanInsideWall(fan, model, pose, layout.wall);

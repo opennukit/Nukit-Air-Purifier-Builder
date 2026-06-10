@@ -22,6 +22,7 @@ import {
   sceneScale,
   visualFilterMediaDimension,
   type FanAxis,
+  type FanFacing,
   type PreviewInteriorPlane,
   type TempestCsgBox,
   type TempestCsgPoint,
@@ -190,6 +191,13 @@ export function moveTempestFanInsideWall(fan: Group, model: TempestModel, pose: 
   const bounds = new Box3().setFromObject(fan);
   const plane = tempestWallInteriorPlane(model, pose, wall);
   fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+// Every wall fan faces the box interior, so the asymmetric CAD silhouette sits
+// flush behind its wall on all four walls. Derived from the same scene-space
+// interior probe the inset shift uses, so it stays correct under any pose.
+export function tempestWallFanFacing(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): FanFacing {
+  return tempestWallInteriorPlane(model, pose, wall).insideSign >= 0 ? "axis-positive" : "axis-negative";
 }
 
 function tempestWallInteriorPlane(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): PreviewInteriorPlane {
