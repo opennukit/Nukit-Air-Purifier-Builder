@@ -10,8 +10,6 @@ import {
 // Workbench Model
 // #######################################
 
-export type ControlsTab = "design" | "setup" | "advanced";
-
 export type WorkbenchFabrication =
   | {
       readonly method: "laser-svg";
@@ -23,7 +21,6 @@ export type WorkbenchFabrication =
 
 export type WorkbenchState = {
   readonly preview: "enclosure" | "fabrication";
-  readonly controlsTab: ControlsTab;
   readonly fabrication: WorkbenchFabrication;
 };
 
@@ -37,7 +34,6 @@ export function decodeWorkbenchState(params: URLSearchParams): WorkbenchState {
   const method = explicitMethodValue === null ? fabricationMethodFromPreviewMode(previewMode) : readExportFormat(explicitMethodValue);
   return {
     preview: previewMode === "enclosure" ? "enclosure" : "fabrication",
-    controlsTab: readControlsTab(params.get("controlsTab")),
     fabrication: createFabricationState(method, params.get("printVolume")),
   };
 }
@@ -45,7 +41,6 @@ export function decodeWorkbenchState(params: URLSearchParams): WorkbenchState {
 export function encodeWorkbenchState(state: WorkbenchState): URLSearchParams {
   const params = new URLSearchParams();
   params.set("previewMode", previewModeForWorkbenchState(state));
-  params.set("controlsTab", state.controlsTab);
   params.set("fabricationMethod", fabricationMethodForWorkbenchState(state));
   if (state.fabrication.method === "print-3mf") {
     params.set("printVolume", state.fabrication.printVolumePresetId);
@@ -87,13 +82,6 @@ export function withPreviewMode(state: WorkbenchState, previewMode: PreviewMode)
     ...state,
     preview: "fabrication",
     fabrication: createFabricationState(fabricationMethodFromPreviewMode(previewMode), printVolumePresetIdForWorkbenchState(state)),
-  };
-}
-
-export function withControlsTab(state: WorkbenchState, controlsTab: ControlsTab): WorkbenchState {
-  return {
-    ...state,
-    controlsTab,
   };
 }
 
@@ -142,22 +130,6 @@ function readPreviewMode(value: string | null): PreviewMode {
     return value;
   }
   return "enclosure";
-}
-
-export function readControlsTab(value: string | null): ControlsTab {
-  if (value === "design" || value === "setup" || value === "advanced") {
-    return value;
-  }
-  if (value === "parts") {
-    return "design";
-  }
-  if (value === "fit" || value === "cutting") {
-    return "advanced";
-  }
-  if (value === "fabrication" || value === "export") {
-    return "setup";
-  }
-  return "design";
 }
 
 function fabricationMethodFromPreviewMode(previewMode: PreviewMode): ExportFormat {

@@ -736,61 +736,10 @@ Control Pane
 }
 
 /* ##############################
-Tab Rail
-############################## */
-
-.controls-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 2px;
-  margin-bottom: 14px;
-  padding: 0;
-  border-bottom: 1px solid rgb(217 208 191 / 82%);
-  background: transparent;
-}
-
-.controls-tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: 44px;
-  border: 1px solid transparent;
-  padding: 0 12px;
-  background: transparent;
-  color: var(--ink);
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  cursor: pointer;
-}
-
-.controls-tab.is-active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: white;
-}
-
-.controls-tab:focus {
-  outline: 0;
-}
-
-.controls-tab:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--focus-ring);
-}
-
-.tab-panel {
-  min-width: 0;
-}
-
-/* ##############################
 Panel Grids
 ############################## */
 
-.design-controls,
-.setup-controls,
-.advanced-controls {
+.controls-sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
@@ -805,26 +754,23 @@ Panel Grids
   grid-column: 2;
 }
 
-.parts-list-section {
+.print-volume-section,
+.laser-output-section {
+  grid-column: 2;
+}
+
+.joint-tuning-section {
   grid-column: 1 / -1;
 }
 
-.setup-controls {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.advanced-controls {
-  grid-template-columns: minmax(0, 1fr);
+.parts-list-section {
+  grid-column: 1 / -1;
 }
 
 .advanced-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 12px;
-}
-
-.tab-panel[hidden] {
-  display: none;
 }
 
 .control-section {
@@ -1600,10 +1546,6 @@ Desktop Fixed View
     padding: 12px;
   }
 
-  .controls-tabs {
-    margin-bottom: 12px;
-  }
-
   .section-heading {
     margin-bottom: 10px;
   }
@@ -1740,13 +1682,9 @@ Tablet Control Grids
 ############################## */
 
 @media (max-width: 1240px) {
-  .design-controls,
+  .controls-sections,
   .advanced-field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .setup-controls {
-    grid-template-columns: 1fr;
   }
 
   .mobile-action-bar {
@@ -1774,15 +1712,16 @@ Narrow Control Stack
 ############################## */
 
 @media (max-width: 860px) {
-  .design-controls,
-  .setup-controls,
-  .advanced-controls,
+  .controls-sections,
   .advanced-field-grid {
     grid-template-columns: 1fr;
   }
 
   .parts-section,
   .geometry-section,
+  .print-volume-section,
+  .laser-output-section,
+  .joint-tuning-section,
   .parts-list-section {
     grid-column: auto;
     grid-row: auto;

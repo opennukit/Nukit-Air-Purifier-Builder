@@ -85,11 +85,9 @@
   import {
     decodeWorkbenchState,
     encodeWorkbenchState,
-    withControlsTab,
     withFabricationMethod,
     withPreviewMode,
     withPrintVolumePreset,
-    type ControlsTab,
     type WorkbenchState,
   } from "@/app/workbench/workbenchState";
   import {
@@ -153,7 +151,6 @@
   // ##############################
 
   let previewMode: PreviewMode = workbenchView.previewMode;
-  let controlsTab: ControlsTab = workbenchView.controlsTab;
   let fabricationMethod: FabricationMethod = workbenchView.fabricationMethod;
   let printVolumePresetId: PrintVolumePresetId = workbenchView.printVolumePresetId;
   let layout: LayoutResult = createLayout(draft);
@@ -174,17 +171,15 @@
   let customFanSizePinned = false;
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   let isStaticReferenceControlsActive = false;
-  let activeStaticReferenceCanPreviewPlate = false;
   let showCutSheetPreviewMode = false;
   let showPrintSheetsPreviewMode = true;
   let isDonutControlsActive = false;
   let isTempestControlsActive = false;
   let isNukitControlsActive = true;
-  let showSetupControlTab = true;
-  let showAdvancedControlTab = true;
+  let showPrintSetupControls = true;
+  let showAdvancedControls = true;
   let layoutSectionTitleText = "Fan placement";
   let partsSectionTitleText = "Filter and fan";
-  let setupTabText = "Print setup";
   let exportActionText = "Download 3MF";
   let copyTopButtonText = "Copy URL";
   let copyMobileButtonText = "Copy URL";
@@ -198,7 +193,6 @@
   $: settings = serializePurifierDraft(draft);
   $: workbenchView = createWorkbenchViewModel(draft, workbenchState);
   $: previewMode = workbenchView.previewMode;
-  $: controlsTab = workbenchView.controlsTab;
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
@@ -216,18 +210,15 @@
   $: activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
   $: selectedFanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
-  $: activeStaticReferenceCanPreviewPlate =
-    activeDesignContext.type === "static-reference" && activeDesignContext.platePreview.type === "available";
   $: showCutSheetPreviewMode = activeFabricationPreview.type === "cut-sheet";
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
-  $: showSetupControlTab = activeControlPanels.setup.type === "available";
-  $: showAdvancedControlTab = activeControlPanels.advanced.type === "available";
+  $: showPrintSetupControls = fabricationMethod === "print-3mf" && activeControlPanels.setup.type === "available";
+  $: showAdvancedControls = activeControlPanels.advanced.type === "available";
   $: layoutSectionTitleText = activeDesignContext.layoutSectionTitle;
   $: partsSectionTitleText = activeDesignContext.partsSectionTitle;
-  $: setupTabText = workbenchView.setupTabLabel;
   $: exportActionText = workbenchView.exportActionLabel;
   $: copyTopButtonText = transientButtonLabels["copy-top"] ?? "Copy URL";
   $: copyMobileButtonText = transientButtonLabels["copy-mobile"] ?? "Copy URL";
@@ -252,7 +243,6 @@
     settings = serializePurifierDraft(draft);
     workbenchView = createWorkbenchViewModel(draft, workbenchState);
     previewMode = workbenchView.previewMode;
-    controlsTab = workbenchView.controlsTab;
     fabricationMethod = workbenchView.fabricationMethod;
     printVolumePresetId = workbenchView.printVolumePresetId;
     activeDesignContext = workbenchView.design;
@@ -418,10 +408,6 @@
 
   function setPreviewMode(nextMode: PreviewMode): void {
     setWorkbenchState(withPreviewMode(workbenchState, nextMode));
-  }
-
-  function setControlsTab(tab: ControlsTab): void {
-    setWorkbenchState(withControlsTab(workbenchState, tab));
   }
 
   function setPrintVolume(event: Event): void {
@@ -892,51 +878,7 @@
           </div>
         </section>
 
-        <div class="controls-tabs" role="tablist" aria-label="Builder steps">
-          <button
-            class:is-active={controlsTab === "design"}
-            class="controls-tab"
-            id="design-controls-tab"
-            type="button"
-            role="tab"
-            aria-selected={controlsTab === "design"}
-            aria-controls="design-controls-panel"
-            onclick={() => setControlsTab("design")}
-          >
-            Design
-          </button>
-          {#if showSetupControlTab}
-            <button
-              class:is-active={controlsTab === "setup"}
-              class="controls-tab"
-              id="setup-controls-tab"
-              type="button"
-              role="tab"
-              aria-selected={controlsTab === "setup"}
-              aria-controls="setup-controls-panel"
-              onclick={() => setControlsTab("setup")}
-            >
-              {setupTabText}
-            </button>
-          {/if}
-          {#if showAdvancedControlTab}
-            <button
-              class:is-active={controlsTab === "advanced"}
-              class="controls-tab"
-              id="advanced-controls-tab"
-              type="button"
-              role="tab"
-              aria-selected={controlsTab === "advanced"}
-              aria-controls="advanced-controls-panel"
-              onclick={() => setControlsTab("advanced")}
-            >
-              Advanced
-            </button>
-          {/if}
-        </div>
-
-        {#if controlsTab === "design"}
-          <div class="tab-panel design-controls" id="design-controls-panel" role="tabpanel" aria-labelledby="design-controls-tab">
+        <div class="controls-sections">
             {#if fabricationMethod === "print-3mf"}
               <section class="control-section design-model-section" data-print-design-control>
                 <div class="section-heading">
@@ -1274,32 +1216,7 @@
               </section>
             {/if}
 
-            <section class="control-section parts-list-section">
-              <div class="parts-list-card" id="partsList">
-                <div class="parts-list-heading">
-                  <strong>What you need</strong>
-                  <span>{fabricationMethod === "print-3mf" ? "Print and assemble" : "Cut and build"}</span>
-                </div>
-                <ul>
-                  {#each partsItems as item}
-                    <li class="parts-list-row">
-                      <div>
-                        <small>{item.category}</small>
-                        <strong>{item.label}</strong>
-                        <span>{item.detail}</span>
-                      </div>
-                      {#if item.url !== undefined}
-                        <a href={item.url} target="_blank" rel="noreferrer">Open</a>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              </div>
-            </section>
-          </div>
-        {:else if controlsTab === "setup"}
-          <div class="tab-panel setup-controls" id="setup-controls-panel" role="tabpanel" aria-labelledby="setup-controls-tab">
-            {#if fabricationMethod === "print-3mf" && (!isStaticReferenceControlsActive || activeStaticReferenceCanPreviewPlate)}
+            {#if showPrintSetupControls}
               <section class="control-section print-volume-section" data-print-volume-section>
                 <div class="section-heading">
                   <p class="eyebrow">Printer</p>
@@ -1362,35 +1279,57 @@
                 </label>
               </section>
             {/if}
-          </div>
-        {:else if controlsTab === "advanced" && isNukitControlsActive}
-          <div class="tab-panel advanced-controls" id="advanced-controls-panel" role="tabpanel" aria-labelledby="advanced-controls-tab">
-            <section class="control-section joint-tuning-section" data-generated-advanced-controls>
-              <div class="section-heading">
-                <p class="eyebrow">Advanced</p>
-                <h2>Joint tuning</h2>
-              </div>
-              <div class="advanced-field-grid">
-                {#each advancedJointControls as control}
-                  <label class="field">
-                    <span>{control.label}</span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name={control.name}
-                        step={control.step}
-                        inputmode="decimal"
-                        value={settings[control.name]}
-                        onchange={(event) => updateNumberSetting(control.name, event)}
-                      />
-                      <small>{control.suffix}</small>
-                    </span>
-                  </label>
-                {/each}
+
+            {#if showAdvancedControls}
+              <section class="control-section joint-tuning-section" data-generated-advanced-controls>
+                <div class="section-heading">
+                  <p class="eyebrow">Advanced</p>
+                  <h2>Joint tuning</h2>
+                </div>
+                <div class="advanced-field-grid">
+                  {#each advancedJointControls as control}
+                    <label class="field">
+                      <span>{control.label}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name={control.name}
+                          step={control.step}
+                          inputmode="decimal"
+                          value={settings[control.name]}
+                          onchange={(event) => updateNumberSetting(control.name, event)}
+                        />
+                        <small>{control.suffix}</small>
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              </section>
+            {/if}
+
+            <section class="control-section parts-list-section">
+              <div class="parts-list-card" id="partsList">
+                <div class="parts-list-heading">
+                  <strong>What you need</strong>
+                  <span>{fabricationMethod === "print-3mf" ? "Print and assemble" : "Cut and build"}</span>
+                </div>
+                <ul>
+                  {#each partsItems as item}
+                    <li class="parts-list-row">
+                      <div>
+                        <small>{item.category}</small>
+                        <strong>{item.label}</strong>
+                        <span>{item.detail}</span>
+                      </div>
+                      {#if item.url !== undefined}
+                        <a href={item.url} target="_blank" rel="noreferrer">Open</a>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
               </div>
             </section>
-          </div>
-        {/if}
+        </div>
 
         <!-- #######################################
         Guides

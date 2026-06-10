@@ -31,49 +31,20 @@ describe("Workbench state", () => {
 
   test("canonicalizes legacy URL params when encoding", () => {
     const state = decodeWorkbenchState(
-      new URLSearchParams("exportFormat=print-3mf&controlsTab=cutting&printVolume=bed-320"),
+      new URLSearchParams("exportFormat=print-3mf&printVolume=bed-320"),
     );
     const encoded = encodeWorkbenchState(state);
 
     expect(encoded.get("fabricationMethod")).toBe("print-3mf");
-    expect(encoded.get("controlsTab")).toBe("advanced");
     expect(encoded.get("printVolume")).toBe("bed-h2-safe");
     expect(encoded.has("exportFormat")).toBe(false);
   });
 
-  test("keeps design workflow tab stable in shared URLs", () => {
-    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=design"));
-    const encoded = encodeWorkbenchState(state);
-
-    expect(encoded.get("controlsTab")).toBe("design");
-  });
-
-  test("maps removed parts tab to the design step", () => {
-    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=parts"));
-    const encoded = encodeWorkbenchState(state);
-
-    expect(encoded.get("controlsTab")).toBe("design");
-  });
-
-  test("keeps advanced workflow tab stable in shared URLs", () => {
+  test("drops the removed controls tab URL param", () => {
     const state = decodeWorkbenchState(new URLSearchParams("controlsTab=advanced"));
     const encoded = encodeWorkbenchState(state);
 
-    expect(encoded.get("controlsTab")).toBe("advanced");
-  });
-
-  test("maps old build tab to the new design step", () => {
-    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=build"));
-    const encoded = encodeWorkbenchState(state);
-
-    expect(encoded.get("controlsTab")).toBe("design");
-  });
-
-  test("maps removed export tab to print setup", () => {
-    const state = decodeWorkbenchState(new URLSearchParams("controlsTab=export"));
-    const encoded = encodeWorkbenchState(state);
-
-    expect(encoded.get("controlsTab")).toBe("setup");
+    expect(encoded.has("controlsTab")).toBe(false);
   });
 
   test("omits print volume for laser fabrication", () => {
@@ -154,7 +125,7 @@ describe("Workbench state", () => {
   test("models static references without local plates as source-only", () => {
     const settings = applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference");
     const state = decodeWorkbenchState(
-      new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets&controlsTab=setup"),
+      new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets"),
     );
     const viewModel = createWorkbenchViewModel(settings, state);
     const normalizedState = normalizeWorkbenchStateForSettings(state, settings);
@@ -176,6 +147,5 @@ describe("Workbench state", () => {
       reason: "static-reference-without-plate-preview",
     });
     expect(previewModeForWorkbenchState(normalizedState)).toBe("enclosure");
-    expect(normalizedState.controlsTab).toBe("design");
   });
 });
