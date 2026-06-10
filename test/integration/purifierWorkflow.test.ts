@@ -402,7 +402,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("reports export readiness warnings before drawing export", () => {
-    const defaultLayout = createLayout(defaultSettings);
+    const defaultLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
     expect(evaluateBuildDiagnostics(defaultLayout)).toEqual([]);
     expect(summarizeBuildReadiness(defaultLayout).severity).toBe("info");
 
@@ -454,7 +454,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   // ##############################
 
   test("splits printable kits to fit common desktop printer beds", () => {
-    const layout = createLayout(defaultSettings);
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
     const boundedPresetIds = printVolumePresets
       .filter((preset) => preset.bed.type === "bounded")
       .map((preset) => preset.id);
@@ -583,8 +583,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalLayout.summary.fans.type === "tempest" ? horizontalLayout.summary.fans.arrangement : undefined).toBe(
       "dual-horizontal-sandwich",
     );
-    // Feature-aware slicing splits the fan-dense axis into 3, so 2×2×3 = 12.
-    expect(horizontalKit.parts).toHaveLength(12);
+    // Feature-aware slicing splits the wider 20x25x2 box into 16 chunks.
+    expect(horizontalKit.parts).toHaveLength(16);
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
@@ -764,7 +764,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("exports bounded-bed print kits as one multi-plate 3MF package", () => {
-    const layout = createLayout(defaultSettings);
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
     const printExport = createPrintableThreeMfExport(layout, "bed-256");
     const model = parseThreeMfModel(printExport.bytes);
     const modelSettings = parseThreeMfModelSettings(printExport.bytes);

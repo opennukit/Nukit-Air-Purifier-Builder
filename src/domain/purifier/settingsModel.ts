@@ -341,11 +341,12 @@ export type PurifierInput =
 // Defaults
 // #######################################
 
+// Default rectangular filter: 20x25x2 in MERV 13 actual size.
 export const defaultSettings: RawPurifierSettings = {
   printDesign: defaultPrintDesignId,
   filterWidth: 622.3,
   filterDepth: 495.3,
-  filterThickness: 19.1,
+  filterThickness: 46.77,
   rim: 30,
   fanColor: defaultFanColor,
   fanDiameter: 140,

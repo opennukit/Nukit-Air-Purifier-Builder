@@ -169,7 +169,7 @@ describe("Tempest CSG printable kit", () => {
     const exported = createPrintDesignThreeMfExport(layout, "bed-256");
 
     expect(layout.configuration.design.type).toBe("tempest");
-    expect(kit.parts).toHaveLength(12);
+    expect(kit.parts).toHaveLength(16);
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(exported.filename).toBe("nukit-tempest-print-kit.3mf");
     expect(exported.bytes.length).toBeGreaterThan(1000);
