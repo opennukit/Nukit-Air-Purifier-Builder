@@ -45,6 +45,13 @@
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
   import {
+    dimensionInputStep,
+    dimensionUnits,
+    displayValueToMillimeters,
+    millimetersToDisplayValue,
+    type DimensionUnit,
+  } from "@/app/controls/dimensionUnits";
+  import {
     fanSizeChoiceForDiameter,
     recommendedFanDiameterOptions,
     type FanSizeChoice,
@@ -167,6 +174,9 @@
   // UI-only: keeps the "Custom" size segment active while the typed diameter
   // still matches a recommended size; the settings store only the diameter.
   let customFanSizePinned = false;
+  // UI-only display unit for the measured filter dimension inputs; the
+  // settings and share URLs always store millimeters.
+  let dimensionUnit: DimensionUnit = "mm";
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   let isStaticReferenceControlsActive = false;
   let showCutSheetPreviewMode = false;
@@ -337,7 +347,17 @@
   function updateFilterDimension(name: FilterDimensionName, event: Event): void {
     commitSettings({
       ...settings,
-      [name]: readNumberInput(event, settings[name]),
+      [name]: readDimensionInputMillimeters(event, settings[name]),
+    });
+  }
+
+  function updateDonutFilterDimension(
+    name: DonutNumberSettingName,
+    event: Event,
+  ): void {
+    commitSettings({
+      ...settings,
+      [name]: readDimensionInputMillimeters(event, settings[name]),
     });
   }
 
@@ -349,6 +369,16 @@
       ...settings,
       [name]: readNumberInput(event, settings[name]),
     });
+  }
+
+  // Reads a dimension input in the active display unit and converts it back
+  // to the canonical millimeter value; invalid input keeps the stored value.
+  function readDimensionInputMillimeters(event: Event, storedMillimeters: number): number {
+    const enteredDisplayValue = readNumberInput(event, Number.NaN);
+    if (Number.isNaN(enteredDisplayValue)) {
+      return storedMillimeters;
+    }
+    return displayValueToMillimeters(enteredDisplayValue, dimensionUnit);
   }
 
   function updateNumberSetting(name: NumericSettingName, event: Event): void {
@@ -1051,6 +1081,24 @@
                   Get your filter and fans first, measure them, then enter the numbers here.
                 </p>
                 <div data-generated-part-controls>
+                  <fieldset class="segmented-field dimension-unit-field">
+                    <legend>Measurement unit</legend>
+                    <div>
+                      {#each dimensionUnits as unit}
+                        <label>
+                          <input
+                            type="radio"
+                            name="dimensionUnit"
+                            value={unit}
+                            checked={dimensionUnit === unit}
+                            onchange={() => (dimensionUnit = unit)}
+                          />
+                          <span>{unit}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  </fieldset>
+
                   {#if !isDonutControlsActive}
                     <div data-rectangular-filter-controls>
                       <div class="custom-dimensions" data-custom-filter-dimensions>
@@ -1061,12 +1109,12 @@
                               <input
                                 type="number"
                                 name={control.name}
-                                step={control.step}
+                                step={dimensionInputStep(control.step, dimensionUnit)}
                                 inputmode="decimal"
-                                value={settings[control.name]}
+                                value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
                                 onchange={(event) => updateFilterDimension(control.name, event)}
                               />
-                              <small>{control.suffix}</small>
+                              <small>{dimensionUnit}</small>
                             </span>
                           </label>
                         {/each}
@@ -1084,12 +1132,12 @@
                               <input
                                 type="number"
                                 name={control.name}
-                                step={control.step}
+                                step={dimensionInputStep(control.step, dimensionUnit)}
                                 inputmode="decimal"
-                                value={settings[control.name]}
-                                onchange={(event) => updateDonutNumberSetting(control.name, event)}
+                                value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                                onchange={(event) => updateDonutFilterDimension(control.name, event)}
                               />
-                              <small>{control.suffix}</small>
+                              <small>{dimensionUnit}</small>
                             </span>
                           </label>
                         {/each}
