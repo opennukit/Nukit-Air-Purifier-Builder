@@ -3,7 +3,6 @@ import { normalizeSettings } from "@/domain/purifier/airPurifier";
 import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import {
   applyFilterPreset,
-  applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   defaultSettings,
@@ -97,7 +96,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(
       decodeSettings(
-        "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterPreset=custom&filterWidth=290&filterDepth=290&filterThickness=25",
+        "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterWidth=290&filterDepth=290&filterThickness=25",
       ),
     );
 
@@ -168,7 +167,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const invalidPreviewColor = decodeSettings("previewMaterialColor=neon");
     const removedPrintPlateLabels = decodeSettings("showPrintPlateLabels=1");
     const highFanCount = decodeSettings("fansLeft=8");
-    const emptyNumericParams = decodeSettings("filterPreset=custom&filterWidth=&filterDepth=%20&filterThickness=&rim=%20");
+    const emptyNumericParams = decodeSettings("filterWidth=&filterDepth=%20&filterThickness=&rim=%20");
     const smallCustomLayout = createLayout({
       ...defaultSettings,
       filterPreset: customFilterPresetId,
@@ -682,10 +681,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const cappedRim = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=70&donutFilterHoleDiameter=62&donutCapRim=40",
     );
-    const presetWithMeasuredLength = decodeSettings(
+    // donutFilterPreset is not a URL param anymore; an unknown value is inert
+    // and the measured dimensions decide everything.
+    const removedPresetParam = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini&donutFilterLength=180",
     );
-    const preset = decodeSettings("printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini");
     const encoded = encodeSettings(measured);
 
     expect(defaults.printDesign).toBe("donut-hepa-adapter");
@@ -694,18 +694,15 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(defaults.donutFilterLength).toBe(150);
     expect(defaults.donutFilterHoleDiameter).toBe(92);
     expect(defaults.fanDiameter).toBe(120);
-    expect(preset.donutFilterPreset).toBe("levoit-core-mini");
-    expect(preset.donutFilterOuterDiameter).toBe(159);
-    expect(preset.donutFilterLength).toBe(135);
     expect(measured.donutFilterHoleDiameter).toBe(86);
     expect(measured.donutFilterLength).toBe(180);
     expect(measured.donutCapEnabled).toBe(false);
     expect(disabledCapWithRim.donutCapRim).toBe(12);
     expect(cappedRim.donutCapRim).toBe(4);
-    expect(presetWithMeasuredLength.donutFilterPreset).toBe("custom");
-    expect(presetWithMeasuredLength.donutFilterOuterDiameter).toBe(159);
-    expect(presetWithMeasuredLength.donutFilterLength).toBe(180);
-    expect(presetWithMeasuredLength.donutFilterHoleDiameter).toBe(92);
+    expect(removedPresetParam.donutFilterPreset).toBe("custom");
+    expect(removedPresetParam.donutFilterOuterDiameter).toBe(125);
+    expect(removedPresetParam.donutFilterLength).toBe(180);
+    expect(removedPresetParam.donutFilterHoleDiameter).toBe(92);
     expect(
       measuredLayout.configuration.design.type === "donut-filter-adapter"
         ? measuredLayout.configuration.design.filter.cap
@@ -714,20 +711,19 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(donutCapTotalHeight(createDonutFilterModel(measuredLayout))).toBe(0);
     expect(measured.donutFilterPreset).toBe("custom");
     expect(encoded).toContain("donutFilterHoleDiameter=86");
-    expect(encoded).toContain("donutFilterPreset=custom");
+    expect(encoded).not.toContain("donutFilterPreset");
     expect(encoded).toContain("donutCapEnabled=false");
   });
 
-  test("uses explicit round-filter presets and does not clamp large measured cartridges to 320 mm", () => {
-    const levoitCore300 = applyDonutFilterPreset(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"), "levoit-core-300");
+  test("keeps curated round-filter data internal and does not clamp large measured cartridges", () => {
+    const levoitCore300 = donutFilterPresets.find((preset) => preset.id === "levoit-core-300");
     const measuredLarge = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=360&donutFilterLength=440&donutFilterHoleDiameter=128",
     );
 
-    expect(donutFilterPresets.map((preset) => preset.id)).toContain("levoit-core-300");
-    expect(levoitCore300.donutFilterOuterDiameter).toBe(193);
-    expect(levoitCore300.donutFilterLength).toBe(147);
-    expect(levoitCore300.donutFilterHoleDiameter).toBe(120);
+    expect(levoitCore300?.settings.outerDiameter).toBe(193);
+    expect(levoitCore300?.settings.length).toBe(147);
+    expect(levoitCore300?.settings.holeDiameter).toBe(120);
     expect(measuredLarge.donutFilterPreset).toBe("custom");
     expect(measuredLarge.donutFilterOuterDiameter).toBe(360);
     expect(measuredLarge.donutFilterLength).toBe(440);

@@ -455,30 +455,6 @@ export function applyFilterPreset(
   };
 }
 
-export function applyDonutFilterPreset(
-  settings: RawPurifierSettings,
-  presetId: DonutFilterPresetId,
-): RawPurifierSettings {
-  const preset = findDonutFilterPreset(presetId);
-  if (preset.id === customDonutFilterPresetId) {
-    return {
-      ...settings,
-      donutFilterPreset: customDonutFilterPresetId,
-    };
-  }
-
-  return {
-    ...settings,
-    donutFilterPreset: preset.id,
-    donutFilterOuterDiameter: preset.settings.outerDiameter,
-    donutFilterLength: preset.settings.length,
-    donutFilterHoleDiameter: preset.settings.holeDiameter,
-    donutAdapterInsertLength: preset.settings.insertLength,
-    donutCapRim: donutCapRawRim(preset.settings.cap),
-    donutCapEnabled: preset.settings.cap.type === "printed-cap",
-  };
-}
-
 export function applyTempestArrangement(
   settings: RawPurifierSettings,
   arrangement: TempestArrangementPreset,
