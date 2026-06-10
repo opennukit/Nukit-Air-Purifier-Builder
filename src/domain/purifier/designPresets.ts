@@ -4,12 +4,11 @@
 
 import type { Millimeters } from "@/domain/units";
 import type { FilterPresetId } from "@/domain/purifier/filter";
-import {
-  defaultFanProductPresetId,
-  type FanBanks,
-  type FanCountRequest,
-  type FanProductPresetId,
-  type FixedFanCount,
+import type {
+  FanBanks,
+  FanCountRequest,
+  FanDiameter,
+  FixedFanCount,
 } from "@/domain/purifier/fanProducts";
 import {
   staticPrintReferenceIds,
@@ -151,7 +150,7 @@ export type PrintDesignPreset =
 
 export type CommonPrintDesignDefaults = {
   readonly filterPreset: FilterPresetId;
-  readonly fanPreset: FanProductPresetId;
+  readonly fanDiameter: FanDiameter;
 };
 
 export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
@@ -313,7 +312,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       type: "laser-derived-printable-kit",
       defaults: {
         filterPreset: "merv13-20x25x1",
-        fanPreset: defaultFanProductPresetId,
+        fanDiameter: 140,
         filterCount: 2,
         fanBanks: {
           left: { type: "auto" },
@@ -342,7 +341,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       defaults: {
         arrangement: "dual-horizontal-sandwich",
         filterPreset: "merv13-20x20x2",
-        fanPreset: defaultFanProductPresetId,
+        fanDiameter: 140,
         materialThickness: 5,
         screwHoleDiameter: 5,
         rim: 30,
@@ -367,7 +366,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       type: "donut-filter-adapter",
       defaults: {
         filterPreset: "custom",
-        fanPreset: "arctic-p12-pwm-pst",
+        fanDiameter: 120,
         donutFilterPreset: defaultDonutFilterPresetId,
         fanCount: 1,
         filter: {
@@ -403,7 +402,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       reference: staticPrintReferences["static-cr-16x20-140"],
       defaults: {
         filterPreset: "merv13-16x20x1",
-        fanPreset: defaultFanProductPresetId,
+        fanDiameter: 140,
         fanCount: 5,
         filterCount: 1,
         splitFrames: false,
@@ -430,7 +429,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       reference: staticPrintReferences["static-cr-14x20-base"],
       defaults: {
         filterPreset: "merv13-14x20x1",
-        fanPreset: "arctic-p12-pwm-pst",
+        fanDiameter: 120,
         fanCount: 4,
         filterCount: 2,
         splitFrames: false,
@@ -460,7 +459,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       reference: staticPrintReferences["static-modular-20x20-reference"],
       defaults: {
         filterPreset: "merv13-20x20x1",
-        fanPreset: defaultFanProductPresetId,
+        fanDiameter: 140,
         fanCount: 4,
         filterCount: 1,
         splitFrames: false,
@@ -566,10 +565,10 @@ export function defaultFilterPresetForPrintDesign(
   return preset.implementation.defaults.filterPreset;
 }
 
-export function defaultFanPresetForPrintDesign(
+export function defaultFanDiameterForPrintDesign(
   preset: PrintDesignPreset,
-): FanProductPresetId {
-  return preset.implementation.defaults.fanPreset;
+): FanDiameter {
+  return preset.implementation.defaults.fanDiameter;
 }
 
 export function staticReferenceDefaultsForPreset(

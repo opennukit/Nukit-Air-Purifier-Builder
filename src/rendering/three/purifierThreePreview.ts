@@ -45,7 +45,7 @@ import {
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import type { FanAppearance } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, type FanAppearance } from "@/domain/purifier/fanProducts";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import {
@@ -410,7 +410,7 @@ export class PurifierThreePreview {
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
-    const fanAppearance = settings.fan.productSelection.product.appearance;
+    const fanAppearance = fanAppearanceForColor(settings.fan.color);
 
     for (const panel of assembly.panels) {
       const panelGroup = createPanelGroup(
@@ -673,7 +673,7 @@ export class PurifierThreePreview {
           axis: "z",
           position: new Vector3(x, 0, 0),
           radius: fanRadius,
-          appearance: settings.fan.productSelection.product.appearance,
+          appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-side-fan";
         fan.position.z += previewInteriorShiftForBounds(new Box3().setFromObject(fan), bodyNearFace);
@@ -694,7 +694,7 @@ export class PurifierThreePreview {
           axis: "y",
           position,
           radius: fanRadius,
-          appearance: settings.fan.productSelection.product.appearance,
+          appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-top-fan";
         collectFanRotors(fan, this.fanRotors);
@@ -712,7 +712,7 @@ export class PurifierThreePreview {
         axis: "z",
         position,
         radius: fanRadius,
-        appearance: settings.fan.productSelection.product.appearance,
+        appearance: fanAppearanceForColor(settings.fan.color),
       });
       fan.name = "static-reference-installed-fan";
       collectFanRotors(fan, this.fanRotors);
@@ -969,7 +969,7 @@ export class PurifierThreePreview {
   private rebuildDonutFilterModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const model = createDonutFilterModel(layout);
-    const fanAppearance = settings.fan.productSelection.product.appearance;
+    const fanAppearance = fanAppearanceForColor(settings.fan.color);
     const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
     const adapterMaterial = createPrintedPartMaterial({
       color: printedPartColor,
@@ -1092,7 +1092,7 @@ export class PurifierThreePreview {
       );
     }
 
-    this.addTempestPreviewPurchasedParts(tempestModel, pose, settings.fan.productSelection.product.appearance, {
+    this.addTempestPreviewPurchasedParts(tempestModel, pose, fanAppearanceForColor(settings.fan.color), {
       showFilterMedia: settings.preview.enclosure.showFilterMedia,
       showFans: settings.preview.enclosure.showFans,
       showPreviewEdges: settings.preview.enclosure.showPreviewEdges,

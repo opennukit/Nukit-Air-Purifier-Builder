@@ -7,7 +7,6 @@
   } from "@/domain/purifier/airPurifier";
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
-    applyFanProductPreset,
     applyTempestArrangementDefaults,
     previewMaterialColorPresets,
     type PreviewMaterialColorId,
@@ -25,10 +24,10 @@
   } from "@/domain/purifier/designPresets";
   import {
     automaticFanCount,
-    customFanProductPresetId,
-    findFanProductPreset,
+    fanAppearanceForColor,
+    fanColors,
     fixedFanCountOptions,
-    type PresetFanProduct,
+    type FanColor,
   } from "@/domain/purifier/fanProducts";
   import { customFilterPresetId } from "@/domain/purifier/filter";
   import {
@@ -48,19 +47,13 @@
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
   import {
-    defaultFanProductPresetForRecommendedDiameter,
-    defaultRecommendedFanDiameter,
-    fanDiameterSelectionForSettings,
-    fanProductOptionsForSelection,
-    isRecommendedFanProductPreset,
+    fanSizeChoiceForDiameter,
     recommendedFanDiameterOptions,
-    type FanDiameterSelection,
-    type RecommendedFanDiameter,
+    type FanSizeChoice,
   } from "@/app/controls/fanSelection";
   import {
     readCheckboxInput,
     readFanCountControlValue,
-    readFanProductPresetControlValue,
     readNumberInput,
     readPrintDesignControlValue,
     requireSelect,
@@ -75,7 +68,7 @@
   } from "@/app/printSheetPlans";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
-  import { fabricationMethodLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
+  import { fabricationMethodLabel, fanColorLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
     createPartsListItems,
     createPreviewSummaryItems,
@@ -176,9 +169,10 @@
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
   let activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
-  let selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
-  let selectedFanDiameterSelection: FanDiameterSelection = defaultRecommendedFanDiameter;
-  let selectedFanProductOptions: readonly PresetFanProduct[] = [];
+  // UI-only: keeps the "Custom" size segment active while the typed diameter
+  // still matches a recommended size; the settings store only the diameter.
+  let customFanSizePinned = false;
+  let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   let isStaticReferenceControlsActive = false;
   let activeStaticReferenceCanPreviewPlate = false;
   let showCutSheetPreviewMode = false;
@@ -220,9 +214,7 @@
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
   $: activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
-  $: selectedFanProductPreset = findFanProductPreset(settings.fanPreset);
-  $: selectedFanDiameterSelection = fanDiameterSelectionForSettings(settings);
-  $: selectedFanProductOptions = fanProductOptionsForSelection(selectedFanDiameterSelection);
+  $: selectedFanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
   $: activeStaticReferenceCanPreviewPlate =
     activeDesignContext.type === "static-reference" && activeDesignContext.platePreview.type === "available";
@@ -327,20 +319,23 @@
   // Form Control Updates
   // ##############################
 
-  function updateFanPreset(event: Event): void {
-    commitSettings(applyFanProductPreset(settings, readFanProductPresetControlValue(event)));
-  }
-
-  function updateRecommendedFanDiameter(diameter: RecommendedFanDiameter): void {
-    if (isRecommendedFanProductPreset(selectedFanProductPreset) && selectedFanProductPreset.diameter === diameter) {
-      commitSettings({
-        ...settings,
-        fanDiameter: diameter,
-      });
+  function updateFanSizeChoice(choice: FanSizeChoice): void {
+    if (choice === "custom") {
+      customFanSizePinned = true;
       return;
     }
+    customFanSizePinned = false;
+    commitSettings({
+      ...settings,
+      fanDiameter: choice,
+    });
+  }
 
-    commitSettings(applyFanProductPreset(settings, defaultFanProductPresetForRecommendedDiameter(diameter).id));
+  function updateFanColor(color: FanColor): void {
+    commitSettings({
+      ...settings,
+      fanColor: color,
+    });
   }
 
   function updatePrintDesign(event: Event): void {
@@ -1165,52 +1160,69 @@
                   {/if}
 
                   <div class="fan-selection">
-                    <fieldset class="segmented-field">
+                    <fieldset class="segmented-field segmented-field-three">
                       <legend>Fan size</legend>
                       <div>
                         {#each recommendedFanDiameterOptions as diameter}
                           <label>
                             <input
                               type="radio"
-                              name="recommendedFanDiameter"
+                              name="fanSizeChoice"
                               value={diameter}
-                              checked={selectedFanDiameterSelection === diameter}
-                              onchange={() => updateRecommendedFanDiameter(diameter)}
+                              checked={selectedFanSizeChoice === diameter}
+                              onchange={() => updateFanSizeChoice(diameter)}
                             />
                             <span>{diameter} mm</span>
                           </label>
                         {/each}
+                        <label>
+                          <input
+                            type="radio"
+                            name="fanSizeChoice"
+                            value="custom"
+                            checked={selectedFanSizeChoice === "custom"}
+                            onchange={() => updateFanSizeChoice("custom")}
+                          />
+                          <span>Custom</span>
+                        </label>
                       </div>
                     </fieldset>
 
-                    <div class="field-with-info">
+                    {#if selectedFanSizeChoice === "custom"}
                       <label class="field">
-                        <span>Fan model</span>
-                        <select name="fanPreset" onchange={updateFanPreset}>
-                          {#each selectedFanProductOptions as preset}
-                            <option value={preset.id} selected={settings.fanPreset === preset.id}>{preset.label}</option>
-                          {/each}
-                          <option value={customFanProductPresetId} selected={settings.fanPreset === customFanProductPresetId}>Custom fan</option>
-                        </select>
+                        <span>Fan diameter</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="fanDiameter"
+                            min="40"
+                            max="140"
+                            step="1"
+                            inputmode="decimal"
+                            value={settings.fanDiameter}
+                            onchange={(event) => updateNumberSetting("fanDiameter", event)}
+                          />
+                          <small>mm</small>
+                        </span>
                       </label>
-                      {#if settings.fanPreset === customFanProductPresetId}
-                        <label class="field">
-                          <span>Fan diameter</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name="fanDiameter"
-                              min="40"
-                              max="140"
-                              step="1"
-                              inputmode="decimal"
-                              value={settings.fanDiameter}
-                              onchange={(event) => updateNumberSetting("fanDiameter", event)}
-                            />
-                            <small>mm</small>
-                          </span>
-                        </label>
-                      {/if}
+                    {/if}
+
+                    <div class="field fan-color-field">
+                      <span>Fan color</span>
+                      <div class="fan-color-options" role="group" aria-label="Fan color">
+                        {#each fanColors as color}
+                          <button
+                            class:active-color={settings.fanColor === color}
+                            type="button"
+                            aria-label={fanColorLabel(color)}
+                            aria-pressed={settings.fanColor === color}
+                            title={fanColorLabel(color)}
+                            onclick={() => updateFanColor(color)}
+                          >
+                            <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>
+                          </button>
+                        {/each}
+                      </div>
                     </div>
                   </div>
                 </div>

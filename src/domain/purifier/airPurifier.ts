@@ -1,11 +1,5 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
-import {
-  createFanProductSelection,
-  customFanProductPresetId,
-  findFanProductPreset,
-  findFanSpec,
-  type FanConfiguration,
-} from "@/domain/purifier/fanProducts";
+import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fanProducts";
 import {
   findDonutFilterPreset,
   findPrintDesignPreset,
@@ -77,12 +71,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       : preset.dimensions,
   );
   const materialThickness = clamp(raw.materialThickness, 1.5, 9);
-  const fanProductPreset = findFanProductPreset(raw.fanPreset);
-  const fanDiameter =
-    fanProductPreset.id === customFanProductPresetId
-      ? raw.fanDiameter
-      : fanProductPreset.diameter;
-  const fanSpec = findFanSpec(fanDiameter);
+  const fanSpec = findFanSpec(raw.fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
   const workingDepth = dimensions.depth - materialThickness;
   const chamberHeight =
@@ -98,7 +87,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
   const filter = createFilterSelection(preset.id, dimensions);
   const fan: FanConfiguration = {
     spec: fanSpec,
-    productSelection: createFanProductSelection(fanProductPreset.id),
+    color: raw.fanColor,
     banks: {
       left: fanCountRequestFromRawSetting(raw.fansLeft),
       right: fanCountRequestFromRawSetting(raw.fansRight),
@@ -194,8 +183,8 @@ export function createPurifierDraft(
   return {
     design: createPurifierDesignDraft(configuration, raw),
     fan: {
-      presetId: findFanProductPreset(raw.fanPreset).id,
       diameter: configuration.fan.spec.diameter,
+      color: configuration.fan.color,
     },
     cutting: {
       materialThickness: configuration.cutting.materialThickness,
@@ -214,7 +203,7 @@ export function serializePurifierDraft(
   const base: RawPurifierSettings = {
     ...defaultSettings,
     printDesign: printDesignIdForPurifierDraft(draft),
-    fanPreset: draft.fan.presetId,
+    fanColor: draft.fan.color,
     fanDiameter: draft.fan.diameter,
     rim: draft.cutting.rim,
     screwHoleDiameter: draft.cutting.screwHoleDiameter,
@@ -340,10 +329,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     filterDepth: filterDimensions.depth,
     filterThickness: filterDimensions.thickness,
     rim: input.cutting.rim,
-    fanPreset:
-      input.fan.productSelection.type === "preset"
-        ? input.fan.productSelection.presetId
-        : customFanProductPresetId,
+    fanColor: input.fan.color,
     fanDiameter: input.fan.spec.diameter,
     filters: input.filterCount,
     splitFrames: input.frameConstruction.type === "split-rails",
@@ -487,7 +473,7 @@ function createConfiguredPrintDesign(input: {
       filter: normalizeDonutFilterSettings(input.raw),
       fan: {
         spec: input.fan.spec,
-        productSelection: input.fan.productSelection,
+        color: input.fan.color,
         count: printDesign.implementation.defaults.fanCount,
       },
     };
@@ -559,7 +545,7 @@ function isStructuredSettings(input: PurifierInput): input is PurifierSettings {
 export function isPurifierDraft(
   input: PurifierInput | RawPurifierSettings | PurifierDraft,
 ): input is PurifierDraft {
-  return "fan" in input && "presetId" in input.fan;
+  return "fan" in input && "diameter" in input.fan;
 }
 
 function createPurifierDesignDraft(

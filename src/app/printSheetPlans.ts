@@ -54,7 +54,6 @@ export function generatedPrintSheetPlanCacheKey(
     filterDepth: rawSettings.filterDepth,
     filterThickness: rawSettings.filterThickness,
     rim: rawSettings.rim,
-    fanPreset: rawSettings.fanPreset,
     fanDiameter: rawSettings.fanDiameter,
     filters: rawSettings.filters,
     splitFrames: rawSettings.splitFrames,

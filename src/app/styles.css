@@ -934,95 +934,9 @@ Unit Inputs
 }
 
 /* ##############################
-Selector Details
-############################## */
-
-.field-with-info {
-  display: grid;
-  gap: 2px;
-  margin: 9px 0 12px;
-}
-
-.field-with-info > .field {
-  margin: 0;
-}
-
-.selector-info {
-  display: grid;
-  justify-items: start;
-}
-
-.selector-info summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 20px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.selector-info summary::-webkit-details-marker {
-  display: none;
-}
-
-.selector-info summary::marker {
-  content: "";
-}
-
-.selector-info summary::after {
-  content: "";
-  width: 0.42em;
-  height: 0.42em;
-  margin-top: -0.14em;
-  border-right: 1.8px solid currentColor;
-  border-bottom: 1.8px solid currentColor;
-  transform: rotate(45deg);
-  transition: transform 160ms ease;
-}
-
-.selector-info summary:hover,
-.selector-info[open] summary {
-  color: var(--ink);
-}
-
-.selector-info[open] summary::after {
-  transform: translateY(0.14em) rotate(225deg);
-}
-
-.selector-info summary:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
-}
-
-.selector-info summary span {
-  color: currentColor;
-}
-
-.selector-info-panel {
-  display: none;
-  width: 100%;
-  margin-top: 4px;
-}
-
-.selector-info[open] .selector-info-panel {
-  display: block;
-}
-
-/* ##############################
 Preset Cards
 ############################## */
 
-.filter-preset-card,
-.fan-preset-card,
 .print-design-card {
   display: grid;
   gap: 4px;
@@ -1036,88 +950,20 @@ Preset Cards
   line-height: 1.28;
 }
 
-.selector-info-panel .filter-preset-card,
-.selector-info-panel .fan-preset-card,
-.selector-info-panel .print-design-card {
-  margin: 0;
-}
-
-.filter-preset-card strong,
-.fan-preset-card strong,
 .print-design-card strong {
   color: var(--ink);
   font-size: 0.86rem;
 }
 
-.filter-preset-card span,
-.fan-preset-card span,
 .print-design-card span {
   overflow-wrap: anywhere;
 }
 
-.filter-preset-card dl,
-.fan-preset-card dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 5px 0 0;
-}
-
-.filter-preset-card dt,
-.filter-preset-card dd,
-.fan-preset-card dt,
-.fan-preset-card dd {
-  margin: 0;
-}
-
-.filter-preset-card dt,
-.fan-preset-card dt {
-  color: rgb(102 113 105 / 82%);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-}
-
-.filter-preset-card dd,
-.fan-preset-card dd {
-  overflow-wrap: anywhere;
-  color: var(--ink);
-  font-size: 0.76rem;
-}
-
-.fan-card-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-}
-
-.fan-color-swatches {
-  display: flex;
-  gap: 4px;
-  padding-top: 2px;
-}
-
-.fan-color-swatches span {
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgb(23 32 28 / 18%);
-  background: var(--swatch-color);
-}
-
-.filter-preset-card small,
-.filter-preset-card a,
-.fan-preset-card small,
-.fan-preset-card a,
 .print-design-card small,
 .print-design-card a {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
-}
-
-.fan-preset-card .parts-note {
-  margin-top: 4px;
-  line-height: 1.28;
 }
 
 /* ##############################
@@ -1514,13 +1360,46 @@ Layout Grids
 
 .fan-selection {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   margin: 9px 0 12px;
 }
 
 .fan-selection .segmented-field,
-.fan-selection .field-with-info {
+.fan-selection .field {
   margin: 0;
+}
+
+/* Same small round color swatches as the preview material color picker,
+without the preview toolbar's pill chrome. */
+.fan-color-options {
+  display: inline-flex;
+  gap: 4px;
+  justify-self: start;
+}
+
+.fan-color-options button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgb(17 24 23 / 28%);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.fan-color-options button span {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--swatch-color);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
+}
+
+.fan-color-options button.active-color {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(31 111 86 / 16%);
 }
 
 .fan-grid > [data-nukit-fan-placement] {

@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { normalizeSettings } from "@/domain/purifier/airPurifier";
 import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import {
-  applyFanProductPreset,
   applyFilterPreset,
   applyDonutFilterPreset,
   applyPrintDesignPreset,
@@ -17,7 +16,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { customFanProductPresetId } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor } from "@/domain/purifier/fanProducts";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
@@ -114,55 +113,46 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
   });
 
-  test("uses fan product presets for product help, cut hole size, and encoded URLs", () => {
-    const presetSettings = applyFanProductPreset(defaultSettings, "arctic-p12-pwm-pst");
-    const layout = createLayout(presetSettings);
+  test("uses fan size and color for cut hole size, preview appearance, and encoded URLs", () => {
+    const layout = createLayout({ ...defaultSettings, fanDiameter: 120, fanColor: "black" });
     const fanPanel = requiredFanPanel(layout);
     const fanCut = requiredCircleCut(fanPanel, "fan");
     const encoded = encodeSettings(layout.rawSettings);
     const decoded = decodeSettings(encoded);
 
-    expect(layout.rawSettings.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(layout.rawSettings.fanColor).toBe("black");
     expect(layout.rawSettings.fanDiameter).toBe(120);
-    expect(layout.configuration.fan.productSelection.type).toBe("preset");
-    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x253a38);
+    expect(layout.configuration.fan.color).toBe("black");
+    expect(fanAppearanceForColor(layout.configuration.fan.color).accentColor).toBe(0x253a38);
     expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
-    expect(decoded.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(decoded.fanColor).toBe("black");
     expect(decoded.fanDiameter).toBe(120);
   });
 
-  test("decodes share URLs carrying a removed fan preset id to a safe fallback", () => {
-    // "cleanairkits-mobius-120p" was removed from the preset list; old shared
-    // URLs must keep working. Unknown ids fall back by diameter: 120 mm is not
-    // the default preset's diameter, so the decode lands on a custom fan.
-    const decoded = decodeSettings("fanPreset=cleanairkits-mobius-120p&fanDiameter=120");
-    expect(decoded.fanPreset).toBe("custom");
-    expect(decoded.fanDiameter).toBe(120);
-  });
+  test("keeps the beige CAD preview appearance for any fan diameter and out of print exports", () => {
+    const custom120 = decodeSettings("fanDiameter=120");
+    const custom92 = decodeSettings("fanDiameter=92");
+    const beigeUrl = decodeSettings("fanColor=beige&fanDiameter=120");
+    const unknownColor = decodeSettings("fanColor=chartreuse");
+    const beigeLayout = createLayout(beigeUrl);
+    const beigePrintExport = createPrintableThreeMfExport(beigeLayout, "bed-256");
+    const beigePrintContent = new TextDecoder("latin1").decode(beigePrintExport.bytes);
 
-  test("preserves legacy custom fan diameters and lets fan presets own their diameter", () => {
-    const legacyCustom = decodeSettings("fanDiameter=120");
-    const legacyCustom92 = decodeSettings("fanDiameter=92");
-    const noctuaUrl = decodeSettings("fanPreset=noctua-nf-a14&fanDiameter=120");
-    const noctuaLayout = createLayout(noctuaUrl);
-    const noctuaPrintExport = createPrintableThreeMfExport(noctuaLayout, "bed-256");
-    const noctuaPrintContent = new TextDecoder("latin1").decode(noctuaPrintExport.bytes);
-
-    expect(legacyCustom.fanPreset).toBe(customFanProductPresetId);
-    expect(legacyCustom.fanDiameter).toBe(120);
-    expect(legacyCustom92.fanPreset).toBe(customFanProductPresetId);
-    expect(legacyCustom92.fanDiameter).toBe(92);
-    expect(noctuaUrl.fanPreset).toBe("noctua-nf-a14");
-    expect(noctuaUrl.fanDiameter).toBe(140);
-    expect(noctuaLayout.configuration.fan.productSelection.type).toBe("preset");
-    expect(noctuaLayout.configuration.fan.productSelection.product.appearance.previewCadModel).toEqual({
+    expect(custom120.fanColor).toBe("black");
+    expect(custom120.fanDiameter).toBe(120);
+    expect(custom92.fanDiameter).toBe(92);
+    expect(beigeUrl.fanColor).toBe("beige");
+    expect(beigeUrl.fanDiameter).toBe(120);
+    expect(unknownColor.fanColor).toBe(defaultSettings.fanColor);
+    expect(beigeLayout.configuration.fan.spec.diameter).toBe(120);
+    expect(fanAppearanceForColor(beigeLayout.configuration.fan.color).previewCadModel).toEqual({
       type: "noctua-nf-a14-public-cad",
       sourceUrl: "https://www.noctua.at/en/3d-cad-models",
       assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
       usage: "preview-only",
     });
-    expect(noctuaPrintContent).not.toContain("A14_Frame_Public");
-    expect(noctuaPrintContent).not.toContain("Noctua NF-A14 Public CAD");
+    expect(beigePrintContent).not.toContain("A14_Frame_Public");
+    expect(beigePrintContent).not.toContain("Noctua NF-A14 Public CAD");
   });
 
   test("keeps URL boundary parsing valid for booleans, fan counts, and constrained rims", () => {
@@ -242,7 +232,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(decoded.filterWidth).toBe(300);
     expect(decoded.filterDepth).toBe(240);
     expect(decoded.filterThickness).toBe(22);
-    expect(decoded.fanPreset).toBe(customFanProductPresetId);
+    expect(decoded.fanColor).toBe(defaultSettings.fanColor);
     expect(decoded.fanDiameter).toBe(120);
     expect(decoded.filters).toBe(1);
     expect(decoded.splitFrames).toBe(false);
@@ -599,7 +589,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(towerSettings.filterWidth).toBe(290);
     expect(towerSettings.filterDepth).toBe(290);
     expect(towerSettings.filterThickness).toBe(25);
-    expect(horizontalSettings.fanPreset).toBe("nukit-arctic-p14");
+    expect(horizontalSettings.fanDiameter).toBe(140);
     expect(horizontalSettings.materialThickness).toBe(5);
     expect(horizontalLayout.configuration.design.type).toBe("tempest");
     expect(horizontalLayout.summary.fans.type).toBe("tempest");
@@ -626,7 +616,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     expect(settings.printDesign).toBe("static-cr-16x20-140");
     expect(settings.filterPreset).toBe("merv13-16x20x1");
-    expect(settings.fanPreset).toBe("nukit-arctic-p14");
+    expect(settings.fanDiameter).toBe(140);
     expect(settings.fansTop).toBe(5);
     expect(settings.splitFrames).toBe(false);
     expect(decoded.printDesign).toBe("static-cr-16x20-140");
@@ -652,7 +642,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const content = new TextDecoder("latin1").decode(printExport.bytes);
 
     expect(settings.printDesign).toBe("donut-hepa-adapter");
-    expect(settings.fanPreset).toBe("arctic-p12-pwm-pst");
     expect(settings.fanDiameter).toBe(120);
     expect(settings.donutFilterPreset).toBe("silentnight-92-reference");
     expect(settings.donutFilterHoleDiameter).toBe(92);
@@ -704,7 +693,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(defaults.donutFilterOuterDiameter).toBe(125);
     expect(defaults.donutFilterLength).toBe(150);
     expect(defaults.donutFilterHoleDiameter).toBe(92);
-    expect(defaults.fanPreset).toBe("arctic-p12-pwm-pst");
+    expect(defaults.fanDiameter).toBe(120);
     expect(preset.donutFilterPreset).toBe("levoit-core-mini");
     expect(preset.donutFilterOuterDiameter).toBe(159);
     expect(preset.donutFilterLength).toBe(135);

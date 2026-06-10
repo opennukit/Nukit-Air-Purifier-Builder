@@ -1,6 +1,7 @@
 // Display text for workbench controls: fabrication method names, preview
-// color names, and swatch CSS color values.
+// color names, fan color names, and swatch CSS color values.
 
+import type { FanColor } from "@/domain/purifier/fanProducts";
 import type { PreviewMaterialColorPreset } from "@/domain/purifier/settingsModel";
 import type { ExportFormat } from "@/fabrication/printing/printableKit";
 
@@ -10,6 +11,10 @@ export function fabricationMethodLabel(method: ExportFormat): string {
 
 export function previewMaterialColorLabel(color: PreviewMaterialColorPreset): string {
   return `${color.label} preview color`;
+}
+
+export function fanColorLabel(color: FanColor): string {
+  return color === "black" ? "Black" : "Beige/brown";
 }
 
 export function swatchColor(color: number): string {

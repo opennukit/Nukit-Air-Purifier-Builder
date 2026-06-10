@@ -11,7 +11,6 @@ import {
   staticPrintReferenceForPreset,
   staticReferenceDefaultsForPreset,
 } from "@/domain/purifier/designPresets";
-import { findFanProductPreset } from "@/domain/purifier/fanProducts";
 import { customFilterPresetId, findFilterPreset, type FilterPreset } from "@/domain/purifier/filter";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
@@ -147,6 +146,10 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 // Parts List
 // ##############################
 
+// Any 4-pin PWM 12 V PC fan of the configured size works; the parts list
+// states the electrical requirement rather than a product.
+const FAN_POWER_NOTE = "4-pin PWM, 12 V";
+
 export function createPartsListItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
@@ -161,7 +164,6 @@ export function createPartsListItems(
     if (staticDefaults === undefined) {
       return [];
     }
-    const fanProduct = findFanProductPreset(currentSettings.fanPreset);
     const fanCount = staticDefaults.fanCount;
     const filterPreset = findFilterPreset(currentSettings.filterPreset);
     const filterCount = staticDefaults.filterCount;
@@ -181,7 +183,7 @@ export function createPartsListItems(
       {
         category: "Fans",
         label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-        detail: fanProduct.powerNote,
+        detail: FAN_POWER_NOTE,
       },
       {
         category: "Power",
@@ -197,13 +199,12 @@ export function createPartsListItems(
     ];
   }
 
-  const fanProduct = findFanProductPreset(currentSettings.fanPreset);
   const fanCount = configuredFanCountFor(currentLayout, currentFabricationMethod);
   const baseItems: PartsListItem[] = [
     {
       category: "Fans",
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-      detail: fanProduct.powerNote,
+      detail: FAN_POWER_NOTE,
     },
     {
       category: "Power",

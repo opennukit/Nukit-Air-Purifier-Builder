@@ -7,13 +7,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   type PrintDesignId,
 } from "@/domain/purifier/designPresets";
-import { automaticFanCount, fanProductPresets, type FanProductPresetId } from "@/domain/purifier/fanProducts";
-import { defaultSettings } from "@/domain/purifier/settingsModel";
-
-export function readFanProductPresetControlValue(event: Event): FanProductPresetId {
-  const preset = fanProductPresets.find((entry) => entry.id === requireSelect(event, "readFanProductPresetControlValue").value);
-  return preset?.id ?? defaultSettings.fanPreset;
-}
+import { automaticFanCount } from "@/domain/purifier/fanProducts";
 
 export function readPrintDesignControlValue(event: Event): PrintDesignId {
   const preset = publicThreeDimensionalPrintDesignPresets.find(

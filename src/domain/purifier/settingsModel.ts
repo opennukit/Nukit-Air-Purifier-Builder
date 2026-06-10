@@ -1,13 +1,13 @@
 // Purifier settings model: the raw, structured, and draft settings types,
 // camera and preview-material vocabulary, the default settings, and the
 // preset-application functions that rewrite raw settings when the user picks
-// a filter, fan, donut filter, tempest arrangement, or print design preset.
+// a filter, donut filter, tempest arrangement, or print design preset.
 
 
 import {
   customDonutFilterPresetId,
   defaultDonutFilterPresetId,
-  defaultFanPresetForPrintDesign,
+  defaultFanDiameterForPrintDesign,
   defaultFilterPresetByTempestArrangement,
   defaultFilterPresetForPrintDesign,
   defaultPrintDesignId,
@@ -32,15 +32,13 @@ import {
 } from "@/domain/purifier/designPresets";
 import {
   automaticFanCount,
-  customFanProductPresetId,
-  defaultFanProductPresetId,
-  findFanProductPreset,
+  defaultFanColor,
   fixedFanCountOptions,
   type FanBanks,
+  type FanColor,
   type FanConfiguration,
   type FanCountRequest,
   type FanDiameter,
-  type FanProductPresetId,
   type FixedFanCount,
   type SingleFanConfiguration,
 } from "@/domain/purifier/fanProducts";
@@ -175,7 +173,7 @@ export type RawPurifierSettings = {
   filterDepth: Millimeters;
   filterThickness: Millimeters;
   rim: Millimeters;
-  fanPreset: FanProductPresetId;
+  fanColor: FanColor;
   fanDiameter: FanDiameter;
   filters: FilterCount;
   splitFrames: boolean;
@@ -218,8 +216,8 @@ export type RawPurifierSettings = {
 };
 
 export type PurifierFanDraft = {
-  readonly presetId: FanProductPresetId;
   readonly diameter: FanDiameter;
+  readonly color: FanColor;
 };
 
 export type PurifierCuttingDraft = {
@@ -364,7 +362,7 @@ export const defaultSettings: RawPurifierSettings = {
   filterDepth: 495.3,
   filterThickness: 19.1,
   rim: 30,
-  fanPreset: defaultFanProductPresetId,
+  fanColor: defaultFanColor,
   fanDiameter: 140,
   filters: 2,
   splitFrames: true,
@@ -457,25 +455,6 @@ export function applyFilterPreset(
   };
 }
 
-export function applyFanProductPreset(
-  settings: RawPurifierSettings,
-  presetId: FanProductPresetId,
-): RawPurifierSettings {
-  const preset = findFanProductPreset(presetId);
-  if (preset.id === customFanProductPresetId) {
-    return {
-      ...settings,
-      fanPreset: customFanProductPresetId,
-    };
-  }
-
-  return {
-    ...settings,
-    fanPreset: preset.id,
-    fanDiameter: preset.diameter,
-  };
-}
-
 export function applyDonutFilterPreset(
   settings: RawPurifierSettings,
   presetId: DonutFilterPresetId,
@@ -538,15 +517,11 @@ export function applyPrintDesignPreset(
   const filterPreset = findFilterPreset(
     defaultFilterPresetForPrintDesign(preset),
   );
-  const fanPreset = findFanProductPreset(
-    defaultFanPresetForPrintDesign(preset),
-  );
   const base = {
     ...settings,
     printDesign: preset.id,
     filters: rawFilterCountForPrintDesign(preset),
-    fanPreset: fanPreset.id,
-    fanDiameter: fanPreset.diameter,
+    fanDiameter: defaultFanDiameterForPrintDesign(preset),
   };
 
   const withRecommendedFilter =
