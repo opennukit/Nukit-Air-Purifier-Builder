@@ -47,7 +47,6 @@ import {
 } from "@/domain/purifier/designPresets";
 import { fanAppearanceForColor, type FanAppearance } from "@/domain/purifier/fanProducts";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import {
   loadStaticPrintAssemblyAssets,
   loadStaticPrintAssets,
@@ -721,7 +720,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterHeight = Math.min(filterDimensions.depth, Math.max(1, asset.height - 24)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
@@ -777,7 +776,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceSideFanFilters(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
@@ -816,7 +815,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceTopFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;

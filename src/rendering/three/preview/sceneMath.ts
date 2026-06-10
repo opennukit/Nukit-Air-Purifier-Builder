@@ -6,7 +6,6 @@ import {
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { staticPrintReferenceHasAssembledPreview } from "@/resources/static-print-references/references";
 import {
   createDonutFilterModel,
@@ -120,7 +119,7 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
   }
 
   return Math.max(
-    filterSelectionDimensions(settings.filter).width,
+    settings.filter.width,
     layout.summary.workingDepth,
     layout.summary.chamberHeight,
   );
@@ -160,7 +159,7 @@ function modelViewScale(layout: LayoutResult): number {
   }
   return (
     Math.max(
-      filterSelectionDimensions(settings.filter).width,
+      settings.filter.width,
       layout.summary.workingDepth,
       layout.summary.chamberHeight,
     ) * sceneScale

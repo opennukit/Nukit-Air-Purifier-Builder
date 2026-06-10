@@ -11,7 +11,7 @@ import {
   staticPrintReferenceForPreset,
   staticReferenceDefaultsForPreset,
 } from "@/domain/purifier/designPresets";
-import { customFilterPresetId, findFilterPreset, type FilterPreset } from "@/domain/purifier/filter";
+import type { StaticReferencePrintDesignDefaults } from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
@@ -165,7 +165,6 @@ export function createPartsListItems(
       return [];
     }
     const fanCount = staticDefaults.fanCount;
-    const filterPreset = findFilterPreset(currentSettings.filterPreset);
     const filterCount = staticDefaults.filterCount;
     return [
       {
@@ -178,7 +177,7 @@ export function createPartsListItems(
       {
         category: "Filters",
         label: `${filterCount} x ${rectangularFilterSize(currentSettings)}`,
-        detail: filterNominalDetail(filterPreset),
+        detail: staticReferenceFilterDetail(staticDefaults, currentSettings),
       },
       {
         category: "Fans",
@@ -243,8 +242,17 @@ function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
   return `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`;
 }
 
-function filterNominalDetail(preset: FilterPreset): string {
-  return preset.id === customFilterPresetId ? "User measured dimensions" : `${preset.nominalSize} nominal size`;
+// The static design's recommended filter has a nominal trade size; once the
+// settings carry different measured dimensions the row reports those instead.
+function staticReferenceFilterDetail(
+  staticDefaults: StaticReferencePrintDesignDefaults,
+  currentSettings: RawPurifierSettings,
+): string {
+  const matchesRecommendedFilter =
+    currentSettings.filterWidth === staticDefaults.filter.width &&
+    currentSettings.filterDepth === staticDefaults.filter.depth &&
+    currentSettings.filterThickness === staticDefaults.filter.thickness;
+  return matchesRecommendedFilter ? `${staticDefaults.filterNominalSize} nominal size` : "User measured dimensions";
 }
 
 function staticPrintEstimatePartsItems(estimate: StaticPrintEstimate | undefined): readonly PartsListItem[] {

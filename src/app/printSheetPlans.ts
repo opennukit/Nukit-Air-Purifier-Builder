@@ -49,7 +49,6 @@ export function generatedPrintSheetPlanCacheKey(
   return JSON.stringify({
     printVolumePresetId: currentPrintVolumePresetId,
     printDesign: rawSettings.printDesign,
-    filterPreset: rawSettings.filterPreset,
     filterWidth: rawSettings.filterWidth,
     filterDepth: rawSettings.filterDepth,
     filterThickness: rawSettings.filterThickness,
@@ -62,7 +61,6 @@ export function generatedPrintSheetPlanCacheKey(
     fansTop: rawSettings.fansTop,
     fansBottom: rawSettings.fansBottom,
     tempestArrangement: rawSettings.tempestArrangement,
-    donutFilterPreset: rawSettings.donutFilterPreset,
     donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
     donutFilterLength: rawSettings.donutFilterLength,
     donutFilterHoleDiameter: rawSettings.donutFilterHoleDiameter,

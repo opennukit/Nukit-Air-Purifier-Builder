@@ -10,10 +10,8 @@ import {
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
 import {
-  customDonutFilterPresetId,
   isTempestPrintDesignId,
   printDesignIds,
-  type DonutFilterPresetId,
   type PrintDesignId,
   type TempestArrangementPreset,
 } from "@/domain/purifier/designPresets";
@@ -23,10 +21,6 @@ import {
   type FanColor,
   type FanDiameter,
 } from "@/domain/purifier/fanProducts";
-import {
-  customFilterPresetId,
-  type FilterPresetId,
-} from "@/domain/purifier/filter";
 import {
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
@@ -150,11 +144,9 @@ export function decodeSettings(search: string): RawPurifierSettings {
     ...defaultSettings,
     ...fields,
     printDesign,
-    filterPreset: impliedFilterPreset(params),
     fanColor: readFanColor(params),
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
-    donutFilterPreset: impliedDonutFilterPreset(params),
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,
@@ -200,23 +192,6 @@ function readFanDiameter(
 function readFanColor(params: URLSearchParams): FanColor {
   const value = params.get("fanColor");
   return fanColors.find((color) => color === value) ?? defaultSettings.fanColor;
-}
-
-// Preset ids are no longer URL params; measured dimensions are the only
-// filter spec a share URL carries, so any measurement param implies the
-// custom preset and a sparse URL falls back to design defaults.
-function impliedFilterPreset(params: URLSearchParams): FilterPresetId {
-  if (hasFilterMeasurementParams(params)) {
-    return customFilterPresetId;
-  }
-  return defaultSettings.filterPreset;
-}
-
-function impliedDonutFilterPreset(params: URLSearchParams): DonutFilterPresetId {
-  if (hasDonutFilterMeasurementParams(params)) {
-    return customDonutFilterPresetId;
-  }
-  return defaultSettings.donutFilterPreset;
 }
 
 function readPreviewMaterialColor(
@@ -274,7 +249,6 @@ function applyPrintDesignUrlDefaults(
 
   return {
     ...parsed,
-    filterPreset: hasFilterInputs ? parsed.filterPreset : defaults.filterPreset,
     filterWidth: hasFilterInputs ? parsed.filterWidth : defaults.filterWidth,
     filterDepth: hasFilterInputs ? parsed.filterDepth : defaults.filterDepth,
     filterThickness: hasFilterInputs
@@ -300,9 +274,6 @@ function applyPrintDesignUrlDefaults(
     tempestArrangement: params.has("tempestArrangement")
       ? parsed.tempestArrangement
       : defaults.tempestArrangement,
-    donutFilterPreset: hasDonutFilterInputs
-      ? parsed.donutFilterPreset
-      : defaults.donutFilterPreset,
     donutFilterOuterDiameter:
       hasDonutFilterInputs || params.has("donutFilterOuterDiameter")
         ? parsed.donutFilterOuterDiameter

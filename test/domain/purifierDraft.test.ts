@@ -25,7 +25,6 @@ describe("Purifier draft model", () => {
     expect(draft.design.filter.holeDiameter).toBe(92);
 
     const serialized = serializePurifierDraft(draft);
-    expect(serialized.filterPreset).toBe("custom");
     expect(serialized.filterWidth).toBe(draft.design.filter.outerDiameter);
     expect(serialized.filterDepth).toBe(draft.design.filter.length);
     expect(serialized.filterThickness).toBe(draft.design.filter.holeDiameter);

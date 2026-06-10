@@ -1,5 +1,4 @@
 import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierGeometry, type FilterLayerGeometry } from "@/domain/purifier/geometry";
 import type { AssemblyPlacement, CutPanel, FilterRailKey, StructuralAssemblyRole } from "@/fabrication/laser/cutGeometry";
 
@@ -71,7 +70,7 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
   const depth = geometry.workingDepth;
   const thickness = settings.cutting.materialThickness;
   const rim = geometry.rim;
-  const filterThickness = filterSelectionDimensions(settings.filter).thickness;
+  const filterThickness = settings.filter.thickness;
 
   return {
     panels: cutPanelFabrication.cutPanels.flatMap((panel) => createStructuralPanelPart(panel)),

@@ -2,13 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { normalizeSettings } from "@/domain/purifier/airPurifier";
 import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import {
-  applyFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
 import {
-  donutFilterPresets,
+  defaultFilterDimensionsByTempestArrangement,
   isStaticReferencePrintDesignId,
   printDesignPresets,
   publicPrintDesignPresets,
@@ -17,7 +16,6 @@ import {
 } from "@/domain/purifier/designPresets";
 import { fanAppearanceForColor } from "@/domain/purifier/fanProducts";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
-import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
 import {
@@ -71,28 +69,19 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(encodeSettings(decoded)).not.toContain("transparentWalls");
   });
 
-  test("uses purchasable filter presets while preserving custom measured dimensions", () => {
-    const luggablePreset = requiredFilterPreset("merv13-20x25x1");
-    const luggableSettings = createLayout(applyFilterPreset(defaultSettings, luggablePreset.id)).rawSettings;
-
-    expect(luggableSettings.filterPreset).toBe("merv13-20x25x1");
-    expect(luggableSettings.filterWidth).toBeCloseTo(luggablePreset.dimensions.width);
-    expect(luggableSettings.filterDepth).toBeCloseTo(luggablePreset.dimensions.depth);
-    expect(luggableSettings.filterThickness).toBeCloseTo(luggablePreset.dimensions.thickness);
-
+  test("preserves custom measured filter dimensions through the URL codec", () => {
     const customSettings = decodeSettings("filterWidth=300&filterDepth=240&filterThickness=22");
-    expect(customSettings.filterPreset).toBe(customFilterPresetId);
     expect(customSettings.filterWidth).toBe(300);
     expect(customSettings.filterDepth).toBe(240);
     expect(customSettings.filterThickness).toBe(22);
 
-    const encodedCustom = encodeSettings(customSettings);
-    expect(decodeSettings(encodedCustom).filterPreset).toBe(customFilterPresetId);
+    const decodedAgain = decodeSettings(encodeSettings(customSettings));
+    expect(decodedAgain.filterWidth).toBe(300);
+    expect(decodedAgain.filterDepth).toBe(240);
+    expect(decodedAgain.filterThickness).toBe(22);
   });
 
-  test("includes the Air Fanta compatible replacement filter as an exact rectangular preset", () => {
-    const preset = requiredFilterPreset("air-fanta-compatible");
-    const settings = createLayout(applyFilterPreset(defaultSettings, preset.id)).rawSettings;
+  test("defaults the four-side tower to the Air Fanta compatible filter size", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(
       decodeSettings(
@@ -100,13 +89,14 @@ describe("FilterBoxBuilder purifier workflow", () => {
       ),
     );
 
-    expect(preset.label).toBe("Air Fanta compatible");
-    expect(preset.nominalSize).toBe("29 x 29 x 2.5 cm");
-    expect(settings.filterPreset).toBe("air-fanta-compatible");
-    expect(settings.filterWidth).toBe(290);
-    expect(settings.filterDepth).toBe(290);
-    expect(settings.filterThickness).toBe(25);
-    expect(customTower.rawSettings.filterThickness).toBe(25);
+    expect(defaultFilterDimensionsByTempestArrangement["four-side-filter-tower"]).toEqual({
+      width: 290,
+      depth: 290,
+      thickness: 25,
+    });
+    expect(presetTower.rawSettings.filterWidth).toBe(290);
+    expect(presetTower.rawSettings.filterDepth).toBe(290);
+    expect(presetTower.rawSettings.filterThickness).toBe(25);
     expect(createTempestModel(createTempestSettingsFromLayout(customTower)).box).toEqual(
       createTempestModel(createTempestSettingsFromLayout(presetTower)).box,
     );
@@ -170,7 +160,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const emptyNumericParams = decodeSettings("filterWidth=&filterDepth=%20&filterThickness=&rim=%20");
     const smallCustomLayout = createLayout({
       ...defaultSettings,
-      filterPreset: customFilterPresetId,
       filterWidth: 120,
       filterDepth: 120,
       materialThickness: 9,
@@ -227,7 +216,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
     const encoded = encodeSettings(decoded);
 
-    expect(decoded.filterPreset).toBe(customFilterPresetId);
     expect(decoded.filterWidth).toBe(300);
     expect(decoded.filterDepth).toBe(240);
     expect(decoded.filterThickness).toBe(22);
@@ -287,19 +275,15 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
   });
 
-  test("keeps preset dimensions derived from the preset id", () => {
+  test("carries measured filter dimensions straight into the structured settings", () => {
     const normalized = normalizeSettings(defaultSettings);
     const normalizedAgain = normalizeSettings(normalized);
-    const dimensions = filterSelectionDimensions(normalized.filter);
 
-    expect(normalized.filter).toEqual({ type: "preset", presetId: "merv13-20x25x1" });
-    expect(dimensions).toEqual({
+    expect(normalized.filter).toEqual({
       width: defaultSettings.filterWidth,
       depth: defaultSettings.filterDepth,
       thickness: defaultSettings.filterThickness,
     });
-    Object.assign(dimensions, { width: 1 });
-    expect(filterSelectionDimensions(normalized.filter).width).toBe(defaultSettings.filterWidth);
     expect(normalizedAgain).toEqual(normalized);
   });
 
@@ -433,7 +417,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     const customLayout = createLayout({
       ...defaultSettings,
-      filterPreset: customFilterPresetId,
       filterWidth: 130,
       filterDepth: 130,
       filterThickness: 10,
@@ -558,9 +541,14 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(staticCr14x20Preset?.implementation.type).toBe("static-reference");
     expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.fanCount : undefined).toBe(4);
     expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterCount : undefined).toBe(2);
-    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterPreset : undefined).toBe(
-      "merv13-14x20x1",
-    );
+    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filter : undefined).toEqual({
+      width: 495.3,
+      depth: 342.9,
+      thickness: 19.1,
+    });
+    expect(
+      staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterNominalSize : undefined,
+    ).toBe("14 x 20 x 1 in");
     expect(staticCr14x20Reference?.printEstimate?.estimatedFilamentKilograms).toBe(1);
     expect(staticCr14x20Reference?.printEstimate?.assumptions.infillPercent).toBe(15);
     const externalStaticReferencePreset = printDesignPresets.find((preset) => preset.id === "static-modular-20x20-reference");
@@ -582,9 +570,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const towerModel = createTempestModel(createTempestSettingsFromLayout(towerLayout));
     const printExport = createPrintDesignThreeMfExport(horizontalLayout, "bed-256");
 
-    expect(horizontalSettings.filterPreset).toBe("merv13-20x20x2");
+    expect(horizontalSettings.filterWidth).toBe(defaultFilterDimensionsByTempestArrangement["dual-horizontal-sandwich"].width);
+    expect(horizontalSettings.filterThickness).toBe(defaultFilterDimensionsByTempestArrangement["dual-horizontal-sandwich"].thickness);
     expect(horizontalSettings.tempestArrangement).toBe("dual-horizontal-sandwich");
-    expect(towerSettings.filterPreset).toBe("air-fanta-compatible");
     expect(towerSettings.filterWidth).toBe(290);
     expect(towerSettings.filterDepth).toBe(290);
     expect(towerSettings.filterThickness).toBe(25);
@@ -614,7 +602,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const layout = createLayout(settings);
 
     expect(settings.printDesign).toBe("static-cr-16x20-140");
-    expect(settings.filterPreset).toBe("merv13-16x20x1");
+    expect(settings.filterWidth).toBe(495.3);
+    expect(settings.filterDepth).toBe(393.7);
+    expect(settings.filterThickness).toBe(19.1);
     expect(settings.fanDiameter).toBe(140);
     expect(settings.fansTop).toBe(5);
     expect(settings.splitFrames).toBe(false);
@@ -642,7 +632,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     expect(settings.printDesign).toBe("donut-hepa-adapter");
     expect(settings.fanDiameter).toBe(120);
-    expect(settings.donutFilterPreset).toBe("silentnight-92-reference");
     expect(settings.donutFilterHoleDiameter).toBe(92);
     expect(settings.donutCapEnabled).toBe(true);
     expect(layout.configuration.design.type).toBe("donut-filter-adapter");
@@ -689,7 +678,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const encoded = encodeSettings(measured);
 
     expect(defaults.printDesign).toBe("donut-hepa-adapter");
-    expect(defaults.donutFilterPreset).toBe("silentnight-92-reference");
     expect(defaults.donutFilterOuterDiameter).toBe(125);
     expect(defaults.donutFilterLength).toBe(150);
     expect(defaults.donutFilterHoleDiameter).toBe(92);
@@ -699,7 +687,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(measured.donutCapEnabled).toBe(false);
     expect(disabledCapWithRim.donutCapRim).toBe(12);
     expect(cappedRim.donutCapRim).toBe(4);
-    expect(removedPresetParam.donutFilterPreset).toBe("custom");
     expect(removedPresetParam.donutFilterOuterDiameter).toBe(125);
     expect(removedPresetParam.donutFilterLength).toBe(180);
     expect(removedPresetParam.donutFilterHoleDiameter).toBe(92);
@@ -709,22 +696,16 @@ describe("FilterBoxBuilder purifier workflow", () => {
         : undefined,
     ).toEqual({ type: "none" });
     expect(donutCapTotalHeight(createDonutFilterModel(measuredLayout))).toBe(0);
-    expect(measured.donutFilterPreset).toBe("custom");
     expect(encoded).toContain("donutFilterHoleDiameter=86");
     expect(encoded).not.toContain("donutFilterPreset");
     expect(encoded).toContain("donutCapEnabled=false");
   });
 
-  test("keeps curated round-filter data internal and does not clamp large measured cartridges", () => {
-    const levoitCore300 = donutFilterPresets.find((preset) => preset.id === "levoit-core-300");
+  test("does not clamp large measured round cartridges", () => {
     const measuredLarge = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=360&donutFilterLength=440&donutFilterHoleDiameter=128",
     );
 
-    expect(levoitCore300?.settings.outerDiameter).toBe(193);
-    expect(levoitCore300?.settings.length).toBe(147);
-    expect(levoitCore300?.settings.holeDiameter).toBe(120);
-    expect(measuredLarge.donutFilterPreset).toBe("custom");
     expect(measuredLarge.donutFilterOuterDiameter).toBe(360);
     expect(measuredLarge.donutFilterLength).toBe(440);
     expect(measuredLarge.donutFilterHoleDiameter).toBe(128);
@@ -883,14 +864,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
 // #######################################
 // Domain Assertion Helpers
 // #######################################
-
-function requiredFilterPreset(id: string) {
-  const preset = filterPresets.find((entry) => entry.id === id);
-  if (preset === undefined) {
-    throw new Error(`requiredFilterPreset: Missing ${id}`);
-  }
-  return preset;
-}
 
 function minimalThreeMfObject(name: string): MeshObject {
   return {

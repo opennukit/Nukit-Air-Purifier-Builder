@@ -1,5 +1,4 @@
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 
 export type BuildDiagnosticSeverity = "info" | "warning";
 
@@ -56,7 +55,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
 
   if (
     layout.configuration.frameConstruction.type === "full-panels" &&
-    filterSelectionDimensions(layout.configuration.filter).width > 530
+    layout.configuration.filter.width > 530
   ) {
     diagnostics.push({
       id: "large-unsplit-frame",
@@ -78,7 +77,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (layout.configuration.filter.type === "custom" && customFilterLooksUnusual(layout)) {
+  if (filterLooksUnusual(layout.configuration.filter)) {
     diagnostics.push({
       id: "custom-filter-range",
       severity: "warning",
@@ -115,7 +114,7 @@ function tightFanMarginLabels(layout: LayoutResult): string[] {
   }
 
   const fanDiameter = layout.configuration.fan.spec.diameter;
-  const filterWidth = filterSelectionDimensions(layout.configuration.filter).width;
+  const filterWidth = layout.configuration.filter.width;
   const { resolvedFans } = layout.summary.fans;
   return [
     fanMarginLabel("Left", resolvedFans.left, layout.summary.workingDepth, fanDiameter),
@@ -134,8 +133,8 @@ function fanMarginLabel(label: string, fans: number, span: number, fanDiameter: 
   return margin < smallFanMargin ? label : null;
 }
 
-function customFilterLooksUnusual(layout: LayoutResult): boolean {
-  const { width, depth, thickness } = filterSelectionDimensions(layout.configuration.filter);
+function filterLooksUnusual(filter: LayoutResult["configuration"]["filter"]): boolean {
+  const { width, depth, thickness } = filter;
   return (
     width < normalCustomFilterMinimum ||
     width > normalCustomFilterMaximum ||

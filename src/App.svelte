@@ -14,7 +14,6 @@
     type RawPurifierSettings,
   } from "@/domain/purifier/settingsModel";
   import {
-    customDonutFilterPresetId,
     defaultThreeDimensionalPrintDesignId,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
@@ -29,7 +28,6 @@
     fixedFanCountOptions,
     type FanColor,
   } from "@/domain/purifier/fanProducts";
-  import { customFilterPresetId } from "@/domain/purifier/filter";
   import {
     advancedJointControls,
     donutFilterDimensionControls,
@@ -340,7 +338,6 @@
     commitSettings({
       ...settings,
       [name]: readNumberInput(event, settings[name]),
-      filterPreset: customFilterPresetId,
     });
   }
 
@@ -351,7 +348,6 @@
     commitSettings({
       ...settings,
       [name]: readNumberInput(event, settings[name]),
-      donutFilterPreset: customDonutFilterPresetId,
     });
   }
 

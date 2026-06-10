@@ -1,7 +1,6 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
 import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fanProducts";
 import {
-  findDonutFilterPreset,
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
   isLaserDerivedPrintDesignPreset,
@@ -37,16 +36,7 @@ import {
   type RawPurifierSettings,
 } from "@/domain/purifier/settingsModel";
 import type { Millimeters } from "@/domain/units";
-import {
-  customFilterPresetId,
-  filterSelectionDimensions,
-  findFilterPreset,
-  findPresetFilter,
-  isPresetFilterId,
-  type FilterDimensions,
-  type FilterPresetId,
-  type FilterSelection,
-} from "@/domain/purifier/filter";
+import type { FilterDimensions } from "@/domain/purifier/filter";
 import type { ReferenceScale } from "@/fabrication/laser/cutSettings";
 
 // #######################################
@@ -64,12 +54,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       ? serializePurifierDraft(input)
       : input;
   const printDesign = findPrintDesignPreset(raw.printDesign);
-  const preset = findFilterPreset(raw.filterPreset);
-  const dimensions = normalizeFilterDimensions(
-    preset.id === customFilterPresetId
-      ? rawFilterDimensions(raw)
-      : preset.dimensions,
-  );
+  const dimensions = normalizeFilterDimensions(rawFilterDimensions(raw));
   const materialThickness = clamp(raw.materialThickness, 1.5, 9);
   const fanSpec = findFanSpec(raw.fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
@@ -84,7 +69,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
     workingDepth,
     chamberHeight,
   );
-  const filter = createFilterSelection(preset.id, dimensions);
+  const filter = dimensions;
   const fan: FanConfiguration = {
     spec: fanSpec,
     color: raw.fanColor,
@@ -144,11 +129,9 @@ export function normalizeRawSettings(
     donutFilter.outerDiameter,
     donutFilter.holeDiameter,
   );
-  const donutFilterPreset = findDonutFilterPreset(input.donutFilterPreset);
   return canonicalizePrintDesignRawSettings({
     ...normalized,
     tempestArrangement,
-    donutFilterPreset: donutFilterPreset.id,
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -181,7 +164,7 @@ export function createPurifierDraft(
   const raw = normalizeRawSettings(input);
   const configuration = normalizeSettings(raw);
   return {
-    design: createPurifierDesignDraft(configuration, raw),
+    design: createPurifierDesignDraft(configuration),
     fan: {
       diameter: configuration.fan.spec.diameter,
       color: configuration.fan.color,
@@ -252,7 +235,6 @@ export function serializePurifierDraft(
   if (draft.design.type === "donut-filter-adapter") {
     return normalizeRawSettings({
       ...base,
-      filterPreset: customFilterPresetId,
       filterWidth: draft.design.filter.outerDiameter,
       filterDepth: draft.design.filter.length,
       filterThickness: draft.design.filter.holeDiameter,
@@ -262,7 +244,6 @@ export function serializePurifierDraft(
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      donutFilterPreset: draft.design.donutFilterPreset,
       donutFilterOuterDiameter: draft.design.filter.outerDiameter,
       donutFilterLength: draft.design.filter.length,
       donutFilterHoleDiameter: draft.design.filter.holeDiameter,
@@ -318,16 +299,11 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     return input;
   }
 
-  const filterDimensions = filterSelectionDimensions(input.filter);
   const base: RawPurifierSettings = {
     printDesign: input.printDesign.id,
-    filterPreset:
-      input.filter.type === "preset"
-        ? input.filter.presetId
-        : customFilterPresetId,
-    filterWidth: filterDimensions.width,
-    filterDepth: filterDimensions.depth,
-    filterThickness: filterDimensions.thickness,
+    filterWidth: input.filter.width,
+    filterDepth: input.filter.depth,
+    filterThickness: input.filter.thickness,
     rim: input.cutting.rim,
     fanColor: input.fan.color,
     fanDiameter: input.fan.spec.diameter,
@@ -338,7 +314,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     tempestArrangement: defaultSettings.tempestArrangement,
-    donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -390,7 +365,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
   if (input.design.type === "donut-filter-adapter") {
     return {
       ...base,
-      filterPreset: customFilterPresetId,
       filterWidth: input.design.filter.outerDiameter,
       filterDepth: input.design.filter.length,
       filterThickness: input.design.filter.holeDiameter,
@@ -400,7 +374,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      donutFilterPreset: input.design.donutFilterPreset,
       donutFilterOuterDiameter: input.design.filter.outerDiameter,
       donutFilterLength: input.design.filter.length,
       donutFilterHoleDiameter: input.design.filter.holeDiameter,
@@ -448,7 +421,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
 function createConfiguredPrintDesign(input: {
   readonly raw: RawPurifierSettings;
   readonly printDesign: PrintDesignPreset;
-  readonly filter: FilterSelection;
+  readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fan: FanConfiguration;
   readonly frameConstruction: FilterFrameConstruction;
@@ -469,7 +442,6 @@ function createConfiguredPrintDesign(input: {
     return {
       type: "donut-filter-adapter",
       preset: printDesign,
-      donutFilterPreset: findDonutFilterPreset(input.raw.donutFilterPreset).id,
       filter: normalizeDonutFilterSettings(input.raw),
       fan: {
         spec: input.fan.spec,
@@ -550,7 +522,6 @@ export function isPurifierDraft(
 
 function createPurifierDesignDraft(
   configuration: PurifierSettings,
-  raw: RawPurifierSettings,
 ): PurifierDesignDraft {
   if (configuration.design.type === "laser-derived-printable-kit") {
     return {
@@ -569,7 +540,6 @@ function createPurifierDesignDraft(
       type: "donut-filter-adapter",
       printDesign: configuration.design.preset.id,
       preset: configuration.design.preset,
-      donutFilterPreset: findDonutFilterPreset(raw.donutFilterPreset).id,
       filter: configuration.design.filter,
       fanCount: configuration.design.fan.count,
     };
@@ -598,26 +568,12 @@ function createPurifierDesignDraft(
 }
 
 function serializedFilterFields(
-  filter: FilterSelection,
-): Pick<
-  RawPurifierSettings,
-  "filterPreset" | "filterWidth" | "filterDepth" | "filterThickness"
-> {
-  if (filter.type === "preset") {
-    const preset = findPresetFilter(filter.presetId);
-    return {
-      filterPreset: preset.id,
-      filterWidth: preset.dimensions.width,
-      filterDepth: preset.dimensions.depth,
-      filterThickness: preset.dimensions.thickness,
-    };
-  }
-
+  filter: FilterDimensions,
+): Pick<RawPurifierSettings, "filterWidth" | "filterDepth" | "filterThickness"> {
   return {
-    filterPreset: customFilterPresetId,
-    filterWidth: filter.dimensions.width,
-    filterDepth: filter.dimensions.depth,
-    filterThickness: filter.dimensions.thickness,
+    filterWidth: filter.width,
+    filterDepth: filter.depth,
+    filterThickness: filter.thickness,
   };
 }
 
@@ -694,26 +650,6 @@ function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
       depthMultiplier: clamp(settings.dovetailDepthMultiplier, 0.5, 2),
       taper: clamp(settings.dovetailTaper, 0, 80),
     },
-  };
-}
-
-// ##############################
-// Selection Helpers
-// ##############################
-
-function createFilterSelection(
-  presetId: FilterPresetId,
-  dimensions: FilterDimensions,
-): FilterSelection {
-  if (isPresetFilterId(presetId)) {
-    return {
-      type: "preset",
-      presetId,
-    };
-  }
-  return {
-    type: "custom",
-    dimensions,
   };
 }
 

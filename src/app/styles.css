@@ -1068,15 +1068,11 @@ Section Notes and Guides
   outline-offset: 2px;
 }
 
-.filter-preset-card a,
-.fan-preset-card a,
 .print-design-card a {
   color: var(--accent-strong);
   text-decoration: none;
 }
 
-.filter-preset-card a:hover,
-.fan-preset-card a:hover,
 .print-design-card a:hover {
   text-decoration: underline;
 }
@@ -1565,37 +1561,12 @@ Desktop Fixed View
     min-height: 38px;
   }
 
-  .filter-preset-card,
-  .fan-preset-card,
   .print-design-card {
     gap: 3px;
     margin: -2px 0 9px;
     padding: 8px 10px;
     font-size: 0.78rem;
     line-height: 1.28;
-  }
-
-  .fan-preset-card .fan-card-header {
-    align-items: center;
-  }
-
-  .fan-preset-card .fan-card-header span {
-    display: block;
-    max-width: 28rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .filter-preset-card dl,
-  .fan-preset-card dl {
-    gap: 6px;
-    margin-top: 3px;
-  }
-
-  .fan-preset-card .parts-note {
-    margin-top: 2px;
-    line-height: 1.22;
   }
 
   .workspace {
