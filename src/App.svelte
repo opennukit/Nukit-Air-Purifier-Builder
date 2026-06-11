@@ -164,12 +164,14 @@
   let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
-  // Reported up by PurifierPreview while its assembled tempest kit builds.
-  let assembledPreviewBuildPhase: "idle" | "building" = "idle";
-  // First load shows a centered "Building model…" state; after the first build
-  // completes, later rebuilds only show the corner pill over the old model.
-  let hasStartedPreviewBuild = false;
-  let hasCompletedFirstPreviewBuild = false;
+  // Reported up by PurifierPreview about its assembled tempest kit build.
+  let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  // First load shows a centered "Building model…" state until the first build
+  // SUCCEEDS; after that, rebuilds only show the corner pill over the old
+  // model. A failed first build stays in-progress, so the next attempt builds
+  // front and center again instead of behind a pill over a blank canvas.
+  type FirstPreviewBuild = "not-started" | "in-progress" | "done";
+  let firstPreviewBuild: FirstPreviewBuild = "not-started";
 
   // ##############################
   // Derived View State
@@ -231,12 +233,24 @@
   $: isPreviewUpdating =
     (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "building") ||
     assembledPreviewBuildPhase === "building";
-  $: if (isPreviewUpdating) {
-    hasStartedPreviewBuild = true;
+  $: hasPreviewBuildFailure =
+    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "failed") ||
+    assembledPreviewBuildPhase === "failed";
+  $: if (isPreviewUpdating && firstPreviewBuild === "not-started") {
+    firstPreviewBuild = "in-progress";
   }
-  $: if (hasStartedPreviewBuild && !isPreviewUpdating) {
-    hasCompletedFirstPreviewBuild = true;
+  $: if (firstPreviewBuild === "in-progress" && !isPreviewUpdating && !hasPreviewBuildFailure) {
+    firstPreviewBuild = "done";
   }
+  // The single source for the preview build status: one persistent live region
+  // announces it, and the visual overlay/pill below render the same text.
+  $: previewStatusText = isPreviewUpdating
+    ? firstPreviewBuild === "done"
+      ? "Updating…"
+      : "Building model…"
+    : hasPreviewBuildFailure
+      ? "Update failed — check console"
+      : "";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
@@ -807,13 +821,16 @@
           class="preview-stage"
           id="previewStage"
         >
-          {#if isPreviewUpdating && !hasCompletedFirstPreviewBuild}
-            <div class="preview-loading-overlay" role="status">
-              <span class="preview-loading-spinner" aria-hidden="true"></span>
-              Building model…
+          <span class="sr-only" role="status">{previewStatusText}</span>
+          {#if isPreviewUpdating && firstPreviewBuild !== "done"}
+            <div class="preview-loading-overlay" aria-hidden="true">
+              <span class="preview-loading-spinner"></span>
+              {previewStatusText}
             </div>
           {:else if isPreviewUpdating}
-            <span class="preview-updating-indicator" role="status">Updating…</span>
+            <span class="preview-updating-indicator" aria-hidden="true">{previewStatusText}</span>
+          {:else if hasPreviewBuildFailure}
+            <span class="preview-updating-indicator preview-update-failed" aria-hidden="true">{previewStatusText}</span>
           {/if}
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
@@ -946,7 +963,7 @@
             <PurifierPreview
               {layout}
               printSeamPlan={activePrintSeamPlan}
-              onAssembledBuildPhase={(phase) => (assembledPreviewBuildPhase = phase)}
+              onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
             />
           {:else if previewMode === "print-sheets"}
             {#if activePrintSheetPlan !== null}

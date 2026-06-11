@@ -26,11 +26,11 @@
   import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import { PurifierThreePreview } from "@/rendering/three/purifierThreePreview";
 
-  type AssembledBuildPhase = "idle" | "building";
+  type AssembledBuildPhase = "idle" | "building" | "failed";
 
   export let layout: LayoutResult;
   export let printSeamPlan: PrintableSheetPlan | null;
-  export let onAssembledBuildPhase: (phase: AssembledBuildPhase) => void = () => {};
+  export let onAssembledBuildPhaseChange: (phase: AssembledBuildPhase) => void = () => {};
 
   // Instance-scoped, unlike the kit cache above: each mount reports its own
   // build phase and waits on its own render, so a build outliving the instance
@@ -66,8 +66,10 @@
       return;
     }
     // A non-tempest render invalidates any tempest render still waiting on a
-    // kit; when that build lands it only warms the cache.
+    // kit (when that build lands it only warms the cache) and clears any
+    // lingering tempest failure — this design renders fine.
     pendingTempestRender = null;
+    onAssembledBuildPhaseChange("idle");
     preview.update(layout, printSeamPlan);
     previousRebuildKey = rebuildKey;
     previousSeamPlan = printSeamPlan;
@@ -84,8 +86,10 @@
     const kitKey = printKitCacheKey(currentLayout.rawSettings, assembledKitPresetId);
     if (assembledKitCache !== null && assembledKitCache.key === kitKey) {
       // The newest render request is satisfied right here; an older build
-      // still in flight must not apply later and revert the preview.
+      // still in flight must not apply later and revert the preview. Serving
+      // from cache also moots any lingering failure for another key.
       pendingTempestRender = null;
+      onAssembledBuildPhaseChange("idle");
       applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, assembledKitCache.kit);
       return;
     }
@@ -97,7 +101,7 @@
       return;
     }
     inFlightAssembledKitKey = kitKey;
-    onAssembledBuildPhase("building");
+    onAssembledBuildPhaseChange("building");
     void assembledKitChannel.request(currentLayout.rawSettings, assembledKitPresetId).then((outcome) => {
       if (outcome.type === "superseded") {
         return;
@@ -109,7 +113,7 @@
         if (destroyed) {
           return;
         }
-        onAssembledBuildPhase("idle");
+        onAssembledBuildPhaseChange("failed");
         pendingTempestRender = null;
         return;
       }
@@ -120,7 +124,7 @@
       if (destroyed) {
         return;
       }
-      onAssembledBuildPhase("idle");
+      onAssembledBuildPhaseChange("idle");
       if (pendingTempestRender !== null) {
         applyTempestRender(pendingTempestRender, outcome.kit);
         pendingTempestRender = null;
@@ -146,7 +150,7 @@
 
   onDestroy(() => {
     destroyed = true;
-    onAssembledBuildPhase("idle");
+    onAssembledBuildPhaseChange("idle");
     preview?.destroy();
     preview = null;
   });

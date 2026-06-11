@@ -445,6 +445,14 @@ screen; this small pill is the only cue that a refresh is on the way. */
   pointer-events: none;
 }
 
+/* Error tone of the same pill: the model on screen no longer matches the
+settings because the last geometry build failed. */
+.preview-update-failed {
+  border-color: rgb(160 102 40 / 45%);
+  background: rgb(160 102 40 / 10%);
+  color: #a06628;
+}
+
 /* ##############################
 Three Preview Controls
 ############################## */
