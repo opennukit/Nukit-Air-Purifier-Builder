@@ -3,6 +3,7 @@ import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication
 import type { CutFeature, CutPanel, CutPoint, RectCut } from "@/fabrication/laser/cutGeometry";
 import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
 import { roundMillimeters } from "@/fabrication/printing/meshWelding";
+import { extrudePlateWithHoles } from "@/fabrication/printing/plateMesh";
 import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
 // #######################################
@@ -743,25 +744,11 @@ function glueKeyCountForLength(length: number): number {
 // #######################################
 
 function createPlateMesh(outline: readonly CutPoint[], height: number, cuts: readonly CutFeature[]): PrintableMesh {
-  const shape = new Shape();
-  const firstPoint = outline[0];
-  if (firstPoint === undefined) {
+  if (outline.length === 0) {
     throw new Error("createPlateMesh: Outline is empty");
   }
-  shape.moveTo(firstPoint.x, firstPoint.y);
-  for (const point of outline.slice(1)) {
-    shape.lineTo(point.x, point.y);
-  }
-  shape.closePath();
-
-  for (const cut of cuts) {
-    const hole = cutToHolePath(cut);
-    if (hole !== null) {
-      shape.holes.push(hole);
-    }
-  }
-
-  return extrudeShapeToMesh(shape, height);
+  const holes = cuts.map(cutToHolePath).filter((hole): hole is Path => hole !== null);
+  return extrudePlateWithHoles(outline, holes, height);
 }
 
 function createDovetailGlueKeyMesh(width: number, depth: number, height: number): PrintableMesh {

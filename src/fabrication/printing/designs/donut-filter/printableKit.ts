@@ -2,6 +2,7 @@ import { Path, Shape } from "three";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
 import { roundVertex } from "@/fabrication/printing/meshWelding";
+import { extrudePlateWithHoles } from "@/fabrication/printing/plateMesh";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
 import { booleans } from "@/fabrication/printing/modeling/manifoldOps";
 import { extractWeldedMesh, solidFromWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
@@ -206,18 +207,21 @@ function adapterFlangeCuts(model: DonutFilterModel): readonly CircleCut[] {
 // #######################################
 
 function createPlateMesh(width: number, depth: number, height: number, cuts: readonly CircleCut[]): PrintableMesh {
-  const shape = createShape([
-    { x: 0, y: 0 },
-    { x: width, y: 0 },
-    { x: width, y: depth },
-    { x: 0, y: depth },
-  ]);
-  for (const cut of cuts) {
+  const holes = cuts.map((cut) => {
     const path = new Path();
     path.absellipse(cut.cx, cut.cy, cut.radius, cut.radius, 0, Math.PI * 2, true);
-    shape.holes.push(path);
-  }
-  return extrudeShapeToMesh(shape, height);
+    return path;
+  });
+  return extrudePlateWithHoles(
+    [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: depth },
+      { x: 0, y: depth },
+    ],
+    holes,
+    height,
+  );
 }
 
 function createTubeShellMesh(input: {
