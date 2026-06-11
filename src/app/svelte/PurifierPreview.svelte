@@ -107,6 +107,10 @@
     const kitKey = printKitCacheKey(currentLayout.rawSettings, presetId);
     const cachedKit = assembledKitCache.get(kitKey);
     if (cachedKit !== undefined) {
+      // Refresh recency so frequently toggled kits (unsplit <-> active preset)
+      // survive eviction.
+      assembledKitCache.delete(kitKey);
+      assembledKitCache.set(kitKey, cachedKit);
       // The newest render request is satisfied right here; an older build
       // still in flight must not apply later and revert the preview. Serving
       // from cache also moots any lingering failure for another key.
@@ -116,10 +120,18 @@
       return;
     }
     if (lastFailedAssembledKitKey === kitKey) {
+      // Re-entering a key that already failed (e.g. toggling exploded view
+      // away and back): re-surface the failure instead of silently keeping
+      // whatever model is on screen.
+      pendingTempestRender = null;
+      onAssembledBuildPhaseChange("failed");
       return;
     }
     pendingTempestRender = { layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey };
     if (inFlightAssembledKitKey === kitKey) {
+      // The build is already on its way; make sure the phase says so even if
+      // a cache-hit render reported "idle" in between.
+      onAssembledBuildPhaseChange("building");
       return;
     }
     inFlightAssembledKitKey = kitKey;

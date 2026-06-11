@@ -100,7 +100,7 @@ export type PrintablePart =
       readonly sourcePlacement?: never;
     });
 
-// Where a tempest chunk's local origin (its mesh min corner) sits inside the
+// Where a tempest chunk's local origin (the chunk grid cell's origin; the mesh is cell-relative and may start inside it) sits inside the
 // posed assembly, in millimeters. Plain data so kits survive the worker's
 // structured clone; the assembled preview uses it to reassemble the chunks and
 // open the seams in exploded view.

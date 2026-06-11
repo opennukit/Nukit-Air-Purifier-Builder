@@ -96,11 +96,13 @@ export type ChunkBoxMillimeters = {
   readonly size: Vector3Tuple;
 };
 
-// Exploded-view displacement per chunk, in posed-assembly millimeters: outward
-// from the assembly's center along the center→chunk-center vector, by
-// tempestChunkSeamExplodeFraction of the assembly's largest dimension. A chunk
-// centered on the assembly stays put — its neighbours moving away already
-// opens every seam it touches.
+// Exploded-view displacement per chunk, in posed-assembly millimeters: each
+// chunk moves outward by its center-offset from the assembly's center, scaled
+// by tempestChunkSeamExplodeFraction. Scaling the UN-normalized vector is the
+// point — chunks further out move proportionally further, so EVERY seam opens
+// by fraction × chunk pitch, including seams between same-side collinear
+// neighbours (a fixed-magnitude offset would leave those closed). A chunk
+// centered on the assembly stays put.
 export function chunkSeamExplodeOffsetsMillimeters(chunks: readonly ChunkBoxMillimeters[]): Vector3Tuple[] {
   if (chunks.length === 0) {
     return [];
@@ -115,15 +117,9 @@ export function chunkSeamExplodeOffsetsMillimeters(chunks: readonly ChunkBoxMill
   });
 
   const assemblyCenter = assemblyBounds.getCenter(new Vector3());
-  const assemblySize = assemblyBounds.getSize(new Vector3());
-  const explodeDistance = Math.max(assemblySize.x, assemblySize.y, assemblySize.z) * tempestChunkSeamExplodeFraction;
 
   return chunkCenters.map((center) => {
-    const direction = center.sub(assemblyCenter);
-    if (direction.lengthSq() < 0.000001) {
-      return [0, 0, 0];
-    }
-    const offset = direction.normalize().multiplyScalar(explodeDistance);
+    const offset = center.sub(assemblyCenter).multiplyScalar(tempestChunkSeamExplodeFraction);
     return [offset.x, offset.y, offset.z];
   });
 }
