@@ -67,11 +67,10 @@
   import {
     createActiveAssemblyPrintSeamPlan,
     createActivePrintSheetPlan,
-    createGeneratedPrintSheetPlanFromLayout,
-    generatedPrintSheetPlanCacheKey,
-    requireGeneratedPrintSheetPlan,
+    printKitCacheKey,
     type GeneratedPrintSheetPlanCacheEntry,
   } from "@/app/printSheetPlans";
+  import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
@@ -108,6 +107,7 @@
   import { summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import {
+    createPrintableSheetPlanFromKit,
     exportFormats as fabricationMethods,
     findPrintVolumePreset,
     printVolumePresets,
@@ -127,6 +127,14 @@
   type FabricationMethod = ExportFormat;
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
+
+  // The print kit behind the generated sheet plan builds in a worker; the
+  // "ready" state lives in the plan cache itself, so this tracks only whether a
+  // build is in flight (and the last failure, which keeps the previous plan).
+  type PrintKitBuildState =
+    | { readonly type: "idle" }
+    | { readonly type: "building" }
+    | { readonly type: "failed"; readonly message: string };
 
   // #######################################
   // Svelte State
@@ -151,6 +159,9 @@
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
   let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
+  const printSheetKitChannel = createPrintKitChannel();
+  let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
+  let inFlightPrintSheetPlanKey: string | null = null;
 
   // ##############################
   // Derived View State
@@ -205,7 +216,8 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = createCurrentGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
+  $: isPreviewUpdating = printSheetKitBuild.type === "building";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
@@ -484,10 +496,12 @@
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
       return "Opened source files";
     }
-    const printExport = createPrintDesignThreeMfExportFromKit(
-      currentLayout,
-      requireGeneratedPrintSheetPlan(currentGeneratedPlan, "exportPrintKit").kit,
-    );
+    // The kit is still building in the worker; ask the user to retry shortly
+    // rather than exporting a stale or missing plan.
+    if (currentGeneratedPlan === null) {
+      return "Still updating…";
+    }
+    const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, currentGeneratedPlan.kit);
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -595,7 +609,10 @@
   // Print Sheet Plans
   // ##############################
 
-  function createCurrentGeneratedPrintSheetPlan(
+  // Resolves the plan synchronously from the cache when possible; otherwise
+  // kicks off a worker build and keeps the previous plan on screen until the
+  // new one lands (the "Updating…" indicator covers the gap).
+  function resolveGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
@@ -603,13 +620,39 @@
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
     }
-    const cacheKey = generatedPrintSheetPlanCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
+    const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
     if (generatedPrintSheetPlanCache?.key === cacheKey) {
       return generatedPrintSheetPlanCache.plan;
     }
-    const plan = createGeneratedPrintSheetPlanFromLayout(currentLayout, currentPrintVolumePresetId);
-    generatedPrintSheetPlanCache = { key: cacheKey, plan };
-    return plan;
+    if (inFlightPrintSheetPlanKey !== cacheKey) {
+      requestGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId, cacheKey);
+    }
+    return generatedPrintSheetPlan;
+  }
+
+  function requestGeneratedPrintSheetPlan(
+    currentLayout: LayoutResult,
+    currentPrintVolumePresetId: PrintVolumePresetId,
+    cacheKey: string,
+  ): void {
+    inFlightPrintSheetPlanKey = cacheKey;
+    printSheetKitBuild = { type: "building" };
+    void printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
+      // A superseded request was replaced by a newer one that now owns the
+      // in-flight key and build state, so it changes nothing here.
+      if (outcome.type === "superseded") {
+        return;
+      }
+      inFlightPrintSheetPlanKey = null;
+      if (outcome.type === "failed") {
+        console.error(`requestGeneratedPrintSheetPlan: print kit build failed: ${outcome.message}`);
+        printSheetKitBuild = { type: "failed", message: outcome.message };
+        return;
+      }
+      generatedPrintSheetPlanCache = { key: cacheKey, plan: createPrintableSheetPlanFromKit(outcome.kit) };
+      generatedPrintSheetPlan = generatedPrintSheetPlanCache.plan;
+      printSheetKitBuild = { type: "idle" };
+    });
   }
 
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
@@ -726,6 +769,9 @@
           class="preview-stage"
           id="previewStage"
         >
+          {#if isPreviewUpdating}
+            <span class="preview-updating-indicator" role="status">Updating…</span>
+          {/if}
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
               <div class="preview-toggle-strip" aria-label="Preview display options">

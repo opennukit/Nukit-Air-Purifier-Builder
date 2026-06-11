@@ -394,6 +394,26 @@ Preview Stage
   height: 100%;
 }
 
+/* While a geometry build runs in the worker the previous model stays on
+screen; this small pill is the only cue that a refresh is on the way. */
+.preview-updating-indicator {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 3;
+  padding: 5px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 253 246 / 88%);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 28px rgb(51 42 27 / 10%);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
 /* ##############################
 Three Preview Controls
 ############################## */
