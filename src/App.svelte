@@ -66,13 +66,12 @@
     requireSelect,
   } from "@/app/controls/inputReaders";
   import {
+    assemblyPrintSeamPlanApplies,
     createActiveAssemblyPrintSeamPlan,
     createActivePrintSheetPlan,
-    createGeneratedPrintSheetPlanFromLayout,
-    generatedPrintSheetPlanCacheKey,
-    requireGeneratedPrintSheetPlan,
     type GeneratedPrintSheetPlanCacheEntry,
   } from "@/app/printSheetPlans";
+  import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
@@ -109,6 +108,7 @@
   import { summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import {
+    createPrintableSheetPlanFromKit,
     exportFormats as fabricationMethods,
     findPrintVolumePreset,
     printVolumePresets,
@@ -116,7 +116,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignThreeMfExportFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
@@ -128,6 +128,17 @@
   type FabricationMethod = ExportFormat;
   type TransientButtonKey = "copy-top" | "copy-mobile" | "export-main" | "export-mobile";
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
+
+  // The print kit behind the generated sheet plan builds in a worker; the
+  // "ready" state lives in the plan cache itself, so this tracks the build in
+  // flight and the last failure (which keeps the previous plan on screen).
+  // Both carry the cache key they answer, so a key is requested at most once:
+  // not re-posted while building, and not retried after failing until the
+  // settings change.
+  type PrintKitBuildState =
+    | { readonly type: "idle" }
+    | { readonly type: "building"; readonly key: string }
+    | { readonly type: "failed"; readonly key: string; readonly message: string };
 
   // #######################################
   // Svelte State
@@ -152,6 +163,16 @@
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
   let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
+  const printSheetKitChannel = createPrintKitChannel();
+  let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
+  // Reported up by PurifierPreview about its assembled tempest kit build.
+  let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  // First load shows a centered "Building model…" state until the first build
+  // SUCCEEDS; after that, rebuilds only show the corner pill over the old
+  // model. A failed first build stays in-progress, so the next attempt builds
+  // front and center again instead of behind a pill over a blank canvas.
+  type FirstPreviewBuild = "not-started" | "in-progress" | "done";
+  let firstPreviewBuild: FirstPreviewBuild = "not-started";
 
   // ##############################
   // Derived View State
@@ -206,7 +227,31 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = createCurrentGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
+  // The sheet-plan half only counts for 3D printing: the laser path renders
+  // synchronously, so no pill or overlay belongs there even if a print build
+  // is still settling in the background.
+  $: isPreviewUpdating =
+    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "building") ||
+    assembledPreviewBuildPhase === "building";
+  $: hasPreviewBuildFailure =
+    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "failed") ||
+    assembledPreviewBuildPhase === "failed";
+  $: if (isPreviewUpdating && firstPreviewBuild === "not-started") {
+    firstPreviewBuild = "in-progress";
+  }
+  $: if (firstPreviewBuild === "in-progress" && !isPreviewUpdating && !hasPreviewBuildFailure) {
+    firstPreviewBuild = "done";
+  }
+  // The single source for the preview build status: one persistent live region
+  // announces it, and the visual overlay/pill below render the same text.
+  $: previewStatusText = isPreviewUpdating
+    ? firstPreviewBuild === "done"
+      ? "Updating…"
+      : "Building model…"
+    : hasPreviewBuildFailure
+      ? "Update failed — check console"
+      : "";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
@@ -456,7 +501,7 @@
     }
 
     if (fabricationMethod === "print-3mf") {
-      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan), 1400);
+      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan, printSheetKitBuild), 1400);
       return;
     }
 
@@ -480,15 +525,30 @@
   function exportPrintKit(
     currentLayout: LayoutResult,
     currentGeneratedPlan: PrintableSheetPlan | null,
+    currentKitBuild: PrintKitBuildState,
   ): string {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
       return "Opened source files";
     }
-    const printExport = createPrintDesignThreeMfExportFromKit(
-      currentLayout,
-      requireGeneratedPrintSheetPlan(currentGeneratedPlan, "exportPrintKit").kit,
-    );
+    // Only a fresh plan may be exported. While a rebuild is in flight the
+    // cached plan still reflects the previous settings, so ask the user to
+    // retry shortly; after a failure there is no plan for these settings at
+    // all.
+    if (currentKitBuild.type === "building") {
+      return "Still updating…";
+    }
+    if (currentKitBuild.type === "failed") {
+      return "Build failed";
+    }
+    if (currentGeneratedPlan === null) {
+      // The plan resolves lazily, so nothing may be building yet (e.g.
+      // exporting straight from the assembled view): start the build now and
+      // ask the user to retry shortly.
+      requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
+      return "Still updating…";
+    }
+    const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, currentGeneratedPlan.kit);
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -596,21 +656,72 @@
   // Print Sheet Plans
   // ##############################
 
-  function createCurrentGeneratedPrintSheetPlan(
+  // Resolves the plan synchronously from the cache when possible. On a cache
+  // miss a worker build only starts when a view actually shows the plan —
+  // posting the visible assembled tempest request first in the worker's FIFO
+  // queue — and the previous plan stays on screen until the new one lands
+  // (the "Updating…" indicator covers the gap). While nothing shows the plan,
+  // the summaries render their pending placeholders and the export button
+  // starts a build on demand.
+  function resolveGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
+    currentPreviewMode: PreviewMode,
+    currentSettings: RawPurifierSettings,
   ): PrintableSheetPlan | null {
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
     }
-    const cacheKey = generatedPrintSheetPlanCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
+    const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
     if (generatedPrintSheetPlanCache?.key === cacheKey) {
+      // A recorded failure always belongs to some other key (failures never
+      // reach the cache), and it is moot once the current key serves from
+      // cache — clear it so the export path sees a fresh plan.
+      if (printSheetKitBuild.type === "failed") {
+        printSheetKitBuild = { type: "idle" };
+      }
       return generatedPrintSheetPlanCache.plan;
     }
-    const plan = createGeneratedPrintSheetPlanFromLayout(currentLayout, currentPrintVolumePresetId);
-    generatedPrintSheetPlanCache = { key: cacheKey, plan };
-    return plan;
+    const planIsOnScreen =
+      currentPreviewMode === "print-sheets" ||
+      assemblyPrintSeamPlanApplies(currentLayout, currentPreviewMode, currentFabricationMethod, currentSettings);
+    if (!planIsOnScreen) {
+      return null;
+    }
+    const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
+    if (!keyAlreadyHandled) {
+      requestGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId, cacheKey);
+    }
+    return generatedPrintSheetPlan;
+  }
+
+  function requestGeneratedPrintSheetPlan(
+    currentLayout: LayoutResult,
+    currentPrintVolumePresetId: PrintVolumePresetId,
+    cacheKey: string,
+  ): void {
+    printSheetKitBuild = { type: "building", key: cacheKey };
+    void printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
+      // A superseded request was replaced by a newer one that now owns the
+      // build state, so it changes nothing here.
+      if (outcome.type === "superseded") {
+        return;
+      }
+      if (outcome.type === "failed") {
+        console.error(`requestGeneratedPrintSheetPlan: print kit build failed: ${outcome.message}`);
+        printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
+        return;
+      }
+      generatedPrintSheetPlanCache = { key: cacheKey, plan: createPrintableSheetPlanFromKit(outcome.kit) };
+      printSheetKitBuild = { type: "idle" };
+      // The finished build always warms the cache, but it only goes on screen
+      // if it still answers the current settings — e.g. switching to the laser
+      // method mid-build must keep the plan null, not resurrect a print plan.
+      if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
+        generatedPrintSheetPlan = generatedPrintSheetPlanCache.plan;
+      }
+    });
   }
 
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
@@ -727,6 +838,17 @@
           class="preview-stage"
           id="previewStage"
         >
+          <span class="sr-only" role="status">{previewStatusText}</span>
+          {#if isPreviewUpdating && firstPreviewBuild !== "done"}
+            <div class="preview-loading-overlay" aria-hidden="true">
+              <span class="preview-loading-spinner"></span>
+              {previewStatusText}
+            </div>
+          {:else if isPreviewUpdating}
+            <span class="preview-updating-indicator" aria-hidden="true">{previewStatusText}</span>
+          {:else if hasPreviewBuildFailure}
+            <span class="preview-updating-indicator preview-update-failed" aria-hidden="true">{previewStatusText}</span>
+          {/if}
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
               <div class="preview-toggle-strip" aria-label="Preview display options">
@@ -855,7 +977,11 @@
                 <span class="sr-only">{settings.autoRotate ? "Pause auto rotate" : "Start auto rotate"}</span>
               </button>
             </div>
-            <PurifierPreview {layout} printSeamPlan={activePrintSeamPlan} />
+            <PurifierPreview
+              {layout}
+              printSeamPlan={activePrintSeamPlan}
+              onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
+            />
           {:else if previewMode === "print-sheets"}
             {#if activePrintSheetPlan !== null}
               <PrintSheetPreview plan={activePrintSheetPlan} />

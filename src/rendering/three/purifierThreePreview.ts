@@ -77,7 +77,7 @@ import {
   createTempestPrintablePose,
   createTempestSettingsFromLayout,
 } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+import type { PrintableKit, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE_PRESET_ID,
@@ -185,6 +185,7 @@ export class PurifierThreePreview {
   private animationId: number | null = null;
   private latestLayout: LayoutResult | null = null;
   private latestPrintSeamPlan: PrintableSheetPlan | null = null;
+  private latestAssembledTempestKit: PrintableKit | null = null;
   private readonly lightGroup = new Group();
   private roomEnvTexture: Texture | null = null;
   private hoveredDimensionId: string | null = null;
@@ -278,7 +279,13 @@ export class PurifierThreePreview {
   // Public API
   // ##############################
 
-  update(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null = null): void {
+  // For tempest designs, callers may pass a prebuilt (e.g. worker-built)
+  // assembled kit; without one the kit builds synchronously on this thread.
+  update(
+    layout: LayoutResult,
+    printSeamPlan: PrintableSheetPlan | null = null,
+    assembledTempestKit: PrintableKit | null = null,
+  ): void {
     if (this.destroyed) {
       return;
     }
@@ -290,6 +297,7 @@ export class PurifierThreePreview {
 
     this.latestLayout = layout;
     this.latestPrintSeamPlan = printSeamPlan;
+    this.latestAssembledTempestKit = assembledTempestKit;
     this.rebuildModel(layout, printSeamPlan);
     if (shouldApplyPresetCamera) {
       this.frameModel(layout);
@@ -1077,7 +1085,10 @@ export class PurifierThreePreview {
     const settings = layout.configuration;
     const tempestModel = createTempestModel(createTempestSettingsFromLayout(layout));
     const pose = createTempestPrintablePose(tempestModel);
-    const kit = createTempestPrintableKitFromLayout(layout, "unsplit");
+    // The expensive Manifold CSG build: normally supplied prebuilt via update()
+    // (built in the kit worker), with the sync build as the self-sufficient
+    // fallback. Appearance-preset rebuilds reuse the latest kit unchanged.
+    const kit = this.latestAssembledTempestKit ?? createTempestPrintableKitFromLayout(layout, "unsplit");
     const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
     const material = createPrintedPartMaterial({
       color: printedPartColor,

@@ -18,7 +18,6 @@ import type {
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
-import { requireGeneratedPrintSheetPlan } from "@/app/printSheetPlans";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
@@ -68,21 +67,20 @@ export function createPreviewSummaryItems(
         ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),
       ];
     }
-    const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
     if (isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
       return [
-        { label: "Print plates", value: String(plan.sheets.length) },
-        { label: "Print chunks", value: String(plan.kit.summary.partCount) },
-        { label: "Split model", value: String(plan.kit.summary.splitPanelCount) },
-        { label: "Bed", value: plan.kit.preset.label },
+        { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
+        { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+        { label: "Split model", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.splitPanelCount)) },
+        { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
       ];
     }
     return [
-      { label: "Print plates", value: String(plan.sheets.length) },
-      { label: "Panel tiles", value: String(plan.kit.summary.panelTileCount) },
-      { label: "Glue keys", value: String(plan.kit.summary.glueKeyCount) },
-      { label: "Split panels", value: String(plan.kit.summary.splitPanelCount) },
-      { label: "Bed", value: plan.kit.preset.label },
+      { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
+      { label: "Panel tiles", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.panelTileCount)) },
+      { label: "Glue keys", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.glueKeyCount)) },
+      { label: "Split panels", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.splitPanelCount)) },
+      { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
 
@@ -98,7 +96,6 @@ export function createPreviewSummaryItems(
   }
 
   if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
-    const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
     const model = createDonutFilterModel(currentLayout);
     return [
       { label: "Design", value: currentLayout.configuration.printDesign.label },
@@ -108,20 +105,19 @@ export function createPreviewSummaryItems(
       },
       { label: "Center hole", value: formatMillimeters(model.filter.holeDiameter) },
       { label: "Fan", value: `${model.fanSize} mm` },
-      { label: "Print parts", value: String(plan.kit.summary.partCount) },
-      { label: "Bed", value: plan.kit.preset.label },
+      { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+      { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
 
   if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
-    const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
     const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
     return [
       { label: "Design", value: currentLayout.configuration.printDesign.label },
       { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
-      { label: "Print chunks", value: String(plan.kit.summary.partCount) },
-      { label: "Bed", value: plan.kit.preset.label },
+      { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+      { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
 
@@ -136,6 +132,13 @@ export function createPreviewSummaryItems(
       value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
     },
   ];
+}
+
+// The print kit builds asynchronously in the kit worker, so a null plan means
+// "still building": plan-derived values show a pending placeholder until the
+// first build lands.
+function planValue(plan: PrintableSheetPlan | null, read: (plan: PrintableSheetPlan) => string): string {
+  return plan === null ? "…" : read(plan);
 }
 
 // Attribution row for curated static designs; omitted when neither the

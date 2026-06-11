@@ -1,19 +1,18 @@
 // Derives the print-sheet preview plans shown in the workbench from a layout:
-// generating the printable sheet plan, the settings-based cache key the app
-// memoizes it under, and the plan variants for the plate and seam previews.
+// the plan variants for the plate and seam previews. The kits behind these
+// plans build asynchronously, so a null generated plan means "still building";
+// the previews keep showing the previous plan until the new one lands.
 
 import { isStaticReferencePrintDesignId, isTempestPrintDesignId, staticPrintReferenceForPreset } from "@/domain/purifier/designPresets";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
-  createPrintableSheetPlanFromKit,
   findPrintVolumePreset,
   type ExportFormat,
   type PrintableSheetPlan,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import { createPrintDesignKit } from "@/fabrication/printing/printDesignKit";
 import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
 
 export type GeneratedPrintSheetPlanCacheEntry = {
@@ -25,7 +24,7 @@ export function createActivePrintSheetPlan(
   currentLayout: LayoutResult,
   currentPrintVolumePresetId: PrintVolumePresetId,
   currentGeneratedPlan: PrintableSheetPlan | null,
-): PrintSheetThreePreviewPlan {
+): PrintSheetThreePreviewPlan | null {
   if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
     if (reference === undefined) {
@@ -39,53 +38,24 @@ export function createActivePrintSheetPlan(
       bedLabel: preset.label,
     };
   }
-  return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActivePrintSheetPlan");
+  return currentGeneratedPlan;
 }
 
-export function generatedPrintSheetPlanCacheKey(
-  rawSettings: RawPurifierSettings,
-  currentPrintVolumePresetId: PrintVolumePresetId,
-): string {
-  return JSON.stringify({
-    printVolumePresetId: currentPrintVolumePresetId,
-    printDesign: rawSettings.printDesign,
-    filterWidth: rawSettings.filterWidth,
-    filterDepth: rawSettings.filterDepth,
-    filterThickness: rawSettings.filterThickness,
-    rim: rawSettings.rim,
-    fanDiameter: rawSettings.fanDiameter,
-    filters: rawSettings.filters,
-    splitFrames: rawSettings.splitFrames,
-    fansLeft: rawSettings.fansLeft,
-    fansRight: rawSettings.fansRight,
-    fansTop: rawSettings.fansTop,
-    fansBottom: rawSettings.fansBottom,
-    tempestArrangement: rawSettings.tempestArrangement,
-    donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
-    donutFilterLength: rawSettings.donutFilterLength,
-    donutFilterHoleDiameter: rawSettings.donutFilterHoleDiameter,
-    donutAdapterInsertLength: rawSettings.donutAdapterInsertLength,
-    donutCapRim: rawSettings.donutCapRim,
-    donutCapEnabled: rawSettings.donutCapEnabled,
-    screwHoleDiameter: rawSettings.screwHoleDiameter,
-    materialThickness: rawSettings.materialThickness,
-    kerfFit: rawSettings.kerfFit,
-    fingerWidthMultiplier: rawSettings.fingerWidthMultiplier,
-    fingerSpaceMultiplier: rawSettings.fingerSpaceMultiplier,
-    fingerPlayMultiplier: rawSettings.fingerPlayMultiplier,
-    fingerHoleWidthMultiplier: rawSettings.fingerHoleWidthMultiplier,
-    fingerHoleOffsetMultiplier: rawSettings.fingerHoleOffsetMultiplier,
-    dovetailSizeMultiplier: rawSettings.dovetailSizeMultiplier,
-    dovetailDepthMultiplier: rawSettings.dovetailDepthMultiplier,
-    dovetailTaper: rawSettings.dovetailTaper,
-  });
-}
-
-export function createGeneratedPrintSheetPlanFromLayout(
+// Whether the assembled view draws print seams for this configuration — the
+// one case the generated sheet plan is shown outside the print-sheets preview.
+export function assemblyPrintSeamPlanApplies(
   currentLayout: LayoutResult,
-  currentPrintVolumePresetId: PrintVolumePresetId,
-): PrintableSheetPlan {
-  return createPrintableSheetPlanFromKit(createPrintDesignKit(currentLayout, currentPrintVolumePresetId));
+  currentPreviewMode: PreviewMode,
+  currentFabricationMethod: ExportFormat,
+  currentSettings: RawPurifierSettings,
+): boolean {
+  return (
+    currentPreviewMode === "enclosure" &&
+    currentFabricationMethod === "print-3mf" &&
+    currentSettings.showPrintSeams &&
+    !isTempestPrintDesignId(currentLayout.configuration.printDesign.id) &&
+    !isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
+  );
 }
 
 export function createActiveAssemblyPrintSeamPlan(
@@ -95,21 +65,8 @@ export function createActiveAssemblyPrintSeamPlan(
   currentSettings: RawPurifierSettings,
   currentGeneratedPlan: PrintableSheetPlan | null,
 ): PrintableSheetPlan | null {
-  if (
-    currentPreviewMode !== "enclosure" ||
-    currentFabricationMethod !== "print-3mf" ||
-    !currentSettings.showPrintSeams ||
-    isTempestPrintDesignId(currentLayout.configuration.printDesign.id) ||
-    isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
-  ) {
+  if (!assemblyPrintSeamPlanApplies(currentLayout, currentPreviewMode, currentFabricationMethod, currentSettings)) {
     return null;
   }
-  return requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createActiveAssemblyPrintSeamPlan");
-}
-
-export function requireGeneratedPrintSheetPlan(plan: PrintableSheetPlan | null, context: string): PrintableSheetPlan {
-  if (plan === null) {
-    throw new Error(`${context}: Expected generated print sheet plan`);
-  }
-  return plan;
+  return currentGeneratedPlan;
 }

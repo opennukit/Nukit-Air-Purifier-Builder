@@ -55,8 +55,14 @@ printing/
 │   ├── chunkSlicing.ts        split the posed model into bed-sized, grill-safe chunks
 │   └── printableKit.ts        build on Manifold, pose, chunk, weld → PrintableKit
 │
+├── worker/                    off-thread kit builds
+│   ├── kitBuild.ts            the one sync build core both threads can run
+│   ├── kitWorkerProtocol.ts   the structured-clone message contract (types only)
+│   ├── kitWorker.ts           Web Worker shell: own kernel init + FIFO builds
+│   └── kitWorkerClient.ts     latest-wins channels, dedupe, worker lifecycle
+│
 ├── printableKit.ts            generic PrintableKit type + 3MF export from a kit
-├── printDesignKit.ts          dispatch by design id; attach enclosure colour
+├── printDesignKit.ts          dispatch by design id; kit cache key; enclosure colour
 └── threeMf.ts                 write the 3MF package (objects, plates, basematerials)
 ```
 
@@ -116,6 +122,30 @@ A reflection caveat worth knowing when rendering: mapping a build vertex
 reverses triangle winding. Renderers that cull front-faces will show shells
 inside-out unless the winding is flipped (`v1, v3, v2`). The geometry itself is
 correct; this only bites at the three.js boundary.
+
+## worker/ — off-thread kit builds
+
+Kit builds are expensive, so the app runs them in one shared, lazily spawned
+Web Worker. `kitWorker.ts` is a thin shell around the same sync build core
+(`kitBuild.ts`) the main thread can also run directly; requests are answered
+FIFO, one build at a time.
+
+The client side (`kitWorkerClient.ts`) exposes **latest-wins channels**: each
+consumer (the print-sheet plan, the assembled tempest preview) owns one
+channel; a new request supersedes the channel's in-flight one — settling its
+caller with `"superseded"` — and at most one request queues behind the build in
+progress, so a burst of edits costs at most two builds. Channels are
+parameterized over a small build port (`{ post }`), with the shared worker as
+the production port, a synchronous on-thread port as the no-Worker fallback,
+and hand-driven fakes in the unit tests. Geometry-identical requests from
+different channels share one build through the deduping port, keyed by
+`printKitCacheKey`.
+
+Messages cross the boundary via structured clone (`kitWorkerProtocol.ts`), so
+everything on the wire is plain data: `RawPurifierSettings` in, `PrintableKit`
+(extracted meshes, no WASM handles) out. Each thread owns its own Manifold
+kernel — the worker initializes one in its own heap, while the main-thread
+kernel (initialized at bootstrap) backs only the fallback paths.
 
 ## Adding another design
 

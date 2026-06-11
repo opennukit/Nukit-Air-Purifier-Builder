@@ -9,8 +9,11 @@ if (appRoot === null) {
   throw new Error("main: App root not found");
 }
 
-// The Tempest print kit builds its geometry synchronously through the Manifold
-// WASM kernel, so it must be loaded before any component can request a kit.
+// Kit geometry normally builds in the kit worker, which initializes its own
+// Manifold kernel in its own heap. This main-thread kernel backs only the
+// fallback paths — the kit channel's no-Worker sync build and the preview's
+// synchronous tempest build — which can run as soon as a component mounts, so
+// it must still be ready before the app does.
 async function bootstrap(root: HTMLElement): Promise<void> {
   await initManifoldKernel(() => manifoldWasmUrl);
   mount(App, { target: root });
