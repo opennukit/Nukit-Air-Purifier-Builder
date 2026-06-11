@@ -135,7 +135,7 @@
   // flight and the last failure (which keeps the previous plan on screen).
   // Both carry the cache key they answer, so a key is requested at most once:
   // not re-posted while building, and not retried after failing until the
-  // settings change.
+  // settings change or the user retries (retryFailedPreviewBuild).
   type PrintKitBuildState =
     | { readonly type: "idle" }
     | { readonly type: "building"; readonly key: string }
@@ -168,6 +168,7 @@
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
   // Reported up by PurifierPreview about its assembled tempest kit build.
   let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  let purifierPreview: PurifierPreview | undefined;
   // First load shows a centered "Building model…" state until the first build
   // SUCCEEDS; after that, rebuilds only show the corner pill over the old
   // model. A failed first build stays in-progress, so the next attempt builds
@@ -252,7 +253,7 @@
       ? "Updating…"
       : "Building model…"
     : hasPreviewBuildFailure
-      ? "Update failed — check console"
+      ? "Couldn't update the model"
       : "";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
@@ -729,6 +730,20 @@
     });
   }
 
+  // "Try again" on the failure pill. A failed key is otherwise never retried
+  // until the settings change, leaving the pill a dead end. The sheet-plan
+  // side resets its build state and re-resolves through the same path the
+  // reactive statement uses (which re-requests the build, since the failed
+  // key no longer blocks it); the assembled preview retries through its own
+  // component, which owns the failed-key memory.
+  function retryFailedPreviewBuild(): void {
+    if (printSheetKitBuild.type === "failed") {
+      printSheetKitBuild = { type: "idle" };
+      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
+    }
+    purifierPreview?.retryFailedAssembledKitBuild();
+  }
+
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
   syncDerivedWorkbenchState();
 </script>
@@ -852,7 +867,10 @@
           {:else if isPreviewUpdating}
             <span class="preview-updating-indicator" aria-hidden="true">{previewStatusText}</span>
           {:else if hasPreviewBuildFailure}
-            <span class="preview-updating-indicator preview-update-failed" aria-hidden="true">{previewStatusText}</span>
+            <span class="preview-updating-indicator preview-update-failed">
+              <span aria-hidden="true">{previewStatusText}</span>
+              <button class="preview-retry-button" type="button" onclick={retryFailedPreviewBuild}>Try again</button>
+            </span>
           {/if}
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
@@ -983,6 +1001,7 @@
               </button>
             </div>
             <PurifierPreview
+              bind:this={purifierPreview}
               {layout}
               printSeamPlan={activePrintSeamPlan}
               {printVolumePresetId}
