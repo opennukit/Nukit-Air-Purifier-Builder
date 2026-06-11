@@ -630,9 +630,22 @@ Three Preview Controls
   padding: 0 13px;
 }
 
+/* Icon-only pills: the label text stays in the accessibility tree (display:
+none would empty the accessible name), it is just visually clipped away. */
 .preview-control-spatial .preview-control-label,
 .preview-control-technical .preview-control-label {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.preview-toggle-field:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .preview-toggle-field:has(input:checked) {

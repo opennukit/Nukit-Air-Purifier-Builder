@@ -931,7 +931,7 @@
                   <span class="preview-control-icon" aria-hidden="true">
                     <span class="preview-control-glyph">mm</span>
                   </span>
-                  <span class="preview-control-label">Dims</span>
+                  <span class="preview-control-label">Show dimensions</span>
                 </label>
                 <label class="toggle-field preview-toggle-field preview-control-spatial" title="Scale reference">
                   <input
@@ -943,7 +943,7 @@
                   <span class="preview-control-icon" aria-hidden="true">
                     <span class="preview-control-glyph preview-control-glyph-wide">1:1</span>
                   </span>
-                  <span class="preview-control-label">Scale</span>
+                  <span class="preview-control-label">Scale reference</span>
                 </label>
                 {#if fabricationMethod === "print-3mf" && !isStaticReferenceControlsActive}
                   <div class="preview-color-field" aria-label="Preview color">
@@ -975,7 +975,7 @@
                         <path d="M9 4v16M15 4v16" />
                       </svg>
                     </span>
-                    <span class="preview-control-label">Splits</span>
+                    <span class="preview-control-label">Print split lines</span>
                   </label>
                 {/if}
               </div>
