@@ -12,13 +12,11 @@ import {
 import {
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
-  isDonutFilterAdapterPrintDesignPreset,
-  isLaserDerivedPrintDesignPreset,
-  isStaticReferencePrintDesignPreset,
+  isLaserCutDesignPreset,
   isPublicThreeDimensionalPrintDesignId,
   isTempestPrintDesignPreset,
   type DonutFilterAdapterPrintDesignPreset,
-  type LaserDerivedPrintDesignPreset,
+  type LaserCutDesignPreset,
   type PrintDesignPreset,
   type StaticReferencePrintDesignPreset,
   type TempestPrintDesignPreset,
@@ -50,7 +48,7 @@ export type StaticReferencePlatePreview =
 export type WorkbenchDesignContext =
   | {
       readonly type: "nukit";
-      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly preset: LaserCutDesignPreset;
       readonly layoutSectionTitle: "Fan placement";
       readonly partsSectionTitle: "Filter and fan";
     }
@@ -202,53 +200,53 @@ function createWorkbenchDesignContext(
   if (fabricationMethod !== "print-3mf") {
     return {
       type: "nukit",
-      preset: isLaserDerivedPrintDesignPreset(preset) ? preset : findLaserDerivedPrintDesignPreset(),
+      preset: isLaserCutDesignPreset(preset) ? preset : findLaserCutDesignPreset(),
       layoutSectionTitle: "Fan placement",
       partsSectionTitle: "Filter and fan",
     };
   }
 
-  if (isDonutFilterAdapterPrintDesignPreset(preset)) {
-    return {
-      type: "donut-filter-adapter",
-      preset,
-      layoutSectionTitle: "Adaptor",
-      partsSectionTitle: "Filter and fan",
-    };
+  // Each arm rebuilds the preset with the narrowed implementation because
+  // TypeScript does not narrow the parent union through a nested discriminant.
+  switch (preset.implementation.type) {
+    case "donut-filter-adapter":
+      return {
+        type: "donut-filter-adapter",
+        preset: { ...preset, implementation: preset.implementation },
+        layoutSectionTitle: "Adaptor",
+        partsSectionTitle: "Filter and fan",
+      };
+    case "tempest":
+      return {
+        type: "tempest",
+        preset: { ...preset, implementation: preset.implementation },
+        layoutSectionTitle: "Tempest layout",
+        partsSectionTitle: "Filter and fan",
+      };
+    case "static-reference": {
+      const reference = preset.implementation.reference;
+      return {
+        type: "static-reference",
+        preset: { ...preset, implementation: preset.implementation },
+        reference,
+        platePreview: staticPrintReferenceHasPlatePreview(reference)
+          ? { type: "available" }
+          : { type: "unavailable", reason: "no-local-print-plate-preview" },
+        layoutSectionTitle: "Source files",
+        partsSectionTitle: "Source and license",
+      };
+    }
+    case "laser-cut":
+      // A laser-only preset under the print method: session normalization
+      // lands such sessions on the default 3D design, so the design context
+      // resolves the same way.
+      return {
+        type: "tempest",
+        preset: findDefaultThreeDimensionalPrintDesignPreset(),
+        layoutSectionTitle: "Tempest layout",
+        partsSectionTitle: "Filter and fan",
+      };
   }
-
-  if (isTempestPrintDesignPreset(preset)) {
-    return {
-      type: "tempest",
-      preset,
-      layoutSectionTitle: "Tempest layout",
-      partsSectionTitle: "Filter and fan",
-    };
-  }
-
-  if (isStaticReferencePrintDesignPreset(preset)) {
-    const reference = preset.implementation.reference;
-    return {
-      type: "static-reference",
-      preset,
-      reference,
-      platePreview: staticPrintReferenceHasPlatePreview(reference)
-        ? { type: "available" }
-        : { type: "unavailable", reason: "no-local-print-plate-preview" },
-      layoutSectionTitle: "Source files",
-      partsSectionTitle: "Source and license",
-    };
-  }
-
-  // A laser-only preset under the print method: session normalization lands
-  // such sessions on the default 3D design, so the design context resolves
-  // the same way.
-  return {
-    type: "tempest",
-    preset: findDefaultThreeDimensionalPrintDesignPreset(),
-    layoutSectionTitle: "Tempest layout",
-    partsSectionTitle: "Filter and fan",
-  };
 }
 
 function isRawPurifierSettings(settings: RawPurifierSettings | PurifierDraft): settings is RawPurifierSettings {
@@ -311,10 +309,10 @@ function exportActionLabelForDesign(
   return fabricationMethod === "print-3mf" ? "Download 3MF" : "Export Laser Drawing";
 }
 
-function findLaserDerivedPrintDesignPreset(): LaserDerivedPrintDesignPreset {
+function findLaserCutDesignPreset(): LaserCutDesignPreset {
   const preset = findPrintDesignPreset("nukit-open-air");
-  if (!isLaserDerivedPrintDesignPreset(preset)) {
-    throw new Error("findLaserDerivedPrintDesignPreset: Nukit Open Air is not a laser-derived design");
+  if (!isLaserCutDesignPreset(preset)) {
+    throw new Error("findLaserCutDesignPreset: Nukit Open Air is not a laser-cut design");
   }
   return preset;
 }

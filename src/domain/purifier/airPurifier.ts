@@ -3,7 +3,7 @@ import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fans";
 import {
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
-  isLaserDerivedPrintDesignPreset,
+  isLaserCutDesignPreset,
   isTempestPrintDesignId,
   isTempestPrintDesignPreset,
   type DonutFilterSettings,
@@ -221,7 +221,7 @@ export function serializePurifierDraft(
         : 0,
   };
 
-  if (draft.design.type === "laser-derived-printable-kit") {
+  if (draft.design.type === "laser-cut") {
     return normalizeRawSettings({
       ...base,
       ...serializedFilterFields(draft.design.filter),
@@ -353,7 +353,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
         : 0,
   };
 
-  if (input.design.type === "laser-derived-printable-kit") {
+  if (input.design.type === "laser-cut") {
     return {
       ...base,
       filters: input.design.filterCount,
@@ -431,9 +431,9 @@ function createConfiguredPrintDesign(input: {
   readonly frameConstruction: FilterFrameConstruction;
 }): ConfiguredPrintDesign {
   const { printDesign } = input;
-  if (isLaserDerivedPrintDesignPreset(printDesign)) {
+  if (isLaserCutDesignPreset(printDesign)) {
     return {
-      type: "laser-derived-printable-kit",
+      type: "laser-cut",
       preset: printDesign,
       filter: input.filter,
       filterCount: input.filterCount,
@@ -527,9 +527,9 @@ export function isPurifierDraft(
 function createPurifierDesignDraft(
   configuration: PurifierSettings,
 ): PurifierDesignDraft {
-  if (configuration.design.type === "laser-derived-printable-kit") {
+  if (configuration.design.type === "laser-cut") {
     return {
-      type: "laser-derived-printable-kit",
+      type: "laser-cut",
       printDesign: configuration.design.preset.id,
       preset: configuration.design.preset,
       filter: configuration.design.filter,

@@ -80,7 +80,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       id: "large-unsplit-frame",
       severity: "warning",
       title: "Large unsplit frame",
-      detail: "The filter frame is wider than many desktop fabrication beds. Split frames are safer for this size.",
+      detail: "The filter frame is wider than many desktop fabrication beds.",
     });
   }
 

@@ -60,7 +60,7 @@ export function createPreviewSummaryItems(
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
       return [
-        { label: "Print plates", value: findPrintVolumePreset(currentPrintVolumePresetId).label },
+        { label: "Bed", value: findPrintVolumePreset(currentPrintVolumePresetId).label },
         { label: "Source STLs", value: String(reference?.platePreviewAssets.length ?? 0) },
         ...staticPrintEstimateSummaryItems(reference?.printEstimate),
         { label: "License", value: currentLayout.configuration.printDesign.license },
@@ -71,7 +71,6 @@ export function createPreviewSummaryItems(
       return [
         { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
         { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-        { label: "Split model", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.splitPanelCount)) },
         { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
       ];
     }
@@ -86,7 +85,7 @@ export function createPreviewSummaryItems(
     const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
     return [
       { label: "Design", value: currentLayout.configuration.printDesign.label },
-      { label: "Type", value: "Curated static" },
+      { label: "Type", value: "Community files" },
       { label: "Files", value: reference?.fileSummary ?? "Original source files" },
       ...staticPrintEstimateSummaryItems(reference?.printEstimate),
       ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),

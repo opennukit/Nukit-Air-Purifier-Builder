@@ -37,6 +37,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { reserveSingleFingerForPageScroll } from "@/rendering/three/orbitTouchScroll";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { findPreviewMaterialColorPreset } from "@/domain/purifier/settingsModel";
 import {
@@ -274,6 +275,7 @@ export class PurifierThreePreview {
     // Keep the camera above the floor — you orbit around a box sitting on a surface,
     // you don't fly underneath it. This reinforces "fixed box, moving camera".
     this.controls.maxPolarAngle = Math.PI * 0.5;
+    reserveSingleFingerForPageScroll(this.controls);
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.clearDimensionHover);

@@ -10,7 +10,7 @@ import {
   defaultPrintDesignId,
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
-  isLaserDerivedPrintDesignPreset,
+  isLaserCutDesignPreset,
   isStaticReferencePrintDesignPreset,
   isTempestPrintDesignPreset,
   tempestArrangementPresets,
@@ -18,7 +18,7 @@ import {
   type DonutFilterAdapterPrintDesignPreset,
   type DonutFilterSettings,
   type FilterCount,
-  type LaserDerivedPrintDesignPreset,
+  type LaserCutDesignPreset,
   type PrintDesignId,
   type PrintDesignPreset,
   type StaticReferencePrintDesignPreset,
@@ -220,10 +220,10 @@ export type PurifierCuttingDraft = {
   readonly joints: JointSettings;
 };
 
-export type LaserDerivedPrintDesignDraft = {
-  readonly type: "laser-derived-printable-kit";
-  readonly printDesign: LaserDerivedPrintDesignPreset["id"];
-  readonly preset: LaserDerivedPrintDesignPreset;
+export type LaserCutDesignDraft = {
+  readonly type: "laser-cut";
+  readonly printDesign: LaserCutDesignPreset["id"];
+  readonly preset: LaserCutDesignPreset;
   readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
@@ -259,7 +259,7 @@ export type StaticReferencePrintDesignDraft = {
 };
 
 export type PurifierDesignDraft =
-  | LaserDerivedPrintDesignDraft
+  | LaserCutDesignDraft
   | DonutFilterAdapterPrintDesignDraft
   | TempestPrintDesignDraft
   | StaticReferencePrintDesignDraft;
@@ -273,8 +273,8 @@ export type PurifierDraft = {
 
 export type ConfiguredPrintDesign =
   | {
-      readonly type: "laser-derived-printable-kit";
-      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly type: "laser-cut";
+      readonly preset: LaserCutDesignPreset;
       readonly filter: FilterDimensions;
       readonly filterCount: FilterCount;
       readonly fanBanks: FanBanks<FanCountRequest>;
@@ -571,7 +571,7 @@ export function applyPrintDesignPreset(
 
 function rawFilterCountForPrintDesign(preset: PrintDesignPreset): FilterCount {
   if (
-    isLaserDerivedPrintDesignPreset(preset) ||
+    isLaserCutDesignPreset(preset) ||
     isStaticReferencePrintDesignPreset(preset)
   ) {
     return preset.implementation.defaults.filterCount;

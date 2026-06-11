@@ -98,7 +98,7 @@ export function requireCutPanelFabricationPlan(layout: LayoutResult, caller: str
 }
 
 function createLayoutFabricationPlan(configuration: PurifierSettings): LayoutFabricationPlan {
-  if (configuration.design.type === "laser-derived-printable-kit") {
+  if (configuration.design.type === "laser-cut") {
     const cutSheetResult = createAirPurifierCutSheet(configuration);
     return {
       type: "cut-panel-source",

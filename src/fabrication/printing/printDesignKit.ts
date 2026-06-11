@@ -51,7 +51,7 @@ export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolume
       return createTempestPrintableKitFromLayout(layout, presetId);
     case "static-reference":
       throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
-    case "laser-derived-printable-kit":
+    case "laser-cut":
       throw new Error("createPrintDesignKit: The Nukit Open Air design fabricates as a laser cut sheet, not a print kit");
   }
 }

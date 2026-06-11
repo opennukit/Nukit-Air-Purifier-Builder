@@ -1765,12 +1765,8 @@ Desktop Fixed View
 
   .preview-pane {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
-  }
-
-  .preview-pane .summary-grid {
-    display: none;
   }
 
   .preview-stage,
