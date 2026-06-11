@@ -446,11 +446,30 @@ screen; this small pill is the only cue that a refresh is on the way. */
 }
 
 /* Error tone of the same pill: the model on screen no longer matches the
-settings because the last geometry build failed. */
+settings because the last geometry build failed. Unlike the passive updating
+pill it carries a retry button, so it accepts pointer events. */
 .preview-update-failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   border-color: rgb(160 102 40 / 45%);
   background: rgb(160 102 40 / 10%);
   color: #a06628;
+  pointer-events: auto;
+}
+
+.preview-retry-button {
+  padding: 1px 10px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.preview-retry-button:hover {
+  background: rgb(160 102 40 / 12%);
 }
 
 /* ##############################

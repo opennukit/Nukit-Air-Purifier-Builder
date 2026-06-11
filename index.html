@@ -9,9 +9,58 @@
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>FilterBoxBuilder: DIY clean air</title>
+    <!-- BOOTSTRAP_FALLBACK_STYLES: styles for the pre-mount loading screen
+    below and the bootstrap error screen rendered by src/main.ts. They live
+    here, not in the bundled stylesheet, so both screens render even when the
+    bundle never loads. -->
+    <style>
+      .bootstrap-fallback {
+        min-height: 100vh;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        padding: 24px;
+        color: #6b6353;
+        font-family: system-ui, sans-serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .bootstrap-spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #e4ddcc;
+        border-top-color: #a06628;
+        border-radius: 999px;
+        animation: bootstrap-spin 0.9s linear infinite;
+      }
+
+      @keyframes bootstrap-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .bootstrap-reload-button {
+        padding: 8px 22px;
+        border: 1px solid #a06628;
+        border-radius: 999px;
+        background: transparent;
+        color: #a06628;
+        font: inherit;
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="bootstrap-fallback">
+        <span class="bootstrap-spinner"></span>
+        <p>Loading FilterBoxBuilder…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
