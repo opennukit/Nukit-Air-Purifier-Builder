@@ -21,6 +21,10 @@
   const assembledKitPresetId = "unsplit";
   let assembledKitCache: { readonly key: string; readonly kit: PrintableKit } | null = null;
   let inFlightAssembledKitKey: string | null = null;
+  // A key that failed to build is not retried until the settings change;
+  // afterUpdate fires on every render, so retrying a persistent failure here
+  // would loop worker rebuilds forever.
+  let lastFailedAssembledKitKey: string | null = null;
   // The latest layout waiting on the in-flight kit; every re-render request for
   // the same kit key overwrites it, so the build applies the newest view state.
   let pendingTempestRender: PendingTempestRender | null = null;
@@ -73,6 +77,9 @@
       applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, assembledKitCache.kit);
       return;
     }
+    if (lastFailedAssembledKitKey === kitKey) {
+      return;
+    }
     pendingTempestRender = { layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey };
     if (inFlightAssembledKitKey === kitKey) {
       return;
@@ -87,9 +94,11 @@
       onAssembledBuildPhase("idle");
       if (outcome.type === "failed") {
         console.error(`updateTempestPreview: assembled kit build failed: ${outcome.message}`);
+        lastFailedAssembledKitKey = kitKey;
         pendingTempestRender = null;
         return;
       }
+      lastFailedAssembledKitKey = null;
       assembledKitCache = { key: kitKey, kit: outcome.kit };
       if (pendingTempestRender !== null) {
         applyTempestRender(pendingTempestRender, outcome.kit);
