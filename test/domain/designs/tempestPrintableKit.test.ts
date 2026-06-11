@@ -1,13 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createTempestModel,
   defaultTempestSettings,
   defaultTempestTowerFilter,
 } from "@/domain/designs/tempest/model";
 import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLayout } from "@/fabrication/purifierLayout";
+import { featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
-import { createPrintableThreeMfExportFromKit } from "@/fabrication/printing/printableKit";
+import {
+  createPrintableThreeMfExportFromKit,
+  type PrintableKit,
+  type PrintablePart,
+} from "@/fabrication/printing/printableKit";
 
 const openScadTowerCornerPostChamfer = 55;
 
@@ -137,6 +143,62 @@ describe("Tempest CSG printable kit", () => {
     expect(chamferFaceSpans.every((span) => span.triangleCount >= 2)).toBe(true);
   }, 15000);
 
+  test("places the unsplit posed assembly at the origin", () => {
+    const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");
+    const chunks = tempestChunkParts(kit);
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].sourcePlacement).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  test("places each bed-256 chunk at its chunk-grid boundaries in the posed assembly", () => {
+    const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
+    const grid = expectedBed256ChunkGrid();
+    const chunks = tempestChunkParts(kit);
+
+    expect(chunks).toHaveLength(kit.parts.length);
+    for (const chunk of chunks) {
+      const address = chunkAddressFromId(chunk.id);
+      expect(chunk.sourcePlacement.x).toBeCloseTo(grid.boundariesX[address.x], 3);
+      expect(chunk.sourcePlacement.y).toBeCloseTo(grid.boundariesY[address.y], 3);
+      expect(chunk.sourcePlacement.z).toBeCloseTo(grid.boundariesZ[address.z], 3);
+      expect(chunk.sourcePlacement.x + chunk.width).toBeCloseTo(grid.boundariesX[address.x + 1], 3);
+      expect(chunk.sourcePlacement.y + chunk.depth).toBeCloseTo(grid.boundariesY[address.y + 1], 3);
+      expect(chunk.sourcePlacement.z + chunk.height).toBeCloseTo(grid.boundariesZ[address.z + 1], 3);
+    }
+  });
+
+  test("chunk placements and sizes tile the posed assembly box", () => {
+    const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
+    const envelope = createTempestModel(bed256TempestSettings()).printablePose.envelope;
+    const chunks = tempestChunkParts(kit);
+
+    expectAxisPartition(
+      chunks.map((chunk) => ({
+        index: chunkAddressFromId(chunk.id).x,
+        min: chunk.sourcePlacement.x,
+        size: chunk.width,
+      })),
+      envelope.width,
+    );
+    expectAxisPartition(
+      chunks.map((chunk) => ({
+        index: chunkAddressFromId(chunk.id).y,
+        min: chunk.sourcePlacement.y,
+        size: chunk.depth,
+      })),
+      envelope.depth,
+    );
+    expectAxisPartition(
+      chunks.map((chunk) => ({
+        index: chunkAddressFromId(chunk.id).z,
+        min: chunk.sourcePlacement.z,
+        size: chunk.height,
+      })),
+      envelope.height,
+    );
+  });
+
   test("exports generated Tempest chunks through the existing 3MF package path", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
     const exported = createPrintableThreeMfExportFromKit(kit, "Tempest print kit", "tempest-print-kit.3mf");
@@ -178,6 +240,67 @@ describe("Tempest CSG printable kit", () => {
 
 function totalTriangleCount(kit: ReturnType<typeof createTempestPrintableKit>): number {
   return kit.parts.reduce((total, part) => total + part.mesh.triangles.length, 0);
+}
+
+type TempestChunkPart = Extract<PrintablePart, { readonly kind: "tempest-print-chunk" }>;
+
+function tempestChunkParts(kit: PrintableKit): readonly TempestChunkPart[] {
+  return kit.parts.filter((part): part is TempestChunkPart => part.kind === "tempest-print-chunk");
+}
+
+function chunkAddressFromId(id: string): { readonly x: number; readonly y: number; readonly z: number } {
+  const match = /^tempest-chunk-(\d+)-(\d+)-(\d+)$/.exec(id);
+  if (match === null) {
+    throw new Error(`chunkAddressFromId: Unexpected chunk id ${id}`);
+  }
+  return { x: Number(match[1]), y: Number(match[2]), z: Number(match[3]) };
+}
+
+function bed256TempestSettings(): typeof defaultTempestSettings {
+  return {
+    ...defaultTempestSettings,
+    printBed: { width: 256, depth: 256, height: 256 },
+  };
+}
+
+// Mirrors createTempestPrintableKit's internal grid: the model built against the
+// preset bed, sliced feature-aware in the printable pose.
+function expectedBed256ChunkGrid(): ReturnType<typeof featureAwarePrintableChunkGrid> {
+  const model = createTempestModel(bed256TempestSettings());
+  return featureAwarePrintableChunkGrid(model, model.printablePose, model.settings.printBed);
+}
+
+type AxisCell = {
+  readonly index: number;
+  readonly min: number;
+  readonly size: number;
+};
+
+// The cells along one axis must partition [0, extent]: every chunk at grid
+// index i agrees on its interval, intervals are contiguous, and they span the
+// posed assembly's full extent.
+function expectAxisPartition(cells: readonly AxisCell[], extent: number): void {
+  const intervalByIndex = new Map<number, { readonly min: number; readonly size: number }>();
+  for (const cell of cells) {
+    const existing = intervalByIndex.get(cell.index);
+    if (existing === undefined) {
+      intervalByIndex.set(cell.index, { min: cell.min, size: cell.size });
+      continue;
+    }
+    expect(cell.min).toBeCloseTo(existing.min, 3);
+    expect(cell.size).toBeCloseTo(existing.size, 3);
+  }
+
+  const indexes = [...intervalByIndex.keys()].sort((a, b) => a - b);
+  expect(indexes).toEqual(indexes.map((_, position) => position));
+
+  let cursor = 0;
+  for (const index of indexes) {
+    const interval = intervalByIndex.get(index)!;
+    expect(interval.min).toBeCloseTo(cursor, 3);
+    cursor = interval.min + interval.size;
+  }
+  expect(cursor).toBeCloseTo(extent, 3);
 }
 
 function meshSignature(mesh: TempestPrintableMesh): {

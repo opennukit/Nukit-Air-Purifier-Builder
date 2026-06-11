@@ -1,4 +1,4 @@
-import { Box3, Group, Vector3 } from "three";
+import { Box3, Group, Object3D, Vector3 } from "three";
 import type { CameraPreset } from "@/domain/purifier/settingsModel";
 import {
   isDonutFilterPrintDesignId,
@@ -26,6 +26,7 @@ import {
   sceneScale,
   staticReferencePreviewZoom,
   staticReferenceSceneScale,
+  tempestChunkSeamExplodeFraction,
   type FanAxis,
   type PreviewInteriorPlane,
 } from "@/rendering/three/preview/previewData";
@@ -50,8 +51,15 @@ export function toSceneOffset(offset: MillimeterVector3): Vector3 {
   return new Vector3(offset[0] * sceneScale, offset[1] * sceneScale, offset[2] * sceneScale);
 }
 
-export function explodeGeneratedPreviewChildrenFromCenter(group: Group, exploded: boolean): void {
-  if (!exploded || group.children.length === 0) {
+// Displaces `children` (default: every child) outward from the whole group's
+// center; the bounds always come from the full group so a partial selection
+// still explodes away from the assembled model's center.
+export function explodeGeneratedPreviewChildrenFromCenter(
+  group: Group,
+  exploded: boolean,
+  children: readonly Object3D[] = group.children,
+): void {
+  if (!exploded || children.length === 0) {
     return;
   }
 
@@ -61,8 +69,8 @@ export function explodeGeneratedPreviewChildrenFromCenter(group: Group, exploded
   }
 
   const modelCenter = modelBounds.getCenter(new Vector3());
-  const totalChildren = group.children.length;
-  group.children.forEach((child, index) => {
+  const totalChildren = children.length;
+  children.forEach((child, index) => {
     const childBounds = new Box3().setFromObject(child);
     if (childBounds.isEmpty()) {
       return;
@@ -80,6 +88,40 @@ export function explodeGeneratedPreviewChildrenFromCenter(group: Group, exploded
 function radialFallbackExplodeDirection(index: number, total: number): Vector3 {
   const angle = (Math.PI * 2 * index) / Math.max(1, total);
   return new Vector3(Math.cos(angle), 0.35, Math.sin(angle));
+}
+
+// The axis-aligned millimeter box one print chunk occupies in the posed assembly.
+export type ChunkBoxMillimeters = {
+  readonly min: Vector3Tuple;
+  readonly size: Vector3Tuple;
+};
+
+// Exploded-view displacement per chunk, in posed-assembly millimeters: each
+// chunk moves outward by its center-offset from the assembly's center, scaled
+// by tempestChunkSeamExplodeFraction. Scaling the UN-normalized vector is the
+// point — chunks further out move proportionally further, so EVERY seam opens
+// by fraction × chunk pitch, including seams between same-side collinear
+// neighbours (a fixed-magnitude offset would leave those closed). A chunk
+// centered on the assembly stays put.
+export function chunkSeamExplodeOffsetsMillimeters(chunks: readonly ChunkBoxMillimeters[]): Vector3Tuple[] {
+  if (chunks.length === 0) {
+    return [];
+  }
+
+  const assemblyBounds = new Box3();
+  const chunkCenters = chunks.map((chunk) => {
+    const min = new Vector3(...chunk.min);
+    const max = min.clone().add(new Vector3(...chunk.size));
+    assemblyBounds.expandByPoint(min).expandByPoint(max);
+    return min.add(max).multiplyScalar(0.5);
+  });
+
+  const assemblyCenter = assemblyBounds.getCenter(new Vector3());
+
+  return chunkCenters.map((center) => {
+    const offset = center.sub(assemblyCenter).multiplyScalar(tempestChunkSeamExplodeFraction);
+    return [offset.x, offset.y, offset.z];
+  });
 }
 
 export function cameraPosition(preset: CameraPreset, maxDimension: number): Vector3 {

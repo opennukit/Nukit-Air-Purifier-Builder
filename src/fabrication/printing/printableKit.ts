@@ -88,10 +88,27 @@ export type PrintablePart =
       readonly sourceTile: PrintableTileSource;
     })
   | (PrintablePartBase & {
-      readonly kind: Exclude<PrintablePartKind, "panel-tile">;
+      readonly kind: "tempest-print-chunk";
       readonly sourcePanelId?: string;
       readonly sourceTile?: never;
+      readonly sourcePlacement: TempestChunkPlacement;
+    })
+  | (PrintablePartBase & {
+      readonly kind: Exclude<PrintablePartKind, "panel-tile" | "tempest-print-chunk">;
+      readonly sourcePanelId?: string;
+      readonly sourceTile?: never;
+      readonly sourcePlacement?: never;
     });
+
+// Where a tempest chunk's local origin (the chunk grid cell's origin; the mesh is cell-relative and may start inside it) sits inside the
+// posed assembly, in millimeters. Plain data so kits survive the worker's
+// structured clone; the assembled preview uses it to reassemble the chunks and
+// open the seams in exploded view.
+export type TempestChunkPlacement = {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+};
 
 export type PrintableTileSource = {
   readonly panelId: string;

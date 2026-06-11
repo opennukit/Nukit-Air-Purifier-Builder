@@ -154,7 +154,13 @@ export function tempestCsgPointToScene(point: TempestCsgPoint, pose: TempestPrin
           z: point.y,
         }
       : point;
-  return new Vector3(posedPoint.x * sceneScale, posedPoint.z * sceneScale, posedPoint.y * sceneScale);
+  return tempestPosedPointToScene(posedPoint);
+}
+
+// Millimeter point already in the printable (posed, Z-up) frame → Y-up scene.
+// Print-chunk meshes and their sourcePlacement live in this frame.
+export function tempestPosedPointToScene(point: TempestCsgPoint): Vector3 {
+  return new Vector3(point.x * sceneScale, point.z * sceneScale, point.y * sceneScale);
 }
 
 export function tempestCsgAxisToSceneAxis(axis: FanAxis, pose: TempestPrintablePose): FanAxis {

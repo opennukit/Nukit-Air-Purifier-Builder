@@ -980,6 +980,7 @@
             <PurifierPreview
               {layout}
               printSeamPlan={activePrintSeamPlan}
+              {printVolumePresetId}
               onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
             />
           {:else if previewMode === "print-sheets"}

@@ -158,6 +158,11 @@ export const bananaReferenceRadius = 14 * sceneScale;
 export const oneMeterCubeSize = 1000 * sceneScale;
 export const staticReferenceExplodeDistance = 46 * sceneScale;
 export const generatedPreviewExplodeDistance = 72 * sceneScale;
+// Exploded tempest chunks displace outward by this fraction of their
+// center-offset from the posed assembly's center, so every glue seam opens by
+// this fraction of the chunk pitch — clear separation while the chunks still
+// read as one model.
+export const tempestChunkSeamExplodeFraction = 0.5;
 export const bananaScaleAssetUrl = "/vendor/scale-reference/banana/banana.glb";
 export const dimensionLabelNormalScale = new Vector3(1.37, 0.367, 1);
 export const dimensionLabelHoverScale = new Vector3(1.9, 0.51, 1);
