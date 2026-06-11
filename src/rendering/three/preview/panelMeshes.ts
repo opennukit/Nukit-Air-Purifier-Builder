@@ -157,6 +157,7 @@ export function createPanelGroup(
               fanCenterZ,
             ),
             radius: cut.radius * sceneScale,
+            facing: "axis-positive",
             appearance: fanAppearance,
           }),
         );

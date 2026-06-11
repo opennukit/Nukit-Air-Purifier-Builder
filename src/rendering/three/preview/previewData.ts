@@ -24,7 +24,7 @@ export type FanPlacement = {
   axis: FanAxis;
   position: Vector3;
   radius: number;
-  facing?: FanFacing;
+  facing: FanFacing;
 };
 
 export type TempestCsgPoint = {

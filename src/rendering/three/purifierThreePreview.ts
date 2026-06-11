@@ -673,6 +673,7 @@ export class PurifierThreePreview {
           axis: "z",
           position: new Vector3(x, 0, 0),
           radius: fanRadius,
+          facing: "axis-positive",
           appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-side-fan";
@@ -694,6 +695,7 @@ export class PurifierThreePreview {
           axis: "y",
           position,
           radius: fanRadius,
+          facing: "axis-positive",
           appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-top-fan";
@@ -712,6 +714,7 @@ export class PurifierThreePreview {
         axis: "z",
         position,
         radius: fanRadius,
+        facing: "axis-positive",
         appearance: fanAppearanceForColor(settings.fan.color),
       });
       fan.name = "static-reference-installed-fan";
@@ -1048,6 +1051,7 @@ export class PurifierThreePreview {
         axis: "x",
         position: new Vector3(fanCenterX, filterRadius, 0),
         radius: (model.fanSize / 2) * sceneScale,
+        facing: "axis-positive",
         appearance: fanAppearance,
       });
       collectFanRotors(fan, this.fanRotors);
@@ -1163,6 +1167,7 @@ export class PurifierThreePreview {
               axis: tempestCsgAxisToSceneAxis("z", pose),
               position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
               radius: (model.settings.fan.diameter / 2) * sceneScale,
+              facing: "axis-positive",
               appearance: fanAppearance,
             });
             collectFanRotors(fan, this.fanRotors);
