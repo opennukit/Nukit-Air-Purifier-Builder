@@ -8,11 +8,9 @@ import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js
 // and two fingers orbit/zoom the model. Mouse and trackpad behavior is
 // unchanged. OrbitControls sets touch-action "none" on the canvas when it
 // connects, so this must run after construction.
-export function reserveSingleFingerForPageScroll(
-  controls: OrbitControls,
-  canvas: HTMLCanvasElement,
-): void {
-  if (!window.matchMedia("(pointer: coarse)").matches) {
+export function reserveSingleFingerForPageScroll(controls: OrbitControls): void {
+  const canvas = controls.domElement;
+  if (canvas === null || !window.matchMedia("(pointer: coarse)").matches) {
     return;
   }
   controls.touches = { ONE: null, TWO: TOUCH.DOLLY_ROTATE };

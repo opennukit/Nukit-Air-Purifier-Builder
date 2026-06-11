@@ -133,7 +133,7 @@ export class PrintSheetThreePreview {
     this.controls.minDistance = 1.2;
     this.controls.maxDistance = 9;
     this.controls.addEventListener("change", this.render);
-    reserveSingleFingerForPageScroll(this.controls, this.renderer.domElement);
+    reserveSingleFingerForPageScroll(this.controls);
 
     this.scene.add(this.sheetGroup);
     this.scene.add(new HemisphereLight(0xfff7e8, 0x7f897a, 2.4));

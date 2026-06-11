@@ -275,7 +275,7 @@ export class PurifierThreePreview {
     // Keep the camera above the floor — you orbit around a box sitting on a surface,
     // you don't fly underneath it. This reinforces "fixed box, moving camera".
     this.controls.maxPolarAngle = Math.PI * 0.5;
-    reserveSingleFingerForPageScroll(this.controls, this.renderer.domElement);
+    reserveSingleFingerForPageScroll(this.controls);
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.clearDimensionHover);
