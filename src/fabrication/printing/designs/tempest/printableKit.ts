@@ -29,6 +29,8 @@ import {
   type ChunkBounds,
   clipPrintChunk,
   posePrintableAssembly,
+  tempestPinPlacementsClearOfFans,
+  type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
@@ -129,6 +131,60 @@ export function createTempestChunkPlan(settings: TempestSettings, presetId: Prin
     pose,
     printableChunkGrid,
     sourceChunkGrid: sourceChunkGridForPose(pose, printableChunkGrid),
+  };
+}
+
+// #######################################
+// Assembly Pin Diagram (pure, no CSG)
+// #######################################
+
+// The seam alignment pins as plain posed-frame data for the exploded preview:
+// where each filament pin sits and along which posed axis it runs. Derived
+// from the same chunk plan and pin-candidate math the kit's CSG build cuts
+// the holes with, so the diagram always matches the exported parts.
+export type TempestPosedPinPlacement = {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly axis: "x" | "y" | "z";
+};
+
+export type TempestAssemblyPinDiagram = {
+  readonly pinDiameter: number;
+  // The physical pin: holeDepth into the chunk on each side of the seam.
+  readonly pinLength: number;
+  readonly placements: readonly TempestPosedPinPlacement[];
+};
+
+export function createTempestAssemblyPinDiagram(
+  settings: TempestSettings,
+  presetId: PrintVolumePresetId,
+): TempestAssemblyPinDiagram | null {
+  const { model, pose, sourceChunkGrid } = createTempestChunkPlan(settings, presetId);
+  const pins = model.settings.alignmentPins;
+  if (pins.type === "disabled") {
+    return null;
+  }
+  const placements = tempestPinPlacementsClearOfFans(model, sourceChunkGrid).map((placement) => posePinPlacement(placement, pose));
+  if (placements.length === 0) {
+    return null;
+  }
+  return {
+    pinDiameter: pins.diameter,
+    pinLength: 2 * pins.holeDepth,
+    placements,
+  };
+}
+
+// Source -> posed frame, matching posePrintableAssembly and
+// sourceChunkGridForPose: upright-dual-filter maps (x, y, z) to
+// (x, envelope.depth - z, y), so the axes follow the same rotation.
+function posePinPlacement(placement: TempestAlignmentPinPlacement, pose: TempestPrintablePose): TempestPosedPinPlacement {
+  const [x, y, z] = placement.position;
+  if (pose.type === "source") {
+    return { position: { x, y, z }, axis: placement.axis };
+  }
+  return {
+    position: { x, y: pose.envelope.depth - z, z: y },
+    axis: placement.axis === "x" ? "x" : placement.axis === "y" ? "z" : "y",
   };
 }
 
