@@ -257,7 +257,7 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: partsItems = createPartsListItems(layout, fabricationMethod, settings);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
   $: assemblyNotes = createAssemblyNotes(layout, fabricationMethod, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
