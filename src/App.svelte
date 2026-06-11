@@ -66,6 +66,7 @@
     requireSelect,
   } from "@/app/controls/inputReaders";
   import {
+    assemblyPrintSeamPlanApplies,
     createActiveAssemblyPrintSeamPlan,
     createActivePrintSheetPlan,
     type GeneratedPrintSheetPlanCacheEntry,
@@ -226,7 +227,7 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
   // The sheet-plan half only counts for 3D printing: the laser path renders
   // synchronously, so no pill or overlay belongs there even if a print build
   // is still settling in the background.
@@ -541,6 +542,10 @@
       return "Build failed";
     }
     if (currentGeneratedPlan === null) {
+      // The plan resolves lazily, so nothing may be building yet (e.g.
+      // exporting straight from the assembled view): start the build now and
+      // ask the user to retry shortly.
+      requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
       return "Still updating…";
     }
     const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, currentGeneratedPlan.kit);
@@ -651,13 +656,19 @@
   // Print Sheet Plans
   // ##############################
 
-  // Resolves the plan synchronously from the cache when possible; otherwise
-  // kicks off a worker build and keeps the previous plan on screen until the
-  // new one lands (the "Updating…" indicator covers the gap).
+  // Resolves the plan synchronously from the cache when possible. On a cache
+  // miss a worker build only starts when a view actually shows the plan —
+  // posting the visible assembled tempest request first in the worker's FIFO
+  // queue — and the previous plan stays on screen until the new one lands
+  // (the "Updating…" indicator covers the gap). While nothing shows the plan,
+  // the summaries render their pending placeholders and the export button
+  // starts a build on demand.
   function resolveGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
+    currentPreviewMode: PreviewMode,
+    currentSettings: RawPurifierSettings,
   ): PrintableSheetPlan | null {
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
@@ -671,6 +682,12 @@
         printSheetKitBuild = { type: "idle" };
       }
       return generatedPrintSheetPlanCache.plan;
+    }
+    const planIsOnScreen =
+      currentPreviewMode === "print-sheets" ||
+      assemblyPrintSeamPlanApplies(currentLayout, currentPreviewMode, currentFabricationMethod, currentSettings);
+    if (!planIsOnScreen) {
+      return null;
     }
     const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
     if (!keyAlreadyHandled) {

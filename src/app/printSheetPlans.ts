@@ -41,6 +41,23 @@ export function createActivePrintSheetPlan(
   return currentGeneratedPlan;
 }
 
+// Whether the assembled view draws print seams for this configuration — the
+// one case the generated sheet plan is shown outside the print-sheets preview.
+export function assemblyPrintSeamPlanApplies(
+  currentLayout: LayoutResult,
+  currentPreviewMode: PreviewMode,
+  currentFabricationMethod: ExportFormat,
+  currentSettings: RawPurifierSettings,
+): boolean {
+  return (
+    currentPreviewMode === "enclosure" &&
+    currentFabricationMethod === "print-3mf" &&
+    currentSettings.showPrintSeams &&
+    !isTempestPrintDesignId(currentLayout.configuration.printDesign.id) &&
+    !isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
+  );
+}
+
 export function createActiveAssemblyPrintSeamPlan(
   currentLayout: LayoutResult,
   currentPreviewMode: PreviewMode,
@@ -48,13 +65,7 @@ export function createActiveAssemblyPrintSeamPlan(
   currentSettings: RawPurifierSettings,
   currentGeneratedPlan: PrintableSheetPlan | null,
 ): PrintableSheetPlan | null {
-  if (
-    currentPreviewMode !== "enclosure" ||
-    currentFabricationMethod !== "print-3mf" ||
-    !currentSettings.showPrintSeams ||
-    isTempestPrintDesignId(currentLayout.configuration.printDesign.id) ||
-    isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)
-  ) {
+  if (!assemblyPrintSeamPlanApplies(currentLayout, currentPreviewMode, currentFabricationMethod, currentSettings)) {
     return null;
   }
   return currentGeneratedPlan;

@@ -4,6 +4,7 @@ import { decodePurifierDraftSettings } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import type { KitBuildResult } from "@/fabrication/printing/worker/kitBuild";
 import {
+  createDedupingPort,
   createPrintKitChannel,
   type KitBuildPort,
   type KitRequestInput,
@@ -92,6 +93,39 @@ describe("createPrintKitChannel", () => {
     posted[0].respond(buildFailure("stale"));
     posted[1].respond(buildFailure("fresh"));
     expect(await queued).toEqual({ type: "failed", message: "fresh" });
+  });
+
+  test("geometry-identical requests from different channels share one underlying build", async () => {
+    const { port, posted } = createManualPort();
+    const dedupingPort = createDedupingPort(port);
+    const sheetChannel = createPrintKitChannel(dedupingPort);
+    const assembledChannel = createPrintKitChannel(dedupingPort);
+
+    // Preview-only differences must not defeat the dedupe.
+    const sheetRequest = sheetChannel.request(settings, "bed-220");
+    const assembledRequest = assembledChannel.request({ ...settings, showFans: !settings.showFans }, "bed-220");
+    expect(posted.length).toBe(1);
+
+    posted[0].respond(buildFailure("shared"));
+    expect(await sheetRequest).toEqual({ type: "failed", message: "shared" });
+    expect(await assembledRequest).toEqual({ type: "failed", message: "shared" });
+
+    // The build settled, so the next identical request starts fresh.
+    const retry = sheetChannel.request(settings, "bed-220");
+    expect(posted.length).toBe(2);
+    posted[1].respond(buildFailure("fresh"));
+    expect(await retry).toEqual({ type: "failed", message: "fresh" });
+  });
+
+  test("geometry-distinct requests do not share builds", () => {
+    const { port, posted } = createManualPort();
+    const dedupingPort = createDedupingPort(port);
+    const first = createPrintKitChannel(dedupingPort);
+    const second = createPrintKitChannel(dedupingPort);
+
+    void first.request(settings, "bed-220");
+    void second.request(settings, "bed-180");
+    expect(posted.length).toBe(2);
   });
 
   test("a synchronous port settles the caller within the same request", async () => {

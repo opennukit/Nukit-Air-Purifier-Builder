@@ -1,10 +1,12 @@
 // Client side of the kit worker: latest-wins request channels over one shared,
 // lazily spawned worker. Each consumer (print-sheet plan, assembled tempest
 // preview) owns its own channel, so their requests supersede within a channel
-// but never across channels.
+// but never across channels; geometry-identical requests from different
+// channels share one build through the deduping port.
 
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import type { PrintableKit, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
+import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
 import { buildKitResult, type KitBuildResult } from "@/fabrication/printing/worker/kitBuild";
 import type { KitWorkerRequest, KitWorkerResponse } from "@/fabrication/printing/worker/kitWorkerProtocol";
 
@@ -86,6 +88,31 @@ const sharedWorkerPort: KitBuildPort = {
   },
 };
 
+// Geometry-identical requests in flight at the same time share one build: the
+// channels never see each other, so without this the assembled preview and an
+// unsplit sheet plan for the same settings would each build the same kit.
+export function createDedupingPort(inner: KitBuildPort): KitBuildPort {
+  const listenersByBuildKey = new Map<string, Array<(result: KitBuildResult) => void>>();
+  return {
+    post(input, onResult) {
+      const buildKey = printKitCacheKey(input.rawSettings, input.presetId);
+      const listeners = listenersByBuildKey.get(buildKey);
+      if (listeners !== undefined) {
+        listeners.push(onResult);
+        return;
+      }
+      listenersByBuildKey.set(buildKey, [onResult]);
+      inner.post(input, (result) => {
+        const settled = listenersByBuildKey.get(buildKey) ?? [];
+        listenersByBuildKey.delete(buildKey);
+        for (const listener of settled) {
+          listener(result);
+        }
+      });
+    },
+  };
+}
+
 // Graceful degradation when Workers are unavailable (SSR, bare test runtimes):
 // the same sync core runs on the calling thread, whose Manifold kernel the app
 // initializes at bootstrap. It is a port like any other, so the channel state
@@ -96,8 +123,10 @@ const syncOnThreadPort: KitBuildPort = {
   },
 };
 
+const sharedDedupingWorkerPort = createDedupingPort(sharedWorkerPort);
+
 function defaultKitBuildPort(): KitBuildPort {
-  return typeof Worker === "undefined" ? syncOnThreadPort : sharedWorkerPort;
+  return typeof Worker === "undefined" ? syncOnThreadPort : sharedDedupingWorkerPort;
 }
 
 // #######################################
