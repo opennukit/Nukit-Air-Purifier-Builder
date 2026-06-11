@@ -34,7 +34,7 @@ export function evaluateActiveExportDiagnostics(
             "tight-fan-margin",
             "large-unsplit-frame",
             "large-sheet",
-            "custom-filter-range",
+            "filter-dimension-range",
           ].includes(diagnostic.id),
       )
     : evaluateBuildDiagnostics(currentLayout);

@@ -456,7 +456,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
       filterDepth: 130,
       filterThickness: 10,
     });
-    expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("custom-filter-range");
+    expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("filter-dimension-range");
   });
 
   test("keeps generated print designs out of wall-bank fan diagnostics", () => {

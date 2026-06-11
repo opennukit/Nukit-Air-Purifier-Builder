@@ -9,8 +9,8 @@ export type BuildDiagnostic = {
   detail: string;
 };
 
-const normalCustomFilterMinimum = 180;
-const normalCustomFilterMaximum = 760;
+const normalFilterMinimum = 180;
+const normalFilterMaximum = 760;
 const normalFilterThicknessMinimum = 12;
 const normalFilterThicknessMaximum = 80;
 const smallFanMargin = 12;
@@ -79,10 +79,10 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
 
   if (filterLooksUnusual(layout.configuration.filter)) {
     diagnostics.push({
-      id: "custom-filter-range",
+      id: "filter-dimension-range",
       severity: "warning",
-      title: "Unusual custom filter",
-      detail: "Custom dimensions are outside the normal range used by common HVAC and purifier filters.",
+      title: "Unusual filter dimensions",
+      detail: "Measured dimensions are outside the normal range used by common HVAC and purifier filters.",
     });
   }
 
@@ -104,7 +104,7 @@ export function summarizeBuildReadiness(layout: LayoutResult): BuildDiagnostic {
     id: "ready",
     severity: "info",
     title: "Ready to export",
-    detail: "No fan, sheet, frame, or custom-dimension issues were detected.",
+    detail: "No fan, sheet, frame, or dimension issues were detected.",
   };
 }
 
@@ -136,10 +136,10 @@ function fanMarginLabel(label: string, fans: number, span: number, fanDiameter: 
 function filterLooksUnusual(filter: LayoutResult["configuration"]["filter"]): boolean {
   const { width, depth, thickness } = filter;
   return (
-    width < normalCustomFilterMinimum ||
-    width > normalCustomFilterMaximum ||
-    depth < normalCustomFilterMinimum ||
-    depth > normalCustomFilterMaximum ||
+    width < normalFilterMinimum ||
+    width > normalFilterMaximum ||
+    depth < normalFilterMinimum ||
+    depth > normalFilterMaximum ||
     thickness < normalFilterThicknessMinimum ||
     thickness > normalFilterThicknessMaximum
   );
