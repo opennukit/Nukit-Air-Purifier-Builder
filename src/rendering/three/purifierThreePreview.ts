@@ -218,6 +218,8 @@ export class PurifierThreePreview {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.autoRotate = false;
+    // Half of three.js's default (2.0) — a calm display-stand spin.
+    this.controls.autoRotateSpeed = 1.0;
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;

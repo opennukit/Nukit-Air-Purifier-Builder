@@ -89,7 +89,9 @@ export function cameraPosition(preset: CameraPreset, maxDimension: number): Vect
   if (preset === "top") {
     return new Vector3(0.001, maxDimension * 2.8, 0.001);
   }
-  return new Vector3(maxDimension * 1.75, maxDimension * 1.05, maxDimension * 2.05);
+  // Default three-quarter start: front-left of the box at modest elevation, so
+  // the filter face and one fan wall are both visible on first load.
+  return new Vector3(-maxDimension * 1.45, maxDimension * 0.5, -maxDimension * 1.95);
 }
 
 export function cameraViewScale(layout: LayoutResult): number {
