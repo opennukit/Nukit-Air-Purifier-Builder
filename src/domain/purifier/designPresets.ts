@@ -220,6 +220,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-tempest",
     label: "Nukit Tempest",
+    detail:
+      "Parametric 3D-printed purifier housing: one or two stacked filters, or four side filters around a central chamber. Generated to your measured filter and chosen fans.",
     license: "Generated from this project",
     releaseVisibility: "public",
     implementation: {
