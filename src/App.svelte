@@ -76,8 +76,7 @@
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
-    createAssemblyNotes,
-    createPartsListItems,
+        createPartsListItems,
     createPreviewSummaryItems,
     type PartsListItem,
     type SummaryItem,
@@ -206,7 +205,6 @@
   let exportReadiness: BuildDiagnostic = summarizeBuildReadiness(layout);
   let previewSummaryItems: readonly SummaryItem[] = [];
   let partsItems: readonly PartsListItem[] = [];
-  let assemblyNotes: readonly string[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
   let activePrintSeamPlan: PrintableSheetPlan | null = null;
@@ -277,7 +275,6 @@
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
-  $: assemblyNotes = createAssemblyNotes(layout, fabricationMethod, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
@@ -1641,21 +1638,6 @@
             </div>
           </section>
 
-          {#if assemblyNotes.length > 0}
-            <section class="control-section assembly-notes-section">
-              <div class="assembly-card" id="assemblyNotes">
-                <div class="parts-list-heading">
-                  <strong>Assembly</strong>
-                  <span>How it goes together</span>
-                </div>
-                <ul>
-                  {#each assemblyNotes as note}
-                    <li>{note}</li>
-                  {/each}
-                </ul>
-              </div>
-            </section>
-          {/if}
         </div>
 
         <!-- #######################################

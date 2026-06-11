@@ -162,45 +162,6 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 }
 
 // ##############################
-// Assembly Guidance
-// ##############################
-
-// The "Assembly" card content: the active design's preset notes, extended for
-// chunked tempest prints with the seam glue/pin steps. The chunk plan is pure
-// arithmetic, so whether the active print volume splits the model is known
-// synchronously — no waiting on the worker-built kit.
-export function createAssemblyNotes(
-  currentLayout: LayoutResult,
-  currentFabricationMethod: ExportFormat,
-  currentPrintVolumePresetId: PrintVolumePresetId,
-): readonly string[] {
-  const baseNotes = currentLayout.configuration.printDesign.assemblyNotes;
-  if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
-    return [...baseNotes, ...tempestSeamAssemblyNotes(currentLayout, currentPrintVolumePresetId)];
-  }
-  return baseNotes;
-}
-
-function tempestSeamAssemblyNotes(
-  currentLayout: LayoutResult,
-  currentPrintVolumePresetId: PrintVolumePresetId,
-): readonly string[] {
-  const plan = createTempestChunkPlan(createTempestSettingsFromLayout(currentLayout), currentPrintVolumePresetId);
-  if (plan.printableChunkGrid.totalCount <= 1) {
-    return [];
-  }
-  const pins = plan.model.settings.alignmentPins;
-  return [
-    "Glue the printed chunks together at the seams with CA or epoxy glue",
-    ...(pins.type === "enabled"
-      ? [
-          `Cut ${formatMillimeters(2 * pins.holeDepth)} lengths of 1.75 mm filament as alignment pins for the holes along each seam`,
-        ]
-      : []),
-  ];
-}
-
-// ##############################
 // Parts List
 // ##############################
 
@@ -324,15 +285,15 @@ function tempestPrintPartsItems(
       ? [
           {
             category: "Assembly",
-            label: "CA or epoxy glue",
+            label: "Super glue or epoxy",
             detail: "Bonds the printed chunks at the seams",
           },
           ...(pins.type === "enabled"
             ? [
                 {
                   category: "Assembly",
-                  label: "1.75 mm filament pins",
-                  detail: `Short ${formatMillimeters(2 * pins.holeDepth)} pieces for the seam alignment holes`,
+                  label: "Filament alignment pins",
+                  detail: `Short ${formatMillimeters(2 * pins.holeDepth)} pieces of 1.75 mm filament for the holes along each seam`,
                 },
               ]
             : []),
@@ -341,7 +302,7 @@ function tempestPrintPartsItems(
   return [
     {
       category: "Filament",
-      label: "1.75 mm PLA or PETG",
+      label: "A spool of PLA or PETG",
       detail: "Prints the housing on the selected bed",
     },
     {

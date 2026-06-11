@@ -1342,28 +1342,6 @@ Diagnostics
   list-style: none;
 }
 
-/* ##############################
-Assembly Guidance
-############################## */
-
-.assembly-card {
-  display: grid;
-  gap: 10px;
-  margin: 0 0 10px;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--line-medium);
-  font-size: 0.8rem;
-  line-height: 1.3;
-}
-
-.assembly-card ul {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0 0 0 16px;
-  color: var(--muted);
-}
-
 /* #######################################
 Design-Specific Layout Controls
 ####################################### */
@@ -1373,16 +1351,17 @@ Segmented Controls
 ############################## */
 
 .segmented-field {
-  margin: 14px 0;
+  /* Matches .field's rhythm so side-by-side controls align on one baseline. */
+  margin: 9px 0;
   padding: 0;
   border: 0;
 }
 
 .segmented-field legend {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* Keeps a legend's text and its info icon on one inline row (legends themselves
@@ -1488,7 +1467,7 @@ hover/focus-within alone never shows the tooltip there. */
 .segmented-field label > span {
   display: grid;
   place-items: center;
-  min-height: 42px;
+  min-height: 36px;
   min-width: 0;
   padding: 0 8px;
   border: 1px solid var(--line);
