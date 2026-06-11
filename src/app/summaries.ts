@@ -11,7 +11,10 @@ import {
   staticPrintReferenceForPreset,
   staticReferenceDefaultsForPreset,
 } from "@/domain/purifier/designPresets";
-import type { StaticReferencePrintDesignDefaults } from "@/domain/purifier/designPresets";
+import type {
+  PrintDesignPreset,
+  StaticReferencePrintDesignDefaults,
+} from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
@@ -25,7 +28,10 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { StaticPrintEstimate } from "@/resources/static-print-references/references";
+import type {
+  StaticPrintEstimate,
+  StaticPrintReference,
+} from "@/resources/static-print-references/references";
 
 export type SummaryItem = {
   readonly label: string;
@@ -59,7 +65,7 @@ export function createPreviewSummaryItems(
         { label: "Source STLs", value: String(reference?.platePreviewAssets.length ?? 0) },
         ...staticPrintEstimateSummaryItems(reference?.printEstimate),
         { label: "License", value: currentLayout.configuration.printDesign.license },
-        { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
+        ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),
       ];
     }
     const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
@@ -87,7 +93,7 @@ export function createPreviewSummaryItems(
       { label: "Type", value: "Curated static" },
       { label: "Files", value: reference?.fileSummary ?? "Original source files" },
       ...staticPrintEstimateSummaryItems(reference?.printEstimate),
-      { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
+      ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),
     ];
   }
 
@@ -130,6 +136,16 @@ export function createPreviewSummaryItems(
       value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
     },
   ];
+}
+
+// Attribution row for curated static designs; omitted when neither the
+// reference nor the preset names a source.
+function sourceSummaryItems(
+  reference: StaticPrintReference | undefined,
+  preset: PrintDesignPreset,
+): readonly SummaryItem[] {
+  const source = reference?.attribution ?? preset.source;
+  return source === undefined ? [] : [{ label: "Source", value: source }];
 }
 
 function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefined): readonly SummaryItem[] {

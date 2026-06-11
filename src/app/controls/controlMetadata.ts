@@ -17,6 +17,10 @@ export type BooleanSettingName = {
 }[keyof RawPurifierSettings];
 export type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
 export type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
+export type DonutFilterDimensionName =
+  | "donutFilterOuterDiameter"
+  | "donutFilterLength"
+  | "donutFilterHoleDiameter";
 export type DonutNumberSettingName =
   | "donutFilterOuterDiameter"
   | "donutFilterLength"
@@ -54,7 +58,7 @@ export const filterDimensionControls: readonly DimensionControl<FilterDimensionN
   { name: "filterDepth", label: "Filter depth", step: "1" },
   { name: "filterThickness", label: "Filter thickness", step: "0.1" },
 ];
-export const donutFilterDimensionControls: readonly DimensionControl<DonutNumberSettingName>[] = [
+export const donutFilterDimensionControls: readonly DimensionControl<DonutFilterDimensionName>[] = [
   { name: "donutFilterOuterDiameter", label: "Outer diameter", step: "1" },
   { name: "donutFilterLength", label: "Length", step: "1" },
   { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },

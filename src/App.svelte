@@ -39,6 +39,7 @@
     staticPrintDesignPresets,
     tempestArrangementOptions,
     type BooleanSettingName,
+    type DonutFilterDimensionName,
     type DonutNumberSettingName,
     type FanCountSettingName,
     type FilterDimensionName,
@@ -73,7 +74,7 @@
   } from "@/app/printSheetPlans";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
-  import { fabricationMethodLabel, fanColorLabel, previewMaterialColorLabel, swatchColor } from "@/app/labels";
+  import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
     createPartsListItems,
     createPreviewSummaryItems,
@@ -298,6 +299,7 @@
     settings = serializePurifierDraft(nextDraft);
     printDesignSettingsMemory = nextMemory;
     workbenchState = normalizeWorkbenchStateForSettings(nextState, nextDraft);
+    customFanSizePinned = false;
     syncDerivedWorkbenchState();
     syncUrl();
   }
@@ -309,6 +311,7 @@
     settings = serializePurifierDraft(nextDraft);
     printDesignSettingsMemory = switched.memory;
     workbenchState = normalizeWorkbenchStateForSettings(workbenchState, nextDraft);
+    customFanSizePinned = false;
     syncDerivedWorkbenchState();
     syncUrl();
   }
@@ -344,15 +347,8 @@
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
   }
 
-  function updateFilterDimension(name: FilterDimensionName, event: Event): void {
-    commitSettings({
-      ...settings,
-      [name]: readDimensionInputMillimeters(event, settings[name]),
-    });
-  }
-
-  function updateDonutFilterDimension(
-    name: DonutNumberSettingName,
+  function updateMeasuredDimension(
+    name: FilterDimensionName | DonutFilterDimensionName,
     event: Event,
   ): void {
     commitSettings({
@@ -930,16 +926,16 @@
                     {/if}
                   </select>
                 </label>
-                {#if activePrintDesignPreset.detail !== "" || activePrintDesignPreset.source !== "" || activeStaticPrintReference !== undefined}
+                {#if activePrintDesignPreset.detail !== undefined || activePrintDesignPreset.source !== undefined || activeStaticPrintReference !== undefined}
                   <div class="print-design-card" id="printDesignDetail">
-                    {#if activePrintDesignPreset.detail !== ""}
+                    {#if activePrintDesignPreset.detail !== undefined}
                       <strong>{activePrintDesignPreset.detail}</strong>
                     {/if}
                     {#if activeStaticPrintReference !== undefined}
                       <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
                       <small>{activeStaticPrintReference.usePolicy.note}</small>
                     {/if}
-                    {#if activePrintDesignPreset.source !== "" || activePrintDesignPreset.sourceUrl !== undefined}
+                    {#if activePrintDesignPreset.source !== undefined || activePrintDesignPreset.sourceUrl !== undefined}
                       <small>
                         {activePrintDesignPreset.source}
                         {#if activePrintDesignPreset.sourceUrl !== undefined}
@@ -1112,7 +1108,7 @@
                                 step={dimensionInputStep(control.step, dimensionUnit)}
                                 inputmode="decimal"
                                 value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                                onchange={(event) => updateFilterDimension(control.name, event)}
+                                onchange={(event) => updateMeasuredDimension(control.name, event)}
                               />
                               <small>{dimensionUnit}</small>
                             </span>
@@ -1135,7 +1131,7 @@
                                 step={dimensionInputStep(control.step, dimensionUnit)}
                                 inputmode="decimal"
                                 value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                                onchange={(event) => updateDonutFilterDimension(control.name, event)}
+                                onchange={(event) => updateMeasuredDimension(control.name, event)}
                               />
                               <small>{dimensionUnit}</small>
                             </span>
@@ -1201,9 +1197,9 @@
                           <button
                             class:active-color={settings.fanColor === color}
                             type="button"
-                            aria-label={fanColorLabel(color)}
+                            aria-label={fanColorLabels[color]}
                             aria-pressed={settings.fanColor === color}
-                            title={fanColorLabel(color)}
+                            title={fanColorLabels[color]}
                             onclick={() => updateFanColor(color)}
                           >
                             <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>

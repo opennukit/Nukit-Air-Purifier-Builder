@@ -64,8 +64,8 @@ export type ReleaseVisibility = "public" | "internal";
 export type PrintDesignPresetBase = {
   readonly id: PrintDesignId;
   readonly label: string;
-  readonly detail: string;
-  readonly source: string;
+  readonly detail?: string;
+  readonly source?: string;
   readonly sourceUrl?: string;
   readonly license: string;
   readonly licenseUrl?: string;
@@ -220,8 +220,6 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-tempest",
     label: "Nukit Tempest",
-    detail: "",
-    source: "",
     license: "Generated from this project",
     releaseVisibility: "public",
     implementation: {

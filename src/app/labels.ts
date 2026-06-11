@@ -13,9 +13,10 @@ export function previewMaterialColorLabel(color: PreviewMaterialColorPreset): st
   return `${color.label} preview color`;
 }
 
-export function fanColorLabel(color: FanColor): string {
-  return color === "black" ? "Black" : "Beige/brown";
-}
+export const fanColorLabels: Record<FanColor, string> = {
+  black: "Black",
+  beige: "Beige/brown",
+};
 
 export function swatchColor(color: number): string {
   return `#${color.toString(16).padStart(6, "0")}`;
