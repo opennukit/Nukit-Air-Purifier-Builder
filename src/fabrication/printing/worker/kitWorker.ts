@@ -4,12 +4,8 @@
 
 import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
 import { initManifoldKernel } from "@/fabrication/printing/modeling/manifoldKernel";
-import {
-  buildKitResult,
-  type KitBuildResult,
-  type KitWorkerRequest,
-  type KitWorkerResponse,
-} from "@/fabrication/printing/worker/kitWorkerProtocol";
+import { buildKitResult, type KitBuildResult } from "@/fabrication/printing/worker/kitBuild";
+import type { KitWorkerRequest, KitWorkerResponse } from "@/fabrication/printing/worker/kitWorkerProtocol";
 
 // The worker global, typed to exactly the surface this entry uses. The project
 // compiles against the DOM lib, which types `self` as Window and lacks the
