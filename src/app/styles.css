@@ -1256,6 +1256,14 @@ Segmented Controls
   font-weight: 800;
 }
 
+/* Keeps a legend's text and its info icon on one inline row (legends themselves
+   ignore flex in some browsers, so the inner span carries the layout). */
+.legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Small "i" next to a legend; its explainer tooltip appears above on hover or
    keyboard focus. */
 .info-tip {
