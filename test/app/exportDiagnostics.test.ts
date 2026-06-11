@@ -16,14 +16,8 @@ import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/setti
 
 const cleanKitSummary: PrintableKitSummary = {
   partCount: 4,
-  panelTileCount: 0,
-  glueKeyCount: 0,
   splitPanelCount: 1,
   oversizedPartCount: 0,
-  sourceCutFeatureCount: 10,
-  retainedCutFeatureCount: 10,
-  sourcePrintCriticalCutFeatureCount: 10,
-  retainedPrintCriticalCutFeatureCount: 10,
 };
 
 function kitWithSummary(summary: PrintableKitSummary): PrintableKit {
@@ -56,14 +50,6 @@ describe("export diagnostics severity", () => {
     const summary = summarizeActiveBuildReadiness(tempestLayout, diagnostics, "print-3mf");
     expect(summary.severity).toBe("error");
     expect(summary.title).toBe("1 issue blocks export");
-  });
-
-  test("lost print-critical cut features block export", () => {
-    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
-    const plan = createPrintableSheetPlanFromKit(kitWithSummary({ ...cleanKitSummary, retainedPrintCriticalCutFeatureCount: 9 }));
-    const diagnostics = evaluateActiveExportDiagnostics(tempestLayout, "print-3mf", plan);
-
-    expect(exportBlockingDiagnostics(diagnostics).map((diagnostic) => diagnostic.id)).toEqual(["critical-print-feature-loss"]);
   });
 
   test("surfaces the filter dimension advisory for generated print designs", () => {

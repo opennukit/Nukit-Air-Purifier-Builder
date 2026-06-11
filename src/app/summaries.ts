@@ -77,9 +77,7 @@ export function createPreviewSummaryItems(
     }
     return [
       { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
-      { label: "Panel tiles", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.panelTileCount)) },
-      { label: "Glue keys", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.glueKeyCount)) },
-      { label: "Split panels", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.splitPanelCount)) },
+      { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }

@@ -35,14 +35,13 @@
   import { afterUpdate, onDestroy, onMount } from "svelte";
   import { isTempestPrintDesignId } from "@/domain/purifier/designPresets";
   import type { LayoutResult } from "@/fabrication/purifierLayout";
-  import type { PrintableSheetPlan, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
+  import type { PrintVolumePresetId } from "@/fabrication/printing/printableKit";
   import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import { PurifierThreePreview } from "@/rendering/three/purifierThreePreview";
 
   type AssembledBuildPhase = "idle" | "building" | "failed";
 
   export let layout: LayoutResult;
-  export let printSeamPlan: PrintableSheetPlan | null;
   export let printVolumePresetId: PrintVolumePresetId;
   export let onAssembledBuildPhaseChange: (phase: AssembledBuildPhase) => void = () => {};
 
@@ -64,26 +63,24 @@
 
   type PendingTempestRender = {
     readonly layout: LayoutResult;
-    readonly seamPlan: PrintableSheetPlan | null;
     readonly rebuildKey: string;
   };
 
   let host: HTMLDivElement;
   let preview: PurifierThreePreview | null = null;
   let previousRebuildKey = "";
-  let previousSeamPlan: PrintableSheetPlan | null = null;
 
   function updatePreview(): void {
     if (preview === null) {
       return;
     }
     const rebuildKey = previewRebuildKey(layout);
-    if (rebuildKey === previousRebuildKey && printSeamPlan === previousSeamPlan) {
+    if (rebuildKey === previousRebuildKey) {
       preview.setAutoRotate(layout.configuration.preview.enclosure.autoRotate);
       return;
     }
     if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
-      updateTempestPreview(layout, printSeamPlan, rebuildKey);
+      updateTempestPreview(layout, rebuildKey);
       return;
     }
     // A non-tempest render invalidates any tempest render still waiting on a
@@ -91,19 +88,14 @@
     // lingering tempest failure — this design renders fine.
     pendingTempestRender = null;
     onAssembledBuildPhaseChange("idle");
-    preview.update(layout, printSeamPlan);
+    preview.update(layout);
     previousRebuildKey = rebuildKey;
-    previousSeamPlan = printSeamPlan;
   }
 
   // The expensive Manifold kit builds off-thread; the previous model stays on
   // screen until the new kit lands. Latest-wins: a newer request supersedes the
   // in-flight one, and a superseded outcome changes nothing.
-  function updateTempestPreview(
-    currentLayout: LayoutResult,
-    currentSeamPlan: PrintableSheetPlan | null,
-    rebuildKey: string,
-  ): void {
+  function updateTempestPreview(currentLayout: LayoutResult, rebuildKey: string): void {
     const presetId = assembledTempestPresetId(currentLayout);
     const kitKey = printKitCacheKey(currentLayout.rawSettings, presetId);
     const cachedKit = assembledKitCache.get(kitKey);
@@ -117,7 +109,7 @@
       // from cache also moots any lingering failure for another key.
       pendingTempestRender = null;
       onAssembledBuildPhaseChange("idle");
-      applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, cachedKit);
+      applyTempestRender({ layout: currentLayout, rebuildKey }, cachedKit);
       return;
     }
     if (lastFailedAssembledKitKey === kitKey) {
@@ -128,7 +120,7 @@
       onAssembledBuildPhaseChange("failed");
       return;
     }
-    pendingTempestRender = { layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey };
+    pendingTempestRender = { layout: currentLayout, rebuildKey };
     if (inFlightAssembledKitKey === kitKey) {
       // The build is already on its way; make sure the phase says so even if
       // a cache-hit render reported "idle" in between.
@@ -171,9 +163,8 @@
     if (preview === null) {
       return;
     }
-    preview.update(render.layout, render.seamPlan, kit);
+    preview.update(render.layout, kit);
     previousRebuildKey = render.rebuildKey;
-    previousSeamPlan = render.seamPlan;
   }
 
   // The failure pill's "Try again" (App.svelte calls this via bind:this):
@@ -201,9 +192,8 @@
     preview = null;
   });
 
-  // The seam plan arrives asynchronously and is compared by reference instead,
-  // so the key covers only the settings that shape the rendered model — plus,
-  // for tempest, which kit the assembled preview renders: changing the print
+  // The key covers the settings that shape the rendered model — plus, for
+  // tempest, which kit the assembled preview renders: changing the print
   // volume while exploded view is on must re-render with the new chunks.
   function previewRebuildKey(currentLayout: LayoutResult): string {
     return JSON.stringify({

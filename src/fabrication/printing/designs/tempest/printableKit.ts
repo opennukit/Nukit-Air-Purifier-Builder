@@ -15,7 +15,6 @@ import {
   type TempestPrintablePose,
 } from "@/domain/designs/tempest/model";
 import type { TempestSettings } from "@/domain/designs/tempest/shared";
-import { matchTopology } from "@/domain/designs/tempest/topology";
 import {
   findPrintVolumePreset,
   printBedFitForPart,
@@ -57,9 +56,6 @@ type ChunkAddress = {
   readonly z: number;
 };
 
-// One fan cutout is five CSG features: the opening plus its four corner screw holes.
-const fanOpeningAndScrewFeatureCount = 5;
-
 // #######################################
 // Public Kit API
 // #######################################
@@ -81,23 +77,16 @@ export function createTempestPrintableKit(
       pose,
       createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, model, printableChunkGrid, assembly);
+    return createChunkParts(ctx, printableChunkGrid, assembly);
   });
-  const featureCount = estimateFeatureCount(model);
 
   return {
     preset,
     parts,
     summary: {
       partCount: parts.length,
-      panelTileCount: 0,
-      glueKeyCount: 0,
       splitPanelCount: printableChunkGrid.totalCount > 1 ? 1 : 0,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
-      sourceCutFeatureCount: featureCount,
-      retainedCutFeatureCount: featureCount,
-      sourcePrintCriticalCutFeatureCount: featureCount,
-      retainedPrintCriticalCutFeatureCount: featureCount,
     },
   };
 }
@@ -223,16 +212,14 @@ function settingsForPresetBed(settings: TempestSettings, presetId: PrintVolumePr
 
 function createChunkParts(
   ctx: GeometryContext<Geom3, Geom2>,
-  model: TempestModel,
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
 ): PrintablePart[] {
   const parts: PrintablePart[] = [];
-  const featureCount = estimateFeatureCount(model);
   for (let z = 0; z < chunkGrid.countZ; z += 1) {
     for (let y = 0; y < chunkGrid.countY; y += 1) {
       for (let x = 0; x < chunkGrid.countX; x += 1) {
-        const part = createChunkPart(ctx, chunkGrid, assembly, { x, y, z }, featureCount);
+        const part = createChunkPart(ctx, chunkGrid, assembly, { x, y, z });
         if (part.mesh.vertices.length > 0) {
           parts.push(part);
         }
@@ -247,7 +234,6 @@ function createChunkPart(
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
   address: ChunkAddress,
-  featureCount: number,
 ): PrintablePart {
   const bounds = chunkBoundsAt(chunkGrid, address);
   const [width, depth, height] = bounds.size;
@@ -256,7 +242,6 @@ function createChunkPart(
     id: `tempest-chunk-${address.x}-${address.y}-${address.z}`,
     name: `Tempest chunk ${address.x},${address.y},${address.z}`,
     kind: "tempest-print-chunk",
-    sourcePanelId: "tempest-parametric-csg",
     sourcePlacement: {
       x: roundMillimeters(originX),
       y: roundMillimeters(originY),
@@ -265,8 +250,6 @@ function createChunkPart(
     width: roundMillimeters(width),
     depth: roundMillimeters(depth),
     height: roundMillimeters(height),
-    cutFeatureCount: featureCount,
-    printCriticalCutFeatureCount: featureCount,
     mesh: extractWeldedMesh(clipPrintChunk(ctx, assembly, bounds)),
   };
 }
@@ -304,16 +287,3 @@ function createFinalAssemblyGeometry(model: TempestModel, alignmentPinChunkGrid:
   return buildTempestGeometry(manifoldModeling, model, alignmentPinChunkGrid);
 }
 
-// #######################################
-// Summary Helpers
-// #######################################
-
-function estimateFeatureCount(model: TempestModel): number {
-  return matchTopology(model, {
-    quad: (m) => m.fanLayout.fanCount * fanOpeningAndScrewFeatureCount + 9,
-    sandwich: (m) => {
-      const fanHoleCount = Object.values(m.fanLayout.walls).reduce((total, wall) => total + wall.actualCount * fanOpeningAndScrewFeatureCount, 0);
-      return fanHoleCount + (m.cordPassThrough.type === "none" ? 0 : 1);
-    },
-  });
-}
