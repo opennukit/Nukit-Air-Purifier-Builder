@@ -901,434 +901,342 @@
         </section>
 
         <div class="controls-sections">
-            {#if fabricationMethod === "print-3mf"}
-              <section class="control-section design-model-section" data-print-design-control>
-                <div class="section-heading">
-                  <p class="eyebrow">Design</p>
-                  <h2>Printable model</h2>
-                </div>
-                <label class="field print-design-select">
-                  <span>Printable design</span>
-                  <select name="printDesign" onchange={updatePrintDesign}>
-                    {#if parametricPrintDesignPresets.length > 0}
-                      <optgroup label="Parametric generators">
-                        {#each parametricPrintDesignPresets as preset}
-                          <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
-                        {/each}
-                      </optgroup>
-                    {/if}
-                    {#if staticPrintDesignPresets.length > 0}
-                      <optgroup label="Curated static references">
-                        {#each staticPrintDesignPresets as preset}
-                          <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
-                        {/each}
-                      </optgroup>
-                    {/if}
-                  </select>
-                </label>
-                {#if activePrintDesignPreset.detail !== undefined || activePrintDesignPreset.source !== undefined || activeStaticPrintReference !== undefined}
-                  <div class="print-design-card" id="printDesignDetail">
-                    {#if activePrintDesignPreset.detail !== undefined}
-                      <strong>{activePrintDesignPreset.detail}</strong>
-                    {/if}
-                    {#if activeStaticPrintReference !== undefined}
-                      <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
-                      <small>{activeStaticPrintReference.usePolicy.note}</small>
-                    {/if}
-                    {#if activePrintDesignPreset.source !== undefined || activePrintDesignPreset.sourceUrl !== undefined}
-                      <small>
-                        {activePrintDesignPreset.source}
-                        {#if activePrintDesignPreset.sourceUrl !== undefined}
-                          <a href={activePrintDesignPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
-                        {/if}
-                      </small>
-                    {/if}
-                  </div>
-                {/if}
-              </section>
-            {/if}
-
-            {#if !isStaticReferenceControlsActive}
-              <section class="control-section layout-section" data-generated-layout-controls>
-                <div class="section-heading">
-                  <p class="eyebrow">Layout</p>
-                  <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
-                </div>
-                <div class="fan-grid">
-                  {#if isNukitControlsActive}
-                    <div data-nukit-fan-placement>
-                      {#each fanPlacementControls as control}
-                        <label class="field compact-field">
-                          <span>{control.label}</span>
-                          <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
-                            <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
-                            {#each fixedFanCountOptions as count}
-                              <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
-                            {/each}
-                          </select>
-                        </label>
+          {#if fabricationMethod === "print-3mf"}
+            <section class="control-section design-model-section" data-print-design-control>
+              <div class="section-heading">
+                <p class="eyebrow">Design</p>
+                <h2>Printable model</h2>
+              </div>
+              <label class="field print-design-select">
+                <span>Printable design</span>
+                <select name="printDesign" onchange={updatePrintDesign}>
+                  {#if parametricPrintDesignPresets.length > 0}
+                    <optgroup label="Parametric generators">
+                      {#each parametricPrintDesignPresets as preset}
+                        <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
                       {/each}
-                    </div>
+                    </optgroup>
                   {/if}
-
-                  {#if isDonutControlsActive}
-                    <div data-donut-layout>
-                      <label class="field">
-                        <span>Insert length</span>
-                        <span class="input-shell">
-                          <input
-                            type="number"
-                            name="donutAdapterInsertLength"
-                            step="0.1"
-                            inputmode="decimal"
-                            value={settings.donutAdapterInsertLength}
-                            onchange={(event) => updateDonutNumberSetting("donutAdapterInsertLength", event)}
-                          />
-                          <small>mm</small>
-                        </span>
-                      </label>
-                      <label class="toggle-field">
-                        <input
-                          type="checkbox"
-                          name="donutCapEnabled"
-                          checked={settings.donutCapEnabled}
-                          onchange={(event) => updateBooleanSetting("donutCapEnabled", event)}
-                        />
-                        <span>Print back cap</span>
-                      </label>
-                      <label class="field">
-                        <span>Back cap rim</span>
-                        <span class="input-shell">
-                          <input
-                            type="number"
-                            name="donutCapRim"
-                            step="0.1"
-                            inputmode="decimal"
-                            value={settings.donutCapRim}
-                            onchange={(event) => updateDonutNumberSetting("donutCapRim", event)}
-                          />
-                          <small>mm</small>
-                        </span>
-                      </label>
-                    </div>
-                  {/if}
-
-                  {#if isTempestControlsActive}
-                    <div data-tempest-layout>
-                      <fieldset class="segmented-field segmented-field-three">
-                        <legend>Filter layout</legend>
-                        <div>
-                          {#each tempestArrangementOptions as option}
-                            <label>
-                              <input
-                                type="radio"
-                                name="tempestArrangement"
-                                value={option.id}
-                                checked={settings.tempestArrangement === option.id}
-                                onchange={() => updateTempestArrangement(option.id)}
-                              />
-                              <span>{option.label}</span>
-                            </label>
-                          {/each}
-                        </div>
-                      </fieldset>
-                    </div>
-                  {/if}
-                </div>
-                {#if isNukitControlsActive}
-                  <div data-nukit-filter-count>
-                    <fieldset class="segmented-field">
-                      <legend>Filters</legend>
-                      <div>
-                        <label>
-                          <input
-                            type="radio"
-                            name="filters"
-                            value="1"
-                            checked={settings.filters === 1}
-                            onchange={() => updateFilterCount(1)}
-                          />
-                          <span>One side</span>
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="filters"
-                            value="2"
-                            checked={settings.filters === 2}
-                            onchange={() => updateFilterCount(2)}
-                          />
-                          <span>Both sides</span>
-                        </label>
-                      </div>
-                    </fieldset>
-                  </div>
-                {/if}
-              </section>
-            {/if}
-
-            {#if !isStaticReferenceControlsActive}
-              <section class="control-section parts-section">
-                <div class="section-heading">
-                  <p class="eyebrow">Parts</p>
-                  <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
-                </div>
-                <p class="section-note">
-                  Get your filter and fans first, measure them, then enter the numbers here.
-                </p>
-                <div data-generated-part-controls>
-                  <fieldset class="segmented-field dimension-unit-field">
-                    <legend>Measurement unit</legend>
-                    <div>
-                      {#each dimensionUnits as unit}
-                        <label>
-                          <input
-                            type="radio"
-                            name="dimensionUnit"
-                            value={unit}
-                            checked={dimensionUnit === unit}
-                            onchange={() => (dimensionUnit = unit)}
-                          />
-                          <span>{unit}</span>
-                        </label>
+                  {#if staticPrintDesignPresets.length > 0}
+                    <optgroup label="Curated static references">
+                      {#each staticPrintDesignPresets as preset}
+                        <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
                       {/each}
-                    </div>
-                  </fieldset>
-
-                  {#if !isDonutControlsActive}
-                    <div data-rectangular-filter-controls>
-                      <div class="custom-dimensions" data-custom-filter-dimensions>
-                        {#each filterDimensionControls as control}
-                          <label class="field">
-                            <span>{control.label}</span>
-                            <span class="input-shell">
-                              <input
-                                type="number"
-                                name={control.name}
-                                step={dimensionInputStep(control.step, dimensionUnit)}
-                                inputmode="decimal"
-                                value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                                onchange={(event) => updateMeasuredDimension(control.name, event)}
-                              />
-                              <small>{dimensionUnit}</small>
-                            </span>
-                          </label>
-                        {/each}
-                      </div>
-                    </div>
+                    </optgroup>
                   {/if}
-
-                  {#if isDonutControlsActive}
-                    <div class="donut-filter-controls" data-donut-filter-controls>
-                      <div class="donut-filter-dimensions">
-                        {#each donutFilterDimensionControls as control}
-                          <label class="field">
-                            <span>{control.label}</span>
-                            <span class="input-shell">
-                              <input
-                                type="number"
-                                name={control.name}
-                                step={dimensionInputStep(control.step, dimensionUnit)}
-                                inputmode="decimal"
-                                value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                                onchange={(event) => updateMeasuredDimension(control.name, event)}
-                              />
-                              <small>{dimensionUnit}</small>
-                            </span>
-                          </label>
-                        {/each}
-                      </div>
-                    </div>
+                </select>
+              </label>
+              {#if activePrintDesignPreset.detail !== undefined || activePrintDesignPreset.source !== undefined || activeStaticPrintReference !== undefined}
+                <div class="print-design-card" id="printDesignDetail">
+                  {#if activePrintDesignPreset.detail !== undefined}
+                    <strong>{activePrintDesignPreset.detail}</strong>
                   {/if}
-
-                  <div class="fan-selection">
-                    <fieldset class="segmented-field segmented-field-three">
-                      <legend>Fan size</legend>
-                      <div>
-                        {#each recommendedFanDiameterOptions as diameter}
-                          <label>
-                            <input
-                              type="radio"
-                              name="fanSizeChoice"
-                              value={diameter}
-                              checked={selectedFanSizeChoice === diameter}
-                              onchange={() => updateFanSizeChoice(diameter)}
-                            />
-                            <span>{diameter} mm</span>
-                          </label>
-                        {/each}
-                        <label>
-                          <input
-                            type="radio"
-                            name="fanSizeChoice"
-                            value="custom"
-                            checked={selectedFanSizeChoice === "custom"}
-                            onchange={() => updateFanSizeChoice("custom")}
-                          />
-                          <span>Custom</span>
-                        </label>
-                      </div>
-                    </fieldset>
-
-                    {#if selectedFanSizeChoice === "custom"}
-                      <label class="field">
-                        <span>Fan diameter</span>
-                        <span class="input-shell">
-                          <input
-                            type="number"
-                            name="fanDiameter"
-                            min="40"
-                            max="140"
-                            step="1"
-                            inputmode="decimal"
-                            title="Snaps to the nearest supported size: 40/60/80/92/120/140"
-                            value={settings.fanDiameter}
-                            onchange={(event) => updateNumberSetting("fanDiameter", event)}
-                          />
-                          <small>mm</small>
-                        </span>
-                      </label>
-                    {/if}
-
-                    <div class="field fan-color-field">
-                      <span>Fan color</span>
-                      <div class="fan-color-options" role="group" aria-label="Fan color">
-                        {#each fanColors as color}
-                          <button
-                            class:active-color={settings.fanColor === color}
-                            type="button"
-                            aria-label={fanColorLabels[color]}
-                            aria-pressed={settings.fanColor === color}
-                            title={fanColorLabels[color]}
-                            onclick={() => updateFanColor(color)}
-                          >
-                            <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>
-                          </button>
-                        {/each}
-                      </div>
-                    </div>
-                  </div>
+                  {#if activeStaticPrintReference !== undefined}
+                    <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
+                    <small>{activeStaticPrintReference.usePolicy.note}</small>
+                  {/if}
+                  {#if activePrintDesignPreset.source !== undefined || activePrintDesignPreset.sourceUrl !== undefined}
+                    <small>
+                      {activePrintDesignPreset.source}
+                      {#if activePrintDesignPreset.sourceUrl !== undefined}
+                        <a href={activePrintDesignPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
+                      {/if}
+                    </small>
+                  {/if}
                 </div>
-              </section>
-            {/if}
+              {/if}
+            </section>
+          {/if}
 
-            {#if !isStaticReferenceControlsActive}
-              <section class="control-section geometry-section" data-generated-geometry-controls>
-                <div class="section-heading">
-                  <p class="eyebrow">Geometry</p>
-                  <h2>Material and fit</h2>
-                </div>
-                {#each generatedGeometryControls as control}
-                  <label class="field">
-                    <span>{control.label}</span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name={control.name}
-                        step={control.step}
-                        inputmode="decimal"
-                        value={settings[control.name]}
-                        onchange={(event) => updateNumberSetting(control.name, event)}
-                      />
-                      <small>{control.suffix}</small>
-                    </span>
-                  </label>
-                {/each}
+          {#if !isStaticReferenceControlsActive}
+            <section class="control-section layout-section" data-generated-layout-controls>
+              <div class="section-heading">
+                <p class="eyebrow">Layout</p>
+                <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
+              </div>
+              <div class="fan-grid">
                 {#if isNukitControlsActive}
-                  <div data-nukit-panel-fit-controls>
-                    {#each nukitPanelFitControls as control}
-                      <label class="field">
+                  <div data-nukit-fan-placement>
+                    {#each fanPlacementControls as control}
+                      <label class="field compact-field">
                         <span>{control.label}</span>
-                        <span class="input-shell">
-                          <input
-                            type="number"
-                            name={control.name}
-                            step={control.step}
-                            inputmode="decimal"
-                            value={settings[control.name]}
-                            onchange={(event) => updateNumberSetting(control.name, event)}
-                          />
-                          <small>{control.suffix}</small>
-                        </span>
+                        <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
+                          <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
+                          {#each fixedFanCountOptions as count}
+                            <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
+                          {/each}
+                        </select>
                       </label>
                     {/each}
                   </div>
                 {/if}
-              </section>
-            {/if}
 
-            {#if showPrintSetupControls}
-              <section class="control-section print-volume-section" data-print-volume-section>
-                <div class="section-heading">
-                  <p class="eyebrow">Printer</p>
-                  <h2>Print setup</h2>
-                </div>
-                <div data-print-volume-control>
-                  <label class="field">
-                    <span>Print volume</span>
-                    <select name="printVolume" onchange={setPrintVolume}>
-                      {#each printVolumePresets as preset}
-                        <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                </div>
-                {#if isNukitControlsActive}
-                  <div data-nukit-print-split-control>
+                {#if isDonutControlsActive}
+                  <div data-donut-layout>
+                    <label class="field">
+                      <span>Insert length</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="donutAdapterInsertLength"
+                          step="0.1"
+                          inputmode="decimal"
+                          value={settings.donutAdapterInsertLength}
+                          onchange={(event) => updateDonutNumberSetting("donutAdapterInsertLength", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
                     <label class="toggle-field">
                       <input
                         type="checkbox"
-                        name="splitFrames"
-                        checked={settings.splitFrames}
-                        onchange={(event) => updateBooleanSetting("splitFrames", event)}
+                        name="donutCapEnabled"
+                        checked={settings.donutCapEnabled}
+                        onchange={(event) => updateBooleanSetting("donutCapEnabled", event)}
                       />
-                      <span>Split large frame panels</span>
+                      <span>Print back cap</span>
+                    </label>
+                    <label class="field">
+                      <span>Back cap rim</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="donutCapRim"
+                          step="0.1"
+                          inputmode="decimal"
+                          value={settings.donutCapRim}
+                          onchange={(event) => updateDonutNumberSetting("donutCapRim", event)}
+                        />
+                        <small>mm</small>
+                      </span>
                     </label>
                   </div>
                 {/if}
-              </section>
-            {/if}
 
-            {#if fabricationMethod === "laser-svg"}
-              <section class="control-section laser-output-section" data-laser-output-controls>
-                <div class="section-heading">
-                  <p class="eyebrow">Laser setup</p>
-                  <h2>Drawing output</h2>
+                {#if isTempestControlsActive}
+                  <div data-tempest-layout>
+                    <fieldset class="segmented-field segmented-field-three">
+                      <legend>Filter layout</legend>
+                      <div>
+                        {#each tempestArrangementOptions as option}
+                          <label>
+                            <input
+                              type="radio"
+                              name="tempestArrangement"
+                              value={option.id}
+                              checked={settings.tempestArrangement === option.id}
+                              onchange={() => updateTempestArrangement(option.id)}
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                  </div>
+                {/if}
+              </div>
+              {#if isNukitControlsActive}
+                <div data-nukit-filter-count>
+                  <fieldset class="segmented-field">
+                    <legend>Filters</legend>
+                    <div>
+                      <label>
+                        <input
+                          type="radio"
+                          name="filters"
+                          value="1"
+                          checked={settings.filters === 1}
+                          onchange={() => updateFilterCount(1)}
+                        />
+                        <span>One side</span>
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="filters"
+                          value="2"
+                          checked={settings.filters === 2}
+                          onchange={() => updateFilterCount(2)}
+                        />
+                        <span>Both sides</span>
+                      </label>
+                    </div>
+                  </fieldset>
                 </div>
-                <label class="toggle-field">
-                  <input
-                    type="checkbox"
-                    name="labels"
-                    checked={settings.labels}
-                    onchange={(event) => updateBooleanSetting("labels", event)}
-                  />
-                  <span>Engrave part labels</span>
-                </label>
+              {/if}
+            </section>
+          {/if}
+
+          {#if !isStaticReferenceControlsActive}
+            <section class="control-section parts-section">
+              <div class="section-heading">
+                <p class="eyebrow">Parts</p>
+                <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
+              </div>
+              <p class="section-note">
+                Get your filter and fans first, measure them, then enter the numbers here.
+              </p>
+              <div data-generated-part-controls>
+                <fieldset class="segmented-field">
+                  <legend>Measurement unit</legend>
+                  <div>
+                    {#each dimensionUnits as unit}
+                      <label>
+                        <input
+                          type="radio"
+                          name="dimensionUnit"
+                          value={unit}
+                          checked={dimensionUnit === unit}
+                          onchange={() => (dimensionUnit = unit)}
+                        />
+                        <span>{unit}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </fieldset>
+
+                {#if !isDonutControlsActive}
+                  <div data-rectangular-filter-controls>
+                    <div class="custom-dimensions" data-custom-filter-dimensions>
+                      {#each filterDimensionControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              step={dimensionInputStep(control.step, dimensionUnit)}
+                              inputmode="decimal"
+                              value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                              onchange={(event) => updateMeasuredDimension(control.name, event)}
+                            />
+                            <small>{dimensionUnit}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                {#if isDonutControlsActive}
+                  <div class="donut-filter-controls" data-donut-filter-controls>
+                    <div class="donut-filter-dimensions">
+                      {#each donutFilterDimensionControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              step={dimensionInputStep(control.step, dimensionUnit)}
+                              inputmode="decimal"
+                              value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                              onchange={(event) => updateMeasuredDimension(control.name, event)}
+                            />
+                            <small>{dimensionUnit}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                <div class="fan-selection">
+                  <fieldset class="segmented-field segmented-field-three">
+                    <legend>Fan size</legend>
+                    <div>
+                      {#each recommendedFanDiameterOptions as diameter}
+                        <label>
+                          <input
+                            type="radio"
+                            name="fanSizeChoice"
+                            value={diameter}
+                            checked={selectedFanSizeChoice === diameter}
+                            onchange={() => updateFanSizeChoice(diameter)}
+                          />
+                          <span>{diameter} mm</span>
+                        </label>
+                      {/each}
+                      <label>
+                        <input
+                          type="radio"
+                          name="fanSizeChoice"
+                          value="custom"
+                          checked={selectedFanSizeChoice === "custom"}
+                          onchange={() => updateFanSizeChoice("custom")}
+                        />
+                        <span>Custom</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  {#if selectedFanSizeChoice === "custom"}
+                    <label class="field">
+                      <span>Fan diameter</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="fanDiameter"
+                          min="40"
+                          max="140"
+                          step="1"
+                          inputmode="decimal"
+                          title="Snaps to the nearest supported size: 40/60/80/92/120/140"
+                          value={settings.fanDiameter}
+                          onchange={(event) => updateNumberSetting("fanDiameter", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                  {/if}
+
+                  <div class="field fan-color-field">
+                    <span>Fan color</span>
+                    <div class="fan-color-options" role="group" aria-label="Fan color">
+                      {#each fanColors as color}
+                        <button
+                          class:active-color={settings.fanColor === color}
+                          type="button"
+                          aria-label={fanColorLabels[color]}
+                          aria-pressed={settings.fanColor === color}
+                          title={fanColorLabels[color]}
+                          onclick={() => updateFanColor(color)}
+                        >
+                          <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          {/if}
+
+          {#if !isStaticReferenceControlsActive}
+            <section class="control-section geometry-section" data-generated-geometry-controls>
+              <div class="section-heading">
+                <p class="eyebrow">Geometry</p>
+                <h2>Material and fit</h2>
+              </div>
+              {#each generatedGeometryControls as control}
                 <label class="field">
-                  <span>Reference scale</span>
+                  <span>{control.label}</span>
                   <span class="input-shell">
                     <input
                       type="number"
-                      name="referenceScale"
-                      step="1"
+                      name={control.name}
+                      step={control.step}
                       inputmode="decimal"
-                      value={settings.referenceScale}
-                      onchange={(event) => updateNumberSetting("referenceScale", event)}
+                      value={settings[control.name]}
+                      onchange={(event) => updateNumberSetting(control.name, event)}
                     />
-                    <small>mm</small>
+                    <small>{control.suffix}</small>
                   </span>
                 </label>
-              </section>
-            {/if}
-
-            {#if showAdvancedControls}
-              <section class="control-section joint-tuning-section" data-generated-advanced-controls>
-                <div class="section-heading">
-                  <p class="eyebrow">Advanced</p>
-                  <h2>Joint tuning</h2>
-                </div>
-                <div class="advanced-field-grid">
-                  {#each advancedJointControls as control}
+              {/each}
+              {#if isNukitControlsActive}
+                <div data-nukit-panel-fit-controls>
+                  {#each nukitPanelFitControls as control}
                     <label class="field">
                       <span>{control.label}</span>
                       <span class="input-shell">
@@ -1345,31 +1253,123 @@
                     </label>
                   {/each}
                 </div>
-              </section>
-            {/if}
+              {/if}
+            </section>
+          {/if}
 
-            <section class="control-section parts-list-section">
-              <div class="parts-list-card" id="partsList">
-                <div class="parts-list-heading">
-                  <strong>What you need</strong>
-                  <span>{fabricationMethod === "print-3mf" ? "Print and assemble" : "Cut and build"}</span>
+          {#if showPrintSetupControls}
+            <section class="control-section print-volume-section" data-print-volume-section>
+              <div class="section-heading">
+                <p class="eyebrow">Printer</p>
+                <h2>Print setup</h2>
+              </div>
+              <div data-print-volume-control>
+                <label class="field">
+                  <span>Print volume</span>
+                  <select name="printVolume" onchange={setPrintVolume}>
+                    {#each printVolumePresets as preset}
+                      <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              </div>
+              {#if isNukitControlsActive}
+                <div data-nukit-print-split-control>
+                  <label class="toggle-field">
+                    <input
+                      type="checkbox"
+                      name="splitFrames"
+                      checked={settings.splitFrames}
+                      onchange={(event) => updateBooleanSetting("splitFrames", event)}
+                    />
+                    <span>Split large frame panels</span>
+                  </label>
                 </div>
-                <ul>
-                  {#each partsItems as item}
-                    <li class="parts-list-row">
-                      <div>
-                        <small>{item.category}</small>
-                        <strong>{item.label}</strong>
-                        <span>{item.detail}</span>
-                      </div>
-                      {#if item.url !== undefined}
-                        <a href={item.url} target="_blank" rel="noreferrer">Open</a>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
+              {/if}
+            </section>
+          {/if}
+
+          {#if fabricationMethod === "laser-svg"}
+            <section class="control-section laser-output-section" data-laser-output-controls>
+              <div class="section-heading">
+                <p class="eyebrow">Laser setup</p>
+                <h2>Drawing output</h2>
+              </div>
+              <label class="toggle-field">
+                <input
+                  type="checkbox"
+                  name="labels"
+                  checked={settings.labels}
+                  onchange={(event) => updateBooleanSetting("labels", event)}
+                />
+                <span>Engrave part labels</span>
+              </label>
+              <label class="field">
+                <span>Reference scale</span>
+                <span class="input-shell">
+                  <input
+                    type="number"
+                    name="referenceScale"
+                    step="1"
+                    inputmode="decimal"
+                    value={settings.referenceScale}
+                    onchange={(event) => updateNumberSetting("referenceScale", event)}
+                  />
+                  <small>mm</small>
+                </span>
+              </label>
+            </section>
+          {/if}
+
+          {#if showAdvancedControls}
+            <section class="control-section joint-tuning-section" data-generated-advanced-controls>
+              <div class="section-heading">
+                <p class="eyebrow">Advanced</p>
+                <h2>Joint tuning</h2>
+              </div>
+              <div class="advanced-field-grid">
+                {#each advancedJointControls as control}
+                  <label class="field">
+                    <span>{control.label}</span>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name={control.name}
+                        step={control.step}
+                        inputmode="decimal"
+                        value={settings[control.name]}
+                        onchange={(event) => updateNumberSetting(control.name, event)}
+                      />
+                      <small>{control.suffix}</small>
+                    </span>
+                  </label>
+                {/each}
               </div>
             </section>
+          {/if}
+
+          <section class="control-section parts-list-section">
+            <div class="parts-list-card" id="partsList">
+              <div class="parts-list-heading">
+                <strong>What you need</strong>
+                <span>{fabricationMethod === "print-3mf" ? "Print and assemble" : "Cut and build"}</span>
+              </div>
+              <ul>
+                {#each partsItems as item}
+                  <li class="parts-list-row">
+                    <div>
+                      <small>{item.category}</small>
+                      <strong>{item.label}</strong>
+                      <span>{item.detail}</span>
+                    </div>
+                    {#if item.url !== undefined}
+                      <a href={item.url} target="_blank" rel="noreferrer">Open</a>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </section>
         </div>
 
         <!-- #######################################
