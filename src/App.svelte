@@ -493,6 +493,31 @@
   }
 
   // ##############################
+  // Info Tips
+  // ##############################
+
+  // Tooltips open on hover/keyboard focus via CSS alone; this click-toggled
+  // state exists for touch, where iOS Safari taps neither hover nor focus the
+  // button. At most one tip is open; the id is the tooltip element's id.
+  let openInfoTipId: string | null = null;
+
+  function toggleInfoTip(tipId: string): void {
+    openInfoTipId = openInfoTipId === tipId ? null : tipId;
+  }
+
+  function closeInfoTip(tipId: string): void {
+    if (openInfoTipId === tipId) {
+      openInfoTipId = null;
+    }
+  }
+
+  function handleInfoTipKeydown(tipId: string, event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      closeInfoTip(tipId);
+    }
+  }
+
+  // ##############################
   // Workbench Navigation
   // ##############################
 
@@ -1261,8 +1286,16 @@
                   <legend>
                     <span class="legend-row">
                       Measurement unit
-                      <span class="info-tip">
-                        <button type="button" aria-label="Why measure instead of using the printed label?" aria-describedby="measureInfoNote">i</button>
+                      <span class="info-tip" class:is-open={openInfoTipId === "measureInfoNote"}>
+                        <button
+                          type="button"
+                          aria-label="Why measure instead of using the printed label?"
+                          aria-describedby="measureInfoNote"
+                          aria-expanded={openInfoTipId === "measureInfoNote"}
+                          onclick={() => toggleInfoTip("measureInfoNote")}
+                          onblur={() => closeInfoTip("measureInfoNote")}
+                          onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
+                        >i</button>
                         <p id="measureInfoNote" role="tooltip">
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
@@ -1479,8 +1512,16 @@
                       <span>
                         {control.label}
                         {#if control.info !== undefined}
-                          <span class="info-tip">
-                            <button type="button" aria-label="What does {control.label} do?" aria-describedby="info-{control.name}">i</button>
+                          <span class="info-tip" class:is-open={openInfoTipId === `info-${control.name}`}>
+                            <button
+                              type="button"
+                              aria-label="What does {control.label} do?"
+                              aria-describedby="info-{control.name}"
+                              aria-expanded={openInfoTipId === `info-${control.name}`}
+                              onclick={() => toggleInfoTip(`info-${control.name}`)}
+                              onblur={() => closeInfoTip(`info-${control.name}`)}
+                              onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
+                            >i</button>
                             <p id="info-{control.name}" role="tooltip">{control.info}</p>
                           </span>
                         {/if}
