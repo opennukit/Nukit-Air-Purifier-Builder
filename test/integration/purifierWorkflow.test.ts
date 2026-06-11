@@ -564,7 +564,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     ]);
     expect(printDesignPresets.map((preset) => preset.id)).toContain("donut-hepa-adapter");
     expect(printDesignPresets.map((preset) => preset.id)).toContain("nukit-tempest");
-    expect(publicPrintDesignPresets[0]?.detail).toContain("dovetail lap keys");
+    expect(publicPrintDesignPresets[0]?.detail).toContain("Laser-cut");
     expect(publicPrintDesignPresets.filter((preset) => isStaticReferencePrintDesignId(preset.id))).toHaveLength(1);
     expect(publicPrintDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")).toBeDefined();
     const staticCr16x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-16x20-140");

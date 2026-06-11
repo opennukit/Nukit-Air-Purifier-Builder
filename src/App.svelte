@@ -1418,19 +1418,6 @@
                 </select>
               </label>
             </div>
-            {#if isNukitControlsActive}
-              <div data-nukit-print-split-control>
-                <label class="toggle-field">
-                  <input
-                    type="checkbox"
-                    name="splitFrames"
-                    checked={settings.splitFrames}
-                    onchange={(event) => updateBooleanSetting("splitFrames", event)}
-                  />
-                  <span>Split large frame panels</span>
-                </label>
-              </div>
-            {/if}
           {/snippet}
 
           {#if !isStaticReferenceControlsActive}

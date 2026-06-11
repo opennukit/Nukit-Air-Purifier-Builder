@@ -1190,7 +1190,6 @@ Conditional Visibility
 [data-generated-advanced-controls][hidden],
 [data-nukit-filter-count][hidden],
 [data-nukit-panel-fit-controls][hidden],
-[data-nukit-print-split-control][hidden],
 [data-laser-output-controls][hidden] {
   display: none;
 }

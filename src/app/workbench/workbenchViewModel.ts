@@ -240,10 +240,13 @@ function createWorkbenchDesignContext(
     };
   }
 
+  // A laser-only preset under the print method: session normalization lands
+  // such sessions on the default 3D design, so the design context resolves
+  // the same way.
   return {
-    type: "nukit",
-    preset: findLaserDerivedPrintDesignPreset(),
-    layoutSectionTitle: "Fan placement",
+    type: "tempest",
+    preset: findDefaultThreeDimensionalPrintDesignPreset(),
+    layoutSectionTitle: "Tempest layout",
     partsSectionTitle: "Filter and fan",
   };
 }
@@ -312,6 +315,14 @@ function findLaserDerivedPrintDesignPreset(): LaserDerivedPrintDesignPreset {
   const preset = findPrintDesignPreset("nukit-open-air");
   if (!isLaserDerivedPrintDesignPreset(preset)) {
     throw new Error("findLaserDerivedPrintDesignPreset: Nukit Open Air is not a laser-derived design");
+  }
+  return preset;
+}
+
+function findDefaultThreeDimensionalPrintDesignPreset(): TempestPrintDesignPreset {
+  const preset = findPrintDesignPreset(defaultThreeDimensionalPrintDesignId);
+  if (!isTempestPrintDesignPreset(preset)) {
+    throw new Error("findDefaultThreeDimensionalPrintDesignPreset: the default 3D design is not a tempest design");
   }
   return preset;
 }
