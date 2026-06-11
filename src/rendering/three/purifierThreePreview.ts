@@ -77,7 +77,7 @@ import {
   createTempestPrintablePose,
   createTempestSettingsFromLayout,
 } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { PrintableKit, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+import type { PrintableKit, PrintablePart, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE_PRESET_ID,
@@ -105,6 +105,7 @@ import {
 import {
   cameraPosition,
   cameraViewScale,
+  chunkSeamExplodeOffsetsMillimeters,
   clamp,
   explodeGeneratedPreviewChildrenFromCenter,
   previewInteriorShiftForBounds,
@@ -123,6 +124,7 @@ import {
   moveTempestFanInsideWall,
   tempestCsgAxisToSceneAxis,
   tempestCsgPointToScene,
+  tempestPosedPointToScene,
   tempestHorizontalFilterBoxes,
   tempestPreviewWalls,
   tempestTowerFilterBoxes,
@@ -1097,16 +1099,24 @@ export class PurifierThreePreview {
     });
     const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.58);
 
-    for (const part of kit.parts) {
-      this.modelGroup.add(
-        createPrintableMeshPreviewGroup(
-          part.mesh,
-          material,
-          edgeMaterial,
-          `tempest-preview-${part.id}`,
-          settings.preview.enclosure.showPreviewEdges,
-        ),
+    const chunkParts = kit.parts.filter(
+      (part): part is Extract<PrintablePart, { readonly kind: "tempest-print-chunk" }> =>
+        part.kind === "tempest-print-chunk",
+    );
+    const chunkGroups: Object3D[] = [];
+    for (const part of chunkParts) {
+      const chunkGroup = createPrintableMeshPreviewGroup(
+        part.mesh,
+        material,
+        edgeMaterial,
+        `tempest-preview-${part.id}`,
+        settings.preview.enclosure.showPreviewEdges,
       );
+      // Chunk meshes are chunk-local; placing each at its posed-assembly origin
+      // reassembles the model regardless of how the kit was split.
+      chunkGroup.position.copy(tempestPosedPointToScene(part.sourcePlacement));
+      chunkGroups.push(chunkGroup);
+      this.modelGroup.add(chunkGroup);
     }
 
     this.addTempestPreviewPurchasedParts(tempestModel, pose, fanAppearanceForColor(settings.fan.color), {
@@ -1116,7 +1126,26 @@ export class PurifierThreePreview {
     });
 
     const dimensionBounds = new Box3().setFromObject(this.modelGroup);
-    explodeGeneratedPreviewChildrenFromCenter(this.modelGroup, settings.preview.enclosure.explodedView);
+    // Exploded view separates the model into its printable chunks along the
+    // glue seams; the purchased parts (filters, fans) keep the generic
+    // from-center explode so they clear the opened shell the same as before.
+    explodeGeneratedPreviewChildrenFromCenter(
+      this.modelGroup,
+      settings.preview.enclosure.explodedView,
+      this.modelGroup.children.filter((child) => !chunkGroups.includes(child)),
+    );
+    if (settings.preview.enclosure.explodedView) {
+      const offsets = chunkSeamExplodeOffsetsMillimeters(
+        chunkParts.map((part) => ({
+          min: [part.sourcePlacement.x, part.sourcePlacement.y, part.sourcePlacement.z],
+          size: [part.width, part.depth, part.height],
+        })),
+      );
+      chunkGroups.forEach((chunkGroup, index) => {
+        const [offsetX, offsetY, offsetZ] = offsets[index];
+        chunkGroup.position.add(tempestPosedPointToScene({ x: offsetX, y: offsetY, z: offsetZ }));
+      });
+    }
 
     const outline = this.settleModelOnGround();
     this.addScaleReference(layout, outline);
