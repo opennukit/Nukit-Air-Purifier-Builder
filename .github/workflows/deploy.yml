@@ -7,7 +7,8 @@ name: Deploy
 #   AWS_REGION                                  - bucket region (e.g. us-east-1)
 #   S3_BUCKET                                   - bucket name
 #   CLOUDFRONT_DISTRIBUTION_ID                  - distribution to invalidate
-# The job skips quietly until those secrets exist.
+# and the repository variable DEPLOY_ENABLED=true; the job skips until the
+# variable is set.
 
 on:
   push:
