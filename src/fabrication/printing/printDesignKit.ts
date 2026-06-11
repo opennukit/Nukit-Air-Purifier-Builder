@@ -33,7 +33,6 @@ export function printKitCacheKey(
     explodedView,
     showDimensions,
     showBananaScale,
-    showPrintSeams,
     showPreviewEdges,
     autoRotate,
     cameraPreset,

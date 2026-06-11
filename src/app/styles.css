@@ -623,17 +623,9 @@ Three Preview Controls
   padding: 0 11px 0 8px;
 }
 
-.toggle-field.preview-control-lines {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: max-content;
-  padding: 0 13px;
-}
-
 /* Icon-only pills: the label text stays in the accessibility tree (display:
 none would empty the accessible name), it is just visually clipped away. */
-.preview-control-spatial .preview-control-label,
-.preview-control-technical .preview-control-label {
+.preview-control-spatial .preview-control-label {
   position: absolute;
   width: 1px;
   height: 1px;

@@ -199,8 +199,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const explicitFalse = decodeSettings("showFans=0");
     const rotationDisabled = decodeSettings("autoRotate=0");
     const bananaEnabled = decodeSettings("showBananaScale=1");
-    const printSeamsEnabled = decodeSettings("showPrintSeams=1");
     const previewEdgesEnabled = decodeSettings("showPreviewEdges=1");
+    const removedPrintSeams = decodeSettings("showPrintSeams=1");
     const defaultPreviewColor = decodeSettings("");
     const grayPreviewColor = decodeSettings("previewMaterialColor=matte-gray");
     const previewColor = decodeSettings("previewMaterialColor=natural-tan");
@@ -220,8 +220,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(explicitFalse.showFans).toBe(false);
     expect(rotationDisabled.autoRotate).toBe(false);
     expect(bananaEnabled.showBananaScale).toBe(true);
-    expect(printSeamsEnabled.showPrintSeams).toBe(true);
     expect(previewEdgesEnabled.showPreviewEdges).toBe(true);
+    expect("showPrintSeams" in removedPrintSeams).toBe(false);
+    expect(encodeSettings(removedPrintSeams)).not.toContain("showPrintSeams");
     expect(defaultPreviewColor.previewMaterialColor).toBe("matte-black");
     expect(grayPreviewColor.previewMaterialColor).toBe("matte-gray");
     expect(previewColor.previewMaterialColor).toBe("natural-tan");

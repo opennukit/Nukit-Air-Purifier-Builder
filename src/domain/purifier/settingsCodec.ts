@@ -120,7 +120,6 @@ export function encodeSettings(
   params.set("explodedView", String(settings.explodedView));
   params.set("showDimensions", String(settings.showDimensions));
   params.set("showBananaScale", String(settings.showBananaScale));
-  params.set("showPrintSeams", String(settings.showPrintSeams));
   params.set("showPreviewEdges", String(settings.showPreviewEdges));
   params.set("previewMaterialColor", settings.previewMaterialColor);
   params.set("autoRotate", String(settings.autoRotate));
@@ -395,7 +394,6 @@ const purifierSettingsFieldKeys: Record<
   explodedView: "explodedView",
   showDimensions: "showDimensions",
   showBananaScale: "showBananaScale",
-  showPrintSeams: "showPrintSeams",
   showPreviewEdges: "showPreviewEdges",
   autoRotate: "autoRotate",
   labels: "labels",

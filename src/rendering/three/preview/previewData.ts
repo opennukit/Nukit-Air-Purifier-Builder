@@ -76,19 +76,12 @@ export type LoadedFanCadMesh = {
 };
 
 // ##############################
-// Camera and Seam Data
+// Camera Data
 // ##############################
 
 export type CameraPose = {
   readonly offsetFromTarget: Vector3;
   readonly viewScale: number;
-};
-
-export type PanelPrintSeam = {
-  readonly orientation: "vertical" | "horizontal";
-  readonly offset: number;
-  readonly start: number;
-  readonly end: number;
 };
 
 // ##############################
@@ -146,7 +139,6 @@ export const filterColor = 0xeef1e6;
 export const groundY = -0.58;
 export const homePreviewRotationX = -Math.PI / 2;
 export const panelCutOverlayLift = 1.4 * sceneScale;
-export const panelPrintSeamOverlayLift = 2.1 * sceneScale;
 export const fanPreviewFrontDepth = 0.018;
 export const fanPreviewRearDepth = 0.047;
 export const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;

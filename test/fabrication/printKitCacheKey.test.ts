@@ -31,7 +31,6 @@ describe("printKitCacheKey", () => {
       { explodedView: !defaultSettings.explodedView },
       { showDimensions: !defaultSettings.showDimensions },
       { showBananaScale: !defaultSettings.showBananaScale },
-      { showPrintSeams: !defaultSettings.showPrintSeams },
       { showPreviewEdges: !defaultSettings.showPreviewEdges },
       { autoRotate: !defaultSettings.autoRotate },
       { cameraPreset: "top" },
