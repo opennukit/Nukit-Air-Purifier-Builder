@@ -6,12 +6,24 @@
   // uses, built off the main thread. Channel and cache live at module scope so
   // they survive preview-mode remounts: switching back to the assembled view
   // re-renders instantly from the cached kit instead of rebuilding through the
-  // worker over a blank canvas. The cache (keyed on geometry-affecting
-  // settings) also makes preview-only toggles like fans or exploded view
-  // re-render instantly without a new geometry build.
+  // worker over a blank canvas. The cache is keyed on geometry-affecting
+  // settings plus the requested print volume; keeping a few entries means
+  // toggling exploded view (which alternates between the unsplit and the
+  // active-preset kit) re-renders instantly once both kits are warm.
   const assembledKitChannel = createPrintKitChannel();
-  const assembledKitPresetId = "unsplit";
-  let assembledKitCache: { readonly key: string; readonly kit: PrintableKit } | null = null;
+  const assembledKitCacheLimit = 4;
+  const assembledKitCache = new Map<string, PrintableKit>();
+
+  function cacheAssembledKit(key: string, kit: PrintableKit): void {
+    assembledKitCache.delete(key);
+    assembledKitCache.set(key, kit);
+    for (const oldestKey of assembledKitCache.keys()) {
+      if (assembledKitCache.size <= assembledKitCacheLimit) {
+        break;
+      }
+      assembledKitCache.delete(oldestKey);
+    }
+  }
   // A key that failed to build is not retried until the settings change;
   // afterUpdate fires on every render, so retrying a persistent failure here
   // would loop worker rebuilds forever.
@@ -22,7 +34,7 @@
   import { afterUpdate, onDestroy, onMount } from "svelte";
   import { isTempestPrintDesignId } from "@/domain/purifier/designPresets";
   import type { LayoutResult } from "@/fabrication/purifierLayout";
-  import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+  import type { PrintableSheetPlan, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
   import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import { PurifierThreePreview } from "@/rendering/three/purifierThreePreview";
 
@@ -30,7 +42,15 @@
 
   export let layout: LayoutResult;
   export let printSeamPlan: PrintableSheetPlan | null;
+  export let printVolumePresetId: PrintVolumePresetId;
   export let onAssembledBuildPhaseChange: (phase: AssembledBuildPhase) => void = () => {};
+
+  // Exploded view shows the model separated into the actual printable chunks
+  // of the user's selected print volume; the assembled view always shows the
+  // seamless unsplit build.
+  function assembledTempestPresetId(currentLayout: LayoutResult): PrintVolumePresetId {
+    return currentLayout.configuration.preview.enclosure.explodedView ? printVolumePresetId : "unsplit";
+  }
 
   // Instance-scoped, unlike the kit cache above: each mount reports its own
   // build phase and waits on its own render, so a build outliving the instance
@@ -83,14 +103,16 @@
     currentSeamPlan: PrintableSheetPlan | null,
     rebuildKey: string,
   ): void {
-    const kitKey = printKitCacheKey(currentLayout.rawSettings, assembledKitPresetId);
-    if (assembledKitCache !== null && assembledKitCache.key === kitKey) {
+    const presetId = assembledTempestPresetId(currentLayout);
+    const kitKey = printKitCacheKey(currentLayout.rawSettings, presetId);
+    const cachedKit = assembledKitCache.get(kitKey);
+    if (cachedKit !== undefined) {
       // The newest render request is satisfied right here; an older build
       // still in flight must not apply later and revert the preview. Serving
       // from cache also moots any lingering failure for another key.
       pendingTempestRender = null;
       onAssembledBuildPhaseChange("idle");
-      applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, assembledKitCache.kit);
+      applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, cachedKit);
       return;
     }
     if (lastFailedAssembledKitKey === kitKey) {
@@ -102,7 +124,7 @@
     }
     inFlightAssembledKitKey = kitKey;
     onAssembledBuildPhaseChange("building");
-    void assembledKitChannel.request(currentLayout.rawSettings, assembledKitPresetId).then((outcome) => {
+    void assembledKitChannel.request(currentLayout.rawSettings, presetId).then((outcome) => {
       if (outcome.type === "superseded") {
         return;
       }
@@ -118,7 +140,7 @@
         return;
       }
       lastFailedAssembledKitKey = null;
-      assembledKitCache = { key: kitKey, kit: outcome.kit };
+      cacheAssembledKit(kitKey, outcome.kit);
       // A build outliving this instance still warmed the module cache above,
       // but it must not clobber the phase a newer instance is reporting.
       if (destroyed) {
@@ -156,11 +178,16 @@
   });
 
   // The seam plan arrives asynchronously and is compared by reference instead,
-  // so the key covers only the settings that shape the rendered model.
+  // so the key covers only the settings that shape the rendered model — plus,
+  // for tempest, which kit the assembled preview renders: changing the print
+  // volume while exploded view is on must re-render with the new chunks.
   function previewRebuildKey(currentLayout: LayoutResult): string {
     return JSON.stringify({
       ...currentLayout.rawSettings,
       autoRotate: undefined,
+      assembledTempestPresetId: isTempestPrintDesignId(currentLayout.configuration.printDesign.id)
+        ? assembledTempestPresetId(currentLayout)
+        : undefined,
     });
   }
 </script>
