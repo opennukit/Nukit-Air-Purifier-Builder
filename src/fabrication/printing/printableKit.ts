@@ -37,8 +37,6 @@ export const defaultPrintVolumePresetId: PrintVolumePresetId = "bed-256";
 export type PrintVolumePreset = {
   readonly id: PrintVolumePresetId;
   readonly label: string;
-  readonly description: string;
-  readonly examples: readonly string[];
   readonly bed: PrintBed;
 };
 
@@ -190,78 +188,56 @@ export const printVolumePresets: readonly PrintVolumePreset[] = [
   {
     id: "bed-180",
     label: "180 x 180 x 180 mm",
-    description: "Aggressive splitting for mini printers.",
-    examples: ["Bambu Lab A1 mini", "Original Prusa MINI+"],
     bed: { type: "bounded", width: 180, depth: 180, height: 180 },
   },
   {
     id: "bed-220",
     label: "220 x 220 x 240 mm",
-    description: "Safe Ender-class bed with the shorter KE Z height.",
-    examples: ["Creality Ender-3 V3 KE", "Sovol SV06"],
     bed: { type: "bounded", width: 220, depth: 220, height: 240 },
   },
   {
     id: "bed-225",
     label: "225 x 225 x 265 mm",
-    description: "Slightly larger square bed used by common Elegoo printers.",
-    examples: ["Elegoo Neptune 4 Pro"],
     bed: { type: "bounded", width: 225, depth: 225, height: 265 },
   },
   {
     id: "bed-prusa-mk",
     label: "250 x 210 x 220 mm",
-    description: "Prusa MK bed where Y is the limiting axis.",
-    examples: ["Original Prusa MK4S"],
     bed: { type: "bounded", width: 250, depth: 210, height: 220 },
   },
   {
     id: "bed-256",
     label: "256 x 256 x 256 mm",
-    description: "Default Bambu A/P/X-series bed.",
-    examples: ["Bambu Lab A1", "P1S", "X1 Carbon"],
     bed: { type: "bounded", width: 256, depth: 256, height: 256 },
   },
   {
     id: "bed-300",
     label: "300 x 300 x 300 mm",
-    description: "Large desktop bed with fewer seams.",
-    examples: ["Creality K1 Max"],
     bed: { type: "bounded", width: 300, depth: 300, height: 300 },
   },
   {
     id: "bed-h2-safe",
     label: "320 x 320 x 325 mm",
-    description: "Conservative H2-family single-nozzle preset.",
-    examples: ["Bambu Lab H2D", "H2S"],
     bed: { type: "bounded", width: 320, depth: 320, height: 325 },
   },
   {
     id: "bed-350",
     label: "350 x 350 x 345 mm",
-    description: "Large enclosed-printer bed.",
-    examples: ["Creality K2 Plus", "Sovol SV08"],
     bed: { type: "bounded", width: 350, depth: 350, height: 345 },
   },
   {
     id: "bed-prusa-xl",
     label: "360 x 360 x 360 mm",
-    description: "Prusa XL bed for large fewer-piece kits.",
-    examples: ["Original Prusa XL"],
     bed: { type: "bounded", width: 360, depth: 360, height: 360 },
   },
   {
     id: "bed-420",
     label: "420 x 420 x 480 mm",
-    description: "Large-format bed for maximum-size parts.",
-    examples: ["Elegoo Neptune 4 Max", "Anycubic Kobra 3 Max"],
     bed: { type: "bounded", width: 420, depth: 420, height: 480 },
   },
   {
     id: "unsplit",
     label: "Cut myself / unsplit",
-    description: "Exports the generated model without splitting it for a bed.",
-    examples: ["Custom cutting"],
     bed: { type: "unbounded" },
   },
 ];
