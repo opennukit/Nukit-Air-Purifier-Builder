@@ -1081,14 +1081,14 @@
                 <fieldset class="segmented-field">
                   <legend>
                     Measurement unit
-                    <details class="measure-info">
-                      <summary aria-label="Why measure instead of using the box label?" title="Why measure?">i</summary>
-                      <p>
+                    <span class="measure-info">
+                      <button type="button" aria-label="Why measure instead of using the box label?" aria-describedby="measureInfoNote">i</button>
+                      <p id="measureInfoNote" role="tooltip">
                         Don't copy the size printed on the box. A "20x25x1" filter actually measures
                         about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands vary by a few
                         millimeters. Measure your filter and enter the real numbers.
                       </p>
-                    </details>
+                    </span>
                   </legend>
                   <div>
                     {#each dimensionUnits as unit}

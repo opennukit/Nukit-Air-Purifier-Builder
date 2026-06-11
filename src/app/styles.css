@@ -1256,7 +1256,8 @@ Segmented Controls
   font-weight: 800;
 }
 
-/* Small "i" disclosure next to a legend; opens an inline explainer note. */
+/* Small "i" next to a legend; its explainer tooltip appears above on hover or
+   keyboard focus. */
 .measure-info {
   position: relative;
   display: inline-block;
@@ -1264,11 +1265,12 @@ Segmented Controls
   vertical-align: middle;
 }
 
-.measure-info summary {
+.measure-info button {
   display: grid;
   place-items: center;
   width: 16px;
   height: 16px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface-overlay);
@@ -1276,16 +1278,12 @@ Segmented Controls
   font-size: 0.68rem;
   font-style: italic;
   font-weight: 800;
-  cursor: pointer;
-  list-style: none;
+  cursor: help;
   user-select: none;
 }
 
-.measure-info summary::-webkit-details-marker {
-  display: none;
-}
-
-.measure-info[open] summary {
+.measure-info:hover button,
+.measure-info:focus-within button {
   background: var(--accent-wash);
   border-color: var(--accent-line-strong);
 }
@@ -1293,8 +1291,9 @@ Segmented Controls
 .measure-info p {
   position: absolute;
   z-index: 4;
-  top: 22px;
+  bottom: 22px;
   left: -8px;
+  display: none;
   width: min(320px, 72vw);
   margin: 0;
   padding: 10px 12px;
@@ -1307,6 +1306,11 @@ Segmented Controls
   line-height: 1.45;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.measure-info:hover p,
+.measure-info:focus-within p {
+  display: block;
 }
 
 .segmented-field div {
