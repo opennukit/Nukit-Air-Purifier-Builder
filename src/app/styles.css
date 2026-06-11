@@ -14,7 +14,7 @@ Design Tokens and Base Elements
   --surface: #f8f5ec;
   --surface-strong: #fffdf6;
   --ink: #17201c;
-  --muted: #667169;
+  --muted: #59635b;
   --line: #d9d0bf;
   --accent: #1f6f56;
   --accent-strong: #164d3d;
@@ -446,11 +446,30 @@ screen; this small pill is the only cue that a refresh is on the way. */
 }
 
 /* Error tone of the same pill: the model on screen no longer matches the
-settings because the last geometry build failed. */
+settings because the last geometry build failed. Unlike the passive updating
+pill it carries a retry button, so it accepts pointer events. */
 .preview-update-failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   border-color: rgb(160 102 40 / 45%);
   background: rgb(160 102 40 / 10%);
-  color: #a06628;
+  color: #8a5520;
+  pointer-events: auto;
+}
+
+.preview-retry-button {
+  padding: 1px 10px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.preview-retry-button:hover {
+  background: rgb(160 102 40 / 12%);
 }
 
 /* ##############################
@@ -611,9 +630,22 @@ Three Preview Controls
   padding: 0 13px;
 }
 
+/* Icon-only pills: the label text stays in the accessibility tree (display:
+none would empty the accessible name), it is just visually clipped away. */
 .preview-control-spatial .preview-control-label,
 .preview-control-technical .preview-control-label {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.preview-toggle-field:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .preview-toggle-field:has(input:checked) {
@@ -640,8 +672,8 @@ color picker render identical swatches, differing only in their containers. */
 .fan-color-options button {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border: 1px solid rgb(17 24 23 / 28%);
   border-radius: 999px;
   background: transparent;
@@ -651,8 +683,8 @@ color picker render identical swatches, differing only in their containers. */
 
 .preview-color-field button span,
 .fan-color-options button span {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
   background: var(--swatch-color);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
@@ -1310,28 +1342,6 @@ Diagnostics
   list-style: none;
 }
 
-/* ##############################
-Assembly Guidance
-############################## */
-
-.assembly-card {
-  display: grid;
-  gap: 10px;
-  margin: 0 0 10px;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--line-medium);
-  font-size: 0.8rem;
-  line-height: 1.3;
-}
-
-.assembly-card ul {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0 0 0 16px;
-  color: var(--muted);
-}
-
 /* #######################################
 Design-Specific Layout Controls
 ####################################### */
@@ -1341,16 +1351,17 @@ Segmented Controls
 ############################## */
 
 .segmented-field {
-  margin: 14px 0;
+  /* Matches .field's rhythm so side-by-side controls align on one baseline. */
+  margin: 9px 0;
   padding: 0;
   border: 0;
 }
 
 .segmented-field legend {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* Keeps a legend's text and its info icon on one inline row (legends themselves
@@ -1371,10 +1382,11 @@ Segmented Controls
 }
 
 .info-tip button {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1387,8 +1399,17 @@ Segmented Controls
   user-select: none;
 }
 
+/* Invisible hit-area extender: the visible disc is 20px, the tap target the
+WCAG-minimum 24px. */
+.info-tip button::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+
 .info-tip:hover button,
-.info-tip:focus-within button {
+.info-tip:focus-within button,
+.info-tip.is-open button {
   background: var(--accent-wash);
   border-color: var(--accent-line-strong);
 }
@@ -1413,8 +1434,11 @@ Segmented Controls
   letter-spacing: 0;
 }
 
+/* The is-open class covers taps: iOS Safari doesn't focus buttons on tap, so
+hover/focus-within alone never shows the tooltip there. */
 .info-tip:hover p,
-.info-tip:focus-within p {
+.info-tip:focus-within p,
+.info-tip.is-open p {
   display: block;
 }
 
@@ -1443,7 +1467,7 @@ Segmented Controls
 .segmented-field label > span {
   display: grid;
   place-items: center;
-  min-height: 42px;
+  min-height: 36px;
   min-width: 0;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -1625,6 +1649,35 @@ Preview Animation
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* ##############################
+Reduced Motion
+############################## */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Skip the settle-in entrance animation. */
+  .three-preview-host,
+  .print-sheet-three-host {
+    animation: none;
+  }
+
+  /* The spinner stops rotating but stays visible as a static indicator next
+  to the loading text. */
+  .preview-loading-spinner {
+    animation: none;
+  }
+
+  .primary-button:hover,
+  .ghost-button:hover,
+  .mode-button:hover,
+  .icon-link:hover {
+    transform: none;
+  }
+
+  .preview-rotation-button::after {
+    transition: none;
   }
 }
 

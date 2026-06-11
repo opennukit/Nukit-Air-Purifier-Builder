@@ -76,8 +76,7 @@
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
-    createAssemblyNotes,
-    createPartsListItems,
+        createPartsListItems,
     createPreviewSummaryItems,
     type PartsListItem,
     type SummaryItem,
@@ -135,7 +134,7 @@
   // flight and the last failure (which keeps the previous plan on screen).
   // Both carry the cache key they answer, so a key is requested at most once:
   // not re-posted while building, and not retried after failing until the
-  // settings change.
+  // settings change or the user retries (retryFailedPreviewBuild).
   type PrintKitBuildState =
     | { readonly type: "idle" }
     | { readonly type: "building"; readonly key: string }
@@ -150,8 +149,26 @@
   // ##############################
 
   const initialUrlParams = new URLSearchParams(window.location.search);
+
+  // Reduced-motion users get a still model by default; an explicit autoRotate
+  // URL param is a deliberate choice in a shared link, so it still wins.
+  function applyReducedMotionAutoRotateDefault(draft: PurifierDraft): PurifierDraft {
+    const autoRotateIsExplicit = initialUrlParams.has("autoRotate");
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (autoRotateIsExplicit || !prefersReducedMotion) {
+      return draft;
+    }
+    return {
+      ...draft,
+      preview: {
+        ...draft.preview,
+        enclosure: { ...draft.preview.enclosure, autoRotate: false },
+      },
+    };
+  }
+
   const initialSession = normalizeWorkbenchSession(
-    decodePurifierDraftSettings(window.location.search),
+    applyReducedMotionAutoRotateDefault(decodePurifierDraftSettings(window.location.search)),
     decodeWorkbenchState(initialUrlParams),
   );
   let draft: PurifierDraft = initialSession.settings;
@@ -168,6 +185,7 @@
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
   // Reported up by PurifierPreview about its assembled tempest kit build.
   let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  let purifierPreview: PurifierPreview | undefined;
   // First load shows a centered "Building model…" state until the first build
   // SUCCEEDS; after that, rebuilds only show the corner pill over the old
   // model. A failed first build stays in-progress, so the next attempt builds
@@ -187,7 +205,6 @@
   let exportReadiness: BuildDiagnostic = summarizeBuildReadiness(layout);
   let previewSummaryItems: readonly SummaryItem[] = [];
   let partsItems: readonly PartsListItem[] = [];
-  let assemblyNotes: readonly string[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
   let activePrintSeamPlan: PrintableSheetPlan | null = null;
@@ -252,13 +269,12 @@
       ? "Updating…"
       : "Building model…"
     : hasPreviewBuildFailure
-      ? "Update failed — check console"
+      ? "Couldn't update the model"
       : "";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
-  $: assemblyNotes = createAssemblyNotes(layout, fabricationMethod, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
@@ -471,6 +487,31 @@
       ...settings,
       autoRotate: !settings.autoRotate,
     });
+  }
+
+  // ##############################
+  // Info Tips
+  // ##############################
+
+  // Tooltips open on hover/keyboard focus via CSS alone; this click-toggled
+  // state exists for touch, where iOS Safari taps neither hover nor focus the
+  // button. At most one tip is open; the id is the tooltip element's id.
+  let openInfoTipId: string | null = null;
+
+  function toggleInfoTip(tipId: string): void {
+    openInfoTipId = openInfoTipId === tipId ? null : tipId;
+  }
+
+  function closeInfoTip(tipId: string): void {
+    if (openInfoTipId === tipId) {
+      openInfoTipId = null;
+    }
+  }
+
+  function handleInfoTipKeydown(tipId: string, event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      closeInfoTip(tipId);
+    }
   }
 
   // ##############################
@@ -729,6 +770,20 @@
     });
   }
 
+  // "Try again" on the failure pill. A failed key is otherwise never retried
+  // until the settings change, leaving the pill a dead end. The sheet-plan
+  // side resets its build state and re-resolves through the same path the
+  // reactive statement uses (which re-requests the build, since the failed
+  // key no longer blocks it); the assembled preview retries through its own
+  // component, which owns the failed-key memory.
+  function retryFailedPreviewBuild(): void {
+    if (printSheetKitBuild.type === "failed") {
+      printSheetKitBuild = { type: "idle" };
+      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
+    }
+    purifierPreview?.retryFailedAssembledKitBuild();
+  }
+
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
   syncDerivedWorkbenchState();
 </script>
@@ -852,7 +907,10 @@
           {:else if isPreviewUpdating}
             <span class="preview-updating-indicator" aria-hidden="true">{previewStatusText}</span>
           {:else if hasPreviewBuildFailure}
-            <span class="preview-updating-indicator preview-update-failed" aria-hidden="true">{previewStatusText}</span>
+            <span class="preview-updating-indicator preview-update-failed">
+              <span aria-hidden="true">{previewStatusText}</span>
+              <button class="preview-retry-button" type="button" onclick={retryFailedPreviewBuild}>Try again</button>
+            </span>
           {/if}
           {#if previewMode === "enclosure"}
             <div class="preview-view-controls" data-preview-view-controls>
@@ -913,7 +971,7 @@
                   <span class="preview-control-icon" aria-hidden="true">
                     <span class="preview-control-glyph">mm</span>
                   </span>
-                  <span class="preview-control-label">Dims</span>
+                  <span class="preview-control-label">Show dimensions</span>
                 </label>
                 <label class="toggle-field preview-toggle-field preview-control-spatial" title="Scale reference">
                   <input
@@ -925,7 +983,7 @@
                   <span class="preview-control-icon" aria-hidden="true">
                     <span class="preview-control-glyph preview-control-glyph-wide">1:1</span>
                   </span>
-                  <span class="preview-control-label">Scale</span>
+                  <span class="preview-control-label">Scale reference</span>
                 </label>
                 {#if fabricationMethod === "print-3mf" && !isStaticReferenceControlsActive}
                   <div class="preview-color-field" aria-label="Preview color">
@@ -957,7 +1015,7 @@
                         <path d="M9 4v16M15 4v16" />
                       </svg>
                     </span>
-                    <span class="preview-control-label">Splits</span>
+                    <span class="preview-control-label">Print split lines</span>
                   </label>
                 {/if}
               </div>
@@ -983,6 +1041,7 @@
               </button>
             </div>
             <PurifierPreview
+              bind:this={purifierPreview}
               {layout}
               printSeamPlan={activePrintSeamPlan}
               {printVolumePresetId}
@@ -1224,8 +1283,16 @@
                   <legend>
                     <span class="legend-row">
                       Measurement unit
-                      <span class="info-tip">
-                        <button type="button" aria-label="Why measure instead of using the printed label?" aria-describedby="measureInfoNote">i</button>
+                      <span class="info-tip" class:is-open={openInfoTipId === "measureInfoNote"}>
+                        <button
+                          type="button"
+                          aria-label="Why measure instead of using the printed label?"
+                          aria-describedby="measureInfoNote"
+                          aria-expanded={openInfoTipId === "measureInfoNote"}
+                          onclick={() => toggleInfoTip("measureInfoNote")}
+                          onblur={() => closeInfoTip("measureInfoNote")}
+                          onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
+                        >i</button>
                         <p id="measureInfoNote" role="tooltip">
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
@@ -1442,8 +1509,16 @@
                       <span>
                         {control.label}
                         {#if control.info !== undefined}
-                          <span class="info-tip">
-                            <button type="button" aria-label="What does {control.label} do?" aria-describedby="info-{control.name}">i</button>
+                          <span class="info-tip" class:is-open={openInfoTipId === `info-${control.name}`}>
+                            <button
+                              type="button"
+                              aria-label="What does {control.label} do?"
+                              aria-describedby="info-{control.name}"
+                              aria-expanded={openInfoTipId === `info-${control.name}`}
+                              onclick={() => toggleInfoTip(`info-${control.name}`)}
+                              onblur={() => closeInfoTip(`info-${control.name}`)}
+                              onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
+                            >i</button>
                             <p id="info-{control.name}" role="tooltip">{control.info}</p>
                           </span>
                         {/if}
@@ -1563,21 +1638,6 @@
             </div>
           </section>
 
-          {#if assemblyNotes.length > 0}
-            <section class="control-section assembly-notes-section">
-              <div class="assembly-card" id="assemblyNotes">
-                <div class="parts-list-heading">
-                  <strong>Assembly</strong>
-                  <span>How it goes together</span>
-                </div>
-                <ul>
-                  {#each assemblyNotes as note}
-                    <li>{note}</li>
-                  {/each}
-                </ul>
-              </div>
-            </section>
-          {/if}
         </div>
 
         <!-- #######################################

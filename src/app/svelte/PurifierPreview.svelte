@@ -24,9 +24,10 @@
       assembledKitCache.delete(oldestKey);
     }
   }
-  // A key that failed to build is not retried until the settings change;
-  // afterUpdate fires on every render, so retrying a persistent failure here
-  // would loop worker rebuilds forever.
+  // A key that failed to build is not retried until the settings change or
+  // the user asks (retryFailedAssembledKitBuild); afterUpdate fires on every
+  // render, so retrying a persistent failure there would loop worker rebuilds
+  // forever.
   let lastFailedAssembledKitKey: string | null = null;
 </script>
 
@@ -173,6 +174,17 @@
     preview.update(render.layout, render.seamPlan, kit);
     previousRebuildKey = render.rebuildKey;
     previousSeamPlan = render.seamPlan;
+  }
+
+  // The failure pill's "Try again" (App.svelte calls this via bind:this):
+  // forget the failed key and run the normal update path again, which now
+  // re-requests the build instead of re-surfacing the recorded failure.
+  export function retryFailedAssembledKitBuild(): void {
+    if (lastFailedAssembledKitKey === null) {
+      return;
+    }
+    lastFailedAssembledKitKey = null;
+    updatePreview();
   }
 
   onMount(() => {
