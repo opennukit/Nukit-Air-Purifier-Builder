@@ -72,3 +72,33 @@ export function totalGenus(mesh: Mesh): number {
   for (const v of used) roots.add(find(v));
   return (2 * roots.size - (used.size - edges.size + mesh.triangles.length)) / 2;
 }
+
+// Number of connected shells. A part meant to print as one body must report 1 —
+// a watertight mesh can still be several disjoint pieces (e.g. a grill that
+// never touches its frame), which prints as loose parts.
+export function shellCount(mesh: Mesh): number {
+  const parent = new Map<number, number>();
+  const find = (a: number): number => {
+    let r = a;
+    while (parent.get(r) !== r) r = parent.get(r) as number;
+    return r;
+  };
+  const used = new Set<number>();
+  for (const t of mesh.triangles) {
+    for (const v of [t.v1, t.v2, t.v3]) {
+      if (!parent.has(v)) parent.set(v, v);
+      used.add(v);
+    }
+    for (const [a, b] of [
+      [t.v1, t.v2],
+      [t.v2, t.v3],
+    ] as const) {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    }
+  }
+  const roots = new Set<number>();
+  for (const v of used) roots.add(find(v));
+  return roots.size;
+}

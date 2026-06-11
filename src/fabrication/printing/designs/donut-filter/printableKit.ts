@@ -131,7 +131,13 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
   }
 
   for (let index = 0; index < 12; index += 1) {
-    meshes.push(createRotatedBarMesh(center, center, outerRing * 2, guard.spokeWidth, guard.thickness, (index / 12) * Math.PI));
+    const angle = (index / 12) * Math.PI;
+    // Each spoke must run all the way into the border frame so the grill and
+    // the frame fuse into ONE printed body — a fixed length left the grill a
+    // loose disjoint piece. Distance from center to the square's edge along
+    // this angle, doubled for the full bar.
+    const reach = center / Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle)));
+    meshes.push(createRotatedBarMesh(center, center, reach * 2, guard.spokeWidth, guard.thickness, angle));
   }
 
   for (const screwCenter of guard.screwCenters) {
