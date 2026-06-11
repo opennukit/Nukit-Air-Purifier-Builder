@@ -8,8 +8,8 @@ This project is not trying to clone every upstream control as a flat form. The g
 - Measured rectangular filter dimensions (no stock-size presets; users measure their actual filter).
 - Fan size (120/140/custom diameter) and a visual fan color; no fan product presets or purchase links.
 - Filter count and wall fan-bank counts for the generated Nukit box.
-- Material thickness, screw-hole diameter, rim, kerf/fit allowance, labels, reference scale, and split-frame output.
-- Preview controls that do not change fabrication geometry, such as media/fan visibility, dimensions, banana scale, seams, labels, rotation, and camera preset.
+- Material thickness, screw-hole diameter, rim, kerf/fit allowance, labels, and reference scale.
+- Preview controls that do not change fabrication geometry, such as media/fan visibility, dimensions, banana scale, labels, rotation, and camera preset.
 
 ## Kept Behind Advanced
 

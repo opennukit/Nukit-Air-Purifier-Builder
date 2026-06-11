@@ -15,7 +15,6 @@ The laser-cut Nukit model and the 3D-printable Tempest model are intentionally s
 
 - Bun. The repo uses `bun.lock`, `bun test`, and Bun script execution.
 - A modern browser with WebGL for the Three.js preview.
-- OpenSCAD is optional. It is only needed for the Tempest equivalence/oracle test suite.
 
 ## Quick Start
 
