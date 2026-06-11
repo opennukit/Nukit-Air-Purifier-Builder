@@ -11,6 +11,9 @@ output/
 .venv-boxes/
 .codex/
 .upToSpeed/
+.claude/
+.agents/
+skills-lock.json
 
 # Local machine files
 .DS_Store
