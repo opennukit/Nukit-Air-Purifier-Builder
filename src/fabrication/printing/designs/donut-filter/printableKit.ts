@@ -1,5 +1,11 @@
-import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
+import { Path, Shape } from "three";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
+import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
+import { roundVertex } from "@/fabrication/printing/meshWelding";
+import { extrudePlateWithHoles } from "@/fabrication/printing/plateMesh";
+import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
+import { booleans } from "@/fabrication/printing/modeling/manifoldOps";
+import { extractWeldedMesh, solidFromWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
 import {
   createDonutFilterModel,
   donutCapTotalHeight,
@@ -68,7 +74,7 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
 
 function createAdapterPart(model: DonutFilterModel): PrintablePart {
   const height = model.adapter.coneLength + model.adapter.insertLength;
-  const mesh = combineMeshes([
+  const mesh = unionMeshes([
     createPlateMesh(model.fanSize, model.fanSize, model.adapter.flangeThickness, adapterFlangeCuts(model)),
     createTubeShellMesh({
       cx: model.fanSize / 2,
@@ -125,7 +131,13 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
   }
 
   for (let index = 0; index < 12; index += 1) {
-    meshes.push(createRotatedBarMesh(center, center, outerRing * 2, guard.spokeWidth, guard.thickness, (index / 12) * Math.PI));
+    const angle = (index / 12) * Math.PI;
+    // Each spoke must run all the way into the border frame so the grill and
+    // the frame fuse into ONE printed body — a fixed length left the grill a
+    // loose disjoint piece. Distance from center to the square's edge along
+    // this angle, doubled for the full bar.
+    const reach = center / Math.max(Math.abs(Math.cos(angle)), Math.abs(Math.sin(angle)));
+    meshes.push(createRotatedBarMesh(center, center, reach * 2, guard.spokeWidth, guard.thickness, angle));
   }
 
   for (const screwCenter of guard.screwCenters) {
@@ -142,13 +154,13 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
     height: guard.thickness,
     cutFeatureCount: 0,
     printCriticalCutFeatureCount: 0,
-    mesh: combineMeshes(meshes),
+    mesh: unionMeshes(meshes),
   };
 }
 
 function createCapPart(model: DonutFilterModel, cap: Extract<DonutFilterCap, { readonly type: "printed-cap" }>): PrintablePart {
   const center = cap.outerDiameter / 2;
-  const mesh = combineMeshes([
+  const mesh = unionMeshes([
     createDiskMesh(center, center, cap.outerDiameter / 2, cap.thickness, 96),
     createTubeShellMesh({
       cx: center,
@@ -201,18 +213,21 @@ function adapterFlangeCuts(model: DonutFilterModel): readonly CircleCut[] {
 // #######################################
 
 function createPlateMesh(width: number, depth: number, height: number, cuts: readonly CircleCut[]): PrintableMesh {
-  const shape = createShape([
-    { x: 0, y: 0 },
-    { x: width, y: 0 },
-    { x: width, y: depth },
-    { x: 0, y: depth },
-  ]);
-  for (const cut of cuts) {
+  const holes = cuts.map((cut) => {
     const path = new Path();
     path.absellipse(cut.cx, cut.cy, cut.radius, cut.radius, 0, Math.PI * 2, true);
-    shape.holes.push(path);
-  }
-  return extrudeShape(shape, height);
+    return path;
+  });
+  return extrudePlateWithHoles(
+    [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: depth },
+      { x: 0, y: depth },
+    ],
+    holes,
+    height,
+  );
 }
 
 function createTubeShellMesh(input: {
@@ -279,7 +294,7 @@ function createRingMesh(cx: number, cy: number, outerRadius: number, innerRadius
 function createDiskMesh(cx: number, cy: number, radius: number, height: number, segments: number): PrintableMesh {
   const shape = new Shape();
   shape.absellipse(cx, cy, radius, radius, 0, Math.PI * 2, false);
-  return extrudeShape(shape, height, segments);
+  return extrudeShapeToMesh(shape, height, segments);
 }
 
 function createBoxMesh(width: number, depth: number, height: number, x: number, y: number): PrintableMesh {
@@ -310,7 +325,7 @@ function createRotatedBarMesh(cx: number, cy: number, length: number, width: num
 }
 
 function createExtrudedPolygonMesh(points: readonly Point2[], height: number): PrintableMesh {
-  return extrudeShape(createShape(points), height);
+  return extrudeShapeToMesh(createShape(points), height);
 }
 
 function createShape(points: readonly Point2[]): Shape {
@@ -327,80 +342,21 @@ function createShape(points: readonly Point2[]): Shape {
   return shape;
 }
 
-function extrudeShape(shape: Shape, height: number, curveSegments = 24): PrintableMesh {
-  const geometry = new ExtrudeGeometry(shape, {
-    depth: height,
-    bevelEnabled: false,
-    curveSegments,
-    steps: 1,
-  });
-  const mesh = geometryToPrintableMesh(geometry);
-  geometry.dispose();
-  return mesh;
-}
-
-function geometryToPrintableMesh(geometry: ExtrudeGeometry): PrintableMesh {
-  const position = geometry.getAttribute("position");
-  if (!(position instanceof BufferAttribute)) {
-    throw new Error("geometryToPrintableMesh: Missing position buffer");
-  }
-
-  const vertices: MeshVertex[] = Array.from({ length: position.count }, (_, index) =>
-    roundVertex({
-      x: position.getX(index),
-      y: position.getY(index),
-      z: position.getZ(index),
-    }),
-  );
-
-  const triangles: MeshTriangle[] = [];
-  const index = geometry.index;
-  if (index !== null) {
-    for (let cursor = 0; cursor < index.count; cursor += 3) {
-      triangles.push({ v1: index.getX(cursor), v2: index.getX(cursor + 1), v3: index.getX(cursor + 2) });
-    }
-  } else {
-    for (let cursor = 0; cursor < vertices.length; cursor += 3) {
-      triangles.push({ v1: cursor, v2: cursor + 1, v3: cursor + 2 });
-    }
-  }
-
-  return { vertices, triangles };
-}
-
 // #######################################
 // Mesh Composition
 // #######################################
 
-function combineMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
-  const vertices: MeshVertex[] = [];
-  const triangles: MeshTriangle[] = [];
-  for (const mesh of meshes) {
-    const offset = vertices.length;
-    vertices.push(...mesh.vertices);
-    triangles.push(
-      ...mesh.triangles.map((triangle) => ({
-        v1: triangle.v1 + offset,
-        v2: triangle.v2 + offset,
-        v3: triangle.v3 + offset,
-      })),
-    );
-  }
-  return { vertices, triangles };
-}
-
-// #######################################
-// Primitive Helpers
-// #######################################
-
-function roundVertex(vertex: MeshVertex): MeshVertex {
-  return {
-    x: roundMillimeters(vertex.x),
-    y: roundMillimeters(vertex.y),
-    z: roundMillimeters(vertex.z),
-  };
-}
-
-function roundMillimeters(value: number): number {
-  return Number(value.toFixed(4));
+// The donut parts are modeled as overlapping closed solids (flange + cones, the
+// fan guard's frame + rings + spokes + bosses). Concatenating those meshes would
+// export self-intersecting shells that slicers must auto-repair — and repair can
+// silently drop thin features like the fan-guard spokes. A real boolean union
+// through the Manifold kernel fuses them into one watertight body instead.
+function unionMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
+  return withGeometryArena(() => {
+    const [first, ...rest] = meshes.map(solidFromWeldedMesh);
+    if (first === undefined) {
+      throw new Error("unionMeshes: No meshes to union");
+    }
+    return extractWeldedMesh(booleans.union(first, ...rest));
+  });
 }

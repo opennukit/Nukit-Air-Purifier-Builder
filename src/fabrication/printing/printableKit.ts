@@ -1,6 +1,9 @@
-import { BufferAttribute, ExtrudeGeometry, Path, Shape } from "three";
+import { Path, Shape } from "three";
 import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication/purifierLayout";
 import type { CutFeature, CutPanel, CutPoint, RectCut } from "@/fabrication/laser/cutGeometry";
+import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
+import { roundMillimeters } from "@/fabrication/printing/meshWelding";
+import { extrudePlateWithHoles } from "@/fabrication/printing/plateMesh";
 import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
 // #######################################
@@ -741,25 +744,11 @@ function glueKeyCountForLength(length: number): number {
 // #######################################
 
 function createPlateMesh(outline: readonly CutPoint[], height: number, cuts: readonly CutFeature[]): PrintableMesh {
-  const shape = new Shape();
-  const firstPoint = outline[0];
-  if (firstPoint === undefined) {
+  if (outline.length === 0) {
     throw new Error("createPlateMesh: Outline is empty");
   }
-  shape.moveTo(firstPoint.x, firstPoint.y);
-  for (const point of outline.slice(1)) {
-    shape.lineTo(point.x, point.y);
-  }
-  shape.closePath();
-
-  for (const cut of cuts) {
-    const hole = cutToHolePath(cut);
-    if (hole !== null) {
-      shape.holes.push(hole);
-    }
-  }
-
-  return extrudeShape(shape, height);
+  const holes = cuts.map(cutToHolePath).filter((hole): hole is Path => hole !== null);
+  return extrudePlateWithHoles(outline, holes, height);
 }
 
 function createDovetailGlueKeyMesh(width: number, depth: number, height: number): PrintableMesh {
@@ -772,54 +761,7 @@ function createDovetailGlueKeyMesh(width: number, depth: number, height: number)
   shape.lineTo(0, depth);
   shape.lineTo(waistInset, depth / 2);
   shape.closePath();
-  return extrudeShape(shape, height);
-}
-
-// ##############################
-// Shape Extrusion
-// ##############################
-
-function extrudeShape(shape: Shape, height: number): PrintableMesh {
-  const geometry = new ExtrudeGeometry(shape, {
-    depth: height,
-    bevelEnabled: false,
-    curveSegments: 24,
-    steps: 1,
-  });
-  const mesh = geometryToPrintableMesh(geometry);
-  geometry.dispose();
-  return mesh;
-}
-
-function geometryToPrintableMesh(geometry: ExtrudeGeometry): PrintableMesh {
-  const position = geometry.getAttribute("position");
-  if (!(position instanceof BufferAttribute)) {
-    throw new Error("geometryToPrintableMesh: Missing position buffer");
-  }
-
-  const vertices: MeshVertex[] = Array.from({ length: position.count }, (_, index) => ({
-    x: roundMillimeters(position.getX(index)),
-    y: roundMillimeters(position.getY(index)),
-    z: roundMillimeters(position.getZ(index)),
-  }));
-
-  const triangles: MeshTriangle[] = [];
-  const index = geometry.index;
-  if (index !== null) {
-    for (let cursor = 0; cursor < index.count; cursor += 3) {
-      triangles.push({
-        v1: index.getX(cursor),
-        v2: index.getX(cursor + 1),
-        v3: index.getX(cursor + 2),
-      });
-    }
-  } else {
-    for (let cursor = 0; cursor < vertices.length; cursor += 3) {
-      triangles.push({ v1: cursor, v2: cursor + 1, v3: cursor + 2 });
-    }
-  }
-
-  return { vertices, triangles };
+  return extrudeShapeToMesh(shape, height);
 }
 
 // ##############################
@@ -1183,8 +1125,4 @@ function requiredArrayValue(values: readonly number[], index: number, context: s
     throw new Error(`${context}: Missing value at ${index}`);
   }
   return value;
-}
-
-function roundMillimeters(value: number): number {
-  return Number(value.toFixed(4));
 }

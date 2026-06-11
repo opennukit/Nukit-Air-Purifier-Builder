@@ -2,10 +2,10 @@ import {
   type Geom2,
   type Geom3,
   manifoldModeling,
-  meshData,
-  POSITION_PROP_COUNT,
 } from "@/fabrication/printing/modeling/manifoldOps";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
+import { extractWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
+import { roundMillimeters } from "@/fabrication/printing/meshWelding";
 import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geometry/context";
 import {
   createTempestModel,
@@ -20,7 +20,6 @@ import {
   findPrintVolumePreset,
   printBedFitForPart,
   type PrintableKit,
-  type PrintableMesh,
   type PrintablePart,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
@@ -33,7 +32,6 @@ import {
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
 
 export {
   createTempestSettingsFromConfiguration,
@@ -185,7 +183,7 @@ function createChunkPart(
     height: roundMillimeters(height),
     cutFeatureCount: featureCount,
     printCriticalCutFeatureCount: featureCount,
-    mesh: manifoldGeometryToPrintableMesh(clipPrintChunk(ctx, assembly, bounds)),
+    mesh: extractWeldedMesh(clipPrintChunk(ctx, assembly, bounds)),
   };
 }
 
@@ -223,64 +221,6 @@ function createFinalAssemblyGeometry(model: TempestModel, alignmentPinChunkGrid:
 }
 
 // #######################################
-// Mesh Conversion
-// #######################################
-
-// Manifold guarantees the solid's topology is watertight and T-junction-free,
-// but `getMesh()` may still duplicate a position across its internal face runs.
-// Welding coincident vertices (snapped to export precision) into one index
-// collapses those duplicates, yielding a compact, fully edge-shared mesh.
-function manifoldGeometryToPrintableMesh(geometry: Geom3): PrintableMesh {
-  const mesh = meshData(geometry);
-  const vertices: MeshVertex[] = [];
-  const triangles: MeshTriangle[] = [];
-  const indexByPosition = new Map<string, number>();
-
-  const weldVertex = (sourceIndex: number): number => {
-    // Position occupies the first POSITION_PROP_COUNT channels of the vertex; the
-    // stride between vertices is the full per-vertex property count (numProp).
-    const positionBase = sourceIndex * mesh.numProp;
-    const vertex = roundVertex(readPosition(mesh.vertProperties, positionBase));
-    const positionKey = `${vertex.x},${vertex.y},${vertex.z}`;
-    const existingIndex = indexByPosition.get(positionKey);
-    if (existingIndex !== undefined) {
-      return existingIndex;
-    }
-    const newIndex = vertices.length;
-    vertices.push(vertex);
-    indexByPosition.set(positionKey, newIndex);
-    return newIndex;
-  };
-
-  for (let cursor = 0; cursor < mesh.triVerts.length; cursor += 3) {
-    const first = weldVertex(mesh.triVerts[cursor]);
-    const second = weldVertex(mesh.triVerts[cursor + 1]);
-    const third = weldVertex(mesh.triVerts[cursor + 2]);
-    if (first === second || second === third || first === third) {
-      continue;
-    }
-    triangles.push({ v1: first, v2: second, v3: third });
-  }
-  return { vertices, triangles };
-}
-
-// Reads the x, y, z position from the first POSITION_PROP_COUNT channels of a
-// vertex's interleaved properties. The xyz field names of `MeshVertex` are the
-// canonical naming of that layout, so this maps the channels onto them.
-function readPosition(vertProperties: Float32Array, positionBase: number): MeshVertex {
-  const [xChannel, yChannel, zChannel] = positionChannelsFrom(positionBase);
-  return {
-    x: vertProperties[xChannel],
-    y: vertProperties[yChannel],
-    z: vertProperties[zChannel],
-  };
-}
-
-function positionChannelsFrom(positionBase: number): readonly number[] {
-  return Array.from({ length: POSITION_PROP_COUNT }, (_, channel) => positionBase + channel);
-}
-
-// #######################################
 // Summary Helpers
 // #######################################
 
@@ -292,20 +232,4 @@ function estimateFeatureCount(model: TempestModel): number {
       return fanHoleCount + (m.cordPassThrough.type === "none" ? 0 : 1);
     },
   });
-}
-
-// #######################################
-// Primitive Helpers
-// #######################################
-
-function roundVertex(vertex: MeshVertex): MeshVertex {
-  return {
-    x: roundMillimeters(vertex.x),
-    y: roundMillimeters(vertex.y),
-    z: roundMillimeters(vertex.z),
-  };
-}
-
-function roundMillimeters(value: number): number {
-  return Number(value.toFixed(4));
 }
