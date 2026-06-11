@@ -4,7 +4,7 @@
   import type { LayoutResult } from "@/fabrication/purifierLayout";
   import type { PrintableKit, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
   import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
-  import { printKitCacheKey } from "@/app/printSheetPlans";
+  import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import { PurifierThreePreview } from "@/rendering/three/purifierThreePreview";
 
   type AssembledBuildPhase = "idle" | "building";

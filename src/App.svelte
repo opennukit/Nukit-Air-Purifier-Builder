@@ -68,7 +68,6 @@
   import {
     createActiveAssemblyPrintSeamPlan,
     createActivePrintSheetPlan,
-    printKitCacheKey,
     type GeneratedPrintSheetPlanCacheEntry,
   } from "@/app/printSheetPlans";
   import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
@@ -116,7 +115,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignThreeMfExportFromKit } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignThreeMfExportFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";

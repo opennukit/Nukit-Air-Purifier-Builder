@@ -1,5 +1,4 @@
 // Derives the print-sheet preview plans shown in the workbench from a layout:
-// the settings-based cache key the app memoizes worker-built kits under, and
 // the plan variants for the plate and seam previews. The kits behind these
 // plans build asynchronously, so a null generated plan means "still building";
 // the previews keep showing the previous plan until the new one lands.
@@ -40,45 +39,6 @@ export function createActivePrintSheetPlan(
     };
   }
   return currentGeneratedPlan;
-}
-
-export function printKitCacheKey(
-  rawSettings: RawPurifierSettings,
-  currentPrintVolumePresetId: PrintVolumePresetId,
-): string {
-  return JSON.stringify({
-    printVolumePresetId: currentPrintVolumePresetId,
-    printDesign: rawSettings.printDesign,
-    filterWidth: rawSettings.filterWidth,
-    filterDepth: rawSettings.filterDepth,
-    filterThickness: rawSettings.filterThickness,
-    rim: rawSettings.rim,
-    fanDiameter: rawSettings.fanDiameter,
-    filters: rawSettings.filters,
-    splitFrames: rawSettings.splitFrames,
-    fansLeft: rawSettings.fansLeft,
-    fansRight: rawSettings.fansRight,
-    fansTop: rawSettings.fansTop,
-    fansBottom: rawSettings.fansBottom,
-    tempestArrangement: rawSettings.tempestArrangement,
-    donutFilterOuterDiameter: rawSettings.donutFilterOuterDiameter,
-    donutFilterLength: rawSettings.donutFilterLength,
-    donutFilterHoleDiameter: rawSettings.donutFilterHoleDiameter,
-    donutAdapterInsertLength: rawSettings.donutAdapterInsertLength,
-    donutCapRim: rawSettings.donutCapRim,
-    donutCapEnabled: rawSettings.donutCapEnabled,
-    screwHoleDiameter: rawSettings.screwHoleDiameter,
-    materialThickness: rawSettings.materialThickness,
-    kerfFit: rawSettings.kerfFit,
-    fingerWidthMultiplier: rawSettings.fingerWidthMultiplier,
-    fingerSpaceMultiplier: rawSettings.fingerSpaceMultiplier,
-    fingerPlayMultiplier: rawSettings.fingerPlayMultiplier,
-    fingerHoleWidthMultiplier: rawSettings.fingerHoleWidthMultiplier,
-    fingerHoleOffsetMultiplier: rawSettings.fingerHoleOffsetMultiplier,
-    dovetailSizeMultiplier: rawSettings.dovetailSizeMultiplier,
-    dovetailDepthMultiplier: rawSettings.dovetailDepthMultiplier,
-    dovetailTaper: rawSettings.dovetailTaper,
-  });
 }
 
 export function createActiveAssemblyPrintSeamPlan(
