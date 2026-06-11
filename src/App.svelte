@@ -162,6 +162,8 @@
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
   let inFlightPrintSheetPlanKey: string | null = null;
+  // Reported up by PurifierPreview while its assembled tempest kit builds.
+  let assembledPreviewBuildPhase: "idle" | "building" = "idle";
 
   // ##############################
   // Derived View State
@@ -217,7 +219,7 @@
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
   $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
-  $: isPreviewUpdating = printSheetKitBuild.type === "building";
+  $: isPreviewUpdating = printSheetKitBuild.type === "building" || assembledPreviewBuildPhase === "building";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
@@ -900,7 +902,11 @@
                 <span class="sr-only">{settings.autoRotate ? "Pause auto rotate" : "Start auto rotate"}</span>
               </button>
             </div>
-            <PurifierPreview {layout} printSeamPlan={activePrintSeamPlan} />
+            <PurifierPreview
+              {layout}
+              printSeamPlan={activePrintSeamPlan}
+              onAssembledBuildPhase={(phase) => (assembledPreviewBuildPhase = phase)}
+            />
           {:else if previewMode === "print-sheets"}
             {#if activePrintSheetPlan !== null}
               <PrintSheetPreview plan={activePrintSheetPlan} />
