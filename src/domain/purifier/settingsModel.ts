@@ -36,7 +36,7 @@ import {
   type FanDiameter,
   type FixedFanCount,
   type SingleFanConfiguration,
-} from "@/domain/purifier/fanProducts";
+} from "@/domain/purifier/fans";
 import {
   defaultRectangularFilterDimensions,
   type FilterDimensions,

@@ -20,7 +20,7 @@ import {
   nearestFanDiameter,
   type FanColor,
   type FanDiameter,
-} from "@/domain/purifier/fanProducts";
+} from "@/domain/purifier/fans";
 import {
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,

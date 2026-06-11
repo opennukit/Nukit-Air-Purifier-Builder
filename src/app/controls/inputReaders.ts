@@ -7,7 +7,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   type PrintDesignId,
 } from "@/domain/purifier/designPresets";
-import { automaticFanCount } from "@/domain/purifier/fanProducts";
+import { automaticFanCount } from "@/domain/purifier/fans";
 
 export function readPrintDesignControlValue(event: Event): PrintDesignId {
   const preset = publicThreeDimensionalPrintDesignPresets.find(

@@ -15,7 +15,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { fanAppearanceForColor, findFanSpec, nearestFanDiameter } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, findFanSpec, nearestFanDiameter } from "@/domain/purifier/fans";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";

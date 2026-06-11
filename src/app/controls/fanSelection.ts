@@ -2,7 +2,7 @@
 // diameters offered as segmented options, plus the "custom" choice that
 // reveals the free diameter input.
 
-import type { FanDiameter } from "@/domain/purifier/fanProducts";
+import type { FanDiameter } from "@/domain/purifier/fans";
 
 export type RecommendedFanDiameter = Extract<FanDiameter, 120 | 140>;
 export type FanSizeChoice = RecommendedFanDiameter | "custom";

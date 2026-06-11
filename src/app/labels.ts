@@ -1,7 +1,7 @@
 // Display text for workbench controls: fabrication method names, preview
 // color names, fan color names, and swatch CSS color values.
 
-import type { FanColor } from "@/domain/purifier/fanProducts";
+import type { FanColor } from "@/domain/purifier/fans";
 import type { PreviewMaterialColorPreset } from "@/domain/purifier/settingsModel";
 import type { ExportFormat } from "@/fabrication/printing/printableKit";
 

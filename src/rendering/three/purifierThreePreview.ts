@@ -45,7 +45,7 @@ import {
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { fanAppearanceForColor, type FanAppearance } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, type FanAppearance } from "@/domain/purifier/fans";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   loadStaticPrintAssemblyAssets,

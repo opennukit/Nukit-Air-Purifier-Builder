@@ -12,7 +12,7 @@ import type {
   FanCountRequest,
   FanDiameter,
   FixedFanCount,
-} from "@/domain/purifier/fanProducts";
+} from "@/domain/purifier/fans";
 import {
   staticPrintReferenceIds,
   staticPrintReferences,

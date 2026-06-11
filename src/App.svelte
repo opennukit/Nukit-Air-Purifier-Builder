@@ -27,7 +27,7 @@
     fanColors,
     fixedFanCountOptions,
     type FanColor,
-  } from "@/domain/purifier/fanProducts";
+  } from "@/domain/purifier/fans";
   import {
     advancedJointControls,
     donutFilterDimensionControls,

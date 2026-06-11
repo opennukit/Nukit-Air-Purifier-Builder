@@ -1,5 +1,5 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
-import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fanProducts";
+import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fans";
 import {
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
