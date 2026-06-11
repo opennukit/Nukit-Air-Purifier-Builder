@@ -59,6 +59,7 @@ import {
 import {
   createAssemblyModel,
   type AssemblyBoxPart,
+  type Vector3Tuple,
 } from "@/fabrication/assemblyModel";
 import {
   createDonutFilterModel,
@@ -73,11 +74,13 @@ import {
 } from "@/domain/designs/tempest/model";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import {
+  createTempestAssemblyPinDiagram,
   createTempestPrintableKitFromLayout,
   createTempestPrintablePose,
   createTempestSettingsFromLayout,
+  type TempestPosedPinPlacement,
 } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { PrintableKit, PrintablePart, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
+import type { PrintableKit, PrintablePart, PrintableSheetPlan, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE_PRESET_ID,
@@ -164,6 +167,50 @@ import {
   type StaticReferenceAssemblyMetrics,
   type StaticReferencePurchasedPartExplosion,
 } from "@/rendering/three/preview/previewData";
+
+// #######################################
+// Tempest Seam Pins
+// #######################################
+
+type TempestPrintChunkPart = Extract<PrintablePart, { readonly kind: "tempest-print-chunk" }>;
+
+// Neutral light gray that reads as bare filament against the printed parts.
+const filamentPinColor = 0xd8d8d8;
+const filamentPinSegments = 12;
+// How far past the seam plane the neighbour-chunk probe reaches, and the
+// tolerance for the rounded chunk boxes.
+const pinSeamProbeMillimeters = 0.5;
+const chunkContainsEpsilonMillimeters = 0.01;
+
+// The index of the chunk part whose posed box contains a probe point nudged
+// just to one side of the pin's seam plane; null when that side's chunk was
+// dropped as empty (a pin needs material on both sides to render).
+function chunkIndexAtPinSide(
+  chunkParts: readonly TempestPrintChunkPart[],
+  placement: TempestPosedPinPlacement,
+  side: -1 | 1,
+): number | null {
+  const probeShift = side * pinSeamProbeMillimeters;
+  const probe = {
+    x: placement.position.x + (placement.axis === "x" ? probeShift : 0),
+    y: placement.position.y + (placement.axis === "y" ? probeShift : 0),
+    z: placement.position.z + (placement.axis === "z" ? probeShift : 0),
+  };
+  const index = chunkParts.findIndex((part) => chunkContainsPoint(part, probe));
+  return index === -1 ? null : index;
+}
+
+function chunkContainsPoint(part: TempestPrintChunkPart, point: { x: number; y: number; z: number }): boolean {
+  const epsilon = chunkContainsEpsilonMillimeters;
+  return (
+    point.x >= part.sourcePlacement.x - epsilon &&
+    point.x <= part.sourcePlacement.x + part.width + epsilon &&
+    point.y >= part.sourcePlacement.y - epsilon &&
+    point.y <= part.sourcePlacement.y + part.depth + epsilon &&
+    point.z >= part.sourcePlacement.z - epsilon &&
+    point.z <= part.sourcePlacement.z + part.height + epsilon
+  );
+}
 
 // #######################################
 // Preview Class
@@ -1100,8 +1147,7 @@ export class PurifierThreePreview {
     const edgeMaterial = createPrintedPartEdgeMaterial(printedPartColor, 0.58);
 
     const chunkParts = kit.parts.filter(
-      (part): part is Extract<PrintablePart, { readonly kind: "tempest-print-chunk" }> =>
-        part.kind === "tempest-print-chunk",
+      (part): part is TempestPrintChunkPart => part.kind === "tempest-print-chunk",
     );
     const chunkGroups: Object3D[] = [];
     for (const part of chunkParts) {
@@ -1145,6 +1191,9 @@ export class PurifierThreePreview {
         const [offsetX, offsetY, offsetZ] = offsets[index];
         chunkGroup.position.add(tempestPosedPointToScene({ x: offsetX, y: offsetY, z: offsetZ }));
       });
+      if (chunkParts.length > 1) {
+        this.addTempestSeamPins(layout, kit.preset.id, chunkParts, offsets);
+      }
     }
 
     const outline = this.settleModelOnGround();
@@ -1157,6 +1206,57 @@ export class PurifierThreePreview {
       return;
     }
     this.updateModelFocus(outline);
+  }
+
+  // Exploded-only assembly cue: a filament-toned cylinder at every seam
+  // alignment-pin site, spanning the opened gap between the two displaced
+  // chunks so the exploded view reads as an assembly diagram. The pin diagram
+  // is pure data derived from the same chunk plan the kit was cut with.
+  private addTempestSeamPins(
+    layout: LayoutResult,
+    presetId: PrintVolumePresetId,
+    chunkParts: readonly TempestPrintChunkPart[],
+    chunkOffsets: readonly Vector3Tuple[],
+  ): void {
+    const diagram = createTempestAssemblyPinDiagram(createTempestSettingsFromLayout(layout), presetId);
+    if (diagram === null) {
+      return;
+    }
+    const material = createPrintedPartMaterial({ color: filamentPinColor, roughness: 0.5, metalness: 0.05 });
+    const radius = (diagram.pinDiameter / 2) * sceneScale;
+    for (const placement of diagram.placements) {
+      const lowIndex = chunkIndexAtPinSide(chunkParts, placement, -1);
+      const highIndex = chunkIndexAtPinSide(chunkParts, placement, 1);
+      if (lowIndex === null || highIndex === null || lowIndex === highIndex) {
+        continue;
+      }
+      const lowOffset = chunkOffsets[lowIndex];
+      const highOffset = chunkOffsets[highIndex];
+      const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
+      const seamGap = Math.max(0, highOffset[axisIndex] - lowOffset[axisIndex]);
+      // The pin's midpoint sits halfway between the two displaced chunk faces;
+      // the cylinder grows by the opened gap so it bridges the seam.
+      const midpoint = {
+        x: placement.position.x + (lowOffset[0] + highOffset[0]) / 2,
+        y: placement.position.y + (lowOffset[1] + highOffset[1]) / 2,
+        z: placement.position.z + (lowOffset[2] + highOffset[2]) / 2,
+      };
+      const pinMesh = new Mesh(
+        new CylinderGeometry(radius, radius, (diagram.pinLength + seamGap) * sceneScale, filamentPinSegments),
+        material,
+      );
+      pinMesh.name = "tempest-seam-pin";
+      pinMesh.position.copy(tempestPosedPointToScene(midpoint));
+      // CylinderGeometry runs along scene Y; tempestPosedPointToScene maps
+      // posed z to scene Y, posed x to scene X, and posed y to scene Z.
+      if (placement.axis === "x") {
+        pinMesh.rotation.z = Math.PI / 2;
+      } else if (placement.axis === "y") {
+        pinMesh.rotation.x = Math.PI / 2;
+      }
+      pinMesh.castShadow = true;
+      this.modelGroup.add(pinMesh);
+    }
   }
 
   private addTempestPreviewPurchasedParts(

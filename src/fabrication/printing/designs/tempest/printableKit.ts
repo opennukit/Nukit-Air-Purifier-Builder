@@ -28,6 +28,8 @@ import {
   type ChunkBounds,
   clipPrintChunk,
   posePrintableAssembly,
+  tempestPinPlacementsClearOfFans,
+  type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
@@ -67,9 +69,7 @@ export function createTempestPrintableKit(
   presetId: PrintVolumePresetId,
 ): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
-  const model = createTempestModel(settingsForPresetBed(settings, presetId));
-  const pose = createTempestPrintablePose(model);
-  const chunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
+  const { model, pose, printableChunkGrid, sourceChunkGrid } = createTempestChunkPlan(settings, presetId);
   // Every Manifold value the build allocates is freed when this arena exits;
   // the returned parts carry only extracted plain-data meshes. The posing and
   // chunk-clipping run through the same ModelingApi seam as the parametric shape
@@ -79,9 +79,9 @@ export function createTempestPrintableKit(
     const assembly = posePrintableAssembly(
       ctx,
       pose,
-      createFinalAssemblyGeometry(model, sourceChunkGridForPose(pose, chunkGrid)),
+      createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, model, chunkGrid, assembly);
+    return createChunkParts(ctx, model, printableChunkGrid, assembly);
   });
   const featureCount = estimateFeatureCount(model);
 
@@ -92,13 +92,97 @@ export function createTempestPrintableKit(
       partCount: parts.length,
       panelTileCount: 0,
       glueKeyCount: 0,
-      splitPanelCount: chunkGrid.totalCount > 1 ? 1 : 0,
+      splitPanelCount: printableChunkGrid.totalCount > 1 ? 1 : 0,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
       sourceCutFeatureCount: featureCount,
       retainedCutFeatureCount: featureCount,
       sourcePrintCriticalCutFeatureCount: featureCount,
       retainedPrintCriticalCutFeatureCount: featureCount,
     },
+  };
+}
+
+// #######################################
+// Chunk Plan (pure, no CSG)
+// #######################################
+
+// How the kit will pose and split the model for a print volume, derived from
+// pure arithmetic — no Manifold build. The same plan drives the kit's actual
+// chunk cutting above, so plan consumers (assembly guidance, parts list, the
+// exploded preview's pin diagram) always agree with the exported chunks.
+export type TempestChunkPlan = {
+  readonly model: TempestModel;
+  readonly pose: TempestPrintablePose;
+  // The cut boundaries in the posed (on-bed) frame the chunks are clipped on.
+  readonly printableChunkGrid: TempestChunkGrid;
+  // The same boundaries mapped back to the source (as-modelled) frame, where
+  // the alignment-pin holes are placed.
+  readonly sourceChunkGrid: TempestChunkGrid;
+};
+
+export function createTempestChunkPlan(settings: TempestSettings, presetId: PrintVolumePresetId): TempestChunkPlan {
+  const model = createTempestModel(settingsForPresetBed(settings, presetId));
+  const pose = createTempestPrintablePose(model);
+  const printableChunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
+  return {
+    model,
+    pose,
+    printableChunkGrid,
+    sourceChunkGrid: sourceChunkGridForPose(pose, printableChunkGrid),
+  };
+}
+
+// #######################################
+// Assembly Pin Diagram (pure, no CSG)
+// #######################################
+
+// The seam alignment pins as plain posed-frame data for the exploded preview:
+// where each filament pin sits and along which posed axis it runs. Derived
+// from the same chunk plan and pin-candidate math the kit's CSG build cuts
+// the holes with, so the diagram always matches the exported parts.
+export type TempestPosedPinPlacement = {
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  readonly axis: "x" | "y" | "z";
+};
+
+export type TempestAssemblyPinDiagram = {
+  readonly pinDiameter: number;
+  // The physical pin: holeDepth into the chunk on each side of the seam.
+  readonly pinLength: number;
+  readonly placements: readonly TempestPosedPinPlacement[];
+};
+
+export function createTempestAssemblyPinDiagram(
+  settings: TempestSettings,
+  presetId: PrintVolumePresetId,
+): TempestAssemblyPinDiagram | null {
+  const { model, pose, sourceChunkGrid } = createTempestChunkPlan(settings, presetId);
+  const pins = model.settings.alignmentPins;
+  if (pins.type === "disabled") {
+    return null;
+  }
+  const placements = tempestPinPlacementsClearOfFans(model, sourceChunkGrid).map((placement) => posePinPlacement(placement, pose));
+  if (placements.length === 0) {
+    return null;
+  }
+  return {
+    pinDiameter: pins.diameter,
+    pinLength: 2 * pins.holeDepth,
+    placements,
+  };
+}
+
+// Source -> posed frame, matching posePrintableAssembly and
+// sourceChunkGridForPose: upright-dual-filter maps (x, y, z) to
+// (x, envelope.depth - z, y), so the axes follow the same rotation.
+function posePinPlacement(placement: TempestAlignmentPinPlacement, pose: TempestPrintablePose): TempestPosedPinPlacement {
+  const [x, y, z] = placement.position;
+  if (pose.type === "source") {
+    return { position: { x, y, z }, axis: placement.axis };
+  }
+  return {
+    position: { x, y: pose.envelope.depth - z, z: y },
+    axis: placement.axis === "x" ? "x" : placement.axis === "y" ? "z" : "y",
   };
 }
 

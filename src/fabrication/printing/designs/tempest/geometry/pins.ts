@@ -1,4 +1,5 @@
 import type { TempestChunkGrid, TempestFanLayout, TempestFilterLayout, TempestModel } from "@/domain/designs/tempest/model";
+import type { TempestExtrudeAxis } from "@/domain/designs/tempest/shared";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
@@ -35,14 +36,20 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
 }
 
 // #######################################
-// Alignment Pins
+// Alignment Pin Placements (pure)
 // #######################################
 
-export function pinHoles<Solid, Region>(
-  ctx: GeometryContext<Solid, Region>,
-  model: TempestModel,
-  chunkGrid: TempestChunkGrid,
-): Solid[] {
+// One alignment-pin site in source (as-modelled) millimeters: the pin's center
+// point on the seam plane; the pin hole runs holeDepth into each chunk from
+// here along `axis`. This is the single source of the pin-candidate math —
+// pinHoles turns these into CSG cylinders, and the exploded preview renders
+// them as filament pins.
+export type TempestAlignmentPinPlacement = {
+  readonly position: readonly [number, number, number];
+  readonly axis: TempestExtrudeAxis;
+};
+
+export function tempestAlignmentPinPlacements(model: TempestModel, chunkGrid: TempestChunkGrid): readonly TempestAlignmentPinPlacement[] {
   if (model.settings.alignmentPins.type === "disabled") {
     return [];
   }
@@ -57,53 +64,94 @@ export function pinHoles<Solid, Region>(
   }
 
   return matchTopology(model, {
+    sandwich: (m) => pinPlacementsSandwich(m, m.filterLayout, chunkGrid, pin),
+    quad: (m) => pinPlacementsQuad(m, m.filterLayout, chunkGrid, pin),
+  });
+}
+
+// The placements that survive the CSG build, as pure data: the sandwich build
+// subtracts the wall fan bores from the pin candidates, so a placement whose
+// center sits inside a bore is dropped here too. A pin that merely grazes a
+// bore keeps its (still usable) hole in both views.
+export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: TempestChunkGrid): readonly TempestAlignmentPinPlacement[] {
+  const placements = tempestAlignmentPinPlacements(model, chunkGrid);
+  return matchTopology(model, {
     sandwich: (m) => {
-      const candidates = pinCandidatesSandwich(ctx, m, m.filterLayout, chunkGrid, pin);
-      if (candidates.length === 0) {
-        return [];
-      }
+      const bores = sandwichFanBores(m, m.fanLayout);
+      return placements.filter((placement) => !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness)));
+    },
+    quad: () => placements,
+  });
+}
+
+// #######################################
+// Alignment Pin Holes (CSG)
+// #######################################
+
+export function pinHoles<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  chunkGrid: TempestChunkGrid,
+): Solid[] {
+  if (model.settings.alignmentPins.type === "disabled") {
+    return [];
+  }
+  const pin = model.settings.alignmentPins;
+  const placements = tempestAlignmentPinPlacements(model, chunkGrid);
+  if (placements.length === 0) {
+    return [];
+  }
+  const candidates = placements.map((placement) => pinHoleCylinder(ctx, placement, pin));
+
+  return matchTopology(model, {
+    sandwich: (m) => {
       // Keep pins clear of the fan bodies so a seam pin never lands in a fan bore.
       const fanZones = fanBodyZones(ctx, m, m.fanLayout);
       const candidateGeometry = unionAll(ctx, candidates);
       return [fanZones.length === 0 ? candidateGeometry : ctx.modeling.booleans.subtract(candidateGeometry, unionAll(ctx, fanZones))];
     },
-    quad: (m) => {
-      const candidates = pinCandidatesQuad(ctx, m, m.filterLayout, chunkGrid, pin);
-      return candidates.length === 0 ? [] : [unionAll(ctx, candidates)];
-    },
+    quad: () => [unionAll(ctx, candidates)],
   });
 }
 
-function pinCandidatesSandwich<Solid, Region>(
+function pinHoleCylinder<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
+  placement: TempestAlignmentPinPlacement,
+  pin: AlignmentPinSpec,
+): Solid {
+  const [x, y, z] = placement.position;
+  const start: readonly [number, number, number] =
+    placement.axis === "x" ? [x - pin.holeDepth, y, z] : placement.axis === "y" ? [x, y - pin.holeDepth, z] : [x, y, z - pin.holeDepth];
+  return cylinderAlongFromStart(ctx, placement.axis, start, 2 * pin.holeDepth, pin.diameter / 2);
+}
+
+function pinPlacementsSandwich(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
-): Solid[] {
-  const geometries: Solid[] = [];
-  const length = 2 * pin.holeDepth;
-  const radius = pin.diameter / 2;
+): TempestAlignmentPinPlacement[] {
+  const placements: TempestAlignmentPinPlacement[] = [];
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
       const seamX = chunkGrid.boundariesX[index];
       for (const wallY of [model.frame.wallThickness / 2, model.box.depth - model.frame.wallThickness / 2]) {
         for (const gridZ of rimPositions(model.frame.outsideFlangeThickness, model.box.height - model.frame.outsideFlangeThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
+          placements.push({ position: [seamX, wallY, gridZ], axis: "x" });
         }
       }
       for (const frameZ of horizontalFrameMidlinesWithOpening(model, filterLayout)) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.frame.rim, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, frameZ], length, radius));
+          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
         }
         for (const gridY of rimPositions(model.box.depth - model.frame.rim, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, frameZ], length, radius));
+          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
         }
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, frameZ], length, radius));
+          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
         }
       }
     }
@@ -114,20 +162,20 @@ function pinCandidatesSandwich<Solid, Region>(
       const seamY = chunkGrid.boundariesY[index];
       for (const wallX of [model.frame.wallThickness / 2, model.box.width - model.frame.wallThickness / 2]) {
         for (const gridZ of rimPositions(model.frame.outsideFlangeThickness, model.box.height - model.frame.outsideFlangeThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
+          placements.push({ position: [wallX, seamY, gridZ], axis: "y" });
         }
       }
       for (const frameZ of horizontalFrameMidlinesWithOpening(model, filterLayout)) {
         for (const gridX of rimPositions(model.frame.wallThickness, model.frame.rim, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, frameZ], length, radius));
+          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
         }
         for (const gridX of rimPositions(model.box.width - model.frame.rim, model.box.width - model.frame.wallThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, frameZ], length, radius));
+          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
         }
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridX of rimPositions(model.frame.wallThickness, model.box.width - model.frame.wallThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, frameZ], length, radius));
+          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
         }
       }
     }
@@ -138,30 +186,27 @@ function pinCandidatesSandwich<Solid, Region>(
       const seamZ = chunkGrid.boundariesZ[index];
       for (const wallY of [model.frame.wallThickness / 2, model.box.depth - model.frame.wallThickness / 2]) {
         for (const gridX of rimPositions(0, model.box.width, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [gridX, wallY, seamZ], axis: "z" });
         }
       }
       for (const wallX of [model.frame.wallThickness / 2, model.box.width - model.frame.wallThickness / 2]) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [wallX, gridY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [wallX, gridY, seamZ], axis: "z" });
         }
       }
     }
   }
 
-  return geometries;
+  return placements;
 }
 
-function pinCandidatesQuad<Solid, Region>(
-  ctx: GeometryContext<Solid, Region>,
+function pinPlacementsQuad(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
-): Solid[] {
-  const geometries: Solid[] = [];
-  const length = 2 * pin.holeDepth;
-  const radius = pin.diameter / 2;
+): TempestAlignmentPinPlacement[] {
+  const placements: TempestAlignmentPinPlacement[] = [];
   const wallZLow = filterLayout.bottomPlateThickness;
   const wallZHigh = model.box.height - filterLayout.topPlateThickness;
   // The structural wall between each filter pocket and the air chamber: its inner
@@ -176,26 +221,22 @@ function pinCandidatesQuad<Solid, Region>(
       const seamX = chunkGrid.boundariesX[index];
       for (const wallY of [model.frame.outsideFlangeThickness / 2, model.box.depth - model.frame.outsideFlangeThickness / 2]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
+          placements.push({ position: [seamX, wallY, gridZ], axis: "x" });
         }
       }
       for (const wallY of [innerWallMidlineLow, innerWallMidlineHighY]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, wallY, gridZ], length, radius));
+          placements.push({ position: [seamX, wallY, gridZ], axis: "x" });
         }
       }
       for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-        geometries.push(cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, filterLayout.bottomPlateThickness / 2], length, radius));
+        placements.push({ position: [seamX, gridY, filterLayout.bottomPlateThickness / 2], axis: "x" });
       }
       for (const gridY of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
-        geometries.push(
-          cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, model.box.height - filterLayout.topPlateThickness / 2], length, radius),
-        );
+        placements.push({ position: [seamX, gridY, model.box.height - filterLayout.topPlateThickness / 2], axis: "x" });
       }
       for (const gridY of rimPositions(model.box.depth - filterLayout.structuralOffset, model.box.depth - model.frame.outsideFlangeThickness, pin.spacing)) {
-        geometries.push(
-          cylinderAlongFromStart(ctx, "x", [seamX - pin.holeDepth, gridY, model.box.height - filterLayout.topPlateThickness / 2], length, radius),
-        );
+        placements.push({ position: [seamX, gridY, model.box.height - filterLayout.topPlateThickness / 2], axis: "x" });
       }
     }
   }
@@ -205,26 +246,22 @@ function pinCandidatesQuad<Solid, Region>(
       const seamY = chunkGrid.boundariesY[index];
       for (const wallX of [model.frame.outsideFlangeThickness / 2, model.box.width - model.frame.outsideFlangeThickness / 2]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
+          placements.push({ position: [wallX, seamY, gridZ], axis: "y" });
         }
       }
       for (const wallX of [innerWallMidlineLow, innerWallMidlineHighX]) {
         for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "y", [wallX, seamY - pin.holeDepth, gridZ], length, radius));
+          placements.push({ position: [wallX, seamY, gridZ], axis: "y" });
         }
       }
       for (const gridX of rimPositions(model.frame.wallThickness, model.box.width - model.frame.wallThickness, pin.spacing)) {
-        geometries.push(cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, filterLayout.bottomPlateThickness / 2], length, radius));
+        placements.push({ position: [gridX, seamY, filterLayout.bottomPlateThickness / 2], axis: "y" });
       }
       for (const gridX of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
-        geometries.push(
-          cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, model.box.height - filterLayout.topPlateThickness / 2], length, radius),
-        );
+        placements.push({ position: [gridX, seamY, model.box.height - filterLayout.topPlateThickness / 2], axis: "y" });
       }
       for (const gridX of rimPositions(model.box.width - filterLayout.structuralOffset, model.box.width - model.frame.outsideFlangeThickness, pin.spacing)) {
-        geometries.push(
-          cylinderAlongFromStart(ctx, "y", [gridX, seamY - pin.holeDepth, model.box.height - filterLayout.topPlateThickness / 2], length, radius),
-        );
+        placements.push({ position: [gridX, seamY, model.box.height - filterLayout.topPlateThickness / 2], axis: "y" });
       }
     }
   }
@@ -234,35 +271,42 @@ function pinCandidatesQuad<Solid, Region>(
       const seamZ = chunkGrid.boundariesZ[index];
       for (const wallY of [model.frame.outsideFlangeThickness / 2, model.box.depth - model.frame.outsideFlangeThickness / 2]) {
         for (const gridX of rimPositions(0, model.box.width, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [gridX, wallY, seamZ], axis: "z" });
         }
       }
       for (const wallX of [model.frame.outsideFlangeThickness / 2, model.box.width - model.frame.outsideFlangeThickness / 2]) {
         for (const gridY of rimPositions(model.frame.outsideFlangeThickness, model.box.depth - model.frame.outsideFlangeThickness, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [wallX, gridY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [wallX, gridY, seamZ], axis: "z" });
         }
       }
       for (const wallY of [innerWallMidlineLow, innerWallMidlineHighY]) {
         for (const gridX of rimPositions(filterLayout.structuralOffset, model.box.width - filterLayout.structuralOffset, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [gridX, wallY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [gridX, wallY, seamZ], axis: "z" });
         }
       }
       for (const wallX of [innerWallMidlineLow, innerWallMidlineHighX]) {
         for (const gridY of rimPositions(filterLayout.structuralOffset, model.box.depth - filterLayout.structuralOffset, pin.spacing)) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [wallX, gridY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [wallX, gridY, seamZ], axis: "z" });
         }
       }
       const pinXY = filterLayout.structuralOffset - model.frame.wallThickness;
       for (const centerX of [pinXY, model.box.width - pinXY]) {
         for (const centerY of [pinXY, model.box.depth - pinXY]) {
-          geometries.push(cylinderAlongFromStart(ctx, "z", [centerX, centerY, seamZ - pin.holeDepth], length, radius));
+          placements.push({ position: [centerX, centerY, seamZ], axis: "z" });
         }
       }
     }
   }
 
-  return geometries;
+  return placements;
 }
+
+// #######################################
+// Wall Fan Bores
+// #######################################
+
+// FAN_BORE_PLACEMENT: fanBodyZones (CSG) and sandwichFanBores (pure) describe
+// the same wall fan bores — keep their placement math in lockstep.
 
 function fanBodyZones<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
@@ -290,6 +334,45 @@ function fanBodyZones<Solid, Region>(
     ),
   ];
 }
+
+// A wall fan bore as data: its center in source millimeters, the wall-normal
+// axis it runs along, and the fan radius.
+type SandwichFanBore = {
+  readonly normalAxis: "x" | "y";
+  readonly center: readonly [number, number, number];
+  readonly radius: number;
+};
+
+function sandwichFanBores(
+  model: TempestModel,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
+): SandwichFanBore[] {
+  const radius = model.settings.fan.diameter / 2;
+  const z = model.frame.outsideFlangeThickness + fanLayout.localVerticalCenter;
+  const wallMid = model.frame.wallThickness / 2;
+  const { width, depth } = model.box;
+  return [
+    ...fanLayout.walls.front.positionsAlongWall.map((position): SandwichFanBore => ({ normalAxis: "y", center: [position, wallMid, z], radius })),
+    ...fanLayout.walls.back.positionsAlongWall.map((position): SandwichFanBore => ({ normalAxis: "y", center: [width - position, depth - wallMid, z], radius })),
+    ...fanLayout.walls.left.positionsAlongWall.map((position): SandwichFanBore => ({ normalAxis: "x", center: [wallMid, depth - position, z], radius })),
+    ...fanLayout.walls.right.positionsAlongWall.map((position): SandwichFanBore => ({ normalAxis: "x", center: [width - wallMid, position, z], radius })),
+  ];
+}
+
+function boreSwallowsPin(bore: SandwichFanBore, placement: TempestAlignmentPinPlacement, wallThickness: number): boolean {
+  const [pinX, pinY, pinZ] = placement.position;
+  const [boreX, boreY, boreZ] = bore.center;
+  const alongNormal = bore.normalAxis === "x" ? pinX - boreX : pinY - boreY;
+  if (Math.abs(alongNormal) > wallThickness / 2 + 1) {
+    return false;
+  }
+  const planarDistance = bore.normalAxis === "x" ? Math.hypot(pinY - boreY, pinZ - boreZ) : Math.hypot(pinX - boreX, pinZ - boreZ);
+  return planarDistance < bore.radius;
+}
+
+// #######################################
+// Seam Frame Midlines
+// #######################################
 
 function horizontalFrameMidlinesWithOpening(
   model: TempestModel,

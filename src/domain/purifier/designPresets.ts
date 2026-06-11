@@ -212,9 +212,9 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       },
     },
     assemblyNotes: [
-      "Keeps the proven Nukit airflow layout",
-      "Uses screws for fans because screws ship with the fans and do not wear like snap clips",
-      "Uses printed dovetail lap keys where panels are split for the printer bed",
+      "Keeps the Nukit airflow layout",
+      "Fans screw on with the screws that ship with the fans; screws do not wear like snap clips",
+      "Printed panel kits join with dovetail lap keys where panels are split for the printer bed",
     ],
   },
   {
@@ -233,9 +233,9 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       },
     },
     assemblyNotes: [
-      "Keeps the Tempest printable housing separate from the laser-derived Nukit panel kit",
-      "Supports one top filter, a two-filter sandwich, or four side-loaded filters around a central chamber",
-      "Automatically chunks the generated CSG model to the selected printer volume",
+      "Holds one top filter, a two-filter sandwich, or four side-loaded filters around a central chamber",
+      "Splits the generated model into chunks that fit the selected printer volume",
+      "Fans screw onto the printed walls with the screws that ship with the fans; the screw holes are sized for them",
     ],
   },
   {

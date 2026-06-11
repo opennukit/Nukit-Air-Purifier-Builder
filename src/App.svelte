@@ -76,6 +76,7 @@
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
   import { fabricationMethodLabel, fanColorLabels, previewMaterialColorLabel, swatchColor } from "@/app/labels";
   import {
+    createAssemblyNotes,
     createPartsListItems,
     createPreviewSummaryItems,
     type PartsListItem,
@@ -105,7 +106,7 @@
     type WorkbenchFabricationPreview,
     type WorkbenchViewModel,
   } from "@/app/workbench/workbenchViewModel";
-  import { summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
+  import { exportBlockingDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import {
     createPrintableSheetPlanFromKit,
@@ -186,6 +187,7 @@
   let exportReadiness: BuildDiagnostic = summarizeBuildReadiness(layout);
   let previewSummaryItems: readonly SummaryItem[] = [];
   let partsItems: readonly PartsListItem[] = [];
+  let assemblyNotes: readonly string[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
   let activePrintSeamPlan: PrintableSheetPlan | null = null;
@@ -255,7 +257,8 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: partsItems = createPartsListItems(layout, fabricationMethod, settings);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
+  $: assemblyNotes = createAssemblyNotes(layout, fabricationMethod, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
@@ -495,7 +498,9 @@
   // #######################################
 
   function exportDrawing(buttonKey: TransientButtonKey): void {
-    if (exportDiagnostics.length > 0) {
+    // Only blocking diagnostics refuse the export; advisories stay visible in
+    // the checks list but leave the download available.
+    if (exportBlockingDiagnostics(exportDiagnostics).length > 0) {
       flashDownloadButtons("Review checks");
       return;
     }
@@ -1026,6 +1031,16 @@
               </button>
             </div>
           </div>
+          {#if exportDiagnostics.length > 0}
+            <ul class="export-diagnostics-list" id="exportDiagnosticsList" aria-label="Export checks">
+              {#each exportDiagnostics as diagnostic (diagnostic.id)}
+                <li class={`diagnostic-item ${diagnostic.severity}`}>
+                  <strong>{diagnostic.title}</strong>
+                  <span>{diagnostic.detail}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
         </section>
 
         <div class="controls-sections">
@@ -1547,6 +1562,22 @@
               </ul>
             </div>
           </section>
+
+          {#if assemblyNotes.length > 0}
+            <section class="control-section assembly-notes-section">
+              <div class="assembly-card" id="assemblyNotes">
+                <div class="parts-list-heading">
+                  <strong>Assembly</strong>
+                  <span>How it goes together</span>
+                </div>
+                <ul>
+                  {#each assemblyNotes as note}
+                    <li>{note}</li>
+                  {/each}
+                </ul>
+              </div>
+            </section>
+          {/if}
         </div>
 
         <!-- #######################################
