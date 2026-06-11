@@ -67,6 +67,9 @@
   ): void {
     const kitKey = printKitCacheKey(currentLayout.rawSettings, assembledKitPresetId);
     if (assembledKitCache !== null && assembledKitCache.key === kitKey) {
+      // The newest render request is satisfied right here; an older build
+      // still in flight must not apply later and revert the preview.
+      pendingTempestRender = null;
       applyTempestRender({ layout: currentLayout, seamPlan: currentSeamPlan, rebuildKey }, assembledKitCache.kit);
       return;
     }
