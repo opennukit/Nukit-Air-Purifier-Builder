@@ -1079,7 +1079,17 @@
               </p>
               <div data-generated-part-controls>
                 <fieldset class="segmented-field">
-                  <legend>Measurement unit</legend>
+                  <legend>
+                    Measurement unit
+                    <details class="measure-info">
+                      <summary aria-label="Why measure instead of using the box label?" title="Why measure?">i</summary>
+                      <p>
+                        Don't copy the size printed on the box. A "20x25x1" filter actually measures
+                        about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands vary by a few
+                        millimeters. Measure your filter and enter the real numbers.
+                      </p>
+                    </details>
+                  </legend>
                   <div>
                     {#each dimensionUnits as unit}
                       <label>
@@ -1213,6 +1223,32 @@
             </section>
           {/if}
 
+          {#snippet printSetupFields()}
+            <div data-print-volume-control>
+              <label class="field">
+                <span>Print volume</span>
+                <select name="printVolume" onchange={setPrintVolume}>
+                  {#each printVolumePresets as preset}
+                    <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+            {#if isNukitControlsActive}
+              <div data-nukit-print-split-control>
+                <label class="toggle-field">
+                  <input
+                    type="checkbox"
+                    name="splitFrames"
+                    checked={settings.splitFrames}
+                    onchange={(event) => updateBooleanSetting("splitFrames", event)}
+                  />
+                  <span>Split large frame panels</span>
+                </label>
+              </div>
+            {/if}
+          {/snippet}
+
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
@@ -1277,38 +1313,19 @@
                   {/each}
                 </div>
               {/if}
+              {#if showPrintSetupControls}
+                {@render printSetupFields()}
+              {/if}
             </section>
           {/if}
 
-          {#if showPrintSetupControls}
+          {#if showPrintSetupControls && isStaticReferenceControlsActive}
             <section class="control-section print-volume-section" data-print-volume-section>
               <div class="section-heading">
                 <p class="eyebrow">Printer</p>
                 <h2>Print setup</h2>
               </div>
-              <div data-print-volume-control>
-                <label class="field">
-                  <span>Print volume</span>
-                  <select name="printVolume" onchange={setPrintVolume}>
-                    {#each printVolumePresets as preset}
-                      <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
-                    {/each}
-                  </select>
-                </label>
-              </div>
-              {#if isNukitControlsActive}
-                <div data-nukit-print-split-control>
-                  <label class="toggle-field">
-                    <input
-                      type="checkbox"
-                      name="splitFrames"
-                      checked={settings.splitFrames}
-                      onchange={(event) => updateBooleanSetting("splitFrames", event)}
-                    />
-                    <span>Split large frame panels</span>
-                  </label>
-                </div>
-              {/if}
+              {@render printSetupFields()}
             </section>
           {/if}
 

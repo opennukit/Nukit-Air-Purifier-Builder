@@ -1256,6 +1256,59 @@ Segmented Controls
   font-weight: 800;
 }
 
+/* Small "i" disclosure next to a legend; opens an inline explainer note. */
+.measure-info {
+  position: relative;
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.measure-info summary {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-style: italic;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.measure-info summary::-webkit-details-marker {
+  display: none;
+}
+
+.measure-info[open] summary {
+  background: var(--accent-wash);
+  border-color: var(--accent-line-strong);
+}
+
+.measure-info p {
+  position: absolute;
+  z-index: 4;
+  top: 22px;
+  left: -8px;
+  width: min(320px, 72vw);
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-medium);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .segmented-field div {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
