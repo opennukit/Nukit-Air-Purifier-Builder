@@ -51,8 +51,29 @@ function kitWorker(): Worker {
       resultHandlerByRequestId.delete(event.data.requestId);
       handleResult(event.data.result);
     };
+    sharedWorker.onerror = (event) => {
+      failAllPendingRequests(`kit worker crashed: ${event.message !== "" ? event.message : "unknown error"}`);
+    };
+    sharedWorker.onmessageerror = () => {
+      failAllPendingRequests("kit worker response could not be deserialized");
+    };
   }
   return sharedWorker;
+}
+
+// A worker-level error carries no requestId to route by, so it fails every
+// pending request through its registered handler — the channels' applyResult,
+// which settles their callers and returns them to idle. The dead worker is
+// discarded; whatever posts next (a queued successor included) spawns a fresh
+// one, which is the retry path.
+function failAllPendingRequests(message: string): void {
+  sharedWorker?.terminate();
+  sharedWorker = null;
+  const pendingHandlers = [...resultHandlerByRequestId.values()];
+  resultHandlerByRequestId.clear();
+  for (const handleResult of pendingHandlers) {
+    handleResult({ type: "failed", message });
+  }
 }
 
 const sharedWorkerPort: KitBuildPort = {
