@@ -1,28 +1,31 @@
+import { inchesToMillimeters, millimetersToInches, type Inches, type Millimeters } from "@/domain/units";
+
 // Display units for the measured-dimension inputs. Settings and share URLs
 // always store millimeters; the selected unit only changes how the inputs
-// render their values and how typed values are interpreted.
+// render their values and how typed values are interpreted. The Millimeters /
+// Inches flavors make crossing the two without a conversion a compile error.
 
 export const dimensionUnits = ["mm", "in"] as const;
 
 export type DimensionUnit = (typeof dimensionUnits)[number];
 
-const millimetersPerInch = 25.4;
-
 export function millimetersToDisplayValue(
-  millimeters: number,
+  millimeters: Millimeters,
   unit: DimensionUnit,
 ): number {
   if (unit === "mm") {
     return millimeters;
   }
-  return roundTo(millimeters / millimetersPerInch, 2);
+  return roundTo(millimetersToInches(millimeters), 2);
 }
 
+// The input's raw value is in whichever unit the toggle selects; the cast to
+// Inches is the one sanctioned entry point for inch-flavored values.
 export function displayValueToMillimeters(
   value: number,
   unit: DimensionUnit,
-): number {
-  return unit === "mm" ? value : value * millimetersPerInch;
+): Millimeters {
+  return unit === "mm" ? value : inchesToMillimeters(value as Inches);
 }
 
 export function dimensionInputStep(
