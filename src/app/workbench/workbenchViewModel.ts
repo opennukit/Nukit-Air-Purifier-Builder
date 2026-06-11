@@ -13,12 +13,12 @@ import {
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
-  isLaserDerivedPrintDesignPreset,
+  isLaserCutDesignPreset,
   isStaticReferencePrintDesignPreset,
   isPublicThreeDimensionalPrintDesignId,
   isTempestPrintDesignPreset,
   type DonutFilterAdapterPrintDesignPreset,
-  type LaserDerivedPrintDesignPreset,
+  type LaserCutDesignPreset,
   type PrintDesignPreset,
   type StaticReferencePrintDesignPreset,
   type TempestPrintDesignPreset,
@@ -50,7 +50,7 @@ export type StaticReferencePlatePreview =
 export type WorkbenchDesignContext =
   | {
       readonly type: "nukit";
-      readonly preset: LaserDerivedPrintDesignPreset;
+      readonly preset: LaserCutDesignPreset;
       readonly layoutSectionTitle: "Fan placement";
       readonly partsSectionTitle: "Filter and fan";
     }
@@ -202,7 +202,7 @@ function createWorkbenchDesignContext(
   if (fabricationMethod !== "print-3mf") {
     return {
       type: "nukit",
-      preset: isLaserDerivedPrintDesignPreset(preset) ? preset : findLaserDerivedPrintDesignPreset(),
+      preset: isLaserCutDesignPreset(preset) ? preset : findLaserCutDesignPreset(),
       layoutSectionTitle: "Fan placement",
       partsSectionTitle: "Filter and fan",
     };
@@ -311,10 +311,10 @@ function exportActionLabelForDesign(
   return fabricationMethod === "print-3mf" ? "Download 3MF" : "Export Laser Drawing";
 }
 
-function findLaserDerivedPrintDesignPreset(): LaserDerivedPrintDesignPreset {
+function findLaserCutDesignPreset(): LaserCutDesignPreset {
   const preset = findPrintDesignPreset("nukit-open-air");
-  if (!isLaserDerivedPrintDesignPreset(preset)) {
-    throw new Error("findLaserDerivedPrintDesignPreset: Nukit Open Air is not a laser-derived design");
+  if (!isLaserCutDesignPreset(preset)) {
+    throw new Error("findLaserCutDesignPreset: Nukit Open Air is not a laser-cut design");
   }
   return preset;
 }

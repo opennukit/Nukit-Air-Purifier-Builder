@@ -48,7 +48,7 @@ describe("Print design settings memory", () => {
 
     const toNukit = switchPrintDesignSettings(toTempest.memory, toTempest.settings, "nukit-open-air");
     const toNukitSerialized = serializePurifierDraft(toNukit.settings);
-    expect(toNukit.settings.design.type).toBe("laser-derived-printable-kit");
+    expect(toNukit.settings.design.type).toBe("laser-cut");
     expect(toNukitSerialized.fansTop).toBe(2);
     expect(toNukitSerialized.rim).toBe(34);
   });

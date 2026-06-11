@@ -77,7 +77,7 @@ describe("Workbench state", () => {
     expect(viewModel.printDesignPreset.id).toBe(viewModel.design.preset.id);
   });
 
-  test("normalizes 3D print sessions away from the laser-derived Nukit design", () => {
+  test("normalizes 3D print sessions away from the laser-cut Nukit design", () => {
     const session = normalizeWorkbenchSession(
       applyPrintDesignPreset(defaultSettings, "nukit-open-air"),
       decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&printDesign=nukit-open-air")),

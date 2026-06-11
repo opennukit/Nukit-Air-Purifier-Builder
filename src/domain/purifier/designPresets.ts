@@ -1,5 +1,5 @@
 // Print design catalog: design identifiers, donut filter types, print design
-// preset types (laser-derived, donut adapter, tempest, static reference), the
+// preset types (laser-cut, donut adapter, tempest, static reference), the
 // preset catalog, public-release filtering, and lookups.
 
 import type { Millimeters } from "@/domain/units";
@@ -75,8 +75,8 @@ export type PrintDesignPresetBase = {
 
 export type PrintDesignImplementation =
   | {
-      readonly type: "laser-derived-printable-kit";
-      readonly defaults: LaserDerivedPrintDesignDefaults;
+      readonly type: "laser-cut";
+      readonly defaults: LaserCutDesignDefaults;
     }
   | {
       readonly type: "donut-filter-adapter";
@@ -92,10 +92,10 @@ export type PrintDesignImplementation =
       readonly defaults: StaticReferencePrintDesignDefaults;
     };
 
-export type LaserDerivedPrintDesignPreset = PrintDesignPresetBase & {
+export type LaserCutDesignPreset = PrintDesignPresetBase & {
   readonly implementation: Extract<
     PrintDesignImplementation,
-    { readonly type: "laser-derived-printable-kit" }
+    { readonly type: "laser-cut" }
   >;
 };
 
@@ -121,7 +121,7 @@ export type StaticReferencePrintDesignPreset = PrintDesignPresetBase & {
 };
 
 export type PrintDesignPreset =
-  | LaserDerivedPrintDesignPreset
+  | LaserCutDesignPreset
   | DonutFilterAdapterPrintDesignPreset
   | TempestPrintDesignPreset
   | StaticReferencePrintDesignPreset;
@@ -130,7 +130,7 @@ export type CommonPrintDesignDefaults = {
   readonly fanDiameter: FanDiameter;
 };
 
-export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
+export type LaserCutDesignDefaults = CommonPrintDesignDefaults & {
   readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
@@ -197,7 +197,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     license: "Generated from this project",
     releaseVisibility: "public",
     implementation: {
-      type: "laser-derived-printable-kit",
+      type: "laser-cut",
       defaults: {
         filter: defaultRectangularFilterDimensions,
         fanDiameter: 140,
@@ -390,7 +390,7 @@ function isPublicPrintDesignPreset(preset: PrintDesignPreset): boolean {
 function isPublicThreeDimensionalPrintDesignPreset(
   preset: PrintDesignPreset,
 ): boolean {
-  return !isLaserDerivedPrintDesignPreset(preset);
+  return !isLaserCutDesignPreset(preset);
 }
 
 // #######################################
@@ -420,10 +420,10 @@ export function isStaticReferencePrintDesignId(id: PrintDesignId): boolean {
   return findPrintDesignPreset(id).implementation.type === "static-reference";
 }
 
-export function isLaserDerivedPrintDesignPreset(
+export function isLaserCutDesignPreset(
   preset: PrintDesignPreset,
-): preset is LaserDerivedPrintDesignPreset {
-  return preset.implementation.type === "laser-derived-printable-kit";
+): preset is LaserCutDesignPreset {
+  return preset.implementation.type === "laser-cut";
 }
 
 export function isDonutFilterAdapterPrintDesignPreset(

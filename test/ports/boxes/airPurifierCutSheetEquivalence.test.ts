@@ -87,9 +87,9 @@ describe("Air purifier cut-sheet equivalence", () => {
     const draftPanels = createAirPurifierCutPanels(layout.configuration);
 
     expect(layout.rawSettings.filterWidth).toBe(layout.configuration.filter.width);
-    expect(layout.configuration.design.type).toBe("laser-derived-printable-kit");
+    expect(layout.configuration.design.type).toBe("laser-cut");
     expect(
-      layout.configuration.design.type === "laser-derived-printable-kit"
+      layout.configuration.design.type === "laser-cut"
         ? layout.configuration.design.fanBanks.left
         : undefined,
     ).toEqual({ type: "auto" });
