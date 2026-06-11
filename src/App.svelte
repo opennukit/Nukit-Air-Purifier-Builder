@@ -129,12 +129,15 @@
   type TransientButtonLabels = Partial<Record<TransientButtonKey, string>>;
 
   // The print kit behind the generated sheet plan builds in a worker; the
-  // "ready" state lives in the plan cache itself, so this tracks only whether a
-  // build is in flight (and the last failure, which keeps the previous plan).
+  // "ready" state lives in the plan cache itself, so this tracks the build in
+  // flight and the last failure (which keeps the previous plan on screen).
+  // Both carry the cache key they answer, so a key is requested at most once:
+  // not re-posted while building, and not retried after failing until the
+  // settings change.
   type PrintKitBuildState =
     | { readonly type: "idle" }
-    | { readonly type: "building" }
-    | { readonly type: "failed"; readonly message: string };
+    | { readonly type: "building"; readonly key: string }
+    | { readonly type: "failed"; readonly key: string; readonly message: string };
 
   // #######################################
   // Svelte State
@@ -161,7 +164,6 @@
   let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
-  let inFlightPrintSheetPlanKey: string | null = null;
   // Reported up by PurifierPreview while its assembled tempest kit builds.
   let assembledPreviewBuildPhase: "idle" | "building" = "idle";
   // First load shows a centered "Building model…" state; after the first build
@@ -643,9 +645,16 @@
     }
     const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
     if (generatedPrintSheetPlanCache?.key === cacheKey) {
+      // A recorded failure always belongs to some other key (failures never
+      // reach the cache), and it is moot once the current key serves from
+      // cache — clear it so the export path sees a fresh plan.
+      if (printSheetKitBuild.type === "failed") {
+        printSheetKitBuild = { type: "idle" };
+      }
       return generatedPrintSheetPlanCache.plan;
     }
-    if (inFlightPrintSheetPlanKey !== cacheKey) {
+    const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
+    if (!keyAlreadyHandled) {
       requestGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId, cacheKey);
     }
     return generatedPrintSheetPlan;
@@ -656,18 +665,16 @@
     currentPrintVolumePresetId: PrintVolumePresetId,
     cacheKey: string,
   ): void {
-    inFlightPrintSheetPlanKey = cacheKey;
-    printSheetKitBuild = { type: "building" };
+    printSheetKitBuild = { type: "building", key: cacheKey };
     void printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
       // A superseded request was replaced by a newer one that now owns the
-      // in-flight key and build state, so it changes nothing here.
+      // build state, so it changes nothing here.
       if (outcome.type === "superseded") {
         return;
       }
-      inFlightPrintSheetPlanKey = null;
       if (outcome.type === "failed") {
         console.error(`requestGeneratedPrintSheetPlan: print kit build failed: ${outcome.message}`);
-        printSheetKitBuild = { type: "failed", message: outcome.message };
+        printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
         return;
       }
       generatedPrintSheetPlanCache = { key: cacheKey, plan: createPrintableSheetPlanFromKit(outcome.kit) };
