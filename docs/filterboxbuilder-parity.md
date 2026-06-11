@@ -5,8 +5,8 @@ This project is not trying to clone every upstream control as a flat form. The g
 ## Kept As First-Path Controls
 
 - Print design selection for generated Nukit, generated printable variants, and curated static references.
-- Filter preset or measured rectangular filter dimensions.
-- Fan product preset or custom fan diameter.
+- Measured rectangular filter dimensions (no stock-size presets; users measure their actual filter).
+- Fan size (120/140/custom diameter) and a visual fan color; no fan product presets or purchase links.
 - Filter count and wall fan-bank counts for the generated Nukit box.
 - Material thickness, screw-hole diameter, rim, kerf/fit allowance, labels, reference scale, and split-frame output.
 - Preview controls that do not change fabrication geometry, such as media/fan visibility, dimensions, banana scale, seams, labels, rotation, and camera preset.
@@ -47,6 +47,6 @@ The app does not expose every low-level upstream option on the main path. That i
 - Fixed static Printables references are not made parametric. Their source dimensions, licenses, and files stay authoritative.
 - Advanced joint settings are hidden for static references because those files are not generated from the current geometry model.
 - Historical workflow tabs such as `fit`, `cutting`, `fabrication`, and `export` are migrated to the current tab model instead of kept as separate UX concepts.
-- Controls that duplicate presets without changing generated output are represented as presets, purchase-list notes, or source/license metadata.
+- Controls that duplicate measured inputs without changing generated output were removed; source/license metadata stays on curated static references only.
 
 The story for users is: start with the safe generated path, open Advanced only when material/cutter/printer tolerances require it, and treat fixed external models as fixed source references.

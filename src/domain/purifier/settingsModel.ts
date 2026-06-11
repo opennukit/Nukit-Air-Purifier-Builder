@@ -129,7 +129,6 @@ export type EnclosurePreviewOptions = {
   readonly explodedView: boolean;
   readonly showDimensions: boolean;
   readonly showBananaScale: boolean;
-  readonly showPrintSeams: boolean;
   readonly showPreviewEdges: boolean;
   readonly materialColor: PreviewMaterialColorId;
   readonly autoRotate: boolean;
@@ -200,7 +199,6 @@ export type RawPurifierSettings = {
   explodedView: boolean;
   showDimensions: boolean;
   showBananaScale: boolean;
-  showPrintSeams: boolean;
   showPreviewEdges: boolean;
   previewMaterialColor: PreviewMaterialColorId;
   autoRotate: boolean;
@@ -389,7 +387,6 @@ export const defaultSettings: RawPurifierSettings = {
   explodedView: false,
   showDimensions: false,
   showBananaScale: false,
-  showPrintSeams: false,
   showPreviewEdges: false,
   previewMaterialColor: defaultPreviewMaterialColorId,
   autoRotate: true,

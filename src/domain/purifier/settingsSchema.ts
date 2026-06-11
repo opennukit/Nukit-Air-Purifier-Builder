@@ -109,7 +109,6 @@ export type PurifierSettingsFieldFallbacks = {
   readonly explodedView: boolean;
   readonly showDimensions: boolean;
   readonly showBananaScale: boolean;
-  readonly showPrintSeams: boolean;
   readonly showPreviewEdges: boolean;
   readonly autoRotate: boolean;
   readonly labels: boolean;
@@ -162,7 +161,6 @@ export const createPurifierSettingsFieldsSchema = (
     explodedView: zBooleanField(fallbacks.explodedView),
     showDimensions: zBooleanField(fallbacks.showDimensions),
     showBananaScale: zBooleanField(fallbacks.showBananaScale),
-    showPrintSeams: zBooleanField(fallbacks.showPrintSeams),
     showPreviewEdges: zBooleanField(fallbacks.showPreviewEdges),
     autoRotate: zBooleanField(fallbacks.autoRotate),
     labels: zBooleanField(fallbacks.labels),

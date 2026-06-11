@@ -17,7 +17,7 @@ import {
 import type { FanAppearance } from "@/domain/purifier/fans";
 import type { AssemblyPanelPart } from "@/fabrication/assemblyModel";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
-import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
+import type { PrintableMesh } from "@/fabrication/printing/printableKit";
 import {
   printableMeshToBufferGeometry,
   type PrintableMeshShading,
@@ -29,9 +29,7 @@ import {
   fanPreviewFrontDepth,
   fanPreviewRearDepth,
   panelCutOverlayLift,
-  panelPrintSeamOverlayLift,
   sceneScale,
-  type PanelPrintSeam,
 } from "@/rendering/three/preview/previewData";
 
 // #######################################
@@ -39,8 +37,8 @@ import {
 // #######################################
 
 // Scene meshes for generated parts: extruded laser-cut panels with their cut
-// marks, print-seam overlays, and fans, plus the printable-mesh-to-geometry
-// preview groups and their contour edge overlays.
+// marks and fans, plus the printable-mesh-to-geometry preview groups and
+// their contour edge overlays.
 
 export function createPreviewEdges(geometry: BufferGeometry, material: Material, name?: string): LineSegments {
   const edges = new LineSegments(new EdgesGeometry(geometry), material);
@@ -124,8 +122,6 @@ export function createPanelGroup(
   edgeMaterial: Material,
   cutMarkMaterial: Material,
   screwMarkMaterial: Material,
-  printSeams: readonly PanelPrintSeam[],
-  printSeamMaterial: Material,
 ): Group {
   const panel = part.panel;
   const group = new Group();
@@ -140,9 +136,6 @@ export function createPanelGroup(
   group.add(edges);
 
   group.add(createPanelCutMarkGroup(panel, materialThickness, cutMarkMaterial, screwMarkMaterial));
-  if (printSeams.length > 0) {
-    group.add(createPanelPrintSeamGroup(panel, materialThickness, printSeams, printSeamMaterial));
-  }
 
   if (showFans) {
     const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
@@ -170,91 +163,6 @@ export function createPanelGroup(
   group.rotation.set(rx, ry, rz);
 
   return group;
-}
-
-export function createPanelPrintSeams(plan: PrintableSheetPlan | null): Map<string, readonly PanelPrintSeam[]> {
-  const seamMap = new Map<string, PanelPrintSeam[]>();
-  if (plan === null) {
-    return seamMap;
-  }
-
-  const seen = new Set<string>();
-  for (const sheet of plan.sheets) {
-    for (const placement of sheet.placements) {
-      const source = placement.part.sourceTile;
-      if (source === undefined) {
-        continue;
-      }
-      for (const seam of seamsForTile(source)) {
-        const key = `${source.panelId}:${seam.orientation}:${seam.offset.toFixed(4)}:${seam.start.toFixed(4)}:${seam.end.toFixed(4)}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        const panelSeams = seamMap.get(source.panelId) ?? [];
-        panelSeams.push(seam);
-        seamMap.set(source.panelId, panelSeams);
-      }
-    }
-  }
-  return seamMap;
-}
-
-function seamsForTile(tile: PrintableTileSource): readonly PanelPrintSeam[] {
-  const seams: PanelPrintSeam[] = [];
-  if (tile.columnIndex < tile.columnCount - 1) {
-    seams.push({
-      orientation: "vertical",
-      offset: tile.x1,
-      start: tile.y0,
-      end: tile.y1,
-    });
-  }
-  if (tile.rowIndex < tile.rowCount - 1) {
-    seams.push({
-      orientation: "horizontal",
-      offset: tile.y1,
-      start: tile.x0,
-      end: tile.x1,
-    });
-  }
-  return seams;
-}
-
-function createPanelPrintSeamGroup(
-  panel: CutPanel,
-  materialThickness: number,
-  printSeams: readonly PanelPrintSeam[],
-  material: Material,
-): LineSegments {
-  const positions: number[] = [];
-  const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelPrintSeamOverlayLift;
-
-  for (const seam of printSeams) {
-    if (seam.orientation === "vertical") {
-      positions.push(
-        (seam.offset - panel.assemblyCenter.x) * sceneScale,
-        (seam.start - panel.assemblyCenter.y) * sceneScale,
-        z,
-        (seam.offset - panel.assemblyCenter.x) * sceneScale,
-        (seam.end - panel.assemblyCenter.y) * sceneScale,
-        z,
-      );
-    } else {
-      positions.push(
-        (seam.start - panel.assemblyCenter.x) * sceneScale,
-        (seam.offset - panel.assemblyCenter.y) * sceneScale,
-        z,
-        (seam.end - panel.assemblyCenter.x) * sceneScale,
-        (seam.offset - panel.assemblyCenter.y) * sceneScale,
-        z,
-      );
-    }
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  return new LineSegments(geometry, material);
 }
 
 function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {

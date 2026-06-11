@@ -1,9 +1,3 @@
-import { Path, Shape } from "three";
-import { requireCutPanelFabricationPlan, type LayoutResult } from "@/fabrication/purifierLayout";
-import type { CutFeature, CutPanel, CutPoint, RectCut } from "@/fabrication/laser/cutGeometry";
-import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
-import { roundMillimeters } from "@/fabrication/printing/meshWelding";
-import { extrudePlateWithHoles } from "@/fabrication/printing/plateMesh";
 import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
 // #######################################
@@ -64,10 +58,6 @@ export type PrintBed =
 // ##############################
 
 export type PrintablePartKind =
-  | "panel-tile"
-  | "dovetail-glue-key"
-  | "scarf-glue-key"
-  | "rail-connector"
   | "donut-filter-adapter"
   | "donut-fan-guard"
   | "donut-filter-cap"
@@ -79,27 +69,16 @@ type PrintablePartBase = {
   readonly width: number;
   readonly depth: number;
   readonly height: number;
-  readonly cutFeatureCount: number;
-  readonly printCriticalCutFeatureCount: number;
   readonly mesh: PrintableMesh;
 };
 
 export type PrintablePart =
   | (PrintablePartBase & {
-      readonly kind: "panel-tile";
-      readonly sourcePanelId: string;
-      readonly sourceTile: PrintableTileSource;
-    })
-  | (PrintablePartBase & {
       readonly kind: "tempest-print-chunk";
-      readonly sourcePanelId?: string;
-      readonly sourceTile?: never;
       readonly sourcePlacement: TempestChunkPlacement;
     })
   | (PrintablePartBase & {
-      readonly kind: Exclude<PrintablePartKind, "panel-tile" | "tempest-print-chunk">;
-      readonly sourcePanelId?: string;
-      readonly sourceTile?: never;
+      readonly kind: Exclude<PrintablePartKind, "tempest-print-chunk">;
       readonly sourcePlacement?: never;
     });
 
@@ -113,18 +92,6 @@ export type TempestChunkPlacement = {
   readonly z: number;
 };
 
-export type PrintableTileSource = {
-  readonly panelId: string;
-  readonly x0: number;
-  readonly x1: number;
-  readonly y0: number;
-  readonly y1: number;
-  readonly columnIndex: number;
-  readonly rowIndex: number;
-  readonly columnCount: number;
-  readonly rowCount: number;
-};
-
 export type PrintableMesh = {
   readonly vertices: readonly MeshVertex[];
   readonly triangles: readonly MeshTriangle[];
@@ -136,14 +103,8 @@ export type PrintableMesh = {
 
 export type PrintableKitSummary = {
   readonly partCount: number;
-  readonly panelTileCount: number;
-  readonly glueKeyCount: number;
   readonly splitPanelCount: number;
   readonly oversizedPartCount: number;
-  readonly sourceCutFeatureCount: number;
-  readonly retainedCutFeatureCount: number;
-  readonly sourcePrintCriticalCutFeatureCount: number;
-  readonly retainedPrintCriticalCutFeatureCount: number;
 };
 
 export type PrintableKit = {
@@ -207,45 +168,8 @@ export type PrintableSheetPlan = {
 };
 
 // ##############################
-// Panel Splitting Internals
+// Sheet Planning Internals
 // ##############################
-
-type PanelCut = {
-  readonly cut: CutFeature;
-  readonly bounds: Bounds2;
-};
-
-type PanelTile = {
-  readonly panel: CutPanel;
-  readonly id: string;
-  readonly name: string;
-  readonly outline: readonly CutPoint[];
-  readonly x0: number;
-  readonly x1: number;
-  readonly y0: number;
-  readonly y1: number;
-  readonly columnIndex: number;
-  readonly rowIndex: number;
-  readonly columnCount: number;
-  readonly rowCount: number;
-  readonly cuts: readonly CutFeature[];
-};
-
-type Bounds2 = {
-  readonly minX: number;
-  readonly maxX: number;
-  readonly minY: number;
-  readonly maxY: number;
-};
-
-type Bounds1 = {
-  readonly min: number;
-  readonly max: number;
-};
-
-type PanelSplitAxis = {
-  readonly splitPositions: readonly number[];
-};
 
 type MutablePrintSheet = Omit<PrintSheet, "placements"> & {
   readonly placements: PrintSheetPlacement[];
@@ -256,13 +180,6 @@ type MutablePrintSheet = Omit<PrintSheet, "placements"> & {
 // ##############################
 
 const sheetGap = 8;
-const splitSearchStep = 0.5;
-const minimumTileSize = 42;
-const cutSplitClearance = 4;
-const glueKeyWidth = 36;
-const glueKeyDepth = 18;
-const glueKeyHeight = 3;
-const glueKeySpacing = 95;
 const unboundedPreviewWidth = 1000;
 
 // #######################################
@@ -343,7 +260,7 @@ export const printVolumePresets: readonly PrintVolumePreset[] = [
   {
     id: "unsplit",
     label: "Cut myself / unsplit",
-    description: "Exports each generated panel as one printable part.",
+    description: "Exports the generated model without splitting it for a bed.",
     examples: ["Custom cutting"],
     bed: { type: "unbounded" },
   },
@@ -370,37 +287,8 @@ export function readExportFormat(value: string | null): ExportFormat {
 }
 
 // #######################################
-// Public Kit and Export API
+// Public Export API
 // #######################################
-
-export function createPrintableKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
-  const preset = findPrintVolumePreset(presetId);
-  const cutPanelFabrication = requireCutPanelFabricationPlan(layout, "createPrintableKit");
-  const parts = cutPanelFabrication.cutPanels.flatMap((panel) =>
-    createPrintablePartsForPanel(panel, layout.configuration.cutting.materialThickness, preset),
-  );
-  const sourceCutFeatureCount = cutPanelFabrication.cutPanels.reduce((total, panel) => total + panel.cuts.length, 0);
-  const sourcePrintCriticalCutFeatureCount = cutPanelFabrication.cutPanels.reduce(
-    (total, panel) => total + panel.cuts.filter(isPrintCriticalCut).length,
-    0,
-  );
-  const summary = summarizePrintableKit(parts, preset, sourceCutFeatureCount, sourcePrintCriticalCutFeatureCount);
-
-  return {
-    preset,
-    parts,
-    summary,
-  };
-}
-
-export function createPrintableThreeMfExport(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableThreeMfExport {
-  const kit = createPrintableKit(layout, presetId);
-  return createPrintableThreeMfExportFromKit(
-    kit,
-    "Nukit Open Air Purifier print kit",
-    "nukit-open-air-purifier-print-kit.3mf",
-  );
-}
 
 export function createPrintableThreeMfExportFromKit(
   kit: PrintableKit,
@@ -422,11 +310,6 @@ export function createPrintableThreeMfExportFromKit(
     kit,
     sheetPlan,
   };
-}
-
-export function createPrintableSheetPlan(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableSheetPlan {
-  const kit = createPrintableKit(layout, presetId);
-  return createPrintableSheetPlanFromKit(kit);
 }
 
 // #######################################
@@ -548,510 +431,8 @@ function requiredLastSheet(sheets: readonly MutablePrintSheet[]): MutablePrintSh
   return sheet;
 }
 
-// #######################################
-// Panel Splitting
-// #######################################
-
-function createPrintablePartsForPanel(panel: CutPanel, materialThickness: number, preset: PrintVolumePreset): PrintablePart[] {
-  const panelCuts = panel.cuts.map((cut) => toPanelCut(cut, panel));
-  const tiles = splitPanelIntoTiles(panel, panelCuts, preset);
-  const panelTileParts = tiles.map((tile) => createPanelTilePart(tile, materialThickness));
-  const glueKeys = createGlueKeyParts(panel, tiles);
-  return [...panelTileParts, ...glueKeys];
-}
-
 // ##############################
-// Tile Layout
-// ##############################
-
-function splitPanelIntoTiles(panel: CutPanel, panelCuts: readonly PanelCut[], preset: PrintVolumePreset): PanelTile[] {
-  const printCriticalCuts = panelCuts.filter((cut) => isPrintCriticalCut(cut.cut));
-  const panelOutline = panelOutlineInNominalCoordinates(panel);
-  const outlineBounds = pointsBounds(panelOutline);
-  const outlineOverhangWidth = Math.max(0, outlineBounds.maxX - outlineBounds.minX - panel.nominalWidth);
-  const outlineOverhangDepth = Math.max(0, outlineBounds.maxY - outlineBounds.minY - panel.nominalHeight);
-  const xAxis = splitAxis(
-    panel.nominalWidth,
-    maxPrintableWidth(preset) - outlineOverhangWidth,
-    printCriticalCuts.map((cut) => xBlockedRange(cut.bounds)),
-  );
-  const yAxis = splitAxis(
-    panel.nominalHeight,
-    maxPrintableDepth(preset) - outlineOverhangDepth,
-    printCriticalCuts.map((cut) => yBlockedRange(cut.bounds)),
-  );
-  const xTileBoundaries = [0, ...xAxis.splitPositions, panel.nominalWidth];
-  const yTileBoundaries = [0, ...yAxis.splitPositions, panel.nominalHeight];
-  const tiles: PanelTile[] = [];
-
-  for (let rowIndex = 0; rowIndex < yTileBoundaries.length - 1; rowIndex += 1) {
-    for (let columnIndex = 0; columnIndex < xTileBoundaries.length - 1; columnIndex += 1) {
-      const x0 = requiredArrayValue(xTileBoundaries, columnIndex, "splitPanelIntoTiles x0");
-      const x1 = requiredArrayValue(xTileBoundaries, columnIndex + 1, "splitPanelIntoTiles x1");
-      const y0 = requiredArrayValue(yTileBoundaries, rowIndex, "splitPanelIntoTiles y0");
-      const y1 = requiredArrayValue(yTileBoundaries, rowIndex + 1, "splitPanelIntoTiles y1");
-      const clipBounds = {
-        minX: columnIndex === 0 ? outlineBounds.minX : x0,
-        maxX: columnIndex === xTileBoundaries.length - 2 ? outlineBounds.maxX : x1,
-        minY: rowIndex === 0 ? outlineBounds.minY : y0,
-        maxY: rowIndex === yTileBoundaries.length - 2 ? outlineBounds.maxY : y1,
-      };
-      const clippedOutline = clipPolygonToBounds(panelOutline, clipBounds);
-      const tileBounds = pointsBounds(clippedOutline);
-      tiles.push({
-        panel,
-        id: tileId(panel.id, columnIndex, rowIndex, xTileBoundaries.length - 1, yTileBoundaries.length - 1),
-        name: tileName(panel.name, columnIndex, rowIndex, xTileBoundaries.length - 1, yTileBoundaries.length - 1),
-        outline: translatePoints(clippedOutline, -tileBounds.minX, -tileBounds.minY),
-        x0,
-        x1,
-        y0,
-        y1,
-        columnIndex,
-        rowIndex,
-        columnCount: xTileBoundaries.length - 1,
-        rowCount: yTileBoundaries.length - 1,
-        cuts: panelCuts
-          .filter((panelCut) =>
-            boundsInsideTile(panelCut.bounds, clipBounds.minX, clipBounds.maxX, clipBounds.minY, clipBounds.maxY),
-          )
-          .map((panelCut) => translateCutToTile(panelCut.cut, tileBounds.minX, tileBounds.minY)),
-      });
-    }
-  }
-
-  return tiles;
-}
-
-// ##############################
-// Safe Split Search
-// ##############################
-
-function splitAxis(length: number, maxLength: number, blockedRanges: readonly Bounds1[]): PanelSplitAxis {
-  if (!Number.isFinite(maxLength) || length <= maxLength) {
-    return { splitPositions: [] };
-  }
-
-  const splitPositions: number[] = [];
-  let cursor = 0;
-
-  while (length - cursor > maxLength) {
-    const maximumCut = cursor + maxLength;
-    const minimumCut = Math.min(cursor + minimumTileSize, length);
-    const split = findSafeSplit(maximumCut, minimumCut, blockedRanges);
-    if (split === null) {
-      break;
-    }
-    splitPositions.push(split);
-    cursor = split;
-  }
-
-  return { splitPositions };
-}
-
-function findSafeSplit(target: number, minimum: number, blockedRanges: readonly Bounds1[]): number | null {
-  for (let candidate = target; candidate >= minimum; candidate -= splitSearchStep) {
-    if (!blockedRanges.some((range) => candidate > range.min && candidate < range.max)) {
-      return roundMillimeters(candidate);
-    }
-  }
-  return null;
-}
-
-// #######################################
-// Printable Parts
-// #######################################
-
-function createPanelTilePart(tile: PanelTile, materialThickness: number): PrintablePart {
-  const bounds = pointsBounds(tile.outline);
-  const width = bounds.maxX - bounds.minX;
-  const depth = bounds.maxY - bounds.minY;
-  return {
-    id: tile.id,
-    name: tile.name,
-    kind: "panel-tile",
-    sourcePanelId: tile.panel.id,
-    sourceTile: {
-      panelId: tile.panel.id,
-      x0: tile.x0,
-      x1: tile.x1,
-      y0: tile.y0,
-      y1: tile.y1,
-      columnIndex: tile.columnIndex,
-      rowIndex: tile.rowIndex,
-      columnCount: tile.columnCount,
-      rowCount: tile.rowCount,
-    },
-    width,
-    depth,
-    height: materialThickness,
-    cutFeatureCount: tile.cuts.length,
-    printCriticalCutFeatureCount: tile.cuts.filter(isPrintCriticalCut).length,
-    mesh: createPlateMesh(tile.outline, materialThickness, tile.cuts),
-  };
-}
-
-// ##############################
-// Glue Keys
-// ##############################
-
-function createGlueKeyParts(panel: CutPanel, tiles: readonly PanelTile[]): PrintablePart[] {
-  const splitColumnCount = Math.max(0, ...tiles.map((tile) => tile.columnCount - 1));
-  const splitRowCount = Math.max(0, ...tiles.map((tile) => tile.rowCount - 1));
-  if (splitColumnCount === 0 && splitRowCount === 0) {
-    return [];
-  }
-
-  const parts: PrintablePart[] = [];
-  for (let index = 0; index < splitColumnCount; index += 1) {
-    const keyCount = glueKeyCountForLength(panel.nominalHeight);
-    for (let keyIndex = 0; keyIndex < keyCount; keyIndex += 1) {
-      parts.push(createGlueKeyPart(panel, "vertical", index, keyIndex));
-    }
-  }
-  for (let index = 0; index < splitRowCount; index += 1) {
-    const keyCount = glueKeyCountForLength(panel.nominalWidth);
-    for (let keyIndex = 0; keyIndex < keyCount; keyIndex += 1) {
-      parts.push(createGlueKeyPart(panel, "horizontal", index, keyIndex));
-    }
-  }
-  return parts;
-}
-
-function createGlueKeyPart(panel: CutPanel, seam: "vertical" | "horizontal", seamIndex: number, keyIndex: number): PrintablePart {
-  const width = seam === "vertical" ? glueKeyWidth : glueKeyDepth;
-  const depth = seam === "vertical" ? glueKeyDepth : glueKeyWidth;
-  return {
-    id: `${panel.id}-${seam}-glue-key-${seamIndex + 1}-${keyIndex + 1}`,
-    name: `${panel.name} ${seam} dovetail glue key ${seamIndex + 1}.${keyIndex + 1}`,
-    kind: "dovetail-glue-key",
-    sourcePanelId: panel.id,
-    width,
-    depth,
-    height: glueKeyHeight,
-    cutFeatureCount: 0,
-    printCriticalCutFeatureCount: 0,
-    mesh: createDovetailGlueKeyMesh(width, depth, glueKeyHeight),
-  };
-}
-
-function glueKeyCountForLength(length: number): number {
-  return Math.max(1, Math.ceil(length / glueKeySpacing));
-}
-
-// #######################################
-// Mesh Generation
-// #######################################
-
-function createPlateMesh(outline: readonly CutPoint[], height: number, cuts: readonly CutFeature[]): PrintableMesh {
-  if (outline.length === 0) {
-    throw new Error("createPlateMesh: Outline is empty");
-  }
-  const holes = cuts.map(cutToHolePath).filter((hole): hole is Path => hole !== null);
-  return extrudePlateWithHoles(outline, holes, height);
-}
-
-function createDovetailGlueKeyMesh(width: number, depth: number, height: number): PrintableMesh {
-  const waistInset = Math.min(width, depth) * 0.22;
-  const shape = new Shape();
-  shape.moveTo(0, 0);
-  shape.lineTo(width, 0);
-  shape.lineTo(width - waistInset, depth / 2);
-  shape.lineTo(width, depth);
-  shape.lineTo(0, depth);
-  shape.lineTo(waistInset, depth / 2);
-  shape.closePath();
-  return extrudeShapeToMesh(shape, height);
-}
-
-// ##############################
-// Cut Paths
-// ##############################
-
-function cutToHolePath(cut: CutFeature): Path | null {
-  if (cut.type === "circle") {
-    const path = new Path();
-    path.absellipse(cut.cx, cut.cy, cut.radius, cut.radius, 0, Math.PI * 2, true);
-    return path;
-  }
-  return rectCutToHolePath(cut);
-}
-
-function rectCutToHolePath(cut: RectCut): Path | null {
-  if (cut.width <= 0 || cut.height <= 0) {
-    return null;
-  }
-  const path = new Path();
-  const radius = Math.min(cut.radius, cut.width / 2, cut.height / 2);
-  if (radius <= 0) {
-    path.moveTo(cut.x, cut.y);
-    path.lineTo(cut.x, cut.y + cut.height);
-    path.lineTo(cut.x + cut.width, cut.y + cut.height);
-    path.lineTo(cut.x + cut.width, cut.y);
-    path.closePath();
-    return path;
-  }
-
-  path.moveTo(cut.x + radius, cut.y);
-  path.lineTo(cut.x + cut.width - radius, cut.y);
-  path.quadraticCurveTo(cut.x + cut.width, cut.y, cut.x + cut.width, cut.y + radius);
-  path.lineTo(cut.x + cut.width, cut.y + cut.height - radius);
-  path.quadraticCurveTo(cut.x + cut.width, cut.y + cut.height, cut.x + cut.width - radius, cut.y + cut.height);
-  path.lineTo(cut.x + radius, cut.y + cut.height);
-  path.quadraticCurveTo(cut.x, cut.y + cut.height, cut.x, cut.y + cut.height - radius);
-  path.lineTo(cut.x, cut.y + radius);
-  path.quadraticCurveTo(cut.x, cut.y, cut.x + radius, cut.y);
-  path.closePath();
-  return path;
-}
-
-// #######################################
-// Panel Coordinate Helpers
-// #######################################
-
-function toPanelCut(cut: CutFeature, panel: CutPanel): PanelCut {
-  const translated = translateCut(cut, panel.nominalWidth / 2 - panel.assemblyCenter.x, panel.nominalHeight / 2 - panel.assemblyCenter.y);
-  return {
-    cut: translated,
-    bounds: cutBounds(translated),
-  };
-}
-
-function panelOutlineInNominalCoordinates(panel: CutPanel): CutPoint[] {
-  return translatePoints(
-    panel.outline,
-    panel.nominalWidth / 2 - panel.assemblyCenter.x,
-    panel.nominalHeight / 2 - panel.assemblyCenter.y,
-  );
-}
-
-function translatePoints(points: readonly CutPoint[], offsetX: number, offsetY: number): CutPoint[] {
-  return points.map((point) => ({
-    x: roundMillimeters(point.x + offsetX),
-    y: roundMillimeters(point.y + offsetY),
-  }));
-}
-
-function translateCut(cut: CutFeature, offsetX: number, offsetY: number): CutFeature {
-  if (cut.type === "circle") {
-    return {
-      ...cut,
-      cx: cut.cx + offsetX,
-      cy: cut.cy + offsetY,
-    };
-  }
-  return {
-    ...cut,
-    x: cut.x + offsetX,
-    y: cut.y + offsetY,
-  };
-}
-
-function translateCutToTile(cut: CutFeature, x0: number, y0: number): CutFeature {
-  return translateCut(cut, -x0, -y0);
-}
-
-// #######################################
-// Clipping and Bounds
-// #######################################
-
-// ##############################
-// Polygon Clipping
-// ##############################
-
-function clipPolygonToBounds(points: readonly CutPoint[], bounds: Bounds2): CutPoint[] {
-  return clipPolygonAgainstEdge(
-    clipPolygonAgainstEdge(
-      clipPolygonAgainstEdge(clipPolygonAgainstEdge(points, (point) => point.x >= bounds.minX, verticalIntersection(bounds.minX)), (point) => point.x <= bounds.maxX, verticalIntersection(bounds.maxX)),
-      (point) => point.y >= bounds.minY,
-      horizontalIntersection(bounds.minY),
-    ),
-    (point) => point.y <= bounds.maxY,
-    horizontalIntersection(bounds.maxY),
-  );
-}
-
-function clipPolygonAgainstEdge(
-  points: readonly CutPoint[],
-  isInside: (point: CutPoint) => boolean,
-  intersectionAtBoundary: (from: CutPoint, to: CutPoint) => CutPoint,
-): CutPoint[] {
-  if (points.length === 0) {
-    return [];
-  }
-  const clipped: CutPoint[] = [];
-  let previous = points[points.length - 1]!;
-  let previousInside = isInside(previous);
-
-  for (const current of points) {
-    const currentInside = isInside(current);
-    if (currentInside && !previousInside) {
-      clipped.push(intersectionAtBoundary(previous, current));
-    }
-    if (currentInside) {
-      clipped.push(current);
-    } else if (previousInside) {
-      clipped.push(intersectionAtBoundary(previous, current));
-    }
-    previous = current;
-    previousInside = currentInside;
-  }
-
-  return removeAdjacentDuplicatePoints(clipped);
-}
-
-function verticalIntersection(x: number): (from: CutPoint, to: CutPoint) => CutPoint {
-  return (from, to) => {
-    const t = (x - from.x) / (to.x - from.x || 1);
-    return {
-      x: roundMillimeters(x),
-      y: roundMillimeters(from.y + (to.y - from.y) * t),
-    };
-  };
-}
-
-function horizontalIntersection(y: number): (from: CutPoint, to: CutPoint) => CutPoint {
-  return (from, to) => {
-    const t = (y - from.y) / (to.y - from.y || 1);
-    return {
-      x: roundMillimeters(from.x + (to.x - from.x) * t),
-      y: roundMillimeters(y),
-    };
-  };
-}
-
-function removeAdjacentDuplicatePoints(points: readonly CutPoint[]): CutPoint[] {
-  const unique: CutPoint[] = [];
-  for (const point of points) {
-    const previous = unique[unique.length - 1];
-    if (previous === undefined || Math.abs(previous.x - point.x) > 0.001 || Math.abs(previous.y - point.y) > 0.001) {
-      unique.push(point);
-    }
-  }
-  const first = unique[0];
-  const last = unique[unique.length - 1];
-  if (
-    first !== undefined &&
-    last !== undefined &&
-    unique.length > 1 &&
-    Math.abs(first.x - last.x) <= 0.001 &&
-    Math.abs(first.y - last.y) <= 0.001
-  ) {
-    unique.pop();
-  }
-  return unique;
-}
-
-// ##############################
-// Bounds and Tile Inclusion
-// ##############################
-
-function cutBounds(cut: CutFeature): Bounds2 {
-  if (cut.type === "circle") {
-    return {
-      minX: cut.cx - cut.radius,
-      maxX: cut.cx + cut.radius,
-      minY: cut.cy - cut.radius,
-      maxY: cut.cy + cut.radius,
-    };
-  }
-  return {
-    minX: cut.x,
-    maxX: cut.x + cut.width,
-    minY: cut.y,
-    maxY: cut.y + cut.height,
-  };
-}
-
-function pointsBounds(points: readonly CutPoint[]): Bounds2 {
-  if (points.length === 0) {
-    throw new Error("pointsBounds: Cannot calculate bounds for empty point set");
-  }
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
-}
-
-function xBlockedRange(bounds: Bounds2): Bounds1 {
-  return {
-    min: bounds.minX - cutSplitClearance,
-    max: bounds.maxX + cutSplitClearance,
-  };
-}
-
-function yBlockedRange(bounds: Bounds2): Bounds1 {
-  return {
-    min: bounds.minY - cutSplitClearance,
-    max: bounds.maxY + cutSplitClearance,
-  };
-}
-
-function boundsInsideTile(bounds: Bounds2, x0: number, x1: number, y0: number, y1: number): boolean {
-  const tolerance = 0.001;
-  return (
-    bounds.minX >= x0 - tolerance &&
-    bounds.maxX <= x1 + tolerance &&
-    bounds.minY >= y0 - tolerance &&
-    bounds.maxY <= y1 + tolerance
-  );
-}
-
-// #######################################
-// Summary Helpers
-// #######################################
-
-function summarizePrintableKit(
-  parts: readonly PrintablePart[],
-  preset: PrintVolumePreset,
-  sourceCutFeatureCount: number,
-  sourcePrintCriticalCutFeatureCount: number,
-): PrintableKitSummary {
-  const splitSourceIds = new Set<string>();
-  for (const part of parts) {
-    if (
-      part.kind === "panel-tile" &&
-      (part.sourceTile.columnCount > 1 || part.sourceTile.rowCount > 1)
-    ) {
-      splitSourceIds.add(part.sourcePanelId);
-    }
-  }
-
-  return {
-    partCount: parts.length,
-    panelTileCount: parts.filter((part) => part.kind === "panel-tile").length,
-    glueKeyCount: parts.filter(isGlueKeyPart).length,
-    splitPanelCount: splitSourceIds.size,
-    oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
-    sourceCutFeatureCount,
-    retainedCutFeatureCount: parts.reduce((total, part) => total + part.cutFeatureCount, 0),
-    sourcePrintCriticalCutFeatureCount,
-    retainedPrintCriticalCutFeatureCount: parts.reduce((total, part) => total + part.printCriticalCutFeatureCount, 0),
-  };
-}
-
-// ##############################
-// Feature Preservation Policy
-// ##############################
-
-type PrintableCutPreservation = "must-preserve" | "may-drop-at-split";
-
-function isPrintCriticalCut(cut: CutFeature): boolean {
-  return printableCutPreservation(cut) === "must-preserve";
-}
-
-function printableCutPreservation(cut: CutFeature): PrintableCutPreservation {
-  return cut.role === "reference" ? "may-drop-at-split" : "must-preserve";
-}
-
-function isGlueKeyPart(part: PrintablePart): boolean {
-  return part.kind === "dovetail-glue-key" || part.kind === "scarf-glue-key";
-}
-
-// ##############################
-// Fit and Naming Helpers
+// Fit Helpers
 // ##############################
 
 export function partFitsPrintBed(part: PrintablePart, bed: PrintBed): boolean {
@@ -1095,34 +476,4 @@ function appendOversizedAxis(
       available,
     });
   }
-}
-
-function maxPrintableWidth(preset: PrintVolumePreset): number {
-  return preset.bed.type === "bounded" ? preset.bed.width : Number.POSITIVE_INFINITY;
-}
-
-function maxPrintableDepth(preset: PrintVolumePreset): number {
-  return preset.bed.type === "bounded" ? preset.bed.depth : Number.POSITIVE_INFINITY;
-}
-
-function tileId(panelId: string, columnIndex: number, rowIndex: number, columnCount: number, rowCount: number): string {
-  if (columnCount === 1 && rowCount === 1) {
-    return `${panelId}-print`;
-  }
-  return `${panelId}-tile-${rowIndex + 1}-${columnIndex + 1}`;
-}
-
-function tileName(panelName: string, columnIndex: number, rowIndex: number, columnCount: number, rowCount: number): string {
-  if (columnCount === 1 && rowCount === 1) {
-    return `${panelName} print panel`;
-  }
-  return `${panelName} tile ${rowIndex + 1}.${columnIndex + 1}`;
-}
-
-function requiredArrayValue(values: readonly number[], index: number, context: string): number {
-  const value = values[index];
-  if (value === undefined) {
-    throw new Error(`${context}: Missing value at ${index}`);
-  }
-  return value;
 }

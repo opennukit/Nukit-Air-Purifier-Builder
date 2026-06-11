@@ -192,7 +192,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     id: "nukit-open-air",
     label: "Nukit Open Air",
     detail:
-      "3D-printable Nukit enclosure split into bed-sized panels with dovetail lap keys for glued seams.",
+      "Laser-cut Nukit enclosure with finger-jointed walls and dovetail filter rails.",
     source: "FilterBoxBuilder browser generator",
     license: "Generated from this project",
     releaseVisibility: "public",
@@ -214,7 +214,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     assemblyNotes: [
       "Keeps the Nukit airflow layout",
       "Fans screw on with the screws that ship with the fans; screws do not wear like snap clips",
-      "Printed panel kits join with dovetail lap keys where panels are split for the printer bed",
+      "Walls join with finger joints; split filter frames slide in as dovetail rails",
     ],
   },
   {

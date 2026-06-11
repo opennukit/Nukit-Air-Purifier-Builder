@@ -17,7 +17,6 @@
     defaultThreeDimensionalPrintDesignId,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
-    isTempestPrintDesignId,
     type PrintDesignId,
     type TempestArrangementPreset,
   } from "@/domain/purifier/designPresets";
@@ -66,8 +65,6 @@
     requireSelect,
   } from "@/app/controls/inputReaders";
   import {
-    assemblyPrintSeamPlanApplies,
-    createActiveAssemblyPrintSeamPlan,
     createActivePrintSheetPlan,
     type GeneratedPrintSheetPlanCacheEntry,
   } from "@/app/printSheetPlans";
@@ -207,7 +204,6 @@
   let partsItems: readonly PartsListItem[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
-  let activePrintSeamPlan: PrintableSheetPlan | null = null;
   let activePrintDesignPreset = workbenchView.printDesignPreset;
   let activeDesignContext: WorkbenchDesignContext = workbenchView.design;
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
@@ -246,7 +242,7 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
   // The sheet-plan half only counts for 3D printing: the laser path renders
   // synchronously, so no pill or overlay belongs there even if a print build
   // is still settling in the background.
@@ -276,7 +272,6 @@
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
-  $: activePrintSeamPlan = createActiveAssemblyPrintSeamPlan(layout, previewMode, fabricationMethod, settings, generatedPrintSheetPlan);
   $: activePrintDesignPreset = workbenchView.printDesignPreset;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
@@ -714,7 +709,6 @@
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
     currentPreviewMode: PreviewMode,
-    currentSettings: RawPurifierSettings,
   ): PrintableSheetPlan | null {
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
@@ -729,10 +723,7 @@
       }
       return generatedPrintSheetPlanCache.plan;
     }
-    const planIsOnScreen =
-      currentPreviewMode === "print-sheets" ||
-      assemblyPrintSeamPlanApplies(currentLayout, currentPreviewMode, currentFabricationMethod, currentSettings);
-    if (!planIsOnScreen) {
+    if (currentPreviewMode !== "print-sheets") {
       return null;
     }
     const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
@@ -779,7 +770,7 @@
   function retryFailedPreviewBuild(): void {
     if (printSheetKitBuild.type === "failed") {
       printSheetKitBuild = { type: "idle" };
-      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, settings);
+      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
     }
     purifierPreview?.retryFailedAssembledKitBuild();
   }
@@ -1001,23 +992,6 @@
                     {/each}
                   </div>
                 {/if}
-                {#if fabricationMethod === "print-3mf" && !isTempestPrintDesignId(settings.printDesign) && !isStaticReferenceControlsActive}
-                  <label class="toggle-field preview-toggle-field preview-control-technical" title="Print split lines">
-                    <input
-                      type="checkbox"
-                      name="showPrintSeams"
-                      checked={settings.showPrintSeams}
-                      onchange={(event) => updateBooleanSetting("showPrintSeams", event)}
-                    />
-                    <span class="preview-control-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" focusable="false">
-                        <path d="M5 6h14M5 12h14M5 18h14" />
-                        <path d="M9 4v16M15 4v16" />
-                      </svg>
-                    </span>
-                    <span class="preview-control-label">Print split lines</span>
-                  </label>
-                {/if}
               </div>
               <button
                 class="preview-rotation-button"
@@ -1043,7 +1017,6 @@
             <PurifierPreview
               bind:this={purifierPreview}
               {layout}
-              printSeamPlan={activePrintSeamPlan}
               {printVolumePresetId}
               onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
             />
@@ -1445,19 +1418,6 @@
                 </select>
               </label>
             </div>
-            {#if isNukitControlsActive}
-              <div data-nukit-print-split-control>
-                <label class="toggle-field">
-                  <input
-                    type="checkbox"
-                    name="splitFrames"
-                    checked={settings.splitFrames}
-                    onchange={(event) => updateBooleanSetting("splitFrames", event)}
-                  />
-                  <span>Split large frame panels</span>
-                </label>
-              </div>
-            {/if}
           {/snippet}
 
           {#if !isStaticReferenceControlsActive}

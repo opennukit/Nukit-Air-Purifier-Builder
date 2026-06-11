@@ -1,13 +1,11 @@
 // Evaluates the export checks shown in the workbench output panel: base build
-// diagnostics filtered for the active fabrication method, print-kit specific
-// blockers, and the one-line readiness summary above the export button.
-// Severity carries the export rule: "error" diagnostics block export, while
-// "warning" diagnostics are advisories that leave export available.
+// diagnostics, print-kit specific blockers, and the one-line readiness summary
+// above the export button. Severity carries the export rule: "error"
+// diagnostics block export, while "warning" diagnostics are advisories that
+// leave export available.
 
 import {
-  isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
-  isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
 import { evaluateBuildDiagnostics, summarizeDiagnostics, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
@@ -23,25 +21,7 @@ export function evaluateActiveExportDiagnostics(
     return [];
   }
 
-  const usesGeneratedPrintKit =
-    currentFabricationMethod === "print-3mf" &&
-    (isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id) ||
-      isTempestPrintDesignId(currentLayout.configuration.printDesign.id));
-  // The wall-bank fan checks describe the laser-derived enclosure, so the
-  // generated print kits drop them; dimensional sanity advisories stay on for
-  // every design that takes the measured rectangular filter.
-  const baseDiagnostics = usesGeneratedPrintKit
-    ? evaluateBuildDiagnostics(currentLayout).filter(
-        (diagnostic) =>
-          ![
-            "no-fans",
-            "no-side-fans",
-            "tight-fan-margin",
-            "large-unsplit-frame",
-            "large-sheet",
-          ].includes(diagnostic.id),
-      )
-    : evaluateBuildDiagnostics(currentLayout);
+  const baseDiagnostics = evaluateBuildDiagnostics(currentLayout);
 
   if (currentFabricationMethod !== "print-3mf") {
     return baseDiagnostics;
@@ -58,14 +38,6 @@ export function evaluateActiveExportDiagnostics(
       severity: "error",
       title: "Print part exceeds bed",
       detail: `${kit.summary.oversizedPartCount} part${kit.summary.oversizedPartCount === 1 ? "" : "s"} exceed ${kit.preset.label}.`,
-    });
-  }
-  if (kit.summary.retainedPrintCriticalCutFeatureCount < kit.summary.sourcePrintCriticalCutFeatureCount) {
-    printDiagnostics.push({
-      id: "critical-print-feature-loss",
-      severity: "error",
-      title: "Critical cut features lost",
-      detail: "The selected split would drop fan, screw, slot, or window features from the printable parts.",
     });
   }
   return [...baseDiagnostics, ...printDiagnostics];

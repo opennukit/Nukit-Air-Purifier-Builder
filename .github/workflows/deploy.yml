@@ -1,0 +1,36 @@
+name: Deploy
+
+# Deploys dist/ to the S3 bucket behind www.filterboxbuilder.com (CloudFront).
+# Requires repository secrets:
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  - IAM user with s3:PutObject/
+#     ListBucket/DeleteObject on the bucket and cloudfront:CreateInvalidation
+#   AWS_REGION                                  - bucket region (e.g. us-east-1)
+#   S3_BUCKET                                   - bucket name
+#   CLOUDFRONT_DISTRIBUTION_ID                  - distribution to invalidate
+# The job skips quietly until those secrets exist.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun test
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      # Hashed assets are immutable; index.html and vendor files revalidate.
+      - run: |
+          aws s3 sync dist/assets "s3://${{ secrets.S3_BUCKET }}/assets" --delete --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync dist "s3://${{ secrets.S3_BUCKET }}" --delete --exclude "assets/*" --cache-control "public, max-age=0, must-revalidate"
+      - run: aws cloudfront create-invalidation --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" --paths "/*"

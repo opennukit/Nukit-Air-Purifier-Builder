@@ -80,7 +80,7 @@ import {
   createTempestSettingsFromLayout,
   type TempestPosedPinPlacement,
 } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { PrintableKit, PrintablePart, PrintableSheetPlan, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
+import type { PrintableKit, PrintablePart, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE_PRESET_ID,
@@ -117,7 +117,6 @@ import {
 import { collectFanRotors, createFan } from "@/rendering/three/preview/fanModels";
 import {
   createPanelGroup,
-  createPanelPrintSeams,
   createPreviewEdges,
   createPrintableMeshPreviewGroup,
 } from "@/rendering/three/preview/panelMeshes";
@@ -233,7 +232,6 @@ export class PurifierThreePreview {
   private readonly pointer = new Vector2();
   private animationId: number | null = null;
   private latestLayout: LayoutResult | null = null;
-  private latestPrintSeamPlan: PrintableSheetPlan | null = null;
   private latestAssembledTempestKit: PrintableKit | null = null;
   private readonly lightGroup = new Group();
   private roomEnvTexture: Texture | null = null;
@@ -330,11 +328,7 @@ export class PurifierThreePreview {
 
   // For tempest designs, callers may pass a prebuilt (e.g. worker-built)
   // assembled kit; without one the kit builds synchronously on this thread.
-  update(
-    layout: LayoutResult,
-    printSeamPlan: PrintableSheetPlan | null = null,
-    assembledTempestKit: PrintableKit | null = null,
-  ): void {
+  update(layout: LayoutResult, assembledTempestKit: PrintableKit | null = null): void {
     if (this.destroyed) {
       return;
     }
@@ -345,9 +339,8 @@ export class PurifierThreePreview {
       previousLayout.configuration.preview.enclosure.cameraPreset !== layout.configuration.preview.enclosure.cameraPreset;
 
     this.latestLayout = layout;
-    this.latestPrintSeamPlan = printSeamPlan;
     this.latestAssembledTempestKit = assembledTempestKit;
-    this.rebuildModel(layout, printSeamPlan);
+    this.rebuildModel(layout);
     if (shouldApplyPresetCamera) {
       this.frameModel(layout);
     } else {
@@ -386,7 +379,7 @@ export class PurifierThreePreview {
     this.renderer.toneMappingExposure = preset.exposure;
     // Material + surface normals are baked at build time, so rebuild the model.
     if (this.latestLayout !== null) {
-      this.rebuildModel(this.latestLayout, this.latestPrintSeamPlan);
+      this.rebuildModel(this.latestLayout);
     }
   }
 
@@ -433,7 +426,7 @@ export class PurifierThreePreview {
   // Model Rebuilds
   // ##############################
 
-  private rebuildModel(layout: LayoutResult, printSeamPlan: PrintableSheetPlan | null): void {
+  private rebuildModel(layout: LayoutResult): void {
     this.staticReferenceLoadToken += 1;
     this.disposeObject(this.modelGroup);
     this.modelGroup.clear();
@@ -464,8 +457,6 @@ export class PurifierThreePreview {
     const railWood = createWoodMaterial();
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
-    const printSeamMaterial = new LineBasicMaterial({ color: 0x2b6fd6, transparent: true, opacity: 0.9 });
-    const panelPrintSeams = createPanelPrintSeams(printSeamPlan);
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
@@ -482,8 +473,6 @@ export class PurifierThreePreview {
         darkEdge,
         cutMark,
         screwMark,
-        panelPrintSeams.get(panel.id) ?? [],
-        printSeamMaterial,
       );
       collectFanRotors(panelGroup, this.fanRotors);
       this.modelGroup.add(panelGroup);
@@ -503,8 +492,6 @@ export class PurifierThreePreview {
               darkEdge,
               cutMark,
               screwMark,
-              panelPrintSeams.get(rail.id) ?? [],
-              printSeamMaterial,
             ),
           );
         }
