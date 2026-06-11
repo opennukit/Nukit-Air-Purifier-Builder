@@ -12,9 +12,7 @@ import {
 import {
   defaultThreeDimensionalPrintDesignId,
   findPrintDesignPreset,
-  isDonutFilterAdapterPrintDesignPreset,
   isLaserCutDesignPreset,
-  isStaticReferencePrintDesignPreset,
   isPublicThreeDimensionalPrintDesignId,
   isTempestPrintDesignPreset,
   type DonutFilterAdapterPrintDesignPreset,
@@ -208,47 +206,47 @@ function createWorkbenchDesignContext(
     };
   }
 
-  if (isDonutFilterAdapterPrintDesignPreset(preset)) {
-    return {
-      type: "donut-filter-adapter",
-      preset,
-      layoutSectionTitle: "Adaptor",
-      partsSectionTitle: "Filter and fan",
-    };
+  // Each arm rebuilds the preset with the narrowed implementation because
+  // TypeScript does not narrow the parent union through a nested discriminant.
+  switch (preset.implementation.type) {
+    case "donut-filter-adapter":
+      return {
+        type: "donut-filter-adapter",
+        preset: { ...preset, implementation: preset.implementation },
+        layoutSectionTitle: "Adaptor",
+        partsSectionTitle: "Filter and fan",
+      };
+    case "tempest":
+      return {
+        type: "tempest",
+        preset: { ...preset, implementation: preset.implementation },
+        layoutSectionTitle: "Tempest layout",
+        partsSectionTitle: "Filter and fan",
+      };
+    case "static-reference": {
+      const reference = preset.implementation.reference;
+      return {
+        type: "static-reference",
+        preset: { ...preset, implementation: preset.implementation },
+        reference,
+        platePreview: staticPrintReferenceHasPlatePreview(reference)
+          ? { type: "available" }
+          : { type: "unavailable", reason: "no-local-print-plate-preview" },
+        layoutSectionTitle: "Source files",
+        partsSectionTitle: "Source and license",
+      };
+    }
+    case "laser-cut":
+      // A laser-only preset under the print method: session normalization
+      // lands such sessions on the default 3D design, so the design context
+      // resolves the same way.
+      return {
+        type: "tempest",
+        preset: findDefaultThreeDimensionalPrintDesignPreset(),
+        layoutSectionTitle: "Tempest layout",
+        partsSectionTitle: "Filter and fan",
+      };
   }
-
-  if (isTempestPrintDesignPreset(preset)) {
-    return {
-      type: "tempest",
-      preset,
-      layoutSectionTitle: "Tempest layout",
-      partsSectionTitle: "Filter and fan",
-    };
-  }
-
-  if (isStaticReferencePrintDesignPreset(preset)) {
-    const reference = preset.implementation.reference;
-    return {
-      type: "static-reference",
-      preset,
-      reference,
-      platePreview: staticPrintReferenceHasPlatePreview(reference)
-        ? { type: "available" }
-        : { type: "unavailable", reason: "no-local-print-plate-preview" },
-      layoutSectionTitle: "Source files",
-      partsSectionTitle: "Source and license",
-    };
-  }
-
-  // A laser-only preset under the print method: session normalization lands
-  // such sessions on the default 3D design, so the design context resolves
-  // the same way.
-  return {
-    type: "tempest",
-    preset: findDefaultThreeDimensionalPrintDesignPreset(),
-    layoutSectionTitle: "Tempest layout",
-    partsSectionTitle: "Filter and fan",
-  };
 }
 
 function isRawPurifierSettings(settings: RawPurifierSettings | PurifierDraft): settings is RawPurifierSettings {
