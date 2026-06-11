@@ -20,8 +20,20 @@ export type PrintKitChannel = {
   request(rawSettings: RawPurifierSettings, presetId: PrintVolumePresetId): Promise<KitRequestOutcome>;
 };
 
+export type KitRequestInput = {
+  readonly rawSettings: RawPurifierSettings;
+  readonly presetId: PrintVolumePresetId;
+};
+
+// Where a channel sends builds: post one request, get onResult called exactly
+// once with its result. The shared worker is the normal backend; a synchronous
+// on-thread build backs runtimes without Workers, and tests inject fakes.
+export type KitBuildPort = {
+  post(input: KitRequestInput, onResult: (result: KitBuildResult) => void): void;
+};
+
 // #######################################
-// Shared Worker
+// Shared Worker Port
 // #######################################
 
 let sharedWorker: Worker | null = null;
@@ -43,51 +55,68 @@ function kitWorker(): Worker {
   return sharedWorker;
 }
 
+const sharedWorkerPort: KitBuildPort = {
+  post(input, onResult) {
+    const requestId = nextRequestId;
+    nextRequestId += 1;
+    resultHandlerByRequestId.set(requestId, onResult);
+    const message: KitWorkerRequest = { requestId, rawSettings: input.rawSettings, presetId: input.presetId };
+    kitWorker().postMessage(message);
+  },
+};
+
+// Graceful degradation when Workers are unavailable (SSR, bare test runtimes):
+// the same sync core runs on the calling thread, whose Manifold kernel the app
+// initializes at bootstrap. It is a port like any other, so the channel state
+// machine stays the single code path for supersede/queue semantics.
+const syncOnThreadPort: KitBuildPort = {
+  post(input, onResult) {
+    onResult(buildKitResult(input.rawSettings, input.presetId));
+  },
+};
+
+function defaultKitBuildPort(): KitBuildPort {
+  return typeof Worker === "undefined" ? syncOnThreadPort : sharedWorkerPort;
+}
+
 // #######################################
 // Latest-Wins Channel
 // #######################################
 
 type SettleOutcome = (outcome: KitRequestOutcome) => void;
 
-type KitRequestInput = {
-  readonly rawSettings: RawPurifierSettings;
-  readonly presetId: PrintVolumePresetId;
-};
-
 type QueuedRequest = {
   readonly input: KitRequestInput;
   readonly settle: SettleOutcome;
 };
 
-// The request the worker is currently building. A superseded one already
-// settled its caller; the id remains so the response can be matched, dropped,
-// and used as the signal that the worker is free for the queued successor.
+// The request the port is currently building. A superseded one already settled
+// its caller; its slot remains so the eventual result can be dropped and used
+// as the signal that the port is free for the queued successor.
 type InFlightRequest =
-  | { readonly type: "live"; readonly requestId: number; readonly settle: SettleOutcome }
-  | { readonly type: "superseded"; readonly requestId: number };
+  | { readonly type: "live"; readonly settle: SettleOutcome }
+  | { readonly type: "superseded" };
 
-// idle: nothing sent. busy: one request in the worker plus at most one queued
+// idle: nothing sent. busy: one request at the port plus at most one queued
 // behind it — new requests replace the queued slot (latest wins), so a burst of
 // edits costs at most the build in progress and one more.
 type ChannelState =
   | { readonly type: "idle" }
   | { readonly type: "busy"; readonly inFlight: InFlightRequest; readonly queued: QueuedRequest | null };
 
-export function createPrintKitChannel(): PrintKitChannel {
+export function createPrintKitChannel(port: KitBuildPort = defaultKitBuildPort()): PrintKitChannel {
   let state: ChannelState = { type: "idle" };
 
   function post(input: KitRequestInput, settle: SettleOutcome): void {
-    const requestId = nextRequestId;
-    nextRequestId += 1;
-    resultHandlerByRequestId.set(requestId, applyResult);
-    state = { type: "busy", inFlight: { type: "live", requestId, settle }, queued: null };
-    const message: KitWorkerRequest = { requestId, rawSettings: input.rawSettings, presetId: input.presetId };
-    kitWorker().postMessage(message);
+    state = { type: "busy", inFlight: { type: "live", settle }, queued: null };
+    port.post(input, applyResult);
   }
 
-  // Runs once per in-flight request when its response arrives: settle a live
+  // Runs once per in-flight request when its result arrives: settle a live
   // caller (a superseded one was settled at supersede time, so its result is
-  // dropped here), then start the queued successor if one is waiting.
+  // dropped here), then start the queued successor if one is waiting. The
+  // channel keeps at most one request at the port, so the result always
+  // belongs to the current in-flight slot.
   function applyResult(result: KitBuildResult): void {
     if (state.type !== "busy") {
       return;
@@ -104,12 +133,6 @@ export function createPrintKitChannel(): PrintKitChannel {
   }
 
   function request(input: KitRequestInput): Promise<KitRequestOutcome> {
-    // Graceful degradation when Workers are unavailable (tests, SSR): the same
-    // sync core runs on the calling thread, whose Manifold kernel the app
-    // initializes at bootstrap.
-    if (typeof Worker === "undefined") {
-      return Promise.resolve(buildKitResult(input.rawSettings, input.presetId));
-    }
     return new Promise((resolve) => {
       if (state.type === "idle") {
         post(input, resolve);
@@ -124,7 +147,7 @@ export function createPrintKitChannel(): PrintKitChannel {
       }
       state = {
         type: "busy",
-        inFlight: { type: "superseded", requestId: inFlight.requestId },
+        inFlight: { type: "superseded" },
         queued: { input, settle: resolve },
       };
     });
