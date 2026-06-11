@@ -35,8 +35,8 @@ import type {
 export function createFan({ axis, position, radius, facing, appearance }: FanPlacement & { appearance: FanAppearance }): Group {
   const fan = new Group();
   fan.position.copy(position);
-  // The bare fan model faces +y; the rotation maps that onto the requested axis
-  // and direction. "axis-negative" mirrors the mapping so the front face points
+  // +y is the fan's exhaust/back side; the rotation maps it onto the requested
+  // axis and facing. "axis-negative" mirrors the mapping so the exhaust points
   // the other way along the same axis.
   const flip = facing === "axis-negative";
   if (axis === "x") {
@@ -94,9 +94,30 @@ const fanCadModelCache = new Map<string, Promise<LoadedFanCadModel>>();
 // CAD Fan Loading
 // ##############################
 
+// The bundled NF-A14 asset is 27 mm deep at its 140 mm nominal diameter and
+// centered on the fan origin, so its loaded depth is the fan width times this
+// ratio at any preview scale.
+const noctuaCadPreviewDepthPerWidth = 27 / 140;
+
+// The CAD silhouette is deeper than the procedural fallback fan. Reserving its
+// final depth with an invisible envelope keeps bounds-driven placement (such
+// as the tempest wall inset) correct before the asset loads asynchronously;
+// Box3.setFromObject includes invisible meshes.
+function createNoctuaCadDepthEnvelope(radius: number): Mesh {
+  const width = radius * 2;
+  const envelope = new Mesh(
+    new BoxGeometry(width, width * noctuaCadPreviewDepthPerWidth, width),
+    new MeshBasicMaterial(),
+  );
+  envelope.name = "noctua-cad-preview-depth-envelope";
+  envelope.visible = false;
+  return envelope;
+}
+
 function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Group {
   const core = new Group();
   core.name = "noctua-nf-a14-preview-cad";
+  core.add(createNoctuaCadDepthEnvelope(radius));
 
   const fallbackStatic = new Group();
   fallbackStatic.add(createFanFrame(radius, appearance));

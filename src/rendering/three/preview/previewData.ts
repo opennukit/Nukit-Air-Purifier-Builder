@@ -149,7 +149,6 @@ export const panelCutOverlayLift = 1.4 * sceneScale;
 export const panelPrintSeamOverlayLift = 2.1 * sceneScale;
 export const fanPreviewFrontDepth = 0.018;
 export const fanPreviewRearDepth = 0.047;
-export const fanPreviewFrontDepthMillimeters = fanPreviewFrontDepth / sceneScale;
 export const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
 export const previewFanWallInset = 0.8 * sceneScale;
 export const filterMediaPreviewClearanceMillimeters = 3;
