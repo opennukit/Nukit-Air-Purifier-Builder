@@ -479,7 +479,7 @@
     }
 
     if (fabricationMethod === "print-3mf") {
-      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan), 1400);
+      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan, printSheetKitBuild), 1400);
       return;
     }
 
@@ -503,13 +503,22 @@
   function exportPrintKit(
     currentLayout: LayoutResult,
     currentGeneratedPlan: PrintableSheetPlan | null,
+    currentKitBuild: PrintKitBuildState,
   ): string {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
       return "Opened source files";
     }
-    // The kit is still building in the worker; ask the user to retry shortly
-    // rather than exporting a stale or missing plan.
+    // Only a fresh plan may be exported. While a rebuild is in flight the
+    // cached plan still reflects the previous settings, so ask the user to
+    // retry shortly; after a failure there is no plan for these settings at
+    // all.
+    if (currentKitBuild.type === "building") {
+      return "Still updating…";
+    }
+    if (currentKitBuild.type === "failed") {
+      return "Build failed";
+    }
     if (currentGeneratedPlan === null) {
       return "Still updating…";
     }
