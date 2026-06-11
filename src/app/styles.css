@@ -1660,6 +1660,35 @@ Preview Animation
   }
 }
 
+/* ##############################
+Reduced Motion
+############################## */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Skip the settle-in entrance animation. */
+  .three-preview-host,
+  .print-sheet-three-host {
+    animation: none;
+  }
+
+  /* The spinner stops rotating but stays visible as a static indicator next
+  to the loading text. */
+  .preview-loading-spinner {
+    animation: none;
+  }
+
+  .primary-button:hover,
+  .ghost-button:hover,
+  .mode-button:hover,
+  .icon-link:hover {
+    transform: none;
+  }
+
+  .preview-rotation-button::after {
+    transition: none;
+  }
+}
+
 /* #######################################
 Responsive Rules
 ####################################### */

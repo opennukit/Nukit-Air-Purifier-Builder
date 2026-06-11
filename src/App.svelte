@@ -150,8 +150,26 @@
   // ##############################
 
   const initialUrlParams = new URLSearchParams(window.location.search);
+
+  // Reduced-motion users get a still model by default; an explicit autoRotate
+  // URL param is a deliberate choice in a shared link, so it still wins.
+  function applyReducedMotionAutoRotateDefault(draft: PurifierDraft): PurifierDraft {
+    const autoRotateIsExplicit = initialUrlParams.has("autoRotate");
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (autoRotateIsExplicit || !prefersReducedMotion) {
+      return draft;
+    }
+    return {
+      ...draft,
+      preview: {
+        ...draft.preview,
+        enclosure: { ...draft.preview.enclosure, autoRotate: false },
+      },
+    };
+  }
+
   const initialSession = normalizeWorkbenchSession(
-    decodePurifierDraftSettings(window.location.search),
+    applyReducedMotionAutoRotateDefault(decodePurifierDraftSettings(window.location.search)),
     decodeWorkbenchState(initialUrlParams),
   );
   let draft: PurifierDraft = initialSession.settings;
