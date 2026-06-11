@@ -3,7 +3,10 @@
 // preset catalog, public-release filtering, and lookups.
 
 import type { Millimeters } from "@/domain/units";
-import type { FilterDimensions } from "@/domain/purifier/filter";
+import {
+  defaultRectangularFilterDimensions,
+  type FilterDimensions,
+} from "@/domain/purifier/filter";
 import type {
   FanBanks,
   FanCountRequest,
@@ -153,11 +156,11 @@ export type TempestArrangementPreset =
   (typeof tempestArrangementPresets)[number];
 
 // Default measured filter sizes per Tempest arrangement. Horizontal
-// arrangements use the 20x25x2 in MERV 13 actual size; the tower uses the
+// arrangements use the shared rectangular filter default; the tower uses the
 // Air Fanta compatible replacement filter pack size (29 x 29 x 2.5 cm).
 export const defaultFilterDimensionsByTempestArrangement = {
-  "single-horizontal-top-filter": { width: 622.3, depth: 495.3, thickness: 46.77 },
-  "dual-horizontal-sandwich": { width: 622.3, depth: 495.3, thickness: 46.77 },
+  "single-horizontal-top-filter": defaultRectangularFilterDimensions,
+  "dual-horizontal-sandwich": defaultRectangularFilterDimensions,
   "four-side-filter-tower": { width: 290, depth: 290, thickness: 25 },
 } satisfies Record<TempestArrangementPreset, FilterDimensions>;
 
@@ -196,8 +199,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     implementation: {
       type: "laser-derived-printable-kit",
       defaults: {
-        // 20x25x1 in MERV 13 actual size.
-        filter: { width: 622.3, depth: 495.3, thickness: 19.1 },
+        filter: defaultRectangularFilterDimensions,
         fanDiameter: 140,
         filterCount: 2,
         fanBanks: {

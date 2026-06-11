@@ -6,6 +6,7 @@ import {
   applyTempestArrangementDefaults,
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
+import { defaultRectangularFilterDimensions } from "@/domain/purifier/filter";
 import {
   defaultFilterDimensionsByTempestArrangement,
   isStaticReferencePrintDesignId,
@@ -67,6 +68,26 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect("transparentWalls" in decoded).toBe(false);
     expect("transparentWalls" in previewOptions).toBe(false);
     expect(encodeSettings(decoded)).not.toContain("transparentWalls");
+  });
+
+  test("uses the same default filter dimensions with and without an explicit default design", () => {
+    const bareDefaults = decodeSettings("");
+    const explicitDesignDefaults = decodeSettings("printDesign=nukit-open-air");
+
+    expect(bareDefaults.filterWidth).toBe(defaultRectangularFilterDimensions.width);
+    expect(bareDefaults.filterDepth).toBe(defaultRectangularFilterDimensions.depth);
+    expect(bareDefaults.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
+    expect(explicitDesignDefaults.filterWidth).toBe(bareDefaults.filterWidth);
+    expect(explicitDesignDefaults.filterDepth).toBe(bareDefaults.filterDepth);
+    expect(explicitDesignDefaults.filterThickness).toBe(bareDefaults.filterThickness);
+  });
+
+  test("falls back unmentioned filter measurements to the active design's defaults", () => {
+    const partialMeasurement = decodeSettings("printDesign=nukit-open-air&x=500&y=400");
+
+    expect(partialMeasurement.filterWidth).toBe(500);
+    expect(partialMeasurement.filterDepth).toBe(400);
+    expect(partialMeasurement.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
   });
 
   test("preserves custom measured filter dimensions through the URL codec", () => {
@@ -402,9 +423,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("reports export readiness warnings before drawing export", () => {
-    const defaultLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
-    expect(evaluateBuildDiagnostics(defaultLayout)).toEqual([]);
-    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("info");
+    // The 20x25x2 in default filter genuinely arranges into a laser sheet
+    // wider than 1500 mm, so the default layout carries that one warning.
+    const defaultLayout = createLayout(defaultSettings);
+    expect(evaluateBuildDiagnostics(defaultLayout).map((diagnostic) => diagnostic.id)).toEqual(["large-sheet"]);
+    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("warning");
 
     const noFanLayout = createLayout({
       ...defaultSettings,
@@ -454,7 +477,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   // ##############################
 
   test("splits printable kits to fit common desktop printer beds", () => {
-    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
+    const layout = createLayout(defaultSettings);
     const boundedPresetIds = printVolumePresets
       .filter((preset) => preset.bed.type === "bounded")
       .map((preset) => preset.id);
@@ -479,7 +502,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
       expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
       expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
       expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
-      if (presetId === "bed-180") {
+      // The default 140 mm fan walls are 242.9 mm tall, which cannot be split
+      // through a fan opening, so the smallest beds keep oversized parts.
+      if (presetId === "bed-180" || presetId === "bed-prusa-mk") {
         expect(kit.summary.oversizedPartCount).toBeGreaterThan(0);
       } else {
         expect(kit.summary.oversizedPartCount).toBe(0);
@@ -764,7 +789,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("exports bounded-bed print kits as one multi-plate 3MF package", () => {
-    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-open-air"));
+    const layout = createLayout(defaultSettings);
     const printExport = createPrintableThreeMfExport(layout, "bed-256");
     const model = parseThreeMfModel(printExport.bytes);
     const modelSettings = parseThreeMfModelSettings(printExport.bytes);

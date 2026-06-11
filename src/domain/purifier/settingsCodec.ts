@@ -200,14 +200,6 @@ function readPreviewMaterialColor(
   return findPreviewMaterialColorPreset(params.get("previewMaterialColor")).id;
 }
 
-function hasFilterMeasurementParams(params: URLSearchParams): boolean {
-  return (
-    hasAnyParam(params, ["filterWidth", "x"]) ||
-    hasAnyParam(params, ["filterDepth", "y"]) ||
-    hasAnyParam(params, ["filterThickness", "filter_height"])
-  );
-}
-
 function hasDonutFilterMeasurementParams(params: URLSearchParams): boolean {
   return (
     params.has("donutFilterOuterDiameter") ||
@@ -243,15 +235,21 @@ function applyPrintDesignUrlDefaults(
     isTempestPrintDesignId(printDesign) && params.has("tempestArrangement")
       ? applyTempestArrangementDefaults(baseDefaults, parsed.tempestArrangement)
       : baseDefaults;
-  const hasFilterInputs = hasFilterMeasurementParams(params);
   const hasFanInputs = hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
   const hasDonutFilterInputs = hasDonutFilterMeasurementParams(params);
 
+  // Each measured filter field falls back to the active design's default on
+  // its own, so a partial measurement URL keeps the design defaults for the
+  // fields it does not mention.
   return {
     ...parsed,
-    filterWidth: hasFilterInputs ? parsed.filterWidth : defaults.filterWidth,
-    filterDepth: hasFilterInputs ? parsed.filterDepth : defaults.filterDepth,
-    filterThickness: hasFilterInputs
+    filterWidth: hasAnyParam(params, ["filterWidth", "x"])
+      ? parsed.filterWidth
+      : defaults.filterWidth,
+    filterDepth: hasAnyParam(params, ["filterDepth", "y"])
+      ? parsed.filterDepth
+      : defaults.filterDepth,
+    filterThickness: hasAnyParam(params, ["filterThickness", "filter_height"])
       ? parsed.filterThickness
       : defaults.filterThickness,
     fanDiameter: hasFanInputs ? parsed.fanDiameter : defaults.fanDiameter,

@@ -37,7 +37,10 @@ import {
   type FixedFanCount,
   type SingleFanConfiguration,
 } from "@/domain/purifier/fanProducts";
-import type { FilterDimensions } from "@/domain/purifier/filter";
+import {
+  defaultRectangularFilterDimensions,
+  type FilterDimensions,
+} from "@/domain/purifier/filter";
 import {
   defaultCutJointSettings,
   type CutJointSettings,
@@ -341,12 +344,11 @@ export type PurifierInput =
 // Defaults
 // #######################################
 
-// Default rectangular filter: 20x25x2 in MERV 13 actual size.
 export const defaultSettings: RawPurifierSettings = {
   printDesign: defaultPrintDesignId,
-  filterWidth: 622.3,
-  filterDepth: 495.3,
-  filterThickness: 46.77,
+  filterWidth: defaultRectangularFilterDimensions.width,
+  filterDepth: defaultRectangularFilterDimensions.depth,
+  filterThickness: defaultRectangularFilterDimensions.thickness,
   rim: 30,
   fanColor: defaultFanColor,
   fanDiameter: 140,

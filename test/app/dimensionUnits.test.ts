@@ -13,7 +13,7 @@ describe("Dimension display units", () => {
 
   test("rounds inch display values to two decimals", () => {
     expect(millimetersToDisplayValue(622.3, "in")).toBe(24.5);
-    expect(millimetersToDisplayValue(46.77, "in")).toBe(1.84);
+    expect(millimetersToDisplayValue(44.45, "in")).toBe(1.75);
   });
 
   test("stores typed inch values as millimeters", () => {
