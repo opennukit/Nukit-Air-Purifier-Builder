@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createTempestModel,
+  defaultTempestHorizontalFilter,
   defaultTempestSettings,
   defaultTempestTowerFilter,
 } from "@/domain/designs/tempest/model";
@@ -15,9 +16,10 @@ describe("Tempest OpenSCAD model port", () => {
       hexFlatToFlat: 10,
       ribThickness: 1.6,
     });
+    // 495 measured footprint + 2*1 fit clearance + 2*5 walls.
     expect(model.box).toEqual({
-      width: 505,
-      depth: 505,
+      width: 507,
+      depth: 507,
       height: 262,
       wallHeight: 242,
     });
@@ -26,8 +28,8 @@ describe("Tempest OpenSCAD model port", () => {
       countY: 2,
       countZ: 2,
       totalCount: 8,
-      chunkWidth: 252.5,
-      chunkDepth: 252.5,
+      chunkWidth: 253.5,
+      chunkDepth: 253.5,
       chunkHeight: 131,
     });
     expect(model.filterLayout.topology).toBe("sandwich");
@@ -57,8 +59,8 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.walls.front.actualCount).toBe(0);
     expect(model.fanLayout.walls.back.actualCount).toBe(0);
     expect(model.fanLayout.walls.left.actualCount).toBe(3);
-    expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 252.5, 403]);
-    expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 252.5, 403]);
+    expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 253.5, 405]);
+    expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 253.5, 405]);
 
     expect(model.cordPassThrough).toMatchObject({
       topology: "sandwich",
@@ -66,7 +68,7 @@ describe("Tempest OpenSCAD model port", () => {
       wall: "right",
       side: "right",
       diameter: 8,
-      positionAlongWall: 488,
+      positionAlongWall: 490,
       verticalCenter: 131,
       axis: "x",
     });
@@ -82,9 +84,11 @@ describe("Tempest OpenSCAD model port", () => {
     };
     const model = createTempestModel(settings);
 
+    // 495 face + 2*1 fit clearance + 2*61 structural offset (the offset itself
+    // carries the 1mm pocket-depth clearance: 10 flange + 45+1 pocket + 5 wall).
     expect(model.box).toEqual({
-      width: 615,
-      depth: 615,
+      width: 619,
+      depth: 619,
       height: 510,
       wallHeight: 495,
     });
@@ -92,19 +96,19 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.filterLayout.topology !== "quad") {
       throw new Error("Expected tower Tempest layout");
     }
-    expect(model.filterLayout.structuralOffset).toBe(60);
+    expect(model.filterLayout.structuralOffset).toBe(61);
     expect(model.filterLayout.airChamber).toEqual({
-      xMin: 60,
-      xMax: 555,
-      yMin: 60,
-      yMax: 555,
+      xMin: 61,
+      xMax: 558,
+      yMin: 61,
+      yMax: 558,
       zMin: 5,
       zMax: 500,
     });
     expect(Object.keys(model.filterLayout.filterPockets)).toHaveLength(4);
     expect(
       Object.values(model.filterLayout.filterPockets).every(
-        (pocket) => pocket.width === 495 && pocket.height === 495 && pocket.depth === 45,
+        (pocket) => pocket.width === 497 && pocket.height === 495 && pocket.depth === 46,
       ),
     ).toBe(true);
 
@@ -112,31 +116,76 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.fanLayout.topology !== "quad") {
       throw new Error("Expected tower fan layout");
     }
-    expect(model.fanLayout.minimumCenterFromEdge).toBe(130);
+    expect(model.fanLayout.minimumCenterFromEdge).toBe(131);
     expect(model.fanLayout.columns).toBe(3);
     expect(model.fanLayout.rows).toBe(3);
     expect(model.fanLayout.fanCount).toBe(9);
-    expect(model.fanLayout.positionsX).toEqual([157.5, 307.5, 457.5]);
-    expect(model.fanLayout.positionsY).toEqual([157.5, 307.5, 457.5]);
+    expect(model.fanLayout.positionsX).toEqual([159.5, 309.5, 459.5]);
+    expect(model.fanLayout.positionsY).toEqual([159.5, 309.5, 459.5]);
 
     expect(model.chunkGrid).toMatchObject({
       countX: 3,
       countY: 3,
       countZ: 2,
       totalCount: 18,
-      chunkWidth: 205,
-      chunkDepth: 205,
+      chunkWidth: 619 / 3,
+      chunkDepth: 619 / 3,
       chunkHeight: 255,
     });
     expect(model.cordPassThrough).toMatchObject({
       topology: "quad",
       type: "top-cylinder",
       diameter: 8,
-      x: 538,
-      y: 538,
+      x: 541,
+      y: 541,
       zStart: 500,
       depth: 10,
     });
+  });
+
+  test("grows every filter cavity by the fit clearance while the measured filter stays fixed", () => {
+    const clearance = 2.5;
+    const sandwichAt = (filterFitClearance: number) =>
+      createTempestModel({
+        ...defaultTempestSettings,
+        frame: { ...defaultTempestSettings.frame, filterFitClearance },
+      });
+    const towerAt = (filterFitClearance: number) =>
+      createTempestModel({
+        ...defaultTempestSettings,
+        arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter },
+        frame: { ...defaultTempestSettings.frame, filterFitClearance },
+      });
+
+    // Sandwich: the interior (box minus walls) is the measured footprint plus one
+    // clearance per side, so the envelope grows by exactly 2*clearance.
+    const snugSandwich = sandwichAt(0);
+    const easedSandwich = sandwichAt(clearance);
+    const wall = defaultTempestSettings.frame.wallThickness;
+    expect(snugSandwich.box.width - 2 * wall).toBe(defaultTempestHorizontalFilter.footprintWidth);
+    expect(easedSandwich.box.width - snugSandwich.box.width).toBe(2 * clearance);
+    expect(easedSandwich.box.depth - snugSandwich.box.depth).toBe(2 * clearance);
+    expect(easedSandwich.box.height).toBe(snugSandwich.box.height);
+
+    // Quad: pockets grow by 2*clearance across the face and 1*clearance in the
+    // thickness direction (the filter rests against the outer flange), and the
+    // wall behind each pocket keeps its full thickness.
+    const snugTowerLayout = towerAt(0).filterLayout;
+    const easedTowerLayout = towerAt(clearance).filterLayout;
+    if (snugTowerLayout.topology !== "quad" || easedTowerLayout.topology !== "quad") {
+      throw new Error("Expected tower Tempest layouts");
+    }
+    expect(snugTowerLayout.filterPockets.front.width).toBe(defaultTempestTowerFilter.faceWidth);
+    expect(snugTowerLayout.filterPockets.front.depth).toBe(defaultTempestTowerFilter.thickness);
+    expect(easedTowerLayout.filterPockets.front.width - snugTowerLayout.filterPockets.front.width).toBe(2 * clearance);
+    expect(easedTowerLayout.filterPockets.front.depth - snugTowerLayout.filterPockets.front.depth).toBe(clearance);
+    expect(easedTowerLayout.filterPockets.front.height).toBe(snugTowerLayout.filterPockets.front.height);
+    for (const towerLayout of [snugTowerLayout, easedTowerLayout]) {
+      const frontRect = towerLayout.wallRects.front;
+      expect(frontRect.xMax - frontRect.xMin).toBe(towerLayout.filterPockets.front.width);
+      expect(frontRect.yMax - frontRect.yMin).toBe(towerLayout.filterPockets.front.depth);
+      expect(towerLayout.structuralOffset - frontRect.yMax).toBe(wall);
+    }
   });
 
   test("keeps chunk export selection explicit and clamps invalid chunk indexes", () => {
@@ -232,8 +281,8 @@ describe("Tempest OpenSCAD model port", () => {
       countY: 2,
       countZ: 2,
       totalCount: 8,
-      chunkWidth: 252.5,
-      chunkDepth: 252.5,
+      chunkWidth: 253.5,
+      chunkDepth: 253.5,
       chunkHeight: 131,
     });
     expect(model.fanLayout.topology).toBe("sandwich");

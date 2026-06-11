@@ -41,10 +41,13 @@ export function tempestHorizontalFilterBoxes(
 ): readonly TempestCsgBox[] {
   const inset = filterMediaPreviewClearanceMillimeters;
   const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
+  // The media keeps its MEASURED footprint; the fit clearance shifts it to the
+  // center of the cavity that grew around it.
+  const fitClearance = model.frame.filterFitClearance;
   return filterLayout.filters.map((layer) => ({
     min: {
-      x: model.frame.wallThickness + inset,
-      y: model.frame.wallThickness + inset,
+      x: model.frame.wallThickness + fitClearance + inset,
+      y: model.frame.wallThickness + fitClearance + inset,
       z: layer.zBottom + surfaceGap,
     },
     size: {
@@ -62,31 +65,35 @@ export function tempestTowerFilterBoxes(
   const filter = filterLayout.filter; // carried on the quad layout
   const inset = filterMediaPreviewClearanceMillimeters;
   const surfaceGap = filterMediaPreviewSurfaceGapMillimeters;
+  // The media keeps its MEASURED face size; the fit clearance centers it across
+  // the wider pocket. In the thickness direction the clearance is single-sided
+  // (chamber side), so resting against the outer flange stays correct.
+  const fitClearance = model.frame.filterFitClearance;
   const faceWidth = visualFilterMediaDimension(filter.faceWidth);
   const faceHeight = visualFilterMediaDimension(filter.faceHeight);
   const filterThickness = recessedMillimeterFilterMediaThickness(filter.thickness);
   const z = filterLayout.bottomPlateThickness + inset;
   return [
     {
-      min: { x: filterLayout.structuralOffset + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
+      min: { x: filterLayout.structuralOffset + fitClearance + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
       size: { x: faceWidth, y: filterThickness, z: faceHeight },
     },
     {
       min: {
-        x: filterLayout.structuralOffset + inset,
+        x: filterLayout.structuralOffset + fitClearance + inset,
         y: model.box.depth - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
         z,
       },
       size: { x: faceWidth, y: filterThickness, z: faceHeight },
     },
     {
-      min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + inset, z },
+      min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + fitClearance + inset, z },
       size: { x: filterThickness, y: faceWidth, z: faceHeight },
     },
     {
       min: {
         x: model.box.width - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
-        y: filterLayout.structuralOffset + inset,
+        y: filterLayout.structuralOffset + fitClearance + inset,
         z,
       },
       size: { x: filterThickness, y: faceWidth, z: faceHeight },

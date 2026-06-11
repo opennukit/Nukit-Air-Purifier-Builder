@@ -623,7 +623,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
-    expect(towerModel.box.width).toBe(370);
+    // 290 face + 2*1 fit clearance + 2*41 structural offset (10 flange + 25+1 pocket + 5 wall).
+    expect(towerModel.box.width).toBe(374);
     expect(towerModel.box.height).toBe(305);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
     expect(towerModel.chunkGrid.totalCount).toBe(8);
