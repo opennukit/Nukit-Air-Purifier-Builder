@@ -17,7 +17,7 @@ import {
 } from "@/domain/purifier/designPresets";
 import {
   fanColors,
-  fanDiameters,
+  nearestFanDiameter,
   type FanColor,
   type FanDiameter,
 } from "@/domain/purifier/fanProducts";
@@ -175,14 +175,19 @@ export function formatMillimeters(value: number): string {
 // Primitive Readers
 // ##############################
 
+// Non-catalog diameters snap to the nearest supported size so the decoded
+// settings match what the build actually uses.
 function readFanDiameter(
   params: URLSearchParams,
   key: string | readonly string[],
   fallback: FanDiameter,
 ): FanDiameter {
-  const parsed = Number(readParam(params, key));
-  const found = fanDiameters.find((diameter) => diameter === parsed);
-  return found ?? fallback;
+  const raw = readParam(params, key);
+  if (raw === null || raw.trim() === "") {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? nearestFanDiameter(parsed) : fallback;
 }
 
 // ##############################

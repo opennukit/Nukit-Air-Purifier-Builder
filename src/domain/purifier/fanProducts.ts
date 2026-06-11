@@ -129,9 +129,23 @@ export type SingleFanConfiguration = {
 // Catalog Lookup Helpers
 // #######################################
 
-export function findFanSpec(diameter: FanDiameter): FanSpec {
-  return (
-    fanSpecs.find((spec) => spec.diameter === diameter) ??
-    fanSpecs[fanSpecs.length - 1]
-  );
+// Snaps any measured or URL-provided diameter to the nearest catalog size;
+// ties round down to the smaller fan.
+export function nearestFanDiameter(value: number): FanDiameter {
+  let nearest: FanDiameter = fanDiameters[0];
+  for (const diameter of fanDiameters) {
+    if (Math.abs(diameter - value) < Math.abs(nearest - value)) {
+      nearest = diameter;
+    }
+  }
+  return nearest;
+}
+
+export function findFanSpec(diameter: number): FanSpec {
+  const nearest = nearestFanDiameter(diameter);
+  const spec = fanSpecs.find((entry) => entry.diameter === nearest);
+  if (spec === undefined) {
+    throw new Error(`findFanSpec: Missing fan spec for diameter ${nearest}`);
+  }
+  return spec;
 }

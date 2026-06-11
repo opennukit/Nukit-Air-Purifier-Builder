@@ -15,7 +15,7 @@ import {
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { fanAppearanceForColor } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, findFanSpec, nearestFanDiameter } from "@/domain/purifier/fanProducts";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
@@ -137,6 +137,18 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
     expect(decoded.fanColor).toBe("black");
     expect(decoded.fanDiameter).toBe(120);
+  });
+
+  test("snaps non-catalog fan diameters to the nearest supported size", () => {
+    expect(decodeSettings("fanDiameter=100").fanDiameter).toBe(92);
+    expect(decodeSettings("fanDiameter=135").fanDiameter).toBe(140);
+    expect(decodeSettings("fanDiameter=").fanDiameter).toBe(defaultSettings.fanDiameter);
+    expect(decodeSettings("fanDiameter=abc").fanDiameter).toBe(defaultSettings.fanDiameter);
+    // Ties round down to the smaller fan.
+    expect(nearestFanDiameter(70)).toBe(60);
+    expect(nearestFanDiameter(106)).toBe(92);
+    // The structured settings used for cut holes and previews snap the same way.
+    expect(findFanSpec(100).diameter).toBe(92);
   });
 
   test("keeps the beige CAD preview appearance for any fan diameter and out of print exports", () => {

@@ -1185,6 +1185,7 @@
                             max="140"
                             step="1"
                             inputmode="decimal"
+                            title="Snaps to the nearest supported size: 40/60/80/92/120/140"
                             value={settings.fanDiameter}
                             onchange={(event) => updateNumberSetting("fanDiameter", event)}
                           />
