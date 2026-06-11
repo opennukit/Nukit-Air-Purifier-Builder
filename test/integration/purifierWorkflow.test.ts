@@ -435,11 +435,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("reports export readiness warnings before drawing export", () => {
-    // The 20x25x2 in default filter genuinely arranges into a laser sheet
-    // wider than 1500 mm, so the default layout carries that one warning.
     const defaultLayout = createLayout(defaultSettings);
-    expect(evaluateBuildDiagnostics(defaultLayout).map((diagnostic) => diagnostic.id)).toEqual(["large-sheet"]);
-    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("warning");
+    expect(evaluateBuildDiagnostics(defaultLayout)).toEqual([]);
+    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("info");
 
     const noFanLayout = createLayout({
       ...defaultSettings,
@@ -514,9 +512,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
       expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
       expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
       expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
-      // The default 140 mm fan walls are 242.9 mm tall, which cannot be split
-      // through a fan opening, so the smallest beds keep oversized parts.
-      if (presetId === "bed-180" || presetId === "bed-prusa-mk") {
+      // The default 140 mm fan walls cannot be split through a fan opening on
+      // the smallest bed, so bed-180 keeps oversized parts.
+      if (presetId === "bed-180") {
         expect(kit.summary.oversizedPartCount).toBeGreaterThan(0);
       } else {
         expect(kit.summary.oversizedPartCount).toBe(0);
@@ -620,8 +618,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalLayout.summary.fans.type === "tempest" ? horizontalLayout.summary.fans.arrangement : undefined).toBe(
       "dual-horizontal-sandwich",
     );
-    // Feature-aware slicing splits the wider 20x25x2 box into 16 chunks.
-    expect(horizontalKit.parts).toHaveLength(16);
+    // Feature-aware slicing splits the default 20x25x1 box into 8 chunks.
+    expect(horizontalKit.parts).toHaveLength(8);
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
