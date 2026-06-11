@@ -394,6 +394,37 @@ Preview Stage
   height: 100%;
 }
 
+/* First model build: nothing is on screen yet, so announce it front and
+center instead of with the corner pill. */
+.preview-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.preview-loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: preview-loading-spin 0.9s linear infinite;
+}
+
+@keyframes preview-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* While a geometry build runs in the worker the previous model stays on
 screen; this small pill is the only cue that a refresh is on the way. */
 .preview-updating-indicator {

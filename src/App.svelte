@@ -165,6 +165,10 @@
   let inFlightPrintSheetPlanKey: string | null = null;
   // Reported up by PurifierPreview while its assembled tempest kit builds.
   let assembledPreviewBuildPhase: "idle" | "building" = "idle";
+  // First load shows a centered "Building model…" state; after the first build
+  // completes, later rebuilds only show the corner pill over the old model.
+  let hasStartedPreviewBuild = false;
+  let hasCompletedFirstPreviewBuild = false;
 
   // ##############################
   // Derived View State
@@ -221,6 +225,12 @@
   $: layout = createLayout(draft);
   $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
   $: isPreviewUpdating = printSheetKitBuild.type === "building" || assembledPreviewBuildPhase === "building";
+  $: if (isPreviewUpdating) {
+    hasStartedPreviewBuild = true;
+  }
+  $: if (hasStartedPreviewBuild && !isPreviewUpdating) {
+    hasCompletedFirstPreviewBuild = true;
+  }
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
@@ -772,7 +782,12 @@
           class="preview-stage"
           id="previewStage"
         >
-          {#if isPreviewUpdating}
+          {#if isPreviewUpdating && !hasCompletedFirstPreviewBuild}
+            <div class="preview-loading-overlay" role="status">
+              <span class="preview-loading-spinner" aria-hidden="true"></span>
+              Building model…
+            </div>
+          {:else if isPreviewUpdating}
             <span class="preview-updating-indicator" role="status">Updating…</span>
           {/if}
           {#if previewMode === "enclosure"}
