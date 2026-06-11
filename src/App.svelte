@@ -225,7 +225,12 @@
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
   $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId);
-  $: isPreviewUpdating = printSheetKitBuild.type === "building" || assembledPreviewBuildPhase === "building";
+  // The sheet-plan half only counts for 3D printing: the laser path renders
+  // synchronously, so no pill or overlay belongs there even if a print build
+  // is still settling in the background.
+  $: isPreviewUpdating =
+    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "building") ||
+    assembledPreviewBuildPhase === "building";
   $: if (isPreviewUpdating) {
     hasStartedPreviewBuild = true;
   }
@@ -678,8 +683,13 @@
         return;
       }
       generatedPrintSheetPlanCache = { key: cacheKey, plan: createPrintableSheetPlanFromKit(outcome.kit) };
-      generatedPrintSheetPlan = generatedPrintSheetPlanCache.plan;
       printSheetKitBuild = { type: "idle" };
+      // The finished build always warms the cache, but it only goes on screen
+      // if it still answers the current settings — e.g. switching to the laser
+      // method mid-build must keep the plan null, not resurrect a print plan.
+      if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
+        generatedPrintSheetPlan = generatedPrintSheetPlanCache.plan;
+      }
     });
   }
 
