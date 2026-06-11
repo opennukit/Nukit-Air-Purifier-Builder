@@ -169,11 +169,17 @@ function createChunkPart(
 ): PrintablePart {
   const bounds = chunkBoundsAt(chunkGrid, address);
   const [width, depth, height] = bounds.size;
+  const [originX, originY, originZ] = bounds.origin;
   return {
     id: `tempest-chunk-${address.x}-${address.y}-${address.z}`,
     name: `Tempest chunk ${address.x},${address.y},${address.z}`,
     kind: "tempest-print-chunk",
     sourcePanelId: "tempest-parametric-csg",
+    sourcePlacement: {
+      x: roundMillimeters(originX),
+      y: roundMillimeters(originY),
+      z: roundMillimeters(originZ),
+    },
     width: roundMillimeters(width),
     depth: roundMillimeters(depth),
     height: roundMillimeters(height),
