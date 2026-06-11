@@ -1,9 +1,28 @@
+<script lang="ts" module>
+  import type { PrintableKit } from "@/fabrication/printing/printableKit";
+  import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
+
+  // The assembled tempest preview renders the same printable kit the export
+  // uses, built off the main thread. Channel and cache live at module scope so
+  // they survive preview-mode remounts: switching back to the assembled view
+  // re-renders instantly from the cached kit instead of rebuilding through the
+  // worker over a blank canvas. The cache (keyed on geometry-affecting
+  // settings) also makes preview-only toggles like fans or exploded view
+  // re-render instantly without a new geometry build.
+  const assembledKitChannel = createPrintKitChannel();
+  const assembledKitPresetId = "unsplit";
+  let assembledKitCache: { readonly key: string; readonly kit: PrintableKit } | null = null;
+  // A key that failed to build is not retried until the settings change;
+  // afterUpdate fires on every render, so retrying a persistent failure here
+  // would loop worker rebuilds forever.
+  let lastFailedAssembledKitKey: string | null = null;
+</script>
+
 <script lang="ts">
   import { afterUpdate, onDestroy, onMount } from "svelte";
   import { isTempestPrintDesignId } from "@/domain/purifier/designPresets";
   import type { LayoutResult } from "@/fabrication/purifierLayout";
-  import type { PrintableKit, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
-  import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
+  import type { PrintableSheetPlan } from "@/fabrication/printing/printableKit";
   import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import { PurifierThreePreview } from "@/rendering/three/purifierThreePreview";
 
@@ -13,18 +32,11 @@
   export let printSeamPlan: PrintableSheetPlan | null;
   export let onAssembledBuildPhase: (phase: AssembledBuildPhase) => void = () => {};
 
-  // The assembled tempest preview renders the same printable kit the export
-  // uses, built off the main thread. The cache (keyed on geometry-affecting
-  // settings) makes preview-only toggles like fans or exploded view re-render
-  // instantly without a new geometry build.
-  const assembledKitChannel = createPrintKitChannel();
-  const assembledKitPresetId = "unsplit";
-  let assembledKitCache: { readonly key: string; readonly kit: PrintableKit } | null = null;
+  // Instance-scoped, unlike the kit cache above: each mount reports its own
+  // build phase and waits on its own render, so a build outliving the instance
+  // can only warm the module cache, never touch a dead preview.
+  let destroyed = false;
   let inFlightAssembledKitKey: string | null = null;
-  // A key that failed to build is not retried until the settings change;
-  // afterUpdate fires on every render, so retrying a persistent failure here
-  // would loop worker rebuilds forever.
-  let lastFailedAssembledKitKey: string | null = null;
   // The latest layout waiting on the in-flight kit; every re-render request for
   // the same kit key overwrites it, so the build applies the newest view state.
   let pendingTempestRender: PendingTempestRender | null = null;
@@ -91,15 +103,24 @@
         return;
       }
       inFlightAssembledKitKey = null;
-      onAssembledBuildPhase("idle");
       if (outcome.type === "failed") {
         console.error(`updateTempestPreview: assembled kit build failed: ${outcome.message}`);
         lastFailedAssembledKitKey = kitKey;
+        if (destroyed) {
+          return;
+        }
+        onAssembledBuildPhase("idle");
         pendingTempestRender = null;
         return;
       }
       lastFailedAssembledKitKey = null;
       assembledKitCache = { key: kitKey, kit: outcome.kit };
+      // A build outliving this instance still warmed the module cache above,
+      // but it must not clobber the phase a newer instance is reporting.
+      if (destroyed) {
+        return;
+      }
+      onAssembledBuildPhase("idle");
       if (pendingTempestRender !== null) {
         applyTempestRender(pendingTempestRender, outcome.kit);
         pendingTempestRender = null;
@@ -124,6 +145,7 @@
   afterUpdate(updatePreview);
 
   onDestroy(() => {
+    destroyed = true;
     onAssembledBuildPhase("idle");
     preview?.destroy();
     preview = null;
