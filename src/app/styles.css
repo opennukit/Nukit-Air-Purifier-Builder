@@ -575,7 +575,10 @@ Three Preview Controls
   padding: 0 7px;
 }
 
-.preview-color-field button {
+/* Shared round color swatch buttons: the preview material picker and the fan
+color picker render identical swatches, differing only in their containers. */
+.preview-color-field button,
+.fan-color-options button {
   display: grid;
   place-items: center;
   width: 20px;
@@ -587,7 +590,8 @@ Three Preview Controls
   cursor: pointer;
 }
 
-.preview-color-field button span {
+.preview-color-field button span,
+.fan-color-options button span {
   width: 13px;
   height: 13px;
   border-radius: 999px;
@@ -595,7 +599,8 @@ Three Preview Controls
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
 }
 
-.preview-color-field button.active-color {
+.preview-color-field button.active-color,
+.fan-color-options button.active-color {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgb(31 111 86 / 16%);
 }
@@ -1311,37 +1316,13 @@ Layout Grids
   margin: 0;
 }
 
-/* Same small round color swatches as the preview material color picker,
-without the preview toolbar's pill chrome. */
+/* Same small round color swatches as the preview material color picker (the
+button rules are comma-joined there), without the preview toolbar's pill
+chrome. */
 .fan-color-options {
   display: inline-flex;
   gap: 4px;
   justify-self: start;
-}
-
-.fan-color-options button {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid rgb(17 24 23 / 28%);
-  border-radius: 999px;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-
-.fan-color-options button span {
-  width: 13px;
-  height: 13px;
-  border-radius: 999px;
-  background: var(--swatch-color);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
-}
-
-.fan-color-options button.active-color {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgb(31 111 86 / 16%);
 }
 
 .fan-grid > [data-nukit-fan-placement] {
