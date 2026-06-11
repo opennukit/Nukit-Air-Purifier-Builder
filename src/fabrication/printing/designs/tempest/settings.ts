@@ -1,8 +1,8 @@
 import { defaultTempestSettings } from "@/domain/designs/tempest/model";
 import type { TempestFanCountRequest, TempestSettings } from "@/domain/designs/tempest/shared";
 import type { PurifierSettings } from "@/domain/purifier/settingsModel";
-import type { FanCountRequest as PurifierFanCountRequest } from "@/domain/purifier/fanProducts";
-import { filterSelectionDimensions, type FilterDimensions } from "@/domain/purifier/filter";
+import type { FanCountRequest as PurifierFanCountRequest } from "@/domain/purifier/fans";
+import type { FilterDimensions } from "@/domain/purifier/filter";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 
 export function createTempestSettingsFromLayout(layout: LayoutResult): TempestSettings {
@@ -45,7 +45,7 @@ function requireTempestDesign(configuration: PurifierSettings): Extract<Purifier
 
 function tempestArrangementFromConfiguration(configuration: PurifierSettings): TempestSettings["arrangement"] {
   const design = requireTempestDesign(configuration);
-  const filter = filterSelectionDimensions(design.filter);
+  const filter = design.filter;
   if (design.arrangement === "four-side-filter-tower") {
     const uprightFace = uprightTowerFilterFace(filter);
     return {

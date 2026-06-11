@@ -19,7 +19,9 @@ describe("Print design settings memory", () => {
 
     expect(switched.settings.design.type).toBe("tempest");
     expect(settings.printDesign).toBe("nukit-tempest");
-    expect(settings.filterPreset).toBe("merv13-20x20x2");
+    expect(settings.filterWidth).toBe(622.3);
+    expect(settings.filterDepth).toBe(495.3);
+    expect(settings.filterThickness).toBe(19.1);
     expect(settings.tempestArrangement).toBe("dual-horizontal-sandwich");
     expect(settings.materialThickness).toBe(5);
   });

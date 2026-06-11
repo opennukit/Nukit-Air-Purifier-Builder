@@ -13,7 +13,6 @@ import {
   vectorAxisValue,
 } from "@/rendering/three/preview/sceneMath";
 import {
-  fanPreviewFrontDepthMillimeters,
   fanPreviewRearDepthMillimeters,
   filterMediaPreviewClearanceMillimeters,
   filterMediaPreviewSurfaceGapMillimeters,
@@ -22,6 +21,7 @@ import {
   sceneScale,
   visualFilterMediaDimension,
   type FanAxis,
+  type FanFacing,
   type PreviewInteriorPlane,
   type TempestCsgBox,
   type TempestCsgPoint,
@@ -174,22 +174,33 @@ export function tempestWallInteriorFanCenter(
   localVerticalCenter: number,
 ): TempestCsgPoint {
   const z = model.frame.outsideFlangeThickness + localVerticalCenter;
+  // All four wall fans exhaust outward, so the wall side is the fan's rear
+  // (exhaust) side; reserve that depth before the inset shift fine-tunes it.
+  const centerDepth = model.frame.wallThickness + fanPreviewRearDepthMillimeters;
   if (wall === "front") {
-    return { x: positionAlongWall, y: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, z };
+    return { x: positionAlongWall, y: centerDepth, z };
   }
   if (wall === "back") {
-    return { x: positionAlongWall, y: model.box.depth - model.frame.wallThickness - fanPreviewRearDepthMillimeters, z };
+    return { x: positionAlongWall, y: model.box.depth - centerDepth, z };
   }
   if (wall === "left") {
-    return { x: model.frame.wallThickness + fanPreviewFrontDepthMillimeters, y: positionAlongWall, z };
+    return { x: centerDepth, y: positionAlongWall, z };
   }
-  return { x: model.box.width - model.frame.wallThickness - fanPreviewRearDepthMillimeters, y: positionAlongWall, z };
+  return { x: model.box.width - centerDepth, y: positionAlongWall, z };
 }
 
 export function moveTempestFanInsideWall(fan: Group, model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): void {
   const bounds = new Box3().setFromObject(fan);
   const plane = tempestWallInteriorPlane(model, pose, wall);
   fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+// Every wall fan exhausts outward: the fan model's local +y is its exhaust/back
+// side, so facing points +y away from the interior on all four walls. Derived
+// from the same scene-space interior probe the inset shift uses, so it stays
+// correct under any pose.
+export function tempestWallFanFacing(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): FanFacing {
+  return tempestWallInteriorPlane(model, pose, wall).insideSign >= 0 ? "axis-negative" : "axis-positive";
 }
 
 function tempestWallInteriorPlane(model: TempestModel, pose: TempestPrintablePose, wall: TempestWall): PreviewInteriorPlane {

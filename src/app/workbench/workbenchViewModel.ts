@@ -28,9 +28,7 @@ import {
   fabricationMethodForWorkbenchState,
   previewModeForWorkbenchState,
   printVolumePresetIdForWorkbenchState,
-  withControlsTab,
   withPreviewMode,
-  type ControlsTab,
   type WorkbenchState,
 } from "@/app/workbench/workbenchState";
 import type { PreviewMode } from "@/app/workbench/previewMode";
@@ -112,14 +110,12 @@ export type WorkbenchControlPanels = {
 
 export type WorkbenchViewModel = {
   readonly previewMode: PreviewMode;
-  readonly controlsTab: ControlsTab;
   readonly fabricationMethod: ExportFormat;
   readonly printVolumePresetId: PrintVolumePresetId;
   readonly printDesignPreset: PrintDesignPreset;
   readonly design: WorkbenchDesignContext;
   readonly fabricationPreview: WorkbenchFabricationPreview;
   readonly controlPanels: WorkbenchControlPanels;
-  readonly setupTabLabel: string;
   readonly exportActionLabel: string;
 };
 
@@ -160,7 +156,6 @@ export function createWorkbenchViewModel(
 ): WorkbenchViewModel {
   const rawSettings = isRawPurifierSettings(settings) ? normalizeRawSettings(settings) : serializePurifierDraft(settings);
   const previewMode = previewModeForWorkbenchState(state);
-  const controlsTab = state.controlsTab;
   const fabricationMethod = fabricationMethodForWorkbenchState(state);
   const printVolumePresetId = printVolumePresetIdForWorkbenchState(state);
   const printDesignPreset = findPrintDesignPreset(rawSettings.printDesign);
@@ -170,14 +165,12 @@ export function createWorkbenchViewModel(
 
   return {
     previewMode,
-    controlsTab,
     fabricationMethod,
     printVolumePresetId,
     printDesignPreset: design.preset,
     design,
     fabricationPreview,
     controlPanels,
-    setupTabLabel: fabricationMethod === "print-3mf" ? "Print setup" : "Laser setup",
     exportActionLabel: exportActionLabelForDesign(fabricationMethod, design),
   };
 }
@@ -187,24 +180,15 @@ export function normalizeWorkbenchStateForSettings(
   nextSettings: RawPurifierSettings | PurifierDraft,
 ): WorkbenchState {
   const viewModel = createWorkbenchViewModel(nextSettings, nextState);
-  let normalizedState = nextState;
 
   if (
     (viewModel.previewMode === "print-sheets" && viewModel.fabricationPreview.type !== "print-sheets") ||
     (viewModel.previewMode === "cut-sheet" && viewModel.fabricationPreview.type !== "cut-sheet")
   ) {
-    normalizedState = withPreviewMode(nextState, "enclosure");
+    return withPreviewMode(nextState, "enclosure");
   }
 
-  const normalizedViewModel = createWorkbenchViewModel(nextSettings, normalizedState);
-  if (
-    (normalizedViewModel.controlPanels.advanced.type === "hidden" && normalizedViewModel.controlsTab === "advanced") ||
-    (normalizedViewModel.controlPanels.setup.type === "hidden" && normalizedViewModel.controlsTab === "setup")
-  ) {
-    return withControlsTab(normalizedState, "design");
-  }
-
-  return normalizedState;
+  return nextState;
 }
 
 // #######################################

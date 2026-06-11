@@ -575,7 +575,10 @@ Three Preview Controls
   padding: 0 7px;
 }
 
-.preview-color-field button {
+/* Shared round color swatch buttons: the preview material picker and the fan
+color picker render identical swatches, differing only in their containers. */
+.preview-color-field button,
+.fan-color-options button {
   display: grid;
   place-items: center;
   width: 20px;
@@ -587,7 +590,8 @@ Three Preview Controls
   cursor: pointer;
 }
 
-.preview-color-field button span {
+.preview-color-field button span,
+.fan-color-options button span {
   width: 13px;
   height: 13px;
   border-radius: 999px;
@@ -595,7 +599,8 @@ Three Preview Controls
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 36%);
 }
 
-.preview-color-field button.active-color {
+.preview-color-field button.active-color,
+.fan-color-options button.active-color {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgb(31 111 86 / 16%);
 }
@@ -736,61 +741,10 @@ Control Pane
 }
 
 /* ##############################
-Tab Rail
-############################## */
-
-.controls-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 2px;
-  margin-bottom: 14px;
-  padding: 0;
-  border-bottom: 1px solid rgb(217 208 191 / 82%);
-  background: transparent;
-}
-
-.controls-tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: 44px;
-  border: 1px solid transparent;
-  padding: 0 12px;
-  background: transparent;
-  color: var(--ink);
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  cursor: pointer;
-}
-
-.controls-tab.is-active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: white;
-}
-
-.controls-tab:focus {
-  outline: 0;
-}
-
-.controls-tab:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--focus-ring);
-}
-
-.tab-panel {
-  min-width: 0;
-}
-
-/* ##############################
 Panel Grids
 ############################## */
 
-.design-controls,
-.setup-controls,
-.advanced-controls {
+.controls-sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
@@ -805,26 +759,23 @@ Panel Grids
   grid-column: 2;
 }
 
-.parts-list-section {
+.print-volume-section,
+.laser-output-section {
+  grid-column: 2;
+}
+
+.joint-tuning-section {
   grid-column: 1 / -1;
 }
 
-.setup-controls {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.advanced-controls {
-  grid-template-columns: minmax(0, 1fr);
+.parts-list-section {
+  grid-column: 1 / -1;
 }
 
 .advanced-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 12px;
-}
-
-.tab-panel[hidden] {
-  display: none;
 }
 
 .control-section {
@@ -934,95 +885,9 @@ Unit Inputs
 }
 
 /* ##############################
-Selector Details
-############################## */
-
-.field-with-info {
-  display: grid;
-  gap: 2px;
-  margin: 9px 0 12px;
-}
-
-.field-with-info > .field {
-  margin: 0;
-}
-
-.selector-info {
-  display: grid;
-  justify-items: start;
-}
-
-.selector-info summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 20px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.selector-info summary::-webkit-details-marker {
-  display: none;
-}
-
-.selector-info summary::marker {
-  content: "";
-}
-
-.selector-info summary::after {
-  content: "";
-  width: 0.42em;
-  height: 0.42em;
-  margin-top: -0.14em;
-  border-right: 1.8px solid currentColor;
-  border-bottom: 1.8px solid currentColor;
-  transform: rotate(45deg);
-  transition: transform 160ms ease;
-}
-
-.selector-info summary:hover,
-.selector-info[open] summary {
-  color: var(--ink);
-}
-
-.selector-info[open] summary::after {
-  transform: translateY(0.14em) rotate(225deg);
-}
-
-.selector-info summary:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
-}
-
-.selector-info summary span {
-  color: currentColor;
-}
-
-.selector-info-panel {
-  display: none;
-  width: 100%;
-  margin-top: 4px;
-}
-
-.selector-info[open] .selector-info-panel {
-  display: block;
-}
-
-/* ##############################
 Preset Cards
 ############################## */
 
-.filter-preset-card,
-.fan-preset-card,
 .print-design-card {
   display: grid;
   gap: 4px;
@@ -1036,88 +901,20 @@ Preset Cards
   line-height: 1.28;
 }
 
-.selector-info-panel .filter-preset-card,
-.selector-info-panel .fan-preset-card,
-.selector-info-panel .print-design-card {
-  margin: 0;
-}
-
-.filter-preset-card strong,
-.fan-preset-card strong,
 .print-design-card strong {
   color: var(--ink);
   font-size: 0.86rem;
 }
 
-.filter-preset-card span,
-.fan-preset-card span,
 .print-design-card span {
   overflow-wrap: anywhere;
 }
 
-.filter-preset-card dl,
-.fan-preset-card dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 5px 0 0;
-}
-
-.filter-preset-card dt,
-.filter-preset-card dd,
-.fan-preset-card dt,
-.fan-preset-card dd {
-  margin: 0;
-}
-
-.filter-preset-card dt,
-.fan-preset-card dt {
-  color: rgb(102 113 105 / 82%);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-}
-
-.filter-preset-card dd,
-.fan-preset-card dd {
-  overflow-wrap: anywhere;
-  color: var(--ink);
-  font-size: 0.76rem;
-}
-
-.fan-card-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-}
-
-.fan-color-swatches {
-  display: flex;
-  gap: 4px;
-  padding-top: 2px;
-}
-
-.fan-color-swatches span {
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgb(23 32 28 / 18%);
-  background: var(--swatch-color);
-}
-
-.filter-preset-card small,
-.filter-preset-card a,
-.fan-preset-card small,
-.fan-preset-card a,
 .print-design-card small,
 .print-design-card a {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
-}
-
-.fan-preset-card .parts-note {
-  margin-top: 4px;
-  line-height: 1.28;
 }
 
 /* ##############################
@@ -1276,15 +1073,11 @@ Section Notes and Guides
   outline-offset: 2px;
 }
 
-.filter-preset-card a,
-.fan-preset-card a,
 .print-design-card a {
   color: var(--accent-strong);
   text-decoration: none;
 }
 
-.filter-preset-card a:hover,
-.fan-preset-card a:hover,
 .print-design-card a:hover {
   text-decoration: underline;
 }
@@ -1514,13 +1307,22 @@ Layout Grids
 
 .fan-selection {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   margin: 9px 0 12px;
 }
 
 .fan-selection .segmented-field,
-.fan-selection .field-with-info {
+.fan-selection .field {
   margin: 0;
+}
+
+/* Same small round color swatches as the preview material color picker (the
+button rules are comma-joined there), without the preview toolbar's pill
+chrome. */
+.fan-color-options {
+  display: inline-flex;
+  gap: 4px;
+  justify-self: start;
 }
 
 .fan-grid > [data-nukit-fan-placement] {
@@ -1721,10 +1523,6 @@ Desktop Fixed View
     padding: 12px;
   }
 
-  .controls-tabs {
-    margin-bottom: 12px;
-  }
-
   .section-heading {
     margin-bottom: 10px;
   }
@@ -1744,37 +1542,12 @@ Desktop Fixed View
     min-height: 38px;
   }
 
-  .filter-preset-card,
-  .fan-preset-card,
   .print-design-card {
     gap: 3px;
     margin: -2px 0 9px;
     padding: 8px 10px;
     font-size: 0.78rem;
     line-height: 1.28;
-  }
-
-  .fan-preset-card .fan-card-header {
-    align-items: center;
-  }
-
-  .fan-preset-card .fan-card-header span {
-    display: block;
-    max-width: 28rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .filter-preset-card dl,
-  .fan-preset-card dl {
-    gap: 6px;
-    margin-top: 3px;
-  }
-
-  .fan-preset-card .parts-note {
-    margin-top: 2px;
-    line-height: 1.22;
   }
 
   .workspace {
@@ -1861,13 +1634,9 @@ Tablet Control Grids
 ############################## */
 
 @media (max-width: 1240px) {
-  .design-controls,
+  .controls-sections,
   .advanced-field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .setup-controls {
-    grid-template-columns: 1fr;
   }
 
   .mobile-action-bar {
@@ -1895,15 +1664,16 @@ Narrow Control Stack
 ############################## */
 
 @media (max-width: 860px) {
-  .design-controls,
-  .setup-controls,
-  .advanced-controls,
+  .controls-sections,
   .advanced-field-grid {
     grid-template-columns: 1fr;
   }
 
   .parts-section,
   .geometry-section,
+  .print-volume-section,
+  .laser-output-section,
+  .joint-tuning-section,
   .parts-list-section {
     grid-column: auto;
     grid-row: auto;

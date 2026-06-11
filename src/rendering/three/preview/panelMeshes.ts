@@ -14,7 +14,7 @@ import {
   ShapeGeometry,
   Vector3,
 } from "three";
-import type { FanAppearance } from "@/domain/purifier/fanProducts";
+import type { FanAppearance } from "@/domain/purifier/fans";
 import type { AssemblyPanelPart } from "@/fabrication/assemblyModel";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 import type { PrintableMesh, PrintableSheetPlan, PrintableTileSource } from "@/fabrication/printing/printableKit";
@@ -157,6 +157,7 @@ export function createPanelGroup(
               fanCenterZ,
             ),
             radius: cut.radius * sceneScale,
+            facing: "axis-positive",
             appearance: fanAppearance,
           }),
         );

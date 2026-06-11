@@ -1,5 +1,4 @@
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 
 export type BuildDiagnosticSeverity = "info" | "warning";
 
@@ -10,8 +9,8 @@ export type BuildDiagnostic = {
   detail: string;
 };
 
-const normalCustomFilterMinimum = 180;
-const normalCustomFilterMaximum = 760;
+const normalFilterMinimum = 180;
+const normalFilterMaximum = 760;
 const normalFilterThicknessMinimum = 12;
 const normalFilterThicknessMaximum = 80;
 const smallFanMargin = 12;
@@ -56,7 +55,7 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
 
   if (
     layout.configuration.frameConstruction.type === "full-panels" &&
-    filterSelectionDimensions(layout.configuration.filter).width > 530
+    layout.configuration.filter.width > 530
   ) {
     diagnostics.push({
       id: "large-unsplit-frame",
@@ -78,12 +77,12 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (layout.configuration.filter.type === "custom" && customFilterLooksUnusual(layout)) {
+  if (filterLooksUnusual(layout.configuration.filter)) {
     diagnostics.push({
-      id: "custom-filter-range",
+      id: "filter-dimension-range",
       severity: "warning",
-      title: "Unusual custom filter",
-      detail: "Custom dimensions are outside the normal range used by common HVAC and purifier filters.",
+      title: "Unusual filter dimensions",
+      detail: "Measured dimensions are outside the normal range used by common HVAC and purifier filters.",
     });
   }
 
@@ -105,7 +104,7 @@ export function summarizeBuildReadiness(layout: LayoutResult): BuildDiagnostic {
     id: "ready",
     severity: "info",
     title: "Ready to export",
-    detail: "No fan, sheet, frame, or custom-dimension issues were detected.",
+    detail: "No fan, sheet, frame, or dimension issues were detected.",
   };
 }
 
@@ -115,7 +114,7 @@ function tightFanMarginLabels(layout: LayoutResult): string[] {
   }
 
   const fanDiameter = layout.configuration.fan.spec.diameter;
-  const filterWidth = filterSelectionDimensions(layout.configuration.filter).width;
+  const filterWidth = layout.configuration.filter.width;
   const { resolvedFans } = layout.summary.fans;
   return [
     fanMarginLabel("Left", resolvedFans.left, layout.summary.workingDepth, fanDiameter),
@@ -134,13 +133,13 @@ function fanMarginLabel(label: string, fans: number, span: number, fanDiameter: 
   return margin < smallFanMargin ? label : null;
 }
 
-function customFilterLooksUnusual(layout: LayoutResult): boolean {
-  const { width, depth, thickness } = filterSelectionDimensions(layout.configuration.filter);
+function filterLooksUnusual(filter: LayoutResult["configuration"]["filter"]): boolean {
+  const { width, depth, thickness } = filter;
   return (
-    width < normalCustomFilterMinimum ||
-    width > normalCustomFilterMaximum ||
-    depth < normalCustomFilterMinimum ||
-    depth > normalCustomFilterMaximum ||
+    width < normalFilterMinimum ||
+    width > normalFilterMaximum ||
+    depth < normalFilterMinimum ||
+    depth > normalFilterMaximum ||
     thickness < normalFilterThicknessMinimum ||
     thickness > normalFilterThicknessMaximum
   );

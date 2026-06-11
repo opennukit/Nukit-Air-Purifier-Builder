@@ -2,24 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { normalizeSettings } from "@/domain/purifier/airPurifier";
 import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import {
-  applyFanProductPreset,
-  applyFilterPreset,
-  applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
+import { defaultRectangularFilterDimensions } from "@/domain/purifier/filter";
 import {
-  donutFilterPresets,
+  defaultFilterDimensionsByTempestArrangement,
   isStaticReferencePrintDesignId,
   printDesignPresets,
   publicPrintDesignPresets,
   publicThreeDimensionalPrintDesignPresets,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { customFanProductPresetId } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, findFanSpec, nearestFanDiameter } from "@/domain/purifier/fans";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
-import { customFilterPresetId, filterPresets, filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
 import {
@@ -73,87 +70,111 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(encodeSettings(decoded)).not.toContain("transparentWalls");
   });
 
-  test("uses purchasable filter presets while preserving custom measured dimensions", () => {
-    const luggablePreset = requiredFilterPreset("merv13-20x25x1");
-    const luggableSettings = createLayout(applyFilterPreset(defaultSettings, luggablePreset.id)).rawSettings;
+  test("uses the same default filter dimensions with and without an explicit default design", () => {
+    const bareDefaults = decodeSettings("");
+    const explicitDesignDefaults = decodeSettings("printDesign=nukit-open-air");
 
-    expect(luggableSettings.filterPreset).toBe("merv13-20x25x1");
-    expect(luggableSettings.filterWidth).toBeCloseTo(luggablePreset.dimensions.width);
-    expect(luggableSettings.filterDepth).toBeCloseTo(luggablePreset.dimensions.depth);
-    expect(luggableSettings.filterThickness).toBeCloseTo(luggablePreset.dimensions.thickness);
+    expect(bareDefaults.filterWidth).toBe(defaultRectangularFilterDimensions.width);
+    expect(bareDefaults.filterDepth).toBe(defaultRectangularFilterDimensions.depth);
+    expect(bareDefaults.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
+    expect(explicitDesignDefaults.filterWidth).toBe(bareDefaults.filterWidth);
+    expect(explicitDesignDefaults.filterDepth).toBe(bareDefaults.filterDepth);
+    expect(explicitDesignDefaults.filterThickness).toBe(bareDefaults.filterThickness);
+  });
 
+  test("falls back unmentioned filter measurements to the active design's defaults", () => {
+    const partialMeasurement = decodeSettings("printDesign=nukit-open-air&x=500&y=400");
+
+    expect(partialMeasurement.filterWidth).toBe(500);
+    expect(partialMeasurement.filterDepth).toBe(400);
+    expect(partialMeasurement.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
+  });
+
+  test("preserves custom measured filter dimensions through the URL codec", () => {
     const customSettings = decodeSettings("filterWidth=300&filterDepth=240&filterThickness=22");
-    expect(customSettings.filterPreset).toBe(customFilterPresetId);
     expect(customSettings.filterWidth).toBe(300);
     expect(customSettings.filterDepth).toBe(240);
     expect(customSettings.filterThickness).toBe(22);
 
-    const encodedCustom = encodeSettings(customSettings);
-    expect(decodeSettings(encodedCustom).filterPreset).toBe(customFilterPresetId);
+    const decodedAgain = decodeSettings(encodeSettings(customSettings));
+    expect(decodedAgain.filterWidth).toBe(300);
+    expect(decodedAgain.filterDepth).toBe(240);
+    expect(decodedAgain.filterThickness).toBe(22);
   });
 
-  test("includes the Air Fanta compatible replacement filter as an exact rectangular preset", () => {
-    const preset = requiredFilterPreset("air-fanta-compatible");
-    const settings = createLayout(applyFilterPreset(defaultSettings, preset.id)).rawSettings;
+  test("defaults the four-side tower to the Air Fanta compatible filter size", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(
       decodeSettings(
-        "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterPreset=custom&filterWidth=290&filterDepth=290&filterThickness=25",
+        "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterWidth=290&filterDepth=290&filterThickness=25",
       ),
     );
 
-    expect(preset.label).toBe("Air Fanta compatible");
-    expect(preset.nominalSize).toBe("29 x 29 x 2.5 cm");
-    expect(settings.filterPreset).toBe("air-fanta-compatible");
-    expect(settings.filterWidth).toBe(290);
-    expect(settings.filterDepth).toBe(290);
-    expect(settings.filterThickness).toBe(25);
-    expect(customTower.rawSettings.filterThickness).toBe(25);
+    expect(defaultFilterDimensionsByTempestArrangement["four-side-filter-tower"]).toEqual({
+      width: 290,
+      depth: 290,
+      thickness: 25,
+    });
+    expect(presetTower.rawSettings.filterWidth).toBe(290);
+    expect(presetTower.rawSettings.filterDepth).toBe(290);
+    expect(presetTower.rawSettings.filterThickness).toBe(25);
     expect(createTempestModel(createTempestSettingsFromLayout(customTower)).box).toEqual(
       createTempestModel(createTempestSettingsFromLayout(presetTower)).box,
     );
   });
 
-  test("uses fan product presets for product help, cut hole size, and encoded URLs", () => {
-    const mobiusSettings = applyFanProductPreset(defaultSettings, "cleanairkits-mobius-120p");
-    const layout = createLayout(mobiusSettings);
+  test("uses fan size and color for cut hole size, preview appearance, and encoded URLs", () => {
+    const layout = createLayout({ ...defaultSettings, fanDiameter: 120, fanColor: "black" });
     const fanPanel = requiredFanPanel(layout);
     const fanCut = requiredCircleCut(fanPanel, "fan");
     const encoded = encodeSettings(layout.rawSettings);
     const decoded = decodeSettings(encoded);
 
-    expect(layout.rawSettings.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(layout.rawSettings.fanColor).toBe("black");
     expect(layout.rawSettings.fanDiameter).toBe(120);
-    expect(layout.configuration.fan.productSelection.type).toBe("preset");
-    expect(layout.configuration.fan.productSelection.product.appearance.accentColor).toBe(0x50b8ff);
+    expect(layout.configuration.fan.color).toBe("black");
+    expect(fanAppearanceForColor(layout.configuration.fan.color).accentColor).toBe(0x253a38);
     expect(fanCut.radius).toBeCloseTo((120 - 4) / 2 - defaultSettings.kerfFit);
-    expect(decoded.fanPreset).toBe("cleanairkits-mobius-120p");
+    expect(decoded.fanColor).toBe("black");
     expect(decoded.fanDiameter).toBe(120);
   });
 
-  test("preserves legacy custom fan diameters and lets fan presets own their diameter", () => {
-    const legacyCustom = decodeSettings("fanDiameter=120");
-    const legacyCustom92 = decodeSettings("fanDiameter=92");
-    const noctuaUrl = decodeSettings("fanPreset=noctua-nf-a14&fanDiameter=120");
-    const noctuaLayout = createLayout(noctuaUrl);
-    const noctuaPrintExport = createPrintableThreeMfExport(noctuaLayout, "bed-256");
-    const noctuaPrintContent = new TextDecoder("latin1").decode(noctuaPrintExport.bytes);
+  test("snaps non-catalog fan diameters to the nearest supported size", () => {
+    expect(decodeSettings("fanDiameter=100").fanDiameter).toBe(92);
+    expect(decodeSettings("fanDiameter=135").fanDiameter).toBe(140);
+    expect(decodeSettings("fanDiameter=").fanDiameter).toBe(defaultSettings.fanDiameter);
+    expect(decodeSettings("fanDiameter=abc").fanDiameter).toBe(defaultSettings.fanDiameter);
+    // Ties round down to the smaller fan.
+    expect(nearestFanDiameter(70)).toBe(60);
+    expect(nearestFanDiameter(106)).toBe(92);
+    // The structured settings used for cut holes and previews snap the same way.
+    expect(findFanSpec(100).diameter).toBe(92);
+  });
 
-    expect(legacyCustom.fanPreset).toBe(customFanProductPresetId);
-    expect(legacyCustom.fanDiameter).toBe(120);
-    expect(legacyCustom92.fanPreset).toBe(customFanProductPresetId);
-    expect(legacyCustom92.fanDiameter).toBe(92);
-    expect(noctuaUrl.fanPreset).toBe("noctua-nf-a14");
-    expect(noctuaUrl.fanDiameter).toBe(140);
-    expect(noctuaLayout.configuration.fan.productSelection.type).toBe("preset");
-    expect(noctuaLayout.configuration.fan.productSelection.product.appearance.previewCadModel).toEqual({
+  test("keeps the beige CAD preview appearance for any fan diameter and out of print exports", () => {
+    const custom120 = decodeSettings("fanDiameter=120");
+    const custom92 = decodeSettings("fanDiameter=92");
+    const beigeUrl = decodeSettings("fanColor=beige&fanDiameter=120");
+    const unknownColor = decodeSettings("fanColor=chartreuse");
+    const beigeLayout = createLayout(beigeUrl);
+    const beigePrintExport = createPrintableThreeMfExport(beigeLayout, "bed-256");
+    const beigePrintContent = new TextDecoder("latin1").decode(beigePrintExport.bytes);
+
+    expect(custom120.fanColor).toBe("black");
+    expect(custom120.fanDiameter).toBe(120);
+    expect(custom92.fanDiameter).toBe(92);
+    expect(beigeUrl.fanColor).toBe("beige");
+    expect(beigeUrl.fanDiameter).toBe(120);
+    expect(unknownColor.fanColor).toBe(defaultSettings.fanColor);
+    expect(beigeLayout.configuration.fan.spec.diameter).toBe(120);
+    expect(fanAppearanceForColor(beigeLayout.configuration.fan.color).previewCadModel).toEqual({
       type: "noctua-nf-a14-public-cad",
       sourceUrl: "https://www.noctua.at/en/3d-cad-models",
       assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
       usage: "preview-only",
     });
-    expect(noctuaPrintContent).not.toContain("A14_Frame_Public");
-    expect(noctuaPrintContent).not.toContain("Noctua NF-A14 Public CAD");
+    expect(beigePrintContent).not.toContain("A14_Frame_Public");
+    expect(beigePrintContent).not.toContain("Noctua NF-A14 Public CAD");
   });
 
   test("keeps URL boundary parsing valid for booleans, fan counts, and constrained rims", () => {
@@ -169,10 +190,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const invalidPreviewColor = decodeSettings("previewMaterialColor=neon");
     const removedPrintPlateLabels = decodeSettings("showPrintPlateLabels=1");
     const highFanCount = decodeSettings("fansLeft=8");
-    const emptyNumericParams = decodeSettings("filterPreset=custom&filterWidth=&filterDepth=%20&filterThickness=&rim=%20");
+    const emptyNumericParams = decodeSettings("filterWidth=&filterDepth=%20&filterThickness=&rim=%20");
     const smallCustomLayout = createLayout({
       ...defaultSettings,
-      filterPreset: customFilterPresetId,
       filterWidth: 120,
       filterDepth: 120,
       materialThickness: 9,
@@ -229,11 +249,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
     const encoded = encodeSettings(decoded);
 
-    expect(decoded.filterPreset).toBe(customFilterPresetId);
     expect(decoded.filterWidth).toBe(300);
     expect(decoded.filterDepth).toBe(240);
     expect(decoded.filterThickness).toBe(22);
-    expect(decoded.fanPreset).toBe(customFanProductPresetId);
+    expect(decoded.fanColor).toBe(defaultSettings.fanColor);
     expect(decoded.fanDiameter).toBe(120);
     expect(decoded.filters).toBe(1);
     expect(decoded.splitFrames).toBe(false);
@@ -289,19 +308,15 @@ describe("FilterBoxBuilder purifier workflow", () => {
     );
   });
 
-  test("keeps preset dimensions derived from the preset id", () => {
+  test("carries measured filter dimensions straight into the structured settings", () => {
     const normalized = normalizeSettings(defaultSettings);
     const normalizedAgain = normalizeSettings(normalized);
-    const dimensions = filterSelectionDimensions(normalized.filter);
 
-    expect(normalized.filter).toEqual({ type: "preset", presetId: "merv13-20x25x1" });
-    expect(dimensions).toEqual({
+    expect(normalized.filter).toEqual({
       width: defaultSettings.filterWidth,
       depth: defaultSettings.filterDepth,
       thickness: defaultSettings.filterThickness,
     });
-    Object.assign(dimensions, { width: 1 });
-    expect(filterSelectionDimensions(normalized.filter).width).toBe(defaultSettings.filterWidth);
     expect(normalizedAgain).toEqual(normalized);
   });
 
@@ -435,12 +450,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     const customLayout = createLayout({
       ...defaultSettings,
-      filterPreset: customFilterPresetId,
       filterWidth: 130,
       filterDepth: 130,
       filterThickness: 10,
     });
-    expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("custom-filter-range");
+    expect(evaluateBuildDiagnostics(customLayout).map((diagnostic) => diagnostic.id)).toContain("filter-dimension-range");
   });
 
   test("keeps generated print designs out of wall-bank fan diagnostics", () => {
@@ -498,6 +512,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
       expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
       expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
       expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
+      // The default 140 mm fan walls cannot be split through a fan opening on
+      // the smallest bed, so bed-180 keeps oversized parts.
       if (presetId === "bed-180") {
         expect(kit.summary.oversizedPartCount).toBeGreaterThan(0);
       } else {
@@ -560,9 +576,14 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(staticCr14x20Preset?.implementation.type).toBe("static-reference");
     expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.fanCount : undefined).toBe(4);
     expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterCount : undefined).toBe(2);
-    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterPreset : undefined).toBe(
-      "merv13-14x20x1",
-    );
+    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filter : undefined).toEqual({
+      width: 495.3,
+      depth: 342.9,
+      thickness: 19.1,
+    });
+    expect(
+      staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterNominalSize : undefined,
+    ).toBe("14 x 20 x 1 in");
     expect(staticCr14x20Reference?.printEstimate?.estimatedFilamentKilograms).toBe(1);
     expect(staticCr14x20Reference?.printEstimate?.assumptions.infillPercent).toBe(15);
     const externalStaticReferencePreset = printDesignPresets.find((preset) => preset.id === "static-modular-20x20-reference");
@@ -584,21 +605,21 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const towerModel = createTempestModel(createTempestSettingsFromLayout(towerLayout));
     const printExport = createPrintDesignThreeMfExport(horizontalLayout, "bed-256");
 
-    expect(horizontalSettings.filterPreset).toBe("merv13-20x20x2");
+    expect(horizontalSettings.filterWidth).toBe(defaultFilterDimensionsByTempestArrangement["dual-horizontal-sandwich"].width);
+    expect(horizontalSettings.filterThickness).toBe(defaultFilterDimensionsByTempestArrangement["dual-horizontal-sandwich"].thickness);
     expect(horizontalSettings.tempestArrangement).toBe("dual-horizontal-sandwich");
-    expect(towerSettings.filterPreset).toBe("air-fanta-compatible");
     expect(towerSettings.filterWidth).toBe(290);
     expect(towerSettings.filterDepth).toBe(290);
     expect(towerSettings.filterThickness).toBe(25);
-    expect(horizontalSettings.fanPreset).toBe("nukit-arctic-p14");
+    expect(horizontalSettings.fanDiameter).toBe(140);
     expect(horizontalSettings.materialThickness).toBe(5);
     expect(horizontalLayout.configuration.design.type).toBe("tempest");
     expect(horizontalLayout.summary.fans.type).toBe("tempest");
     expect(horizontalLayout.summary.fans.type === "tempest" ? horizontalLayout.summary.fans.arrangement : undefined).toBe(
       "dual-horizontal-sandwich",
     );
-    // Feature-aware slicing splits the fan-dense axis into 3, so 2×2×3 = 12.
-    expect(horizontalKit.parts).toHaveLength(12);
+    // Feature-aware slicing splits the default 20x25x1 box into 8 chunks.
+    expect(horizontalKit.parts).toHaveLength(8);
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
@@ -616,8 +637,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const layout = createLayout(settings);
 
     expect(settings.printDesign).toBe("static-cr-16x20-140");
-    expect(settings.filterPreset).toBe("merv13-16x20x1");
-    expect(settings.fanPreset).toBe("nukit-arctic-p14");
+    expect(settings.filterWidth).toBe(495.3);
+    expect(settings.filterDepth).toBe(393.7);
+    expect(settings.filterThickness).toBe(19.1);
+    expect(settings.fanDiameter).toBe(140);
     expect(settings.fansTop).toBe(5);
     expect(settings.splitFrames).toBe(false);
     expect(decoded.printDesign).toBe("static-cr-16x20-140");
@@ -643,9 +666,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const content = new TextDecoder("latin1").decode(printExport.bytes);
 
     expect(settings.printDesign).toBe("donut-hepa-adapter");
-    expect(settings.fanPreset).toBe("arctic-p12-pwm-pst");
     expect(settings.fanDiameter).toBe(120);
-    expect(settings.donutFilterPreset).toBe("silentnight-92-reference");
     expect(settings.donutFilterHoleDiameter).toBe(92);
     expect(settings.donutCapEnabled).toBe(true);
     expect(layout.configuration.design.type).toBe("donut-filter-adapter");
@@ -684,53 +705,42 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const cappedRim = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=70&donutFilterHoleDiameter=62&donutCapRim=40",
     );
-    const presetWithMeasuredLength = decodeSettings(
+    // donutFilterPreset is not a URL param anymore; an unknown value is inert
+    // and the measured dimensions decide everything.
+    const removedPresetParam = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini&donutFilterLength=180",
     );
-    const preset = decodeSettings("printDesign=donut-hepa-adapter&donutFilterPreset=levoit-core-mini");
     const encoded = encodeSettings(measured);
 
     expect(defaults.printDesign).toBe("donut-hepa-adapter");
-    expect(defaults.donutFilterPreset).toBe("silentnight-92-reference");
     expect(defaults.donutFilterOuterDiameter).toBe(125);
     expect(defaults.donutFilterLength).toBe(150);
     expect(defaults.donutFilterHoleDiameter).toBe(92);
-    expect(defaults.fanPreset).toBe("arctic-p12-pwm-pst");
-    expect(preset.donutFilterPreset).toBe("levoit-core-mini");
-    expect(preset.donutFilterOuterDiameter).toBe(159);
-    expect(preset.donutFilterLength).toBe(135);
+    expect(defaults.fanDiameter).toBe(120);
     expect(measured.donutFilterHoleDiameter).toBe(86);
     expect(measured.donutFilterLength).toBe(180);
     expect(measured.donutCapEnabled).toBe(false);
     expect(disabledCapWithRim.donutCapRim).toBe(12);
     expect(cappedRim.donutCapRim).toBe(4);
-    expect(presetWithMeasuredLength.donutFilterPreset).toBe("custom");
-    expect(presetWithMeasuredLength.donutFilterOuterDiameter).toBe(159);
-    expect(presetWithMeasuredLength.donutFilterLength).toBe(180);
-    expect(presetWithMeasuredLength.donutFilterHoleDiameter).toBe(92);
+    expect(removedPresetParam.donutFilterOuterDiameter).toBe(125);
+    expect(removedPresetParam.donutFilterLength).toBe(180);
+    expect(removedPresetParam.donutFilterHoleDiameter).toBe(92);
     expect(
       measuredLayout.configuration.design.type === "donut-filter-adapter"
         ? measuredLayout.configuration.design.filter.cap
         : undefined,
     ).toEqual({ type: "none" });
     expect(donutCapTotalHeight(createDonutFilterModel(measuredLayout))).toBe(0);
-    expect(measured.donutFilterPreset).toBe("custom");
     expect(encoded).toContain("donutFilterHoleDiameter=86");
-    expect(encoded).toContain("donutFilterPreset=custom");
+    expect(encoded).not.toContain("donutFilterPreset");
     expect(encoded).toContain("donutCapEnabled=false");
   });
 
-  test("uses explicit round-filter presets and does not clamp large measured cartridges to 320 mm", () => {
-    const levoitCore300 = applyDonutFilterPreset(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"), "levoit-core-300");
+  test("does not clamp large measured round cartridges", () => {
     const measuredLarge = decodeSettings(
       "printDesign=donut-hepa-adapter&donutFilterOuterDiameter=360&donutFilterLength=440&donutFilterHoleDiameter=128",
     );
 
-    expect(donutFilterPresets.map((preset) => preset.id)).toContain("levoit-core-300");
-    expect(levoitCore300.donutFilterOuterDiameter).toBe(193);
-    expect(levoitCore300.donutFilterLength).toBe(147);
-    expect(levoitCore300.donutFilterHoleDiameter).toBe(120);
-    expect(measuredLarge.donutFilterPreset).toBe("custom");
     expect(measuredLarge.donutFilterOuterDiameter).toBe(360);
     expect(measuredLarge.donutFilterLength).toBe(440);
     expect(measuredLarge.donutFilterHoleDiameter).toBe(128);
@@ -889,14 +899,6 @@ describe("FilterBoxBuilder purifier workflow", () => {
 // #######################################
 // Domain Assertion Helpers
 // #######################################
-
-function requiredFilterPreset(id: string) {
-  const preset = filterPresets.find((entry) => entry.id === id);
-  if (preset === undefined) {
-    throw new Error(`requiredFilterPreset: Missing ${id}`);
-  }
-  return preset;
-}
 
 function minimalThreeMfObject(name: string): MeshObject {
   return {

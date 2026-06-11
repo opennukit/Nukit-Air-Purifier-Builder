@@ -12,8 +12,8 @@ import type { FilterCount } from "@/domain/purifier/designPresets";
 // the EXACT fallback it had before, so a parsed value carries its proof.
 //
 // Numbers, integers, booleans, and the 1-or-2 filter count are owned here. The
-// preset/enum fields whose fallback depends on OTHER params (filterPreset,
-// fanPreset, donutFilterPreset, ...) stay in decodeSettings: their resolution
+// preset/enum fields whose fallback depends on OTHER params (printDesign,
+// fanColor, tempestArrangement, ...) stay in decodeSettings: their resolution
 // is cross-field domain reconciliation, not per-field validation, so making a
 // per-field schema depend on the whole preset vocabulary would invert Parnas'
 // subset criteria (the general depending on the specific).

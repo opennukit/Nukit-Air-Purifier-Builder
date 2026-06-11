@@ -1,17 +1,13 @@
 // Purifier settings model: the raw, structured, and draft settings types,
 // camera and preview-material vocabulary, the default settings, and the
 // preset-application functions that rewrite raw settings when the user picks
-// a filter, fan, donut filter, tempest arrangement, or print design preset.
+// a tempest arrangement or print design preset.
 
 
 import {
-  customDonutFilterPresetId,
-  defaultDonutFilterPresetId,
-  defaultFanPresetForPrintDesign,
-  defaultFilterPresetByTempestArrangement,
-  defaultFilterPresetForPrintDesign,
+  defaultFanDiameterForPrintDesign,
+  defaultFilterDimensionsByTempestArrangement,
   defaultPrintDesignId,
-  findDonutFilterPreset,
   findPrintDesignPreset,
   isDonutFilterAdapterPrintDesignPreset,
   isLaserDerivedPrintDesignPreset,
@@ -20,7 +16,6 @@ import {
   tempestArrangementPresets,
   type DonutCap,
   type DonutFilterAdapterPrintDesignPreset,
-  type DonutFilterPresetId,
   type DonutFilterSettings,
   type FilterCount,
   type LaserDerivedPrintDesignPreset,
@@ -32,23 +27,19 @@ import {
 } from "@/domain/purifier/designPresets";
 import {
   automaticFanCount,
-  customFanProductPresetId,
-  defaultFanProductPresetId,
-  findFanProductPreset,
+  defaultFanColor,
   fixedFanCountOptions,
   type FanBanks,
+  type FanColor,
   type FanConfiguration,
   type FanCountRequest,
   type FanDiameter,
-  type FanProductPresetId,
   type FixedFanCount,
   type SingleFanConfiguration,
-} from "@/domain/purifier/fanProducts";
+} from "@/domain/purifier/fans";
 import {
-  customFilterPresetId,
-  findFilterPreset,
-  type FilterPresetId,
-  type FilterSelection,
+  defaultRectangularFilterDimensions,
+  type FilterDimensions,
 } from "@/domain/purifier/filter";
 import {
   defaultCutJointSettings,
@@ -170,12 +161,11 @@ export type CutSheetPreviewOptions = {
 
 export type RawPurifierSettings = {
   printDesign: PrintDesignId;
-  filterPreset: FilterPresetId;
   filterWidth: Millimeters;
   filterDepth: Millimeters;
   filterThickness: Millimeters;
   rim: Millimeters;
-  fanPreset: FanProductPresetId;
+  fanColor: FanColor;
   fanDiameter: FanDiameter;
   filters: FilterCount;
   splitFrames: boolean;
@@ -184,7 +174,6 @@ export type RawPurifierSettings = {
   fansTop: number;
   fansBottom: number;
   tempestArrangement: TempestArrangementPreset;
-  donutFilterPreset: DonutFilterPresetId;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -218,8 +207,8 @@ export type RawPurifierSettings = {
 };
 
 export type PurifierFanDraft = {
-  readonly presetId: FanProductPresetId;
   readonly diameter: FanDiameter;
+  readonly color: FanColor;
 };
 
 export type PurifierCuttingDraft = {
@@ -234,7 +223,7 @@ export type LaserDerivedPrintDesignDraft = {
   readonly type: "laser-derived-printable-kit";
   readonly printDesign: LaserDerivedPrintDesignPreset["id"];
   readonly preset: LaserDerivedPrintDesignPreset;
-  readonly filter: FilterSelection;
+  readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
   readonly frameConstruction: FilterFrameConstruction;
@@ -244,7 +233,6 @@ export type DonutFilterAdapterPrintDesignDraft = {
   readonly type: "donut-filter-adapter";
   readonly printDesign: DonutFilterAdapterPrintDesignPreset["id"];
   readonly preset: DonutFilterAdapterPrintDesignPreset;
-  readonly donutFilterPreset: DonutFilterPresetId;
   readonly filter: DonutFilterSettings;
   readonly fanCount: FixedFanCount;
 };
@@ -254,7 +242,7 @@ export type TempestPrintDesignDraft = {
   readonly printDesign: TempestPrintDesignPreset["id"];
   readonly preset: TempestPrintDesignPreset;
   readonly arrangement: TempestArrangementPreset;
-  readonly filter: FilterSelection;
+  readonly filter: FilterDimensions;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -263,7 +251,7 @@ export type StaticReferencePrintDesignDraft = {
   readonly preset: StaticReferencePrintDesignPreset;
   readonly reference: StaticPrintReference;
   readonly capabilities: StaticPrintReferenceCapabilities;
-  readonly filter: FilterSelection;
+  readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fanCount: number;
 };
@@ -285,7 +273,7 @@ export type ConfiguredPrintDesign =
   | {
       readonly type: "laser-derived-printable-kit";
       readonly preset: LaserDerivedPrintDesignPreset;
-      readonly filter: FilterSelection;
+      readonly filter: FilterDimensions;
       readonly filterCount: FilterCount;
       readonly fanBanks: FanBanks<FanCountRequest>;
       readonly frameConstruction: FilterFrameConstruction;
@@ -293,7 +281,6 @@ export type ConfiguredPrintDesign =
   | {
       readonly type: "donut-filter-adapter";
       readonly preset: DonutFilterAdapterPrintDesignPreset;
-      readonly donutFilterPreset: DonutFilterPresetId;
       readonly filter: DonutFilterSettings;
       readonly fan: SingleFanConfiguration;
     }
@@ -301,14 +288,14 @@ export type ConfiguredPrintDesign =
       readonly type: "tempest";
       readonly preset: TempestPrintDesignPreset;
       readonly arrangement: TempestArrangementPreset;
-      readonly filter: FilterSelection;
+      readonly filter: FilterDimensions;
     }
   | {
       readonly type: "static-reference";
       readonly preset: StaticReferencePrintDesignPreset;
       readonly reference: StaticPrintReference;
       readonly capabilities: StaticPrintReferenceCapabilities;
-      readonly filter: FilterSelection;
+      readonly filter: FilterDimensions;
       readonly filterCount: FilterCount;
       readonly fanCount: number;
     };
@@ -316,7 +303,7 @@ export type ConfiguredPrintDesign =
 export type PurifierSettings = {
   printDesign: PrintDesignPreset;
   design: ConfiguredPrintDesign;
-  filter: FilterSelection;
+  filter: FilterDimensions;
   filterCount: FilterCount;
   fan: FanConfiguration;
   frameConstruction: FilterFrameConstruction;
@@ -359,12 +346,11 @@ export type PurifierInput =
 
 export const defaultSettings: RawPurifierSettings = {
   printDesign: defaultPrintDesignId,
-  filterPreset: "merv13-20x25x1",
-  filterWidth: 622.3,
-  filterDepth: 495.3,
-  filterThickness: 19.1,
+  filterWidth: defaultRectangularFilterDimensions.width,
+  filterDepth: defaultRectangularFilterDimensions.depth,
+  filterThickness: defaultRectangularFilterDimensions.thickness,
   rim: 30,
-  fanPreset: defaultFanProductPresetId,
+  fanColor: defaultFanColor,
   fanDiameter: 140,
   filters: 2,
   splitFrames: true,
@@ -373,7 +359,6 @@ export const defaultSettings: RawPurifierSettings = {
   fansTop: 0,
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
-  donutFilterPreset: defaultDonutFilterPresetId,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,
@@ -412,17 +397,6 @@ export const defaultSettings: RawPurifierSettings = {
 // Catalog Lookup Helpers
 // #######################################
 
-function requiredDonutFilterDefaults(
-  preset: PrintDesignPreset,
-): DonutFilterSettings {
-  if (preset.implementation.type !== "donut-filter-adapter") {
-    throw new Error(
-      `requiredDonutFilterDefaults: ${preset.id} is not a donut-filter design`,
-    );
-  }
-  return preset.implementation.defaults.filter;
-}
-
 export function findPreviewMaterialColorPreset(
   id: PreviewMaterialColorId | string | null | undefined,
 ): PreviewMaterialColorPreset {
@@ -436,67 +410,15 @@ export function findPreviewMaterialColorPreset(
 // Preset Application
 // #######################################
 
-export function applyFilterPreset(
+function applyFilterDimensions(
   settings: RawPurifierSettings,
-  presetId: FilterPresetId,
+  filter: FilterDimensions,
 ): RawPurifierSettings {
-  const preset = findFilterPreset(presetId);
-  if (preset.id === customFilterPresetId) {
-    return {
-      ...settings,
-      filterPreset: customFilterPresetId,
-    };
-  }
-
   return {
     ...settings,
-    filterPreset: preset.id,
-    filterWidth: preset.dimensions.width,
-    filterDepth: preset.dimensions.depth,
-    filterThickness: preset.dimensions.thickness,
-  };
-}
-
-export function applyFanProductPreset(
-  settings: RawPurifierSettings,
-  presetId: FanProductPresetId,
-): RawPurifierSettings {
-  const preset = findFanProductPreset(presetId);
-  if (preset.id === customFanProductPresetId) {
-    return {
-      ...settings,
-      fanPreset: customFanProductPresetId,
-    };
-  }
-
-  return {
-    ...settings,
-    fanPreset: preset.id,
-    fanDiameter: preset.diameter,
-  };
-}
-
-export function applyDonutFilterPreset(
-  settings: RawPurifierSettings,
-  presetId: DonutFilterPresetId,
-): RawPurifierSettings {
-  const preset = findDonutFilterPreset(presetId);
-  if (preset.id === customDonutFilterPresetId) {
-    return {
-      ...settings,
-      donutFilterPreset: customDonutFilterPresetId,
-    };
-  }
-
-  return {
-    ...settings,
-    donutFilterPreset: preset.id,
-    donutFilterOuterDiameter: preset.settings.outerDiameter,
-    donutFilterLength: preset.settings.length,
-    donutFilterHoleDiameter: preset.settings.holeDiameter,
-    donutAdapterInsertLength: preset.settings.insertLength,
-    donutCapRim: donutCapRawRim(preset.settings.cap),
-    donutCapEnabled: preset.settings.cap.type === "printed-cap",
+    filterWidth: filter.width,
+    filterDepth: filter.depth,
+    filterThickness: filter.thickness,
   };
 }
 
@@ -522,11 +444,11 @@ export function applyTempestArrangementDefaults(
   arrangement: TempestArrangementPreset,
 ): RawPurifierSettings {
   const arrangedSettings = applyTempestArrangement(settings, arrangement);
-  return applyFilterPreset(
+  return applyFilterDimensions(
     arrangedSettings,
-    defaultFilterPresetForTempestArrangement(
-      arrangedSettings.tempestArrangement,
-    ),
+    defaultFilterDimensionsByTempestArrangement[
+      arrangedSettings.tempestArrangement
+    ],
   );
 }
 
@@ -535,42 +457,17 @@ export function applyPrintDesignPreset(
   presetId: PrintDesignId,
 ): RawPurifierSettings {
   const preset = findPrintDesignPreset(presetId);
-  const filterPreset = findFilterPreset(
-    defaultFilterPresetForPrintDesign(preset),
-  );
-  const fanPreset = findFanProductPreset(
-    defaultFanPresetForPrintDesign(preset),
-  );
   const base = {
     ...settings,
     printDesign: preset.id,
     filters: rawFilterCountForPrintDesign(preset),
-    fanPreset: fanPreset.id,
-    fanDiameter: fanPreset.diameter,
+    fanDiameter: defaultFanDiameterForPrintDesign(preset),
   };
 
-  const withRecommendedFilter =
-    filterPreset.id === customFilterPresetId
-      ? base
-      : {
-          ...base,
-          filterPreset: filterPreset.id,
-          filterWidth: filterPreset.dimensions.width,
-          filterDepth: filterPreset.dimensions.depth,
-          filterThickness: filterPreset.dimensions.thickness,
-        };
-
   if (preset.implementation.type === "donut-filter-adapter") {
-    const donutPreset = findDonutFilterPreset(
-      preset.implementation.defaults.donutFilterPreset,
-    );
-    const donutFilter =
-      donutPreset.id === customDonutFilterPresetId
-        ? requiredDonutFilterDefaults(preset)
-        : donutPreset.settings;
+    const donutFilter = preset.implementation.defaults.filter;
     return {
-      ...withRecommendedFilter,
-      filterPreset: customFilterPresetId,
+      ...base,
       filterWidth: donutFilter.outerDiameter,
       filterDepth: donutFilter.length,
       filterThickness: donutFilter.holeDiameter,
@@ -579,7 +476,6 @@ export function applyPrintDesignPreset(
       fansRight: 0,
       fansTop: 0,
       fansBottom: 0,
-      donutFilterPreset: donutPreset.id,
       donutFilterOuterDiameter: donutFilter.outerDiameter,
       donutFilterLength: donutFilter.length,
       donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -594,18 +490,18 @@ export function applyPrintDesignPreset(
   }
 
   if (preset.implementation.type === "tempest") {
-    const fanBanks = tempestRawFanBanksForArrangement(
-      preset.implementation.defaults.arrangement,
-    );
+    const arrangement = preset.implementation.defaults.arrangement;
+    const fanBanks = tempestRawFanBanksForArrangement(arrangement);
     return {
-      ...withRecommendedFilter,
-      tempestArrangement: preset.implementation.defaults.arrangement,
-      filters: rawFilterCountForPrintDesign(preset),
+      ...applyFilterDimensions(
+        base,
+        defaultFilterDimensionsByTempestArrangement[arrangement],
+      ),
+      tempestArrangement: arrangement,
       fansLeft: fanBanks.left,
       fansRight: fanBanks.right,
       fansTop: fanBanks.top,
       fansBottom: fanBanks.bottom,
-      donutFilterPreset: defaultSettings.donutFilterPreset,
       donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
       donutFilterLength: defaultSettings.donutFilterLength,
       donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -621,12 +517,11 @@ export function applyPrintDesignPreset(
 
   if (preset.implementation.type === "static-reference") {
     return {
-      ...withRecommendedFilter,
+      ...applyFilterDimensions(base, preset.implementation.defaults.filter),
       fansLeft: 0,
       fansRight: 0,
       fansTop: preset.implementation.defaults.fanCount,
       fansBottom: 0,
-      donutFilterPreset: defaultSettings.donutFilterPreset,
       donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
       donutFilterLength: defaultSettings.donutFilterLength,
       donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -641,7 +536,7 @@ export function applyPrintDesignPreset(
   }
 
   return {
-    ...withRecommendedFilter,
+    ...applyFilterDimensions(base, preset.implementation.defaults.filter),
     fansLeft: fanCountRequestToRawSetting(
       preset.implementation.defaults.fanBanks.left,
     ),
@@ -654,7 +549,6 @@ export function applyPrintDesignPreset(
     fansBottom: fanCountRequestToRawSetting(
       preset.implementation.defaults.fanBanks.bottom,
     ),
-    donutFilterPreset: defaultSettings.donutFilterPreset,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -698,14 +592,6 @@ export function canonicalTempestArrangement(
     (arrangement) => arrangement === value,
   );
   return found ?? defaultSettings.tempestArrangement;
-}
-
-function defaultFilterPresetForTempestArrangement(
-  arrangement: TempestArrangementPreset,
-): FilterPresetId {
-  return defaultFilterPresetByTempestArrangement[
-    canonicalTempestArrangement(arrangement)
-  ];
 }
 
 function requiredPreviewMaterialColorPreset(

@@ -21,7 +21,7 @@ import type {
   PurifierInput,
   PurifierSettings,
 } from "@/domain/purifier/settingsModel";
-import type { FanCountRequest } from "@/domain/purifier/fanProducts";
+import type { FanCountRequest } from "@/domain/purifier/fans";
 
 type FingerHoleCutRequest =
   | {

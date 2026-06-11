@@ -10,29 +10,18 @@ import {
   serializePurifierDraft,
 } from "@/domain/purifier/airPurifier";
 import {
-  customDonutFilterPresetId,
-  donutFilterPresetIds,
   isTempestPrintDesignId,
   printDesignIds,
-  type DonutFilterPresetId,
   type PrintDesignId,
   type TempestArrangementPreset,
 } from "@/domain/purifier/designPresets";
 import {
-  customFanProductPresetId,
-  fanDiameters,
-  fanProductPresetIds,
-  findFanProductPreset,
+  fanColors,
+  nearestFanDiameter,
+  type FanColor,
   type FanDiameter,
-  type FanProductPresetId,
-} from "@/domain/purifier/fanProducts";
+} from "@/domain/purifier/fans";
 import {
-  customFilterPresetId,
-  filterPresetIds,
-  type FilterPresetId,
-} from "@/domain/purifier/filter";
-import {
-  applyDonutFilterPreset,
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   cameraPresets,
@@ -62,12 +51,11 @@ export function encodeSettings(
     : input;
   const params = new URLSearchParams();
   params.set("printDesign", settings.printDesign);
-  params.set("filterPreset", settings.filterPreset);
   params.set("filterWidth", formatNumber(settings.filterWidth));
   params.set("filterDepth", formatNumber(settings.filterDepth));
   params.set("filterThickness", formatNumber(settings.filterThickness));
   params.set("rim", formatNumber(settings.rim));
-  params.set("fanPreset", settings.fanPreset);
+  params.set("fanColor", settings.fanColor);
   params.set("fanDiameter", String(settings.fanDiameter));
   if (!isTempestPrintDesignId(settings.printDesign)) {
     params.set("filters", String(settings.filters));
@@ -78,7 +66,6 @@ export function encodeSettings(
     params.set("fansBottom", String(settings.fansBottom));
   }
   params.set("tempestArrangement", settings.tempestArrangement);
-  params.set("donutFilterPreset", settings.donutFilterPreset);
   params.set(
     "donutFilterOuterDiameter",
     formatNumber(settings.donutFilterOuterDiameter),
@@ -147,23 +134,19 @@ export function decodeSettings(search: string): RawPurifierSettings {
     search.startsWith("?") ? search.slice(1) : search,
   );
   const printDesign = readPrintDesign(params);
-  const filterPreset = readFilterPreset(params);
   const fanDiameter = readFanDiameter(
     params,
     ["fanDiameter", "fan_diameter"],
     defaultSettings.fanDiameter,
   );
-  const fanPreset = readFanProductPreset(params, fanDiameter);
   const fields = parsePurifierSettingsFields(params);
   const parsed: RawPurifierSettings = {
     ...defaultSettings,
     ...fields,
     printDesign,
-    filterPreset,
-    fanPreset,
+    fanColor: readFanColor(params),
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
-    donutFilterPreset: readDonutFilterPreset(params),
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,
@@ -171,12 +154,8 @@ export function decodeSettings(search: string): RawPurifierSettings {
       defaultSettings.cameraPreset,
     ),
   };
-  const parsedWithDonutPreset = applyDonutUrlPresetAndMeasurements(
-    params,
-    parsed,
-  );
   return normalizeRawSettings(
-    applyPrintDesignUrlDefaults(params, parsedWithDonutPreset, printDesign),
+    applyPrintDesignUrlDefaults(params, parsed, printDesign),
   );
 }
 
@@ -196,61 +175,28 @@ export function formatMillimeters(value: number): string {
 // Primitive Readers
 // ##############################
 
+// Non-catalog diameters snap to the nearest supported size so the decoded
+// settings match what the build actually uses.
 function readFanDiameter(
   params: URLSearchParams,
   key: string | readonly string[],
   fallback: FanDiameter,
 ): FanDiameter {
-  const parsed = Number(readParam(params, key));
-  const found = fanDiameters.find((diameter) => diameter === parsed);
-  return found ?? fallback;
+  const raw = readParam(params, key);
+  if (raw === null || raw.trim() === "") {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? nearestFanDiameter(parsed) : fallback;
 }
 
 // ##############################
 // Preset Readers
 // ##############################
 
-function readFanProductPreset(
-  params: URLSearchParams,
-  fanDiameter: FanDiameter,
-): FanProductPresetId {
-  const value = params.get("fanPreset");
-  const found = fanProductPresetIds.find((preset) => preset === value);
-  if (found !== undefined) {
-    return found;
-  }
-  return fanDiameter ===
-    findFanProductPreset(defaultSettings.fanPreset).diameter
-    ? defaultSettings.fanPreset
-    : customFanProductPresetId;
-}
-
-function readFilterPreset(params: URLSearchParams): FilterPresetId {
-  const value = params.get("filterPreset");
-  const found = filterPresetIds.find((preset) => preset === value);
-  if (found !== undefined) {
-    return found;
-  }
-  if (
-    hasAnyParam(params, ["filterWidth", "x"]) ||
-    hasAnyParam(params, ["filterDepth", "y"]) ||
-    hasAnyParam(params, ["filterThickness", "filter_height"])
-  ) {
-    return customFilterPresetId;
-  }
-  return defaultSettings.filterPreset;
-}
-
-function readDonutFilterPreset(params: URLSearchParams): DonutFilterPresetId {
-  const value = params.get("donutFilterPreset");
-  const found = donutFilterPresetIds.find((preset) => preset === value);
-  if (found !== undefined) {
-    return found;
-  }
-  if (hasDonutFilterMeasurementParams(params)) {
-    return customDonutFilterPresetId;
-  }
-  return defaultSettings.donutFilterPreset;
+function readFanColor(params: URLSearchParams): FanColor {
+  const value = params.get("fanColor");
+  return fanColors.find((color) => color === value) ?? defaultSettings.fanColor;
 }
 
 function readPreviewMaterialColor(
@@ -268,49 +214,6 @@ function hasDonutFilterMeasurementParams(params: URLSearchParams): boolean {
     params.has("donutCapRim") ||
     params.has("donutCapEnabled")
   );
-}
-
-// ##############################
-// Donut URL Defaults
-// ##############################
-
-function applyDonutUrlPresetAndMeasurements(
-  params: URLSearchParams,
-  parsed: RawPurifierSettings,
-): RawPurifierSettings {
-  const presetValue = params.get("donutFilterPreset");
-  const presetId = donutFilterPresetIds.find((id) => id === presetValue);
-  if (presetId === undefined) {
-    return parsed;
-  }
-
-  const presetSettings = applyDonutFilterPreset(parsed, presetId);
-  if (!hasDonutFilterMeasurementParams(params)) {
-    return presetSettings;
-  }
-
-  return {
-    ...presetSettings,
-    donutFilterPreset: customDonutFilterPresetId,
-    donutFilterOuterDiameter: params.has("donutFilterOuterDiameter")
-      ? parsed.donutFilterOuterDiameter
-      : presetSettings.donutFilterOuterDiameter,
-    donutFilterLength: params.has("donutFilterLength")
-      ? parsed.donutFilterLength
-      : presetSettings.donutFilterLength,
-    donutFilterHoleDiameter: params.has("donutFilterHoleDiameter")
-      ? parsed.donutFilterHoleDiameter
-      : presetSettings.donutFilterHoleDiameter,
-    donutAdapterInsertLength: params.has("donutAdapterInsertLength")
-      ? parsed.donutAdapterInsertLength
-      : presetSettings.donutAdapterInsertLength,
-    donutCapRim: params.has("donutCapRim")
-      ? parsed.donutCapRim
-      : presetSettings.donutCapRim,
-    donutCapEnabled: params.has("donutCapEnabled")
-      ? parsed.donutCapEnabled
-      : presetSettings.donutCapEnabled,
-  };
 }
 
 function readTempestArrangement(
@@ -337,26 +240,23 @@ function applyPrintDesignUrlDefaults(
     isTempestPrintDesignId(printDesign) && params.has("tempestArrangement")
       ? applyTempestArrangementDefaults(baseDefaults, parsed.tempestArrangement)
       : baseDefaults;
-  const hasFilterInputs =
-    params.has("filterPreset") ||
-    hasAnyParam(params, ["filterWidth", "x"]) ||
-    hasAnyParam(params, ["filterDepth", "y"]) ||
-    hasAnyParam(params, ["filterThickness", "filter_height"]);
-  const hasFanInputs =
-    params.has("fanPreset") ||
-    hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
-  const hasDonutFilterInputs =
-    params.has("donutFilterPreset") || hasDonutFilterMeasurementParams(params);
+  const hasFanInputs = hasAnyParam(params, ["fanDiameter", "fan_diameter"]);
+  const hasDonutFilterInputs = hasDonutFilterMeasurementParams(params);
 
+  // Each measured filter field falls back to the active design's default on
+  // its own, so a partial measurement URL keeps the design defaults for the
+  // fields it does not mention.
   return {
     ...parsed,
-    filterPreset: hasFilterInputs ? parsed.filterPreset : defaults.filterPreset,
-    filterWidth: hasFilterInputs ? parsed.filterWidth : defaults.filterWidth,
-    filterDepth: hasFilterInputs ? parsed.filterDepth : defaults.filterDepth,
-    filterThickness: hasFilterInputs
+    filterWidth: hasAnyParam(params, ["filterWidth", "x"])
+      ? parsed.filterWidth
+      : defaults.filterWidth,
+    filterDepth: hasAnyParam(params, ["filterDepth", "y"])
+      ? parsed.filterDepth
+      : defaults.filterDepth,
+    filterThickness: hasAnyParam(params, ["filterThickness", "filter_height"])
       ? parsed.filterThickness
       : defaults.filterThickness,
-    fanPreset: hasFanInputs ? parsed.fanPreset : defaults.fanPreset,
     fanDiameter: hasFanInputs ? parsed.fanDiameter : defaults.fanDiameter,
     filters: params.has("filters") ? parsed.filters : defaults.filters,
     splitFrames: hasAnyParam(params, ["splitFrames", "split_frames"])
@@ -377,9 +277,6 @@ function applyPrintDesignUrlDefaults(
     tempestArrangement: params.has("tempestArrangement")
       ? parsed.tempestArrangement
       : defaults.tempestArrangement,
-    donutFilterPreset: hasDonutFilterInputs
-      ? parsed.donutFilterPreset
-      : defaults.donutFilterPreset,
     donutFilterOuterDiameter:
       hasDonutFilterInputs || params.has("donutFilterOuterDiameter")
         ? parsed.donutFilterOuterDiameter

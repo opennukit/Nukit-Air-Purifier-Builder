@@ -1,7 +1,6 @@
 import type { PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
-import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fanProducts";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
+import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fans";
 import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";
 import {
   cutPanelsToDocument,
@@ -350,7 +349,7 @@ function createSideWallPanel(input: {
       input.settings.filterCount,
       input.height,
       input.settings.cutting.materialThickness,
-      filterSelectionDimensions(input.settings.filter).thickness,
+      input.settings.filter.thickness,
     );
   return rectangularPanel({
     id: input.id,

@@ -17,6 +17,10 @@ export type BooleanSettingName = {
 }[keyof RawPurifierSettings];
 export type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
 export type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
+export type DonutFilterDimensionName =
+  | "donutFilterOuterDiameter"
+  | "donutFilterLength"
+  | "donutFilterHoleDiameter";
 export type DonutNumberSettingName =
   | "donutFilterOuterDiameter"
   | "donutFilterLength"
@@ -27,6 +31,13 @@ export type NumberControl<Name extends NumericSettingName> = {
   readonly name: Name;
   readonly label: string;
   readonly suffix: string;
+  readonly step: string;
+};
+// Dimension inputs render their unit suffix and step from the active display
+// unit, so their control rows carry only the label and millimeter step.
+export type DimensionControl<Name extends NumericSettingName> = {
+  readonly name: Name;
+  readonly label: string;
   readonly step: string;
 };
 
@@ -42,15 +53,15 @@ export const fanPlacementControls: readonly { readonly name: FanCountSettingName
   { name: "fansTop", label: "Top" },
   { name: "fansBottom", label: "Bottom" },
 ];
-export const filterDimensionControls: readonly NumberControl<FilterDimensionName>[] = [
-  { name: "filterWidth", label: "Filter width", suffix: "mm", step: "1" },
-  { name: "filterDepth", label: "Filter depth", suffix: "mm", step: "1" },
-  { name: "filterThickness", label: "Filter thickness", suffix: "mm", step: "0.1" },
+export const filterDimensionControls: readonly DimensionControl<FilterDimensionName>[] = [
+  { name: "filterWidth", label: "Filter width", step: "1" },
+  { name: "filterDepth", label: "Filter depth", step: "1" },
+  { name: "filterThickness", label: "Filter thickness", step: "0.1" },
 ];
-export const donutFilterDimensionControls: readonly NumberControl<DonutNumberSettingName>[] = [
-  { name: "donutFilterOuterDiameter", label: "Outer diameter", suffix: "mm", step: "1" },
-  { name: "donutFilterLength", label: "Length", suffix: "mm", step: "1" },
-  { name: "donutFilterHoleDiameter", label: "Center hole", suffix: "mm", step: "0.1" },
+export const donutFilterDimensionControls: readonly DimensionControl<DonutFilterDimensionName>[] = [
+  { name: "donutFilterOuterDiameter", label: "Outer diameter", step: "1" },
+  { name: "donutFilterLength", label: "Length", step: "1" },
+  { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },
 ];
 export const generatedGeometryControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },

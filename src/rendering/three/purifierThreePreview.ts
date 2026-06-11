@@ -45,9 +45,8 @@ import {
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import type { FanAppearance } from "@/domain/purifier/fanProducts";
+import { fanAppearanceForColor, type FanAppearance } from "@/domain/purifier/fans";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import {
   loadStaticPrintAssemblyAssets,
   loadStaticPrintAssets,
@@ -127,6 +126,7 @@ import {
   tempestHorizontalFilterBoxes,
   tempestPreviewWalls,
   tempestTowerFilterBoxes,
+  tempestWallFanFacing,
   tempestWallInteriorFanCenter,
   tempestWallNormalAxis,
 } from "@/rendering/three/preview/tempestParts";
@@ -218,6 +218,8 @@ export class PurifierThreePreview {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.autoRotate = false;
+    // Half of three.js's default (2.0) — a calm display-stand spin.
+    this.controls.autoRotateSpeed = 1.0;
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;
@@ -410,7 +412,7 @@ export class PurifierThreePreview {
     const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
-    const fanAppearance = settings.fan.productSelection.product.appearance;
+    const fanAppearance = fanAppearanceForColor(settings.fan.color);
 
     for (const panel of assembly.panels) {
       const panelGroup = createPanelGroup(
@@ -673,7 +675,8 @@ export class PurifierThreePreview {
           axis: "z",
           position: new Vector3(x, 0, 0),
           radius: fanRadius,
-          appearance: settings.fan.productSelection.product.appearance,
+          facing: "axis-positive",
+          appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-side-fan";
         fan.position.z += previewInteriorShiftForBounds(new Box3().setFromObject(fan), bodyNearFace);
@@ -694,7 +697,8 @@ export class PurifierThreePreview {
           axis: "y",
           position,
           radius: fanRadius,
-          appearance: settings.fan.productSelection.product.appearance,
+          facing: "axis-positive",
+          appearance: fanAppearanceForColor(settings.fan.color),
         });
         fan.name = "static-reference-installed-top-fan";
         collectFanRotors(fan, this.fanRotors);
@@ -712,7 +716,8 @@ export class PurifierThreePreview {
         axis: "z",
         position,
         radius: fanRadius,
-        appearance: settings.fan.productSelection.product.appearance,
+        facing: "axis-positive",
+        appearance: fanAppearanceForColor(settings.fan.color),
       });
       fan.name = "static-reference-installed-fan";
       collectFanRotors(fan, this.fanRotors);
@@ -721,7 +726,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterHeight = Math.min(filterDimensions.depth, Math.max(1, asset.height - 24)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
@@ -777,7 +782,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceSideFanFilters(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
@@ -816,7 +821,7 @@ export class PurifierThreePreview {
   }
 
   private addStaticReferenceTopFilter(asset: StaticReferenceAssemblyMetrics, layout: LayoutResult, target: Group): void {
-    const filterDimensions = filterSelectionDimensions(layout.configuration.filter);
+    const filterDimensions = layout.configuration.filter;
     const filterWidth = Math.min(filterDimensions.width, Math.max(1, asset.footprintWidth - 28)) * sceneScale;
     const filterDepth = Math.min(filterDimensions.depth, Math.max(1, asset.height - 28)) * sceneScale;
     const filterThickness = Math.min(filterDimensions.thickness, Math.max(10, asset.footprintDepth * 0.08)) * sceneScale;
@@ -969,7 +974,7 @@ export class PurifierThreePreview {
   private rebuildDonutFilterModel(layout: LayoutResult): void {
     const settings = layout.configuration;
     const model = createDonutFilterModel(layout);
-    const fanAppearance = settings.fan.productSelection.product.appearance;
+    const fanAppearance = fanAppearanceForColor(settings.fan.color);
     const printedPartColor = findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color;
     const adapterMaterial = createPrintedPartMaterial({
       color: printedPartColor,
@@ -1048,6 +1053,7 @@ export class PurifierThreePreview {
         axis: "x",
         position: new Vector3(fanCenterX, filterRadius, 0),
         radius: (model.fanSize / 2) * sceneScale,
+        facing: "axis-positive",
         appearance: fanAppearance,
       });
       collectFanRotors(fan, this.fanRotors);
@@ -1092,7 +1098,7 @@ export class PurifierThreePreview {
       );
     }
 
-    this.addTempestPreviewPurchasedParts(tempestModel, pose, settings.fan.productSelection.product.appearance, {
+    this.addTempestPreviewPurchasedParts(tempestModel, pose, fanAppearanceForColor(settings.fan.color), {
       showFilterMedia: settings.preview.enclosure.showFilterMedia,
       showFans: settings.preview.enclosure.showFans,
       showPreviewEdges: settings.preview.enclosure.showPreviewEdges,
@@ -1163,6 +1169,7 @@ export class PurifierThreePreview {
               axis: tempestCsgAxisToSceneAxis("z", pose),
               position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
               radius: (model.settings.fan.diameter / 2) * sceneScale,
+              facing: "axis-positive",
               appearance: fanAppearance,
             });
             collectFanRotors(fan, this.fanRotors);
@@ -1185,6 +1192,7 @@ export class PurifierThreePreview {
         axis: tempestCsgAxisToSceneAxis(tempestWallNormalAxis(layout.wall), pose),
         position: tempestCsgPointToScene(tempestWallInteriorFanCenter(model, layout.wall, position, localVerticalCenter), pose),
         radius: (model.settings.fan.diameter / 2) * sceneScale,
+        facing: tempestWallFanFacing(model, pose, layout.wall),
         appearance: fanAppearance,
       });
       moveTempestFanInsideWall(fan, model, pose, layout.wall);

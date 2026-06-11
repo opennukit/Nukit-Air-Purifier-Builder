@@ -1,16 +1,18 @@
-// Print design catalog: design identifiers, donut filter types and presets,
-// print design preset types (laser-derived, donut adapter, tempest, static
-// reference), the preset catalogs, public-release filtering, and lookups.
+// Print design catalog: design identifiers, donut filter types, print design
+// preset types (laser-derived, donut adapter, tempest, static reference), the
+// preset catalog, public-release filtering, and lookups.
 
 import type { Millimeters } from "@/domain/units";
-import type { FilterPresetId } from "@/domain/purifier/filter";
 import {
-  defaultFanProductPresetId,
-  type FanBanks,
-  type FanCountRequest,
-  type FanProductPresetId,
-  type FixedFanCount,
-} from "@/domain/purifier/fanProducts";
+  defaultRectangularFilterDimensions,
+  type FilterDimensions,
+} from "@/domain/purifier/filter";
+import type {
+  FanBanks,
+  FanCountRequest,
+  FanDiameter,
+  FixedFanCount,
+} from "@/domain/purifier/fans";
 import {
   staticPrintReferenceIds,
   staticPrintReferences,
@@ -53,31 +55,6 @@ export type DonutCap =
       readonly rim: Millimeters;
     };
 
-export const donutFilterPresetIds = [
-  "silentnight-92-reference",
-  "levoit-core-mini",
-  "levoit-core-200s",
-  "levoit-core-300",
-  "custom",
-] as const;
-
-export type DonutFilterPresetId = (typeof donutFilterPresetIds)[number];
-
-export type PresetDonutFilterId = Exclude<DonutFilterPresetId, "custom">;
-
-export type DonutFilterPreset = {
-  readonly id: DonutFilterPresetId;
-  readonly label: string;
-  readonly detail: string;
-  readonly source: string;
-  readonly measurementNote: string;
-  readonly settings: DonutFilterSettings;
-};
-
-export type PresetDonutFilter = DonutFilterPreset & {
-  readonly id: PresetDonutFilterId;
-};
-
 export type ReleaseVisibility = "public" | "internal";
 
 // ##############################
@@ -87,8 +64,8 @@ export type ReleaseVisibility = "public" | "internal";
 export type PrintDesignPresetBase = {
   readonly id: PrintDesignId;
   readonly label: string;
-  readonly detail: string;
-  readonly source: string;
+  readonly detail?: string;
+  readonly source?: string;
   readonly sourceUrl?: string;
   readonly license: string;
   readonly licenseUrl?: string;
@@ -150,11 +127,11 @@ export type PrintDesignPreset =
   | StaticReferencePrintDesignPreset;
 
 export type CommonPrintDesignDefaults = {
-  readonly filterPreset: FilterPresetId;
-  readonly fanPreset: FanProductPresetId;
+  readonly fanDiameter: FanDiameter;
 };
 
 export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly filter: FilterDimensions;
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
   readonly splitFrames: boolean;
@@ -162,7 +139,6 @@ export type LaserDerivedPrintDesignDefaults = CommonPrintDesignDefaults & {
 
 export type DonutFilterAdapterPrintDesignDefaults =
   CommonPrintDesignDefaults & {
-    readonly donutFilterPreset: PresetDonutFilterId;
     readonly filter: DonutFilterSettings;
     readonly fanCount: FixedFanCount;
     readonly splitFrames: boolean;
@@ -179,11 +155,14 @@ export const tempestArrangementPresets = [
 export type TempestArrangementPreset =
   (typeof tempestArrangementPresets)[number];
 
-export const defaultFilterPresetByTempestArrangement = {
-  "single-horizontal-top-filter": "merv13-20x20x2",
-  "dual-horizontal-sandwich": "merv13-20x20x2",
-  "four-side-filter-tower": "air-fanta-compatible",
-} satisfies Record<TempestArrangementPreset, FilterPresetId>;
+// Default measured filter sizes per Tempest arrangement. Horizontal
+// arrangements use the shared rectangular filter default; the tower uses the
+// Air Fanta compatible replacement filter pack size (29 x 29 x 2.5 cm).
+export const defaultFilterDimensionsByTempestArrangement = {
+  "single-horizontal-top-filter": defaultRectangularFilterDimensions,
+  "dual-horizontal-sandwich": defaultRectangularFilterDimensions,
+  "four-side-filter-tower": { width: 290, depth: 290, thickness: 25 },
+} satisfies Record<TempestArrangementPreset, FilterDimensions>;
 
 export type TempestPrintDesignDefaults = CommonPrintDesignDefaults & {
   readonly arrangement: TempestArrangementPreset;
@@ -193,104 +172,12 @@ export type TempestPrintDesignDefaults = CommonPrintDesignDefaults & {
 };
 
 export type StaticReferencePrintDesignDefaults = CommonPrintDesignDefaults & {
+  readonly filter: FilterDimensions;
+  readonly filterNominalSize: string;
   readonly filterCount: FilterCount;
   readonly fanCount: number;
   readonly splitFrames: boolean;
 };
-
-export const customDonutFilterPresetId: DonutFilterPresetId = "custom";
-export const defaultDonutFilterPresetId: PresetDonutFilterId =
-  "silentnight-92-reference";
-
-// #######################################
-// Donut Filter Presets
-// #######################################
-
-export const donutFilterPresets: readonly DonutFilterPreset[] = [
-  {
-    id: "silentnight-92-reference",
-    label: "Silentnight-style 92 mm cartridge",
-    detail:
-      "Compact round HEPA cartridge used by the OpenSCAD reference adapter.",
-    source: "OpenSCAD reference dimensions",
-    measurementNote:
-      "The reference script uses a 92 mm center hole; measure the cartridge before printing.",
-    settings: {
-      outerDiameter: 125,
-      length: 150,
-      holeDiameter: 92,
-      insertLength: 10,
-      cap: { type: "printed-cap", rim: 10 },
-    },
-  },
-  {
-    id: "levoit-core-mini",
-    label: "Levoit Core Mini",
-    detail: "Small round replacement filter cartridge.",
-    // Dimension provenance: Levoit Core Mini-RF replacement filter listing
-    // (https://www.levoit.com.ph/products/levoit-core-mini-true-hepa-3-stage-original-replacement-filter-core-mini-rf-white).
-    source: "Levoit Core Mini-RF listing",
-    measurementNote:
-      "Outer size is from published listings; center hole is a starter value and should be measured.",
-    settings: {
-      outerDiameter: 159,
-      length: 135,
-      holeDiameter: 92,
-      insertLength: 10,
-      cap: { type: "printed-cap", rim: 10 },
-    },
-  },
-  {
-    id: "levoit-core-200s",
-    label: "Levoit Core 200S",
-    detail: "Medium round replacement filter cartridge.",
-    // Dimension provenance: Levoit Core 200S-RF listings
-    // (https://device.report/levoit/core-200s-rf).
-    source: "Levoit Core 200S-RF listings",
-    measurementNote:
-      "Outer size is from published listings; center hole is a starter value and should be measured.",
-    settings: {
-      outerDiameter: 183,
-      length: 145,
-      holeDiameter: 110,
-      insertLength: 12,
-      cap: { type: "printed-cap", rim: 12 },
-    },
-  },
-  {
-    id: "levoit-core-300",
-    label: "Levoit Core 300",
-    detail: "Larger round replacement filter cartridge.",
-    // Dimension provenance: Levoit Core 300-RF listings
-    // (https://cleanairadviser.com/levoit-core-300-replacement-filter-guide/).
-    source: "Levoit Core 300-RF listings",
-    measurementNote:
-      "Outer size is from published listings; center hole is a starter value and should be measured.",
-    settings: {
-      outerDiameter: 193,
-      length: 147,
-      holeDiameter: 120,
-      insertLength: 12,
-      cap: { type: "printed-cap", rim: 12 },
-    },
-  },
-  {
-    id: "custom",
-    label: "Custom measured round filter",
-    detail:
-      "Use calipers and enter the exact outside diameter, length, and center-hole diameter.",
-    source: "User supplied measurements",
-    measurementNote:
-      "Measure the center hole carefully; that dimension controls whether the adaptor actually seats.",
-    settings: {
-      outerDiameter: 125,
-      length: 150,
-      holeDiameter: 92,
-      insertLength: 10,
-      cap: { type: "printed-cap", rim: 10 },
-    },
-  },
-];
 
 export const defaultPrintDesignId: PrintDesignId = "nukit-open-air";
 export const defaultThreeDimensionalPrintDesignId: PrintDesignId =
@@ -312,8 +199,8 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     implementation: {
       type: "laser-derived-printable-kit",
       defaults: {
-        filterPreset: "merv13-20x25x1",
-        fanPreset: defaultFanProductPresetId,
+        filter: defaultRectangularFilterDimensions,
+        fanDiameter: 140,
         filterCount: 2,
         fanBanks: {
           left: { type: "auto" },
@@ -333,16 +220,13 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   {
     id: "nukit-tempest",
     label: "Nukit Tempest",
-    detail: "Parametric Tempest printable housing",
-    source: "",
     license: "Generated from this project",
     releaseVisibility: "public",
     implementation: {
       type: "tempest",
       defaults: {
         arrangement: "dual-horizontal-sandwich",
-        filterPreset: "merv13-20x20x2",
-        fanPreset: defaultFanProductPresetId,
+        fanDiameter: 140,
         materialThickness: 5,
         screwHoleDiameter: 5,
         rim: 30,
@@ -366,10 +250,10 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     implementation: {
       type: "donut-filter-adapter",
       defaults: {
-        filterPreset: "custom",
-        fanPreset: "arctic-p12-pwm-pst",
-        donutFilterPreset: defaultDonutFilterPresetId,
+        fanDiameter: 120,
         fanCount: 1,
+        // Silentnight-style 92 mm cartridge from the OpenSCAD reference; the
+        // center hole is a starter value users should measure before printing.
         filter: {
           outerDiameter: 125,
           length: 150,
@@ -402,8 +286,10 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       type: "static-reference",
       reference: staticPrintReferences["static-cr-16x20-140"],
       defaults: {
-        filterPreset: "merv13-16x20x1",
-        fanPreset: defaultFanProductPresetId,
+        // 16x20x1 in MERV 13 actual size.
+        filter: { width: 495.3, depth: 393.7, thickness: 19.1 },
+        filterNominalSize: "16 x 20 x 1 in",
+        fanDiameter: 140,
         fanCount: 5,
         filterCount: 1,
         splitFrames: false,
@@ -429,8 +315,10 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       type: "static-reference",
       reference: staticPrintReferences["static-cr-14x20-base"],
       defaults: {
-        filterPreset: "merv13-14x20x1",
-        fanPreset: "arctic-p12-pwm-pst",
+        // 14x20x1 in MERV 13 actual size.
+        filter: { width: 495.3, depth: 342.9, thickness: 19.1 },
+        filterNominalSize: "14 x 20 x 1 in",
+        fanDiameter: 120,
         fanCount: 4,
         filterCount: 2,
         splitFrames: false,
@@ -459,8 +347,10 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
       type: "static-reference",
       reference: staticPrintReferences["static-modular-20x20-reference"],
       defaults: {
-        filterPreset: "merv13-20x20x1",
-        fanPreset: defaultFanProductPresetId,
+        // 20x20x1 in MERV 13 actual size.
+        filter: { width: 495.3, depth: 495.3, thickness: 19.1 },
+        filterNominalSize: "20 x 20 x 1 in",
+        fanDiameter: 140,
         fanCount: 4,
         filterCount: 1,
         splitFrames: false,
@@ -560,16 +450,10 @@ export function staticPrintReferenceForPreset(
     : undefined;
 }
 
-export function defaultFilterPresetForPrintDesign(
+export function defaultFanDiameterForPrintDesign(
   preset: PrintDesignPreset,
-): FilterPresetId {
-  return preset.implementation.defaults.filterPreset;
-}
-
-export function defaultFanPresetForPrintDesign(
-  preset: PrintDesignPreset,
-): FanProductPresetId {
-  return preset.implementation.defaults.fanPreset;
+): FanDiameter {
+  return preset.implementation.defaults.fanDiameter;
 }
 
 export function staticReferenceDefaultsForPreset(
@@ -586,32 +470,4 @@ function requiredPrintDesignPreset(id: PrintDesignId): PrintDesignPreset {
     throw new Error(`requiredPrintDesignPreset: Missing print design ${id}`);
   }
   return preset;
-}
-
-export function findDonutFilterPreset(
-  id: DonutFilterPresetId | string | null,
-): DonutFilterPreset {
-  return (
-    donutFilterPresets.find((preset) => preset.id === id) ??
-    findPresetDonutFilter(defaultDonutFilterPresetId)
-  );
-}
-
-export function findPresetDonutFilter(
-  id: PresetDonutFilterId,
-): PresetDonutFilter {
-  const preset = donutFilterPresets.find(
-    (entry): entry is PresetDonutFilter =>
-      entry.id === id && isPresetDonutFilterId(entry.id),
-  );
-  if (preset === undefined) {
-    throw new Error(`findPresetDonutFilter: Missing preset round filter ${id}`);
-  }
-  return preset;
-}
-
-function isPresetDonutFilterId(
-  id: DonutFilterPresetId,
-): id is PresetDonutFilterId {
-  return id !== customDonutFilterPresetId;
 }

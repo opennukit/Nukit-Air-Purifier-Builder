@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
-import { filterSelectionDimensions } from "@/domain/purifier/filter";
 import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";
 import { edgeSections } from "@/fabrication/laser/cutGeometry";
 // `generateAirPurifier` is the boxes.py golden reference (see src/ports/boxes/reference/README.md).
@@ -87,8 +86,7 @@ describe("Air purifier cut-sheet equivalence", () => {
     const layout = createLayout(defaultSettings);
     const draftPanels = createAirPurifierCutPanels(layout.configuration);
 
-    expect(layout.rawSettings.filterWidth).toBe(filterSelectionDimensions(layout.configuration.filter).width);
-    expect(layout.configuration.filter.type).toBe("preset");
+    expect(layout.rawSettings.filterWidth).toBe(layout.configuration.filter.width);
     expect(layout.configuration.design.type).toBe("laser-derived-printable-kit");
     expect(
       layout.configuration.design.type === "laser-derived-printable-kit"

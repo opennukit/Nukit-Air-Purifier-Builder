@@ -1,6 +1,6 @@
 import type { PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
-import { filterSelectionDimensions, type FilterDimensions } from "@/domain/purifier/filter";
+import type { FilterDimensions } from "@/domain/purifier/filter";
 
 export type FilterFrameFace = "inner" | "outer";
 
@@ -29,7 +29,7 @@ const maximumRim = 90;
 const minimumFrameOpening = 1;
 
 export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifierGeometry {
-  const dimensions = filterSelectionDimensions(settings.filter);
+  const dimensions = settings.filter;
   const materialThickness = settings.cutting.materialThickness;
   const fanDiameter = settings.fan.spec.diameter;
   const workingDepth = dimensions.depth - materialThickness;

@@ -11,8 +11,10 @@ import {
   staticPrintReferenceForPreset,
   staticReferenceDefaultsForPreset,
 } from "@/domain/purifier/designPresets";
-import { findFanProductPreset } from "@/domain/purifier/fanProducts";
-import { customFilterPresetId, findFilterPreset, type FilterPreset } from "@/domain/purifier/filter";
+import type {
+  PrintDesignPreset,
+  StaticReferencePrintDesignDefaults,
+} from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
@@ -26,7 +28,10 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
-import type { StaticPrintEstimate } from "@/resources/static-print-references/references";
+import type {
+  StaticPrintEstimate,
+  StaticPrintReference,
+} from "@/resources/static-print-references/references";
 
 export type SummaryItem = {
   readonly label: string;
@@ -60,7 +65,7 @@ export function createPreviewSummaryItems(
         { label: "Source STLs", value: String(reference?.platePreviewAssets.length ?? 0) },
         ...staticPrintEstimateSummaryItems(reference?.printEstimate),
         { label: "License", value: currentLayout.configuration.printDesign.license },
-        { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
+        ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),
       ];
     }
     const plan = requireGeneratedPrintSheetPlan(currentGeneratedPlan, "createPreviewSummaryItems");
@@ -88,7 +93,7 @@ export function createPreviewSummaryItems(
       { label: "Type", value: "Curated static" },
       { label: "Files", value: reference?.fileSummary ?? "Original source files" },
       ...staticPrintEstimateSummaryItems(reference?.printEstimate),
-      { label: "Source", value: reference?.attribution ?? currentLayout.configuration.printDesign.source },
+      ...sourceSummaryItems(reference, currentLayout.configuration.printDesign),
     ];
   }
 
@@ -133,6 +138,16 @@ export function createPreviewSummaryItems(
   ];
 }
 
+// Attribution row for curated static designs; omitted when neither the
+// reference nor the preset names a source.
+function sourceSummaryItems(
+  reference: StaticPrintReference | undefined,
+  preset: PrintDesignPreset,
+): readonly SummaryItem[] {
+  const source = reference?.attribution ?? preset.source;
+  return source === undefined ? [] : [{ label: "Source", value: source }];
+}
+
 function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefined): readonly SummaryItem[] {
   if (estimate === undefined) {
     return [];
@@ -146,6 +161,10 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 // ##############################
 // Parts List
 // ##############################
+
+// Any 4-pin PWM 12 V PC fan of the configured size works; the parts list
+// states the electrical requirement rather than a product.
+const FAN_POWER_NOTE = "4-pin PWM, 12 V";
 
 export function createPartsListItems(
   currentLayout: LayoutResult,
@@ -161,9 +180,7 @@ export function createPartsListItems(
     if (staticDefaults === undefined) {
       return [];
     }
-    const fanProduct = findFanProductPreset(currentSettings.fanPreset);
     const fanCount = staticDefaults.fanCount;
-    const filterPreset = findFilterPreset(currentSettings.filterPreset);
     const filterCount = staticDefaults.filterCount;
     return [
       {
@@ -176,12 +193,12 @@ export function createPartsListItems(
       {
         category: "Filters",
         label: `${filterCount} x ${rectangularFilterSize(currentSettings)}`,
-        detail: filterNominalDetail(filterPreset),
+        detail: staticReferenceFilterDetail(staticDefaults, currentSettings),
       },
       {
         category: "Fans",
         label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-        detail: fanProduct.powerNote,
+        detail: FAN_POWER_NOTE,
       },
       {
         category: "Power",
@@ -197,13 +214,12 @@ export function createPartsListItems(
     ];
   }
 
-  const fanProduct = findFanProductPreset(currentSettings.fanPreset);
   const fanCount = configuredFanCountFor(currentLayout, currentFabricationMethod);
   const baseItems: PartsListItem[] = [
     {
       category: "Fans",
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-      detail: fanProduct.powerNote,
+      detail: FAN_POWER_NOTE,
     },
     {
       category: "Power",
@@ -228,12 +244,11 @@ export function createPartsListItems(
     ];
   }
 
-  const filterPreset = findFilterPreset(currentSettings.filterPreset);
   return [
     {
       category: "Filter",
       label: rectangularFilterSize(currentSettings),
-      detail: filterNominalDetail(filterPreset),
+      detail: "Measured width x depth x thickness",
     },
     ...baseItems,
   ];
@@ -243,8 +258,17 @@ function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
   return `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`;
 }
 
-function filterNominalDetail(preset: FilterPreset): string {
-  return preset.id === customFilterPresetId ? "User measured dimensions" : `${preset.nominalSize} nominal size`;
+// The static design's recommended filter has a nominal trade size; once the
+// settings carry different measured dimensions the row reports those instead.
+function staticReferenceFilterDetail(
+  staticDefaults: StaticReferencePrintDesignDefaults,
+  currentSettings: RawPurifierSettings,
+): string {
+  const matchesRecommendedFilter =
+    currentSettings.filterWidth === staticDefaults.filter.width &&
+    currentSettings.filterDepth === staticDefaults.filter.depth &&
+    currentSettings.filterThickness === staticDefaults.filter.thickness;
+  return matchesRecommendedFilter ? `${staticDefaults.filterNominalSize} nominal size` : "User measured dimensions";
 }
 
 function staticPrintEstimatePartsItems(estimate: StaticPrintEstimate | undefined): readonly PartsListItem[] {
