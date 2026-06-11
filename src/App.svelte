@@ -1086,14 +1086,14 @@
                 <span>Printable design</span>
                 <select name="printDesign" onchange={updatePrintDesign}>
                   {#if parametricPrintDesignPresets.length > 0}
-                    <optgroup label="Parametric generators">
+                    <optgroup label="Generated designs">
                       {#each parametricPrintDesignPresets as preset}
                         <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
                       {/each}
                     </optgroup>
                   {/if}
                   {#if staticPrintDesignPresets.length > 0}
-                    <optgroup label="Curated static references">
+                    <optgroup label="Fixed community designs">
                       {#each staticPrintDesignPresets as preset}
                         <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
                       {/each}

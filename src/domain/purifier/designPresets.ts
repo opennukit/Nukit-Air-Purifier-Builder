@@ -305,7 +305,7 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
   },
   {
     id: "static-cr-14x20-base",
-    label: "Static CR 14x20 reference",
+    label: "Corsi-Rosenthal box 14x20 (community files)",
     detail:
       "Curated fixed Printables design with STEP source for a Corsi-Rosenthal filter housing.",
     source: "Printables static reference",
