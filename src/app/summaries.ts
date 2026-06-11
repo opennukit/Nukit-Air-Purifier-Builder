@@ -26,7 +26,7 @@ import {
   type PrintableSheetPlan,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
+import { createTempestChunkPlan, createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import type {
   StaticPrintEstimate,
   StaticPrintReference,
@@ -158,6 +158,45 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
   return [
     { label: "Filament", value: `${formatKilograms(estimate.estimatedFilamentKilograms)} @ ${estimate.assumptions.infillPercent}%` },
     { label: "Print time", value: `${formatHourRange(estimate.printTimeHours)} h` },
+  ];
+}
+
+// ##############################
+// Assembly Guidance
+// ##############################
+
+// The "Assembly" card content: the active design's preset notes, extended for
+// chunked tempest prints with the seam glue/pin steps. The chunk plan is pure
+// arithmetic, so whether the active print volume splits the model is known
+// synchronously — no waiting on the worker-built kit.
+export function createAssemblyNotes(
+  currentLayout: LayoutResult,
+  currentFabricationMethod: ExportFormat,
+  currentPrintVolumePresetId: PrintVolumePresetId,
+): readonly string[] {
+  const baseNotes = currentLayout.configuration.printDesign.assemblyNotes;
+  if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
+    return [...baseNotes, ...tempestSeamAssemblyNotes(currentLayout, currentPrintVolumePresetId)];
+  }
+  return baseNotes;
+}
+
+function tempestSeamAssemblyNotes(
+  currentLayout: LayoutResult,
+  currentPrintVolumePresetId: PrintVolumePresetId,
+): readonly string[] {
+  const plan = createTempestChunkPlan(createTempestSettingsFromLayout(currentLayout), currentPrintVolumePresetId);
+  if (plan.printableChunkGrid.totalCount <= 1) {
+    return [];
+  }
+  const pins = plan.model.settings.alignmentPins;
+  return [
+    "Glue the printed chunks together at the seams with CA or epoxy glue",
+    ...(pins.type === "enabled"
+      ? [
+          `Cut ${formatMillimeters(2 * pins.holeDepth)} lengths of 1.75 mm filament as alignment pins for the holes along each seam`,
+        ]
+      : []),
   ];
 }
 

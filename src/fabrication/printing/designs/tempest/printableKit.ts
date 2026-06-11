@@ -69,9 +69,7 @@ export function createTempestPrintableKit(
   presetId: PrintVolumePresetId,
 ): PrintableKit {
   const preset = findPrintVolumePreset(presetId);
-  const model = createTempestModel(settingsForPresetBed(settings, presetId));
-  const pose = createTempestPrintablePose(model);
-  const chunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
+  const { model, pose, printableChunkGrid, sourceChunkGrid } = createTempestChunkPlan(settings, presetId);
   // Every Manifold value the build allocates is freed when this arena exits;
   // the returned parts carry only extracted plain-data meshes. The posing and
   // chunk-clipping run through the same ModelingApi seam as the parametric shape
@@ -81,9 +79,9 @@ export function createTempestPrintableKit(
     const assembly = posePrintableAssembly(
       ctx,
       pose,
-      createFinalAssemblyGeometry(model, sourceChunkGridForPose(pose, chunkGrid)),
+      createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, model, chunkGrid, assembly);
+    return createChunkParts(ctx, model, printableChunkGrid, assembly);
   });
   const featureCount = estimateFeatureCount(model);
 
@@ -94,13 +92,43 @@ export function createTempestPrintableKit(
       partCount: parts.length,
       panelTileCount: 0,
       glueKeyCount: 0,
-      splitPanelCount: chunkGrid.totalCount > 1 ? 1 : 0,
+      splitPanelCount: printableChunkGrid.totalCount > 1 ? 1 : 0,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
       sourceCutFeatureCount: featureCount,
       retainedCutFeatureCount: featureCount,
       sourcePrintCriticalCutFeatureCount: featureCount,
       retainedPrintCriticalCutFeatureCount: featureCount,
     },
+  };
+}
+
+// #######################################
+// Chunk Plan (pure, no CSG)
+// #######################################
+
+// How the kit will pose and split the model for a print volume, derived from
+// pure arithmetic — no Manifold build. The same plan drives the kit's actual
+// chunk cutting above, so plan consumers (assembly guidance, parts list, the
+// exploded preview's pin diagram) always agree with the exported chunks.
+export type TempestChunkPlan = {
+  readonly model: TempestModel;
+  readonly pose: TempestPrintablePose;
+  // The cut boundaries in the posed (on-bed) frame the chunks are clipped on.
+  readonly printableChunkGrid: TempestChunkGrid;
+  // The same boundaries mapped back to the source (as-modelled) frame, where
+  // the alignment-pin holes are placed.
+  readonly sourceChunkGrid: TempestChunkGrid;
+};
+
+export function createTempestChunkPlan(settings: TempestSettings, presetId: PrintVolumePresetId): TempestChunkPlan {
+  const model = createTempestModel(settingsForPresetBed(settings, presetId));
+  const pose = createTempestPrintablePose(model);
+  const printableChunkGrid = featureAwarePrintableChunkGrid(model, pose, model.settings.printBed);
+  return {
+    model,
+    pose,
+    printableChunkGrid,
+    sourceChunkGrid: sourceChunkGridForPose(pose, printableChunkGrid),
   };
 }
 
