@@ -45,17 +45,27 @@ function expectQuadArrangement(arrangement: TempestFilterArrangement): QuadArran
   }
 }
 
+// The fit clearance sits inside the structural offset: the pocket deepens by one
+// clearance (thickness direction is single-sided — the filter rests against the
+// outer flange, so the play goes on the chamber side) and the inner wall steps
+// back with it, keeping a full wallThickness between pocket and air chamber.
 function towerStructuralOffset(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
-  return frame.outsideFlangeThickness + arrangement.filter.thickness + frame.wallThickness;
+  return frame.outsideFlangeThickness + towerPocketDepth(arrangement, frame) + frame.wallThickness;
+}
+
+function towerPocketDepth(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
+  return arrangement.filter.thickness + frame.filterFitClearance;
 }
 
 export function createQuadBox(settings: TempestSettings, frame: TempestFrameModel): TempestBoxEnvelope {
   const arrangement = expectQuadArrangement(settings.arrangement);
   const offset = towerStructuralOffset(arrangement, frame);
   const height = frame.wallThickness + arrangement.filter.faceHeight + frame.outsideFlangeThickness;
+  // In-plane the pocket spans the gap between the two structural offsets, so the
+  // measured face width gets one slide-in clearance per side.
   return {
-    width: arrangement.filter.faceWidth + 2 * offset,
-    depth: arrangement.filter.faceWidth + 2 * offset,
+    width: arrangement.filter.faceWidth + 2 * frame.filterFitClearance + 2 * offset,
+    depth: arrangement.filter.faceWidth + 2 * frame.filterFitClearance + 2 * offset,
     height,
     wallHeight: height - frame.wallThickness - frame.outsideFlangeThickness,
   };
@@ -68,12 +78,16 @@ export function createQuadFilterLayout(
 ): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
   const arrangement = expectQuadArrangement(settings.arrangement);
   const structuralOffset = towerStructuralOffset(arrangement, frame);
+  const pocketDepth = towerPocketDepth(arrangement, frame);
   const zMin = frame.wallThickness;
   const zMax = box.height - frame.outsideFlangeThickness;
+  // Width gets the per-side clearance; depth gets the single-sided clearance
+  // (see towerStructuralOffset). Height stays measured: the filter loads from the
+  // top, so the vertical fit never has to slide past anything.
   const pocket: TempestTowerFilterPocket = {
-    width: arrangement.filter.faceWidth,
+    width: arrangement.filter.faceWidth + 2 * frame.filterFitClearance,
     height: arrangement.filter.faceHeight,
-    depth: arrangement.filter.thickness,
+    depth: pocketDepth,
   };
   return {
     topology: "quad",
@@ -91,7 +105,7 @@ export function createQuadFilterLayout(
       zMax,
     },
     wallRects: mapTempestWalls((wall) =>
-      quadWallRect(wall, box, structuralOffset, frame.outsideFlangeThickness, arrangement.filter.thickness),
+      quadWallRect(wall, box, structuralOffset, frame.outsideFlangeThickness, pocketDepth),
     ),
     filterPockets: mapTempestWalls(() => pocket),
     loading: {
@@ -102,14 +116,15 @@ export function createQuadFilterLayout(
 }
 
 // The filter-pocket rect for one wall, in model coordinates. The pocket is a thin
-// slab one filter-thickness deep, set one outer-wall in from the outer face and
-// running between the two structural offsets on the in-plane span.
+// slab one pocket-depth (filter thickness + fit clearance) deep, set one outer-wall
+// in from the outer face and running between the two structural offsets on the
+// in-plane span.
 function quadWallRect(
   wall: TempestWall,
   box: TempestBoxEnvelope,
   structuralOffset: Millimeters,
   outsideFlange: Millimeters,
-  filterThickness: Millimeters,
+  pocketDepth: Millimeters,
 ): TempestQuadWallRect {
   const planes = { innerPlaneOffset: structuralOffset, outerPlaneOffset: outsideFlange };
   if (wall === "front") {
@@ -117,7 +132,7 @@ function quadWallRect(
       xMin: structuralOffset,
       xMax: box.width - structuralOffset,
       yMin: outsideFlange,
-      yMax: outsideFlange + filterThickness,
+      yMax: outsideFlange + pocketDepth,
       inletNormalAxis: "y",
       ...planes,
     };
@@ -126,7 +141,7 @@ function quadWallRect(
     return {
       xMin: structuralOffset,
       xMax: box.width - structuralOffset,
-      yMin: box.depth - outsideFlange - filterThickness,
+      yMin: box.depth - outsideFlange - pocketDepth,
       yMax: box.depth - outsideFlange,
       inletNormalAxis: "y",
       ...planes,
@@ -135,7 +150,7 @@ function quadWallRect(
   if (wall === "left") {
     return {
       xMin: outsideFlange,
-      xMax: outsideFlange + filterThickness,
+      xMax: outsideFlange + pocketDepth,
       yMin: structuralOffset,
       yMax: box.depth - structuralOffset,
       inletNormalAxis: "x",
@@ -143,7 +158,7 @@ function quadWallRect(
     };
   }
   return {
-    xMin: box.width - outsideFlange - filterThickness,
+    xMin: box.width - outsideFlange - pocketDepth,
     xMax: box.width - outsideFlange,
     yMin: structuralOffset,
     yMax: box.depth - structuralOffset,

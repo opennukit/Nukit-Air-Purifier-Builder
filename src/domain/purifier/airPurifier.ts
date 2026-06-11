@@ -132,6 +132,9 @@ export function normalizeRawSettings(
   return canonicalizePrintDesignRawSettings({
     ...normalized,
     tempestArrangement,
+    // Preserved like tempestArrangement: the value survives even while a
+    // non-tempest design is active, so switching back keeps the user's fit.
+    filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -259,6 +262,7 @@ export function serializePurifierDraft(
       ...base,
       ...serializedFilterFields(draft.design.filter),
       tempestArrangement: draft.design.arrangement,
+      filterFitClearance: draft.design.filterFitClearance,
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -314,6 +318,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     tempestArrangement: defaultSettings.tempestArrangement,
+    filterFitClearance: defaultSettings.filterFitClearance,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -389,6 +394,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...base,
       ...serializedFilterFields(input.design.filter),
       tempestArrangement: input.design.arrangement,
+      filterFitClearance: input.design.filterFitClearance,
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -457,6 +463,7 @@ function createConfiguredPrintDesign(input: {
       preset: printDesign,
       arrangement: canonicalTempestArrangement(input.raw.tempestArrangement),
       filter: input.filter,
+      filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
     };
   }
 
@@ -552,6 +559,7 @@ function createPurifierDesignDraft(
       preset: configuration.design.preset,
       arrangement: configuration.design.arrangement,
       filter: configuration.design.filter,
+      filterFitClearance: configuration.design.filterFitClearance,
     };
   }
 
@@ -634,6 +642,10 @@ function normalizeDonutCapRim(
     0,
     Math.max(0, (outerDiameter - holeDiameter) / 2),
   );
+}
+
+function normalizeFilterFitClearance(value: Millimeters): Millimeters {
+  return clamp(value, 0, 5);
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {

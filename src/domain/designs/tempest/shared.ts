@@ -104,6 +104,10 @@ export type TempestFrameSettings = {
   readonly rim: Millimeters;
   readonly chamferSize: Millimeters;
   readonly towerCornerPostChamfer: Millimeters;
+  // Clearance added per side around the MEASURED filter so it slides into its
+  // cavity instead of press-fitting; deliberately separate from the measurement
+  // so users enter the filter's real size and the box adds the play itself.
+  readonly filterFitClearance: Millimeters;
 };
 
 export type TempestFilterSlotSettings = {

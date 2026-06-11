@@ -319,6 +319,7 @@ export const defaultTempestSettings: TempestSettings = {
     rim: 30,
     chamferSize: 2,
     towerCornerPostChamfer: 55,
+    filterFitClearance: 1,
   },
   filterSlot: {
     wall: "back",
@@ -528,6 +529,7 @@ function normalizeTempestFrameSettings(frame: TempestFrameSettings): TempestFram
     rim: finiteNonNegative(frame.rim, defaultTempestSettings.frame.rim),
     chamferSize: finiteNonNegative(frame.chamferSize, defaultTempestSettings.frame.chamferSize),
     towerCornerPostChamfer: finiteNonNegative(frame.towerCornerPostChamfer, defaultTempestSettings.frame.towerCornerPostChamfer),
+    filterFitClearance: finiteNonNegative(frame.filterFitClearance, defaultTempestSettings.frame.filterFitClearance),
   };
 }
 
