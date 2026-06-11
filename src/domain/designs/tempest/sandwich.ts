@@ -61,9 +61,11 @@ export function createSandwichBox(settings: TempestSettings, frame: TempestFrame
     HORIZONTAL_FAN_VERTICAL_PADDING_MM +
     2 * frame.outsideFlangeThickness +
     filterCount * (arrangement.filter.thickness + frame.wallThickness);
+  // The interior is the measured footprint plus the slide-in clearance per side,
+  // so the filter drops in without press-fitting against the walls.
   return {
-    width: arrangement.filter.footprintWidth + 2 * frame.wallThickness,
-    depth: arrangement.filter.footprintDepth + 2 * frame.wallThickness,
+    width: arrangement.filter.footprintWidth + 2 * frame.filterFitClearance + 2 * frame.wallThickness,
+    depth: arrangement.filter.footprintDepth + 2 * frame.filterFitClearance + 2 * frame.wallThickness,
     height,
     wallHeight: height - 2 * frame.outsideFlangeThickness,
   };

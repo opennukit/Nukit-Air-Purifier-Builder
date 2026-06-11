@@ -102,6 +102,23 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(decodedAgain.filterThickness).toBe(22);
   });
 
+  test("preserves the tempest filter fit clearance through the URL codec into the frame settings", () => {
+    const decoded = decodeSettings("printDesign=nukit-tempest&filterFitClearance=2.5");
+    expect(decoded.filterFitClearance).toBe(2.5);
+
+    const decodedAgain = decodeSettings(encodeSettings(decoded));
+    expect(decodedAgain.filterFitClearance).toBe(2.5);
+
+    // Clamped at the boundary like the other raw measurements.
+    expect(decodeSettings("filterFitClearance=99").filterFitClearance).toBe(5);
+    expect(decodeSettings("filterFitClearance=-3").filterFitClearance).toBe(0);
+    expect(decodeSettings("").filterFitClearance).toBe(defaultSettings.filterFitClearance);
+
+    // The decoded clearance reaches the tempest frame settings the model builds from.
+    const layout = createLayout(decoded);
+    expect(createTempestSettingsFromLayout(layout).frame.filterFitClearance).toBe(2.5);
+  });
+
   test("defaults the four-side tower to the Air Fanta compatible filter size", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(
@@ -623,7 +640,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
-    expect(towerModel.box.width).toBe(370);
+    // 290 face + 2*1 fit clearance + 2*41 structural offset (10 flange + 25+1 pocket + 5 wall).
+    expect(towerModel.box.width).toBe(374);
     expect(towerModel.box.height).toBe(305);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
     expect(towerModel.chunkGrid.totalCount).toBe(8);

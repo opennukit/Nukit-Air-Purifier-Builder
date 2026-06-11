@@ -3,8 +3,11 @@ import type { CameraPreset } from "@/domain/purifier/settingsModel";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
+  isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
+import { createTempestModel } from "@/domain/designs/tempest/model";
+import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { staticPrintReferenceHasAssembledPreview } from "@/resources/static-print-references/references";
 import {
@@ -119,12 +122,23 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
       model.fanSize,
     );
   }
+  if (isTempestPrintDesignId(settings.printDesign.id)) {
+    return tempestLargestDimensionMillimeters(layout);
+  }
 
   return Math.max(
     settings.filter.width,
     layout.summary.workingDepth,
     layout.summary.chamberHeight,
   );
+}
+
+// The tempest arrangements differ wildly in shape (a flat sandwich vs a tall
+// four-filter tower), so framing must follow the real derived box — the laser
+// summary fields underestimate the tower and the camera ends up zoomed in.
+function tempestLargestDimensionMillimeters(layout: LayoutResult): number {
+  const box = createTempestModel(createTempestSettingsFromLayout(layout)).box;
+  return Math.max(box.width, box.depth, box.height);
 }
 
 
@@ -158,6 +172,9 @@ function modelViewScale(layout: LayoutResult): number {
       sceneScale *
       1.25;
     return baseScale + scalePadding;
+  }
+  if (isTempestPrintDesignId(settings.printDesign.id)) {
+    return tempestLargestDimensionMillimeters(layout) * sceneScale + scalePadding;
   }
   return (
     Math.max(

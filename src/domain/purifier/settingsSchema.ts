@@ -78,6 +78,7 @@ export type PurifierSettingsFieldFallbacks = {
   readonly filterWidth: number;
   readonly filterDepth: number;
   readonly filterThickness: number;
+  readonly filterFitClearance: number;
   readonly rim: number;
   readonly filters: FilterCount;
   readonly splitFrames: boolean;
@@ -126,6 +127,7 @@ export const createPurifierSettingsFieldsSchema = (
     filterWidth: zNumberField(fallbacks.filterWidth),
     filterDepth: zNumberField(fallbacks.filterDepth),
     filterThickness: zNumberField(fallbacks.filterThickness),
+    filterFitClearance: zNumberField(fallbacks.filterFitClearance),
     rim: zNumberField(fallbacks.rim),
     filters: zFilterCountField(fallbacks.filters),
     splitFrames: zBooleanField(fallbacks.splitFrames),

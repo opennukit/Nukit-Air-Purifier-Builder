@@ -38,6 +38,7 @@
     parametricPrintDesignPresets,
     staticPrintDesignPresets,
     tempestArrangementOptions,
+    tempestFitControls,
     type BooleanSettingName,
     type DonutFilterDimensionName,
     type DonutNumberSettingName,
@@ -1130,7 +1131,19 @@
               </p>
               <div data-generated-part-controls>
                 <fieldset class="segmented-field">
-                  <legend>Measurement unit</legend>
+                  <legend>
+                    <span class="legend-row">
+                      Measurement unit
+                      <span class="info-tip">
+                        <button type="button" aria-label="Why measure instead of using the printed label?" aria-describedby="measureInfoNote">i</button>
+                        <p id="measureInfoNote" role="tooltip">
+                          <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
+                          actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
+                          vary by a few millimeters. Measure your filter and enter the real numbers.
+                        </p>
+                      </span>
+                    </span>
+                  </legend>
                   <div>
                     {#each dimensionUnits as unit}
                       <label>
@@ -1264,6 +1277,32 @@
             </section>
           {/if}
 
+          {#snippet printSetupFields()}
+            <div data-print-volume-control>
+              <label class="field">
+                <span>Print volume</span>
+                <select name="printVolume" onchange={setPrintVolume}>
+                  {#each printVolumePresets as preset}
+                    <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+            {#if isNukitControlsActive}
+              <div data-nukit-print-split-control>
+                <label class="toggle-field">
+                  <input
+                    type="checkbox"
+                    name="splitFrames"
+                    checked={settings.splitFrames}
+                    onchange={(event) => updateBooleanSetting("splitFrames", event)}
+                  />
+                  <span>Split large frame panels</span>
+                </label>
+              </div>
+            {/if}
+          {/snippet}
+
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
@@ -1306,38 +1345,49 @@
                   {/each}
                 </div>
               {/if}
+              {#if isTempestControlsActive}
+                <div data-tempest-fit-controls>
+                  {#each tempestFitControls as control}
+                    <label class="field">
+                      <span>
+                        {control.label}
+                        {#if control.info !== undefined}
+                          <span class="info-tip">
+                            <button type="button" aria-label="What does {control.label} do?" aria-describedby="info-{control.name}">i</button>
+                            <p id="info-{control.name}" role="tooltip">{control.info}</p>
+                          </span>
+                        {/if}
+                      </span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name={control.name}
+                          min="0"
+                          max="5"
+                          step={control.step}
+                          inputmode="decimal"
+                          value={settings[control.name]}
+                          onchange={(event) => updateNumberSetting(control.name, event)}
+                        />
+                        <small>{control.suffix}</small>
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+              {#if showPrintSetupControls}
+                {@render printSetupFields()}
+              {/if}
             </section>
           {/if}
 
-          {#if showPrintSetupControls}
+          {#if showPrintSetupControls && isStaticReferenceControlsActive}
             <section class="control-section print-volume-section" data-print-volume-section>
               <div class="section-heading">
                 <p class="eyebrow">Printer</p>
                 <h2>Print setup</h2>
               </div>
-              <div data-print-volume-control>
-                <label class="field">
-                  <span>Print volume</span>
-                  <select name="printVolume" onchange={setPrintVolume}>
-                    {#each printVolumePresets as preset}
-                      <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
-                    {/each}
-                  </select>
-                </label>
-              </div>
-              {#if isNukitControlsActive}
-                <div data-nukit-print-split-control>
-                  <label class="toggle-field">
-                    <input
-                      type="checkbox"
-                      name="splitFrames"
-                      checked={settings.splitFrames}
-                      onchange={(event) => updateBooleanSetting("splitFrames", event)}
-                    />
-                    <span>Split large frame panels</span>
-                  </label>
-                </div>
-              {/if}
+              {@render printSetupFields()}
             </section>
           {/if}
 
