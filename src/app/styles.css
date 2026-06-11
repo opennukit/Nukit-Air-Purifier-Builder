@@ -14,7 +14,7 @@ Design Tokens and Base Elements
   --surface: #f8f5ec;
   --surface-strong: #fffdf6;
   --ink: #17201c;
-  --muted: #667169;
+  --muted: #59635b;
   --line: #d9d0bf;
   --accent: #1f6f56;
   --accent-strong: #164d3d;
@@ -454,7 +454,7 @@ pill it carries a retry button, so it accepts pointer events. */
   gap: 10px;
   border-color: rgb(160 102 40 / 45%);
   background: rgb(160 102 40 / 10%);
-  color: #a06628;
+  color: #8a5520;
   pointer-events: auto;
 }
 
