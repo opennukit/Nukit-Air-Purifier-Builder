@@ -49,21 +49,14 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
     createFanGuardPart(model),
     ...(model.cap.type === "printed-cap" ? [createCapPart(model, model.cap)] : []),
   ];
-  const featureCount = parts.reduce((total, part) => total + part.cutFeatureCount, 0);
 
   return {
     preset,
     parts,
     summary: {
       partCount: parts.length,
-      panelTileCount: parts.filter((part) => part.kind === "panel-tile").length,
-      glueKeyCount: 0,
       splitPanelCount: 0,
       oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
-      sourceCutFeatureCount: featureCount,
-      retainedCutFeatureCount: featureCount,
-      sourcePrintCriticalCutFeatureCount: featureCount,
-      retainedPrintCriticalCutFeatureCount: featureCount,
     },
   };
 }
@@ -104,12 +97,9 @@ function createAdapterPart(model: DonutFilterModel): PrintablePart {
     id: "donut-filter-fan-adapter",
     name: "Donut filter fan adaptor",
     kind: "donut-filter-adapter",
-    sourcePanelId: "donut-filter-adapter",
     width: model.fanSize,
     depth: model.fanSize,
     height,
-    cutFeatureCount: 5,
-    printCriticalCutFeatureCount: 5,
     mesh,
   };
 }
@@ -148,12 +138,9 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
     id: "donut-filter-fan-guard",
     name: "Printed fan guard",
     kind: "donut-fan-guard",
-    sourcePanelId: "donut-filter-adapter",
     width: guard.outerSize,
     depth: guard.outerSize,
     height: guard.thickness,
-    cutFeatureCount: 0,
-    printCriticalCutFeatureCount: 0,
     mesh: unionMeshes(meshes),
   };
 }
@@ -179,12 +166,9 @@ function createCapPart(model: DonutFilterModel, cap: Extract<DonutFilterCap, { r
     id: "donut-filter-blanking-cap",
     name: "Press-fit filter blanking cap",
     kind: "donut-filter-cap",
-    sourcePanelId: "donut-filter-cap",
     width: cap.outerDiameter,
     depth: cap.outerDiameter,
     height: donutCapTotalHeight(model),
-    cutFeatureCount: 1,
-    printCriticalCutFeatureCount: 1,
     mesh,
   };
 }

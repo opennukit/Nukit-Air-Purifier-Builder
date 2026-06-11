@@ -47,7 +47,6 @@ const printPartLift = 0.004;
 // stay flat and grills/rounded corners read smooth (matches the assembled preview).
 const printPartCreaseAngleRadians = (40 * Math.PI) / 180;
 const panelColor = 0xd1a166;
-const glueKeyColor = 0x7f997d;
 const oversizedColor = 0xd78872;
 const edgeColor = 0x604322;
 
@@ -57,7 +56,6 @@ const edgeColor = 0x604322;
 
 type PrintPreviewMaterials = {
   readonly panel: MeshStandardMaterial;
-  readonly glueKey: MeshStandardMaterial;
   readonly oversized: MeshStandardMaterial;
   readonly staticPart: MeshStandardMaterial;
   readonly staticFanPart: MeshStandardMaterial;
@@ -491,14 +489,6 @@ function createPrintPreviewMaterials(): PrintPreviewMaterials {
       roughness: 0.68,
       metalness: 0.02,
     }),
-    glueKey: new MeshStandardMaterial({
-      color: glueKeyColor,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-      roughness: 0.62,
-      metalness: 0.02,
-    }),
     oversized: new MeshStandardMaterial({
       color: oversizedColor,
       polygonOffset: true,
@@ -530,14 +520,7 @@ function createPrintPreviewMaterials(): PrintPreviewMaterials {
 }
 
 function partMaterial(placement: PrintSheetPlacement, materials: PrintPreviewMaterials): MeshStandardMaterial {
-  if (placement.fit.type === "oversized") {
-    return materials.oversized;
-  }
-  return placement.part.kind === "dovetail-glue-key" ||
-    placement.part.kind === "scarf-glue-key" ||
-    placement.part.kind === "rail-connector"
-    ? materials.glueKey
-    : materials.panel;
+  return placement.fit.type === "oversized" ? materials.oversized : materials.panel;
 }
 
 function staticPartMaterial(placement: StaticPrintSheetPlacement, materials: PrintPreviewMaterials): MeshStandardMaterial {

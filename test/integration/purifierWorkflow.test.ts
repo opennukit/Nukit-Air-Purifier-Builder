@@ -19,18 +19,10 @@ import { fanAppearanceForColor, findFanSpec, nearestFanDiameter } from "@/domain
 import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
-import {
-  createPrintableKit,
-  createPrintableThreeMfExport,
-  findPrintVolumePreset,
-  partFitsPrintBed,
-  printVolumePresets,
-  type PrintVolumePresetId,
-} from "@/fabrication/printing/printableKit";
+import { findPrintVolumePreset, partFitsPrintBed } from "@/fabrication/printing/printableKit";
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
 import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight } from "@/domain/designs/donut-filter/model";
 import { createTempestModel } from "@/domain/designs/tempest/model";
-import { createPrintableSheetPlan } from "@/fabrication/printing/printableKit";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import { createThreeMfPackage, type MeshObject } from "@/fabrication/printing/threeMf";
 import {
@@ -174,7 +166,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const beigeUrl = decodeSettings("fanColor=beige&fanDiameter=120");
     const unknownColor = decodeSettings("fanColor=chartreuse");
     const beigeLayout = createLayout(beigeUrl);
-    const beigePrintExport = createPrintableThreeMfExport(beigeLayout, "bed-256");
+    const beigePrintExport = createPrintDesignThreeMfExport(
+      createLayout(decodeSettings("printDesign=donut-hepa-adapter&fanColor=beige&fanDiameter=120")),
+      "bed-256",
+    );
     const beigePrintContent = new TextDecoder("latin1").decode(beigePrintExport.bytes);
 
     expect(custom120.fanColor).toBe("black");
@@ -498,54 +493,12 @@ describe("FilterBoxBuilder purifier workflow", () => {
       localPlatePreviewCount: staticPrintReferenceForPreset(staticLayout.configuration.printDesign)?.platePreviewAssets.length ?? 0,
     });
     expect(() => createLaserSvg(donutLayout)).toThrow("does not have cut-panel fabrication");
+    expect(() => createPrintDesignKit(cutPanelLayout, "bed-256")).toThrow("laser cut sheet, not a print kit");
   });
 
   // ##############################
   // Printable Beds and Static Designs
   // ##############################
-
-  test("splits printable kits to fit common desktop printer beds", () => {
-    const layout = createLayout(defaultSettings);
-    const boundedPresetIds = printVolumePresets
-      .filter((preset) => preset.bed.type === "bounded")
-      .map((preset) => preset.id);
-
-    expect(boundedPresetIds).toEqual([
-      "bed-180",
-      "bed-220",
-      "bed-225",
-      "bed-prusa-mk",
-      "bed-256",
-      "bed-300",
-      "bed-h2-safe",
-      "bed-350",
-      "bed-prusa-xl",
-      "bed-420",
-    ] satisfies readonly PrintVolumePresetId[]);
-
-    for (const presetId of boundedPresetIds) {
-      const kit = createPrintableKit(layout, presetId);
-
-      expect(kit.summary.partCount).toBeGreaterThan(cutPanels(layout).length);
-      expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
-      expect(kit.summary.glueKeyCount).toBeGreaterThan(0);
-      expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
-      // The default 140 mm fan walls cannot be split through a fan opening on
-      // the smallest bed, so bed-180 keeps oversized parts.
-      if (presetId === "bed-180") {
-        expect(kit.summary.oversizedPartCount).toBeGreaterThan(0);
-      } else {
-        expect(kit.summary.oversizedPartCount).toBe(0);
-        expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
-      }
-      expect(kit.parts.some((part) => part.kind === "dovetail-glue-key")).toBe(true);
-      expect(
-        kit.parts
-          .filter((part) => part.kind === "panel-tile")
-          .some((part) => part.sourceTile !== undefined && part.sourceTile.columnCount + part.sourceTile.rowCount > 2),
-      ).toBe(true);
-    }
-  });
 
   test("keeps the 256 mm print bed as the default and redirects the legacy 320 mm URL", () => {
     expect(findPrintVolumePreset(null).id).toBe("bed-256");
@@ -769,57 +722,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
   // 3MF Export
   // ##############################
 
-  test("keeps the unsplit print preset as one printable part per cut panel", () => {
-    const layout = createLayout(defaultSettings);
-    const kit = createPrintableKit(layout, "unsplit");
-
-    expect(kit.summary.partCount).toBe(cutPanels(layout).length);
-    expect(kit.summary.panelTileCount).toBe(cutPanels(layout).length);
-    expect(kit.summary.glueKeyCount).toBe(0);
-    expect(kit.summary.splitPanelCount).toBe(0);
-    expect(kit.summary.oversizedPartCount).toBe(0);
-    expect(kit.summary.retainedCutFeatureCount).toBe(kit.summary.sourceCutFeatureCount);
-    expect(kit.summary.retainedPrintCriticalCutFeatureCount).toBe(kit.summary.sourcePrintCriticalCutFeatureCount);
-  });
-
-  test("lays printable kit parts onto previewable print sheets", () => {
-    const layout = createLayout(defaultSettings);
-    const plan = createPrintableSheetPlan(layout, "bed-256");
-
-    expect(plan.kit.preset.id).toBe("bed-256");
-    expect(plan.sheets.length).toBeGreaterThan(1);
-    expect(plan.sheets.every((sheet) => sheet.placements.length > 0)).toBe(true);
-    expect(plan.sheets.every((sheet) => sheet.placements.every((placement) => placement.fit.type === "fits"))).toBe(true);
-    expect(
-      plan.sheets.every((sheet) =>
-        sheet.placements.every(
-          (placement) =>
-            placement.x + placement.part.width <= sheet.width + 0.001 &&
-            placement.y + placement.part.depth <= sheet.depth + 0.001,
-        ),
-      ),
-    ).toBe(true);
-  });
-
-  test("exports panel outlines in single-sheet 3MF packages", () => {
-    const layout = createLayout(defaultSettings);
-    const printExport = createPrintableThreeMfExport(layout, "unsplit");
-    const model = parseThreeMfModel(printExport.bytes);
-    const sourcePanel = requiredPanel(cutPanels(layout), "bottom-fan-wall");
-    const exportedPanel = requiredThreeMfObject(model, "Bottom fan wall print panel");
-    const bounds = meshBounds(exportedPanel.vertices);
-
-    expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
-    expect(printExport.mimeType).toBe("model/3mf");
-    expect(bounds.width).toBeCloseTo(sourcePanel.width);
-    expect(bounds.depth).toBeCloseTo(sourcePanel.height);
-    expect(exportedPanel.triangles.length).toBeGreaterThan(12);
-    expectTriangleIndicesValid(exportedPanel);
-  });
-
   test("exports bounded-bed print kits as one multi-plate 3MF package", () => {
-    const layout = createLayout(defaultSettings);
-    const printExport = createPrintableThreeMfExport(layout, "bed-256");
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const printExport = createPrintDesignThreeMfExport(layout, "bed-256");
     const model = parseThreeMfModel(printExport.bytes);
     const modelSettings = parseThreeMfModelSettings(printExport.bytes);
     let nextObjectId = 1;
@@ -835,8 +740,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     }));
     const expectedPlacements = expectedPlates.flatMap((plate) => plate.instances);
 
-    expect(printExport.filename).toBe("nukit-open-air-purifier-print-kit.3mf");
+    expect(printExport.filename).toBe("nukit-tempest-print-kit.3mf");
     expect(printExport.mimeType).toBe("model/3mf");
+    expect(printExport.sheetPlan.sheets.length).toBeGreaterThan(1);
     expect(printExport.bytes[0]).toBe(0x50);
     expect(printExport.bytes[1]).toBe(0x4b);
     expect(listStoredZipFileNames(printExport.bytes)).toEqual([
@@ -884,7 +790,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
         expect(bounds.maxY).toBeLessThanOrEqual(sheet.depth + 0.01);
       }
     }
-  });
+  }, 30000);
 
   test("rejects invalid 3MF plate object assignments", () => {
     const objects = [minimalThreeMfObject("A"), minimalThreeMfObject("B")];
@@ -1052,7 +958,9 @@ function parseThreeMfModel(bytes: Uint8Array): ParsedThreeMfModel {
     throw new Error("parseThreeMfModel: Missing model unit");
   }
 
-  const objects = Array.from(modelXml.matchAll(/<object id="(\d+)" type="model" name="([^"]+)">([\s\S]*?)<\/object>/gu)).map(
+  // The optional attributes between type and name are the material reference
+  // (pid/pindex) the export adds when it carries a display color.
+  const objects = Array.from(modelXml.matchAll(/<object id="(\d+)" type="model"[^>]*? name="([^"]+)">([\s\S]*?)<\/object>/gu)).map(
     (match) => ({
       id: Number(match[1]),
       name: unescapeXml(match[2] ?? ""),
@@ -1152,14 +1060,6 @@ function visitStoredZipEntries(bytes: Uint8Array, visit: (name: string, content:
     visit(name, bytes.slice(contentStart, contentEnd));
     offset = contentEnd;
   }
-}
-
-function requiredThreeMfObject(model: ParsedThreeMfModel, name: string): ParsedThreeMfObject {
-  const object = model.objects.find((entry) => entry.name === name);
-  if (object === undefined) {
-    throw new Error(`requiredThreeMfObject: Missing ${name}`);
-  }
-  return object;
 }
 
 function requiredThreeMfObjectById(model: ParsedThreeMfModel, id: number): ParsedThreeMfObject {

@@ -13,7 +13,6 @@ describe("printKitCacheKey", () => {
       { filterWidth: defaultSettings.filterWidth + 1 },
       { filterFitClearance: defaultSettings.filterFitClearance + 0.2 },
       { tempestArrangement: "four-side-filter-tower" },
-      { splitFrames: !defaultSettings.splitFrames },
       { materialThickness: defaultSettings.materialThickness + 1 },
     ];
     for (const edit of geometryEdits) {
@@ -38,6 +37,7 @@ describe("printKitCacheKey", () => {
       { fanColor: defaultSettings.fanColor === "black" ? "beige" : "black" },
       { labels: !defaultSettings.labels },
       { referenceScale: defaultSettings.referenceScale + 10 },
+      { splitFrames: !defaultSettings.splitFrames },
     ];
     for (const edit of nonGeometryEdits) {
       expect(printKitCacheKey({ ...defaultSettings, ...edit }, "bed-220")).toBe(baseKey);

@@ -1,28 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
 import { createLayout } from "@/fabrication/purifierLayout";
-import { createPrintableKit, type PrintablePart } from "@/fabrication/printing/printableKit";
+import type { PrintablePart } from "@/fabrication/printing/printableKit";
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { cleanManifold, manifoldReport, shellCount, totalGenus } from "../helpers/manifoldChecks";
 
-// three.js ExtrudeGeometry is non-indexed triangle soup, so before welding a
-// plain plate exported with every edge as a boundary edge; and the donut parts
-// concatenated overlapping solids into self-intersecting shells. These tests pin
-// the repaired invariant: every exported part is watertight as written, with no
-// boundary, over-shared, or degenerate topology left for the slicer to repair.
-
-describe("Laser-derived print kit meshes are 2-manifold", () => {
-  test("split bed-180 kit: every panel tile and dovetail glue key is watertight", () => {
-    const kit = createPrintableKit(createLayout(defaultSettings), "bed-180");
-
-    expect(kit.summary.splitPanelCount).toBeGreaterThan(0);
-    expect(kit.parts.some((part) => part.kind === "panel-tile")).toBe(true);
-    expect(kit.parts.some((part) => part.kind === "dovetail-glue-key")).toBe(true);
-    for (const part of kit.parts) {
-      expect(manifoldReport(part.mesh)).toEqual(cleanManifold);
-    }
-  });
-});
+// three.js ExtrudeGeometry is non-indexed triangle soup, so before welding the
+// donut parts concatenated overlapping solids into self-intersecting shells.
+// These tests pin the repaired invariant: every exported part is watertight as
+// written, with no boundary, over-shared, or degenerate topology left for the
+// slicer to repair.
 
 describe("Donut filter print kit meshes are 2-manifold", () => {
   const kit = createDonutFilterPrintableKit(

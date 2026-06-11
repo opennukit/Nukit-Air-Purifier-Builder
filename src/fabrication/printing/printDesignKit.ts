@@ -1,14 +1,8 @@
 import { createDonutFilterPrintableKit } from "@/fabrication/printing/designs/donut-filter/printableKit";
 import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import { findPreviewMaterialColorPreset, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
-import {
-  isDonutFilterPrintDesignId,
-  isStaticReferencePrintDesignId,
-  isTempestPrintDesignId,
-} from "@/domain/purifier/designPresets";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
-  createPrintableKit,
   createPrintableThreeMfExportFromKit,
   type PrintableKit,
   type PrintableThreeMfExport,
@@ -40,25 +34,26 @@ export function printKitCacheKey(
     // baked into its geometry.
     previewMaterialColor,
     fanColor,
-    // Laser-SVG output options; the print pipeline never reads them.
+    // Laser-only settings; the print pipeline never reads them.
     labels,
     referenceScale,
+    splitFrames,
     ...kitGeometryInputs
   } = rawSettings;
   return JSON.stringify({ printVolumePresetId: presetId, ...kitGeometryInputs });
 }
 
 export function createPrintDesignKit(layout: LayoutResult, presetId: PrintVolumePresetId): PrintableKit {
-  if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
-    throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
+  switch (layout.configuration.design.type) {
+    case "donut-filter-adapter":
+      return createDonutFilterPrintableKit(layout, presetId);
+    case "tempest":
+      return createTempestPrintableKitFromLayout(layout, presetId);
+    case "static-reference":
+      throw new Error("createPrintDesignKit: Static reference designs do not generate browser print kits");
+    case "laser-derived-printable-kit":
+      throw new Error("createPrintDesignKit: The Nukit Open Air design fabricates as a laser cut sheet, not a print kit");
   }
-  if (isDonutFilterPrintDesignId(layout.configuration.printDesign.id)) {
-    return createDonutFilterPrintableKit(layout, presetId);
-  }
-  if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
-    return createTempestPrintableKitFromLayout(layout, presetId);
-  }
-  return createPrintableKit(layout, presetId);
 }
 
 export function createPrintDesignThreeMfExport(
@@ -73,25 +68,11 @@ export function createPrintDesignThreeMfExportFromKit(
   layout: LayoutResult,
   kit: PrintableKit,
 ): PrintableThreeMfExport {
-  const displayColor = enclosureDisplayColor(layout);
-
-  if (
-    isDonutFilterPrintDesignId(layout.configuration.printDesign.id) ||
-    isTempestPrintDesignId(layout.configuration.printDesign.id)
-  ) {
-    return createPrintableThreeMfExportFromKit(
-      kit,
-      `${layout.configuration.printDesign.label} print kit`,
-      `${layout.configuration.printDesign.id}-print-kit.3mf`,
-      displayColor,
-    );
-  }
-
   return createPrintableThreeMfExportFromKit(
     kit,
-    "Nukit Open Air Purifier print kit",
-    "nukit-open-air-purifier-print-kit.3mf",
-    displayColor,
+    `${layout.configuration.printDesign.label} print kit`,
+    `${layout.configuration.printDesign.id}-print-kit.3mf`,
+    enclosureDisplayColor(layout),
   );
 }
 
