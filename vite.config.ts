@@ -12,9 +12,10 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      // The geometry playground is a dev tool; it is served by the dev server
+      // but deliberately excluded from the production build.
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
-        playground: fileURLToPath(new URL("./playground.html", import.meta.url)),
       },
     },
   },

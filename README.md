@@ -49,21 +49,12 @@ bun run port:audit
 bun run oracle:airpurifier
 ```
 
-Run optional OpenSCAD oracle checks for the Tempest 3D-print port:
-
-```sh
-bun run test:openscad
-```
-
-This requires the `openscad` CLI on `PATH`, or `OPENSCAD_BIN=/path/to/OpenSCAD`. The suite renders the checked-in Tempest `.scad` reference and compares parsed oracle metrics with the TypeScript/JSCAD port.
-
 ## Model Correctness
 
 - Browser previews use Three.js for display.
 - Generated laser files come from the laser fabrication model.
-- Generated 3MF files come from the TypeScript/JSCAD print model.
-- The Tempest print model is a hand port of the OpenSCAD reference in [references/tempest-openscad-reference](./references/tempest-openscad-reference).
-- OpenSCAD oracle tests compare reference-derived dimensions and layout metrics against the port. They do not replace manual print-fit validation.
+- Generated 3MF files come from the parametric model built on the Manifold CSG kernel, which guarantees watertight, slicer-ready meshes.
+- The Tempest print model is a hand port of the OpenSCAD reference in [references/tempest-openscad-reference](./references/tempest-openscad-reference); watertightness and topology are pinned by manifold/genus tests. They do not replace manual print-fit validation.
 
 ## Repository Layout
 
