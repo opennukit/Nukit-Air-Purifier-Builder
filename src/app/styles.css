@@ -1294,6 +1294,22 @@ Diagnostics
   background: rgb(160 102 40 / 10%);
 }
 
+.diagnostic-item.error {
+  border-left-color: #a32f26;
+  background: rgb(163 47 38 / 10%);
+}
+
+/* The per-check list under the readiness summary spans the full output panel
+   width, below the summary/button row. */
+.export-diagnostics-list {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* #######################################
 Design-Specific Layout Controls
 ####################################### */

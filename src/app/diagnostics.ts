@@ -1,6 +1,8 @@
 // Evaluates the export checks shown in the workbench output panel: base build
 // diagnostics filtered for the active fabrication method, print-kit specific
-// warnings, and the one-line readiness summary above the export button.
+// blockers, and the one-line readiness summary above the export button.
+// Severity carries the export rule: "error" diagnostics block export, while
+// "warning" diagnostics are advisories that leave export available.
 
 import {
   isDonutFilterPrintDesignId,
@@ -8,7 +10,7 @@ import {
   isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
-import { evaluateBuildDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
+import { evaluateBuildDiagnostics, summarizeDiagnostics, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type { ExportFormat, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
 
@@ -25,6 +27,9 @@ export function evaluateActiveExportDiagnostics(
     currentFabricationMethod === "print-3mf" &&
     (isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id) ||
       isTempestPrintDesignId(currentLayout.configuration.printDesign.id));
+  // The wall-bank fan checks describe the laser-derived enclosure, so the
+  // generated print kits drop them; dimensional sanity advisories stay on for
+  // every design that takes the measured rectangular filter.
   const baseDiagnostics = usesGeneratedPrintKit
     ? evaluateBuildDiagnostics(currentLayout).filter(
         (diagnostic) =>
@@ -34,7 +39,6 @@ export function evaluateActiveExportDiagnostics(
             "tight-fan-margin",
             "large-unsplit-frame",
             "large-sheet",
-            "filter-dimension-range",
           ].includes(diagnostic.id),
       )
     : evaluateBuildDiagnostics(currentLayout);
@@ -51,7 +55,7 @@ export function evaluateActiveExportDiagnostics(
   if (kit.summary.oversizedPartCount > 0) {
     printDiagnostics.push({
       id: "oversized-print-part",
-      severity: "warning",
+      severity: "error",
       title: "Print part exceeds bed",
       detail: `${kit.summary.oversizedPartCount} part${kit.summary.oversizedPartCount === 1 ? "" : "s"} exceed ${kit.preset.label}.`,
     });
@@ -59,7 +63,7 @@ export function evaluateActiveExportDiagnostics(
   if (kit.summary.retainedPrintCriticalCutFeatureCount < kit.summary.sourcePrintCriticalCutFeatureCount) {
     printDiagnostics.push({
       id: "critical-print-feature-loss",
-      severity: "warning",
+      severity: "error",
       title: "Critical cut features lost",
       detail: "The selected split would drop fan, screw, slot, or window features from the printable parts.",
     });
@@ -72,14 +76,10 @@ export function summarizeActiveBuildReadiness(
   diagnostics: readonly BuildDiagnostic[],
   currentFabricationMethod: ExportFormat,
 ): BuildDiagnostic {
-  if (diagnostics.length > 0) {
-    return {
-      id: "warnings",
-      severity: "warning",
-      title: `${diagnostics.length} export check${diagnostics.length === 1 ? "" : "s"}`,
-      detail: "Review the fabrication checks before exporting.",
-    };
-  }
+  return summarizeDiagnostics(diagnostics, readyDiagnostic(currentLayout, currentFabricationMethod));
+}
+
+function readyDiagnostic(currentLayout: LayoutResult, currentFabricationMethod: ExportFormat): BuildDiagnostic {
   if (currentFabricationMethod === "print-3mf") {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
@@ -97,5 +97,10 @@ export function summarizeActiveBuildReadiness(
       detail: "No print-bed or printable-geometry issues were detected.",
     };
   }
-  return summarizeBuildReadiness(currentLayout);
+  return {
+    id: "ready",
+    severity: "info",
+    title: "Ready to export",
+    detail: "No fan, sheet, frame, or dimension issues were detected.",
+  };
 }

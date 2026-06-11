@@ -105,7 +105,7 @@
     type WorkbenchFabricationPreview,
     type WorkbenchViewModel,
   } from "@/app/workbench/workbenchViewModel";
-  import { summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
+  import { exportBlockingDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import {
     createPrintableSheetPlanFromKit,
@@ -495,7 +495,9 @@
   // #######################################
 
   function exportDrawing(buttonKey: TransientButtonKey): void {
-    if (exportDiagnostics.length > 0) {
+    // Only blocking diagnostics refuse the export; advisories stay visible in
+    // the checks list but leave the download available.
+    if (exportBlockingDiagnostics(exportDiagnostics).length > 0) {
       flashDownloadButtons("Review checks");
       return;
     }
@@ -1026,6 +1028,16 @@
               </button>
             </div>
           </div>
+          {#if exportDiagnostics.length > 0}
+            <ul class="export-diagnostics-list" id="exportDiagnosticsList" aria-label="Export checks">
+              {#each exportDiagnostics as diagnostic (diagnostic.id)}
+                <li class={`diagnostic-item ${diagnostic.severity}`}>
+                  <strong>{diagnostic.title}</strong>
+                  <span>{diagnostic.detail}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
         </section>
 
         <div class="controls-sections">

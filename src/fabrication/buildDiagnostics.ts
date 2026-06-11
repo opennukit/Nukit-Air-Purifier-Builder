@@ -1,6 +1,10 @@
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 
-export type BuildDiagnosticSeverity = "info" | "warning";
+// How a diagnostic affects export:
+// - "error" blocks export — the output would be broken or unprintable.
+// - "warning" is an advisory — shown prominently, but export stays available.
+// - "info" is the all-clear readiness state, never produced by checks.
+export type BuildDiagnosticSeverity = "info" | "warning" | "error";
 
 export type BuildDiagnostic = {
   id: string;
@@ -8,6 +12,10 @@ export type BuildDiagnostic = {
   title: string;
   detail: string;
 };
+
+export function exportBlockingDiagnostics(diagnostics: readonly BuildDiagnostic[]): readonly BuildDiagnostic[] {
+  return diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+}
 
 const normalFilterMinimum = 180;
 const normalFilterMaximum = 760;
@@ -18,6 +26,17 @@ const largeSheetDimension = 1500;
 
 export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[] {
   const diagnostics: BuildDiagnostic[] = [];
+  // The measured-dimension sanity check applies to every design that takes the
+  // rectangular filter; the donut adaptor measures its own round filter.
+  if (layout.configuration.design.type !== "donut-filter-adapter" && filterLooksUnusual(layout.configuration.filter)) {
+    diagnostics.push({
+      id: "filter-dimension-range",
+      severity: "warning",
+      title: "Unusual filter dimensions",
+      detail: "Measured dimensions are outside the normal range used by common HVAC and purifier filters.",
+    });
+  }
+
   if (layout.summary.fans.type !== "wall-banks") {
     return diagnostics;
   }
@@ -77,35 +96,40 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (filterLooksUnusual(layout.configuration.filter)) {
-    diagnostics.push({
-      id: "filter-dimension-range",
-      severity: "warning",
-      title: "Unusual filter dimensions",
-      detail: "Measured dimensions are outside the normal range used by common HVAC and purifier filters.",
-    });
-  }
-
   return diagnostics;
 }
 
 export function summarizeBuildReadiness(layout: LayoutResult): BuildDiagnostic {
-  const warnings = evaluateBuildDiagnostics(layout);
-  if (warnings.length > 0) {
-    return {
-      id: "warnings",
-      severity: "warning",
-      title: `${warnings.length} export check${warnings.length === 1 ? "" : "s"}`,
-      detail: "Review the fabrication checks before exporting.",
-    };
-  }
-
-  return {
+  return summarizeDiagnostics(evaluateBuildDiagnostics(layout), {
     id: "ready",
     severity: "info",
     title: "Ready to export",
     detail: "No fan, sheet, frame, or dimension issues were detected.",
-  };
+  });
+}
+
+// The one-line readiness summary above the export button: blockers dominate
+// (export is refused), advisories note that export stays available, and the
+// caller supplies its method-specific all-clear diagnostic.
+export function summarizeDiagnostics(diagnostics: readonly BuildDiagnostic[], ready: BuildDiagnostic): BuildDiagnostic {
+  const blockers = exportBlockingDiagnostics(diagnostics);
+  if (blockers.length > 0) {
+    return {
+      id: "export-blocked",
+      severity: "error",
+      title: blockers.length === 1 ? "1 issue blocks export" : `${blockers.length} issues block export`,
+      detail: "Fix the blocking checks below before exporting.",
+    };
+  }
+  if (diagnostics.length > 0) {
+    return {
+      id: "advisories",
+      severity: "warning",
+      title: diagnostics.length === 1 ? "1 advisory" : `${diagnostics.length} advisories`,
+      detail: "Review the notes below — export is still available.",
+    };
+  }
+  return ready;
 }
 
 function tightFanMarginLabels(layout: LayoutResult): string[] {
