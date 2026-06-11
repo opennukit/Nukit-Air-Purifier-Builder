@@ -1,3 +1,4 @@
+import { manifoldKernel, track } from "@/fabrication/printing/modeling/manifoldKernel";
 import { type Geom3, meshData, POSITION_PROP_COUNT } from "@/fabrication/printing/modeling/manifoldOps";
 import { createMeshWelder, type WeldedMesh } from "@/fabrication/printing/meshWelding";
 import type { MeshVertex } from "@/fabrication/printing/threeMf";
@@ -40,4 +41,36 @@ function readPosition(vertProperties: Float32Array, positionBase: number): MeshV
 
 function positionChannelsFrom(positionBase: number): readonly number[] {
   return Array.from({ length: POSITION_PROP_COUNT }, (_, channel) => positionBase + channel);
+}
+
+// #######################################
+// Welded Mesh to Manifold Solid
+// #######################################
+
+// The inverse direction: lifts an already-closed welded mesh into the kernel so
+// it can participate in boolean ops. `Manifold.ofMesh` throws unless the input
+// is an oriented 2-manifold, so a soup that slipped past the welder fails loudly
+// here instead of exporting self-intersecting shells. `merge()` only rebuilds
+// the merge vectors for positions that still coincide at the kernel's tolerance
+// (a no-op for an already-welded mesh); it never moves or drops geometry.
+// ARENA_LIFETIME: the returned solid is tracked, so this must run inside the
+// `withGeometryArena` call that will consume it.
+export function solidFromWeldedMesh(mesh: WeldedMesh): Geom3 {
+  const { Manifold, Mesh } = manifoldKernel();
+  const vertProperties = new Float32Array(mesh.vertices.length * POSITION_PROP_COUNT);
+  for (const [vertexIndex, vertex] of mesh.vertices.entries()) {
+    const [xChannel, yChannel, zChannel] = positionChannelsFrom(vertexIndex * POSITION_PROP_COUNT);
+    vertProperties[xChannel] = vertex.x;
+    vertProperties[yChannel] = vertex.y;
+    vertProperties[zChannel] = vertex.z;
+  }
+  const triVerts = new Uint32Array(mesh.triangles.length * 3);
+  for (const [triangleIndex, triangle] of mesh.triangles.entries()) {
+    triVerts[triangleIndex * 3] = triangle.v1;
+    triVerts[triangleIndex * 3 + 1] = triangle.v2;
+    triVerts[triangleIndex * 3 + 2] = triangle.v3;
+  }
+  const meshGl = new Mesh({ numProp: POSITION_PROP_COUNT, vertProperties, triVerts });
+  meshGl.merge();
+  return track(Manifold.ofMesh(meshGl));
 }

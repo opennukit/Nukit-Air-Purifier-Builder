@@ -2,6 +2,9 @@ import { Path, Shape } from "three";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { extrudeShapeToMesh } from "@/fabrication/printing/extrudeMesh";
 import { roundVertex } from "@/fabrication/printing/meshWelding";
+import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
+import { booleans } from "@/fabrication/printing/modeling/manifoldOps";
+import { extractWeldedMesh, solidFromWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
 import {
   createDonutFilterModel,
   donutCapTotalHeight,
@@ -70,7 +73,7 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
 
 function createAdapterPart(model: DonutFilterModel): PrintablePart {
   const height = model.adapter.coneLength + model.adapter.insertLength;
-  const mesh = combineMeshes([
+  const mesh = unionMeshes([
     createPlateMesh(model.fanSize, model.fanSize, model.adapter.flangeThickness, adapterFlangeCuts(model)),
     createTubeShellMesh({
       cx: model.fanSize / 2,
@@ -144,13 +147,13 @@ function createFanGuardPart(model: DonutFilterModel): PrintablePart {
     height: guard.thickness,
     cutFeatureCount: 0,
     printCriticalCutFeatureCount: 0,
-    mesh: combineMeshes(meshes),
+    mesh: unionMeshes(meshes),
   };
 }
 
 function createCapPart(model: DonutFilterModel, cap: Extract<DonutFilterCap, { readonly type: "printed-cap" }>): PrintablePart {
   const center = cap.outerDiameter / 2;
-  const mesh = combineMeshes([
+  const mesh = unionMeshes([
     createDiskMesh(center, center, cap.outerDiameter / 2, cap.thickness, 96),
     createTubeShellMesh({
       cx: center,
@@ -333,19 +336,17 @@ function createShape(points: readonly Point2[]): Shape {
 // Mesh Composition
 // #######################################
 
-function combineMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
-  const vertices: MeshVertex[] = [];
-  const triangles: MeshTriangle[] = [];
-  for (const mesh of meshes) {
-    const offset = vertices.length;
-    vertices.push(...mesh.vertices);
-    triangles.push(
-      ...mesh.triangles.map((triangle) => ({
-        v1: triangle.v1 + offset,
-        v2: triangle.v2 + offset,
-        v3: triangle.v3 + offset,
-      })),
-    );
-  }
-  return { vertices, triangles };
+// The donut parts are modeled as overlapping closed solids (flange + cones, the
+// fan guard's frame + rings + spokes + bosses). Concatenating those meshes would
+// export self-intersecting shells that slicers must auto-repair — and repair can
+// silently drop thin features like the fan-guard spokes. A real boolean union
+// through the Manifold kernel fuses them into one watertight body instead.
+function unionMeshes(meshes: readonly PrintableMesh[]): PrintableMesh {
+  return withGeometryArena(() => {
+    const [first, ...rest] = meshes.map(solidFromWeldedMesh);
+    if (first === undefined) {
+      throw new Error("unionMeshes: No meshes to union");
+    }
+    return extractWeldedMesh(booleans.union(first, ...rest));
+  });
 }
