@@ -1258,14 +1258,14 @@ Segmented Controls
 
 /* Small "i" next to a legend; its explainer tooltip appears above on hover or
    keyboard focus. */
-.measure-info {
+.info-tip {
   position: relative;
   display: inline-block;
   margin-left: 6px;
   vertical-align: middle;
 }
 
-.measure-info button {
+.info-tip button {
   display: grid;
   place-items: center;
   width: 16px;
@@ -1282,13 +1282,13 @@ Segmented Controls
   user-select: none;
 }
 
-.measure-info:hover button,
-.measure-info:focus-within button {
+.info-tip:hover button,
+.info-tip:focus-within button {
   background: var(--accent-wash);
   border-color: var(--accent-line-strong);
 }
 
-.measure-info p {
+.info-tip p {
   position: absolute;
   z-index: 4;
   bottom: 22px;
@@ -1308,8 +1308,8 @@ Segmented Controls
   letter-spacing: 0;
 }
 
-.measure-info:hover p,
-.measure-info:focus-within p {
+.info-tip:hover p,
+.info-tip:focus-within p {
   display: block;
 }
 

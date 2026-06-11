@@ -32,6 +32,8 @@ export type NumberControl<Name extends NumericSettingName> = {
   readonly label: string;
   readonly suffix: string;
   readonly step: string;
+  // Optional hover explainer rendered as a small "i" next to the label.
+  readonly info?: string;
 };
 // Dimension inputs render their unit suffix and step from the active display
 // unit, so their control rows carry only the label and millimeter step.
@@ -74,7 +76,14 @@ export const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[]
 // Slide-in clearance around the measured filter; mm-only like the other
 // generated-geometry inputs.
 export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "filterFitClearance", label: "Filter fit clearance", suffix: "mm", step: "0.5" },
+  {
+    name: "filterFitClearance",
+    label: "Filter fit clearance",
+    suffix: "mm",
+    step: "0.5",
+    info:
+      "Extra space added around your measured filter so it slides in instead of press-fitting. 1 mm per side works for most printers; 0 makes the cavity exactly the measured size.",
+  },
 ];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },

@@ -1081,7 +1081,7 @@
                 <fieldset class="segmented-field">
                   <legend>
                     Measurement unit
-                    <span class="measure-info">
+                    <span class="info-tip">
                       <button type="button" aria-label="Why measure instead of using the box label?" aria-describedby="measureInfoNote">i</button>
                       <p id="measureInfoNote" role="tooltip">
                         Don't copy the size printed on the box. A "20x25x1" filter actually measures
@@ -1295,7 +1295,15 @@
                 <div data-tempest-fit-controls>
                   {#each tempestFitControls as control}
                     <label class="field">
-                      <span>{control.label}</span>
+                      <span>
+                        {control.label}
+                        {#if control.info !== undefined}
+                          <span class="info-tip">
+                            <button type="button" aria-label="What does {control.label} do?" aria-describedby="info-{control.name}">i</button>
+                            <p id="info-{control.name}" role="tooltip">{control.info}</p>
+                          </span>
+                        {/if}
+                      </span>
                       <span class="input-shell">
                         <input
                           type="number"
