@@ -174,6 +174,9 @@ export type RawPurifierSettings = {
   fansTop: number;
   fansBottom: number;
   tempestArrangement: TempestArrangementPreset;
+  // Tempest-only: clearance added per side around the MEASURED filter so it
+  // slides into its cavity; separate from the measurement on purpose.
+  filterFitClearance: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -243,6 +246,7 @@ export type TempestPrintDesignDraft = {
   readonly preset: TempestPrintDesignPreset;
   readonly arrangement: TempestArrangementPreset;
   readonly filter: FilterDimensions;
+  readonly filterFitClearance: Millimeters;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -289,6 +293,7 @@ export type ConfiguredPrintDesign =
       readonly preset: TempestPrintDesignPreset;
       readonly arrangement: TempestArrangementPreset;
       readonly filter: FilterDimensions;
+      readonly filterFitClearance: Millimeters;
     }
   | {
       readonly type: "static-reference";
@@ -359,6 +364,7 @@ export const defaultSettings: RawPurifierSettings = {
   fansTop: 0,
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
+  filterFitClearance: 1,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,

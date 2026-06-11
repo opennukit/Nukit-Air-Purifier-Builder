@@ -102,6 +102,23 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(decodedAgain.filterThickness).toBe(22);
   });
 
+  test("preserves the tempest filter fit clearance through the URL codec into the frame settings", () => {
+    const decoded = decodeSettings("printDesign=nukit-tempest&filterFitClearance=2.5");
+    expect(decoded.filterFitClearance).toBe(2.5);
+
+    const decodedAgain = decodeSettings(encodeSettings(decoded));
+    expect(decodedAgain.filterFitClearance).toBe(2.5);
+
+    // Clamped at the boundary like the other raw measurements.
+    expect(decodeSettings("filterFitClearance=99").filterFitClearance).toBe(5);
+    expect(decodeSettings("filterFitClearance=-3").filterFitClearance).toBe(0);
+    expect(decodeSettings("").filterFitClearance).toBe(defaultSettings.filterFitClearance);
+
+    // The decoded clearance reaches the tempest frame settings the model builds from.
+    const layout = createLayout(decoded);
+    expect(createTempestSettingsFromLayout(layout).frame.filterFitClearance).toBe(2.5);
+  });
+
   test("defaults the four-side tower to the Air Fanta compatible filter size", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(

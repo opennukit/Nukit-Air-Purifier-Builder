@@ -71,6 +71,11 @@ export const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[]
   { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
   { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01" },
 ];
+// Slide-in clearance around the measured filter; mm-only like the other
+// generated-geometry inputs.
+export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = [
+  { name: "filterFitClearance", label: "Filter fit clearance", suffix: "mm", step: "0.5" },
+];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },
   { name: "fingerSpaceMultiplier", label: "Finger space", suffix: "x", step: "0.1" },

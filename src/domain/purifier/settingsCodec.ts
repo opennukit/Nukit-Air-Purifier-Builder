@@ -66,6 +66,7 @@ export function encodeSettings(
     params.set("fansBottom", String(settings.fansBottom));
   }
   params.set("tempestArrangement", settings.tempestArrangement);
+  params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set(
     "donutFilterOuterDiameter",
     formatNumber(settings.donutFilterOuterDiameter),
@@ -360,6 +361,7 @@ const purifierSettingsFieldKeys: Record<
   filterWidth: ["filterWidth", "x"],
   filterDepth: ["filterDepth", "y"],
   filterThickness: ["filterThickness", "filter_height"],
+  filterFitClearance: "filterFitClearance",
   rim: "rim",
   filters: "filters",
   splitFrames: ["splitFrames", "split_frames"],

@@ -38,6 +38,7 @@
     parametricPrintDesignPresets,
     staticPrintDesignPresets,
     tempestArrangementOptions,
+    tempestFitControls,
     type BooleanSettingName,
     type DonutFilterDimensionName,
     type DonutNumberSettingName,
@@ -1243,6 +1244,28 @@
                         <input
                           type="number"
                           name={control.name}
+                          step={control.step}
+                          inputmode="decimal"
+                          value={settings[control.name]}
+                          onchange={(event) => updateNumberSetting(control.name, event)}
+                        />
+                        <small>{control.suffix}</small>
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+              {#if isTempestControlsActive}
+                <div data-tempest-fit-controls>
+                  {#each tempestFitControls as control}
+                    <label class="field">
+                      <span>{control.label}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name={control.name}
+                          min="0"
+                          max="5"
                           step={control.step}
                           inputmode="decimal"
                           value={settings[control.name]}
