@@ -28,8 +28,8 @@ describe("parts list", () => {
     expect(categories).toContain("Filament");
     expect(categories).toContain("Fasteners");
     expect(items.filter((item) => item.category === "Assembly").map((item) => item.label)).toEqual([
-      "CA or epoxy glue",
-      "1.75 mm filament pins",
+      "Super glue or epoxy",
+      "Filament alignment pins",
     ]);
     expect(categories).not.toContain("Sheet");
   });
