@@ -88,6 +88,13 @@ const sharedWorkerPort: KitBuildPort = {
   },
 };
 
+// Dev HMR replaces this module (and its sharedWorker binding) wholesale; the
+// old worker would otherwise keep running unreachable.
+import.meta.hot?.dispose(() => {
+  sharedWorker?.terminate();
+  sharedWorker = null;
+});
+
 // Geometry-identical requests in flight at the same time share one build: the
 // channels never see each other, so without this the assembled preview and an
 // unsplit sheet plan for the same settings would each build the same kit.
