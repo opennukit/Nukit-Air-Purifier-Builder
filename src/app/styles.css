@@ -1341,7 +1341,9 @@ Segmented Controls
   pointer-events: none;
 }
 
-.segmented-field span {
+/* Scoped to the option labels: the fieldset's legend can carry other spans
+   (e.g. the info icon) that must not render as segment cells. */
+.segmented-field label > span {
   display: grid;
   place-items: center;
   min-height: 42px;
