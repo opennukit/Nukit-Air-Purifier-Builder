@@ -76,6 +76,11 @@ export function createFilterMediaMaterial(opacity: number): Material {
     opacity,
     side: DoubleSide,
     depthWrite: false,
+    // The media slab shares faces with the panels/rails that hold it; pull it
+    // slightly toward the camera in depth so coincident surfaces don't flicker.
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
   });
 }
 
