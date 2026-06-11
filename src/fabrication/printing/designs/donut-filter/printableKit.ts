@@ -55,7 +55,6 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
     parts,
     summary: {
       partCount: parts.length,
-      splitPanelCount: 0,
       oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
     },
   };

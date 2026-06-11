@@ -101,7 +101,6 @@ export type PrintableMesh = {
 
 export type PrintableKitSummary = {
   readonly partCount: number;
-  readonly splitPanelCount: number;
   readonly oversizedPartCount: number;
 };
 

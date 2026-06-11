@@ -85,7 +85,6 @@ export function createTempestPrintableKit(
     parts,
     summary: {
       partCount: parts.length,
-      splitPanelCount: printableChunkGrid.totalCount > 1 ? 1 : 0,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
     },
   };

@@ -71,7 +71,6 @@ export function createPreviewSummaryItems(
       return [
         { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
         { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-        { label: "Split model", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.splitPanelCount)) },
         { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
       ];
     }

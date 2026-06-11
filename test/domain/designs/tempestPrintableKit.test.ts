@@ -26,7 +26,6 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts).toHaveLength(12);
     expect(kit.summary).toEqual({
       partCount: 12,
-      splitPanelCount: 1,
       oversizedPartCount: 0,
     });
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
@@ -95,7 +94,6 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts).toHaveLength(18);
     expect(kit.summary).toEqual({
       partCount: 18,
-      splitPanelCount: 1,
       oversizedPartCount: 0,
     });
     expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);

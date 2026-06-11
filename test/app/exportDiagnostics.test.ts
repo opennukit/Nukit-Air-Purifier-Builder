@@ -16,7 +16,6 @@ import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/setti
 
 const cleanKitSummary: PrintableKitSummary = {
   partCount: 4,
-  splitPanelCount: 1,
   oversizedPartCount: 0,
 };
 
