@@ -35,12 +35,28 @@ self.onmessage = (event: MessageEvent<KitWorkerRequest>) => {
 // arrays whose buffers ride the transfer list, so the main thread receives
 // them without a per-vertex structured clone.
 async function respond(request: KitWorkerRequest): Promise<void> {
-  const { result, transfer } = packKitBuildResult(await buildAfterKernelReady(request));
-  const response: KitWorkerResponse = {
-    requestId: request.requestId,
-    result,
-  };
-  self.postMessage(response, transfer);
+  const buildResult = await buildAfterKernelReady(request);
+  // Packing allocates one typed array per mesh; on a huge kit that can throw
+  // (out of memory), and an exception escaping here would die as an unhandled
+  // rejection the parent's onerror never sees, wedging the channel. Convert it
+  // into an ordinary failed response instead.
+  try {
+    const { result, transfer } = packKitBuildResult(buildResult);
+    const response: KitWorkerResponse = {
+      requestId: request.requestId,
+      result,
+    };
+    self.postMessage(response, transfer);
+  } catch (error) {
+    const response: KitWorkerResponse = {
+      requestId: request.requestId,
+      result: {
+        type: "failed",
+        message: `kitWorker: failed to pack or post the kit result: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    };
+    self.postMessage(response, []);
+  }
 }
 
 async function buildAfterKernelReady(request: KitWorkerRequest): Promise<KitBuildResult> {
