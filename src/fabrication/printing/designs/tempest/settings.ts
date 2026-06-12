@@ -1,6 +1,11 @@
 import { defaultTempestSettings } from "@/domain/designs/tempest/model";
-import type { TempestFanCountRequest, TempestSettings } from "@/domain/designs/tempest/shared";
-import type { PurifierSettings } from "@/domain/purifier/settingsModel";
+import {
+  defaultTempestCordPassThrough,
+  type TempestCordPassThrough,
+  type TempestFanCountRequest,
+  type TempestSettings,
+} from "@/domain/designs/tempest/shared";
+import type { CordHoleSettings, PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FanCountRequest as PurifierFanCountRequest } from "@/domain/purifier/fans";
 import type { FilterDimensions } from "@/domain/purifier/filter";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -34,6 +39,20 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       rim: configuration.cutting.rim,
       filterFitClearance: design.filterFitClearance,
     },
+    cordPassThrough: tempestCordPassThroughFromCordHole(design.cordHole),
+  };
+}
+
+// The user picks the wall and bore; the in-wall placement (side, corner
+// offset) keeps the shipped defaults.
+function tempestCordPassThroughFromCordHole(cordHole: CordHoleSettings): TempestCordPassThrough {
+  if (cordHole.placement === "none") {
+    return { type: "none" };
+  }
+  return {
+    ...defaultTempestCordPassThrough,
+    wall: cordHole.placement,
+    diameter: cordHole.diameter,
   };
 }
 

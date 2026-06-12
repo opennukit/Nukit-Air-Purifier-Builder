@@ -8,6 +8,7 @@
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
     applyTempestArrangementDefaults,
+    canonicalCordHolePlacement,
     previewMaterialColorPresets,
     type PreviewMaterialColorId,
     type PurifierDraft,
@@ -29,6 +30,8 @@
   } from "@/domain/purifier/fans";
   import {
     advancedJointControls,
+    cordHoleInfo,
+    cordHolePlacementOptions,
     donutFilterDimensionControls,
     fanPlacementControls,
     filterDimensionControls,
@@ -405,6 +408,13 @@
 
   function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
+  }
+
+  function updateCordHolePlacement(event: Event): void {
+    commitSettings({
+      ...settings,
+      cordHolePlacement: canonicalCordHolePlacement(requireSelect(event, "updateCordHolePlacement").value),
+    });
   }
 
   function updateMeasuredDimension(
@@ -1500,6 +1510,46 @@
                       </span>
                     </label>
                   {/each}
+                  <label class="field">
+                    <span>
+                      Power cord hole
+                      <span class="info-tip" class:is-open={openInfoTipId === "info-cordHolePlacement"}>
+                        <button
+                          type="button"
+                          aria-label="What does Power cord hole do?"
+                          aria-describedby="info-cordHolePlacement"
+                          aria-expanded={openInfoTipId === "info-cordHolePlacement"}
+                          onclick={() => toggleInfoTip("info-cordHolePlacement")}
+                          onblur={() => closeInfoTip("info-cordHolePlacement")}
+                          onkeydown={(event) => handleInfoTipKeydown("info-cordHolePlacement", event)}
+                        >i</button>
+                        <p id="info-cordHolePlacement" role="tooltip">{cordHoleInfo}</p>
+                      </span>
+                    </span>
+                    <select name="cordHolePlacement" onchange={updateCordHolePlacement}>
+                      {#each cordHolePlacementOptions as option}
+                        <option value={option.id} selected={settings.cordHolePlacement === option.id}>{option.label}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  {#if settings.cordHolePlacement !== "none"}
+                    <label class="field">
+                      <span>Cord hole diameter</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="cordHoleDiameter"
+                          min="3"
+                          max="25"
+                          step="0.5"
+                          inputmode="decimal"
+                          value={settings.cordHoleDiameter}
+                          onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                  {/if}
                 </div>
               {/if}
               {#if showPrintSetupControls}

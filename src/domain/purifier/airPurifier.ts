@@ -14,6 +14,7 @@ import {
 import {
   applyTempestArrangement,
   cameraPresets,
+  canonicalCordHolePlacement,
   canonicalTempestArrangement,
   clamp,
   defaultSettings,
@@ -135,6 +136,8 @@ export function normalizeRawSettings(
     // Preserved like tempestArrangement: the value survives even while a
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
+    cordHolePlacement: canonicalCordHolePlacement(input.cordHolePlacement),
+    cordHoleDiameter: normalizeCordHoleDiameter(input.cordHoleDiameter),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -262,6 +265,8 @@ export function serializePurifierDraft(
       ...serializedFilterFields(draft.design.filter),
       tempestArrangement: draft.design.arrangement,
       filterFitClearance: draft.design.filterFitClearance,
+      cordHolePlacement: draft.design.cordHole.placement,
+      cordHoleDiameter: draft.design.cordHole.diameter,
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -318,6 +323,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     tempestArrangement: defaultSettings.tempestArrangement,
     filterFitClearance: defaultSettings.filterFitClearance,
+    cordHolePlacement: defaultSettings.cordHolePlacement,
+    cordHoleDiameter: defaultSettings.cordHoleDiameter,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -393,6 +400,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...serializedFilterFields(input.design.filter),
       tempestArrangement: input.design.arrangement,
       filterFitClearance: input.design.filterFitClearance,
+      cordHolePlacement: input.design.cordHole.placement,
+      cordHoleDiameter: input.design.cordHole.diameter,
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -462,6 +471,10 @@ function createConfiguredPrintDesign(input: {
       arrangement: canonicalTempestArrangement(input.raw.tempestArrangement),
       filter: input.filter,
       filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
+      cordHole: {
+        placement: canonicalCordHolePlacement(input.raw.cordHolePlacement),
+        diameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
+      },
     };
   }
 
@@ -557,6 +570,7 @@ function createPurifierDesignDraft(
       arrangement: configuration.design.arrangement,
       filter: configuration.design.filter,
       filterFitClearance: configuration.design.filterFitClearance,
+      cordHole: configuration.design.cordHole,
     };
   }
 
@@ -643,6 +657,10 @@ function normalizeDonutCapRim(
 
 function normalizeFilterFitClearance(value: Millimeters): Millimeters {
   return clamp(value, 0, 5);
+}
+
+function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
+  return clamp(value, 3, 25);
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {

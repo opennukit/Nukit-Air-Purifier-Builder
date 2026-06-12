@@ -110,6 +110,40 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(createTempestSettingsFromLayout(layout).frame.filterFitClearance).toBe(2.5);
   });
 
+  test("preserves the tempest cord hole choice through the URL codec into the cord pass-through", () => {
+    // Default = the shipped cord hole: right wall, 8 mm bore.
+    const defaultLayout = createLayout(decodeSettings("printDesign=nukit-tempest"));
+    expect(createTempestSettingsFromLayout(defaultLayout).cordPassThrough).toMatchObject({
+      type: "wall",
+      wall: "right",
+      diameter: 8,
+    });
+
+    const decoded = decodeSettings("printDesign=nukit-tempest&cordHolePlacement=left&cordHoleDiameter=10");
+    expect(decoded.cordHolePlacement).toBe("left");
+    expect(decoded.cordHoleDiameter).toBe(10);
+
+    const decodedAgain = decodeSettings(encodeSettings(decoded));
+    expect(decodedAgain.cordHolePlacement).toBe("left");
+    expect(decodedAgain.cordHoleDiameter).toBe(10);
+
+    const chosenLayout = createLayout(decoded);
+    expect(createTempestSettingsFromLayout(chosenLayout).cordPassThrough).toMatchObject({
+      type: "wall",
+      wall: "left",
+      diameter: 10,
+    });
+
+    // "none" removes the hole entirely.
+    const noneLayout = createLayout(decodeSettings("printDesign=nukit-tempest&cordHolePlacement=none"));
+    expect(createTempestSettingsFromLayout(noneLayout).cordPassThrough).toEqual({ type: "none" });
+
+    // Unknown placements fall back to the default; the diameter clamps at the boundary.
+    expect(decodeSettings("cordHolePlacement=chimney").cordHolePlacement).toBe("right");
+    expect(decodeSettings("cordHoleDiameter=99").cordHoleDiameter).toBe(25);
+    expect(decodeSettings("cordHoleDiameter=1").cordHoleDiameter).toBe(3);
+  });
+
   test("defaults the four-side tower to the Air Fanta compatible filter size", () => {
     const presetTower = createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower"));
     const customTower = createLayout(

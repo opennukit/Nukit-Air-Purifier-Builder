@@ -128,6 +128,17 @@ export type TempestCordPassThrough =
       readonly cornerOffset: Millimeters;
     };
 
+// The shipped cord hole: an 8 mm bore hugging the right corner of the right
+// wall. The raw purifier settings expose the wall and diameter as user
+// choices and fall back to this for side and cornerOffset.
+export const defaultTempestCordPassThrough = {
+  type: "wall",
+  diameter: 8,
+  wall: "right",
+  side: "right",
+  cornerOffset: 17,
+} as const satisfies TempestCordPassThrough;
+
 export type TempestAlignmentPinSettings =
   | {
       readonly type: "disabled";

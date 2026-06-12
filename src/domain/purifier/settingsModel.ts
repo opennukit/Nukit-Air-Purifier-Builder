@@ -47,6 +47,11 @@ import {
   type ReferenceScale,
 } from "@/fabrication/laser/cutSettings";
 import type { Millimeters } from "@/domain/units";
+import {
+  defaultTempestCordPassThrough,
+  tempestWalls,
+  type TempestWall,
+} from "@/domain/designs/tempest/shared";
 import type {
   StaticPrintReferenceCapabilities,
   StaticPrintReference,
@@ -63,6 +68,26 @@ import type {
 export const cameraPresets = ["official", "front", "side", "top"] as const;
 
 export type CameraPreset = (typeof cameraPresets)[number];
+
+// ##############################
+// Power Cord Hole
+// ##############################
+
+// Tempest-only: where the fan power cables exit the housing. A wall choice
+// drills that wall (the tower routes it through the matching top-plate
+// corner); "none" omits the hole.
+export type CordHolePlacement = "none" | TempestWall;
+
+export const cordHolePlacements: readonly CordHolePlacement[] = [
+  "none",
+  ...tempestWalls,
+];
+
+export type CordHoleSettings = {
+  readonly placement: CordHolePlacement;
+  // Preserved while placement is "none" so re-enabling keeps the user's bore.
+  readonly diameter: Millimeters;
+};
 
 // #######################################
 // Build Configuration
@@ -176,6 +201,9 @@ export type RawPurifierSettings = {
   // Tempest-only: clearance added per side around the MEASURED filter so it
   // slides into its cavity; separate from the measurement on purpose.
   filterFitClearance: Millimeters;
+  // Tempest-only: the power-cord hole choice and bore diameter.
+  cordHolePlacement: CordHolePlacement;
+  cordHoleDiameter: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -245,6 +273,7 @@ export type TempestPrintDesignDraft = {
   readonly arrangement: TempestArrangementPreset;
   readonly filter: FilterDimensions;
   readonly filterFitClearance: Millimeters;
+  readonly cordHole: CordHoleSettings;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -292,6 +321,7 @@ export type ConfiguredPrintDesign =
       readonly arrangement: TempestArrangementPreset;
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
+      readonly cordHole: CordHoleSettings;
     }
   | {
       readonly type: "static-reference";
@@ -363,6 +393,8 @@ export const defaultSettings: RawPurifierSettings = {
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
   filterFitClearance: 1,
+  cordHolePlacement: defaultTempestCordPassThrough.wall,
+  cordHoleDiameter: defaultTempestCordPassThrough.diameter,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,
@@ -595,6 +627,13 @@ export function canonicalTempestArrangement(
     (arrangement) => arrangement === value,
   );
   return found ?? defaultSettings.tempestArrangement;
+}
+
+export function canonicalCordHolePlacement(
+  value: CordHolePlacement | string | null | undefined,
+): CordHolePlacement {
+  const found = cordHolePlacements.find((placement) => placement === value);
+  return found ?? defaultSettings.cordHolePlacement;
 }
 
 function requiredPreviewMaterialColorPreset(

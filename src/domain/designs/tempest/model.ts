@@ -3,6 +3,7 @@ import { assertNever, type TempestTopology } from "./topology";
 import { sandwichPlan } from "./sandwich";
 import { quadPlan } from "./quad";
 import {
+  defaultTempestCordPassThrough,
   finiteNonNegativeInteger,
   type TempestAlignmentPinSettings,
   type TempestChunkIndex,
@@ -326,13 +327,7 @@ export const defaultTempestSettings: TempestSettings = {
     clearance: 1,
     endMargin: 4,
   },
-  cordPassThrough: {
-    type: "wall",
-    diameter: 8,
-    wall: "right",
-    side: "right",
-    cornerOffset: 17,
-  },
+  cordPassThrough: defaultTempestCordPassThrough,
   alignmentPins: {
     type: "enabled",
     diameter: 1.8,
