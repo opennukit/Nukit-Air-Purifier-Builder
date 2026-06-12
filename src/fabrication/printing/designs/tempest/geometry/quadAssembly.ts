@@ -203,7 +203,7 @@ export function quadTopExhaust<Solid, Region>(
 }
 
 // A single large box/exhaust-fan opening over the air chamber, plus paired
-// corner holes for zip-tying a box fan in place (the traditional CR-Box top).
+// corner holes for zip-tying a box fan in place (the traditional box-fan top).
 export function towerBoxExhaustCuts<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,

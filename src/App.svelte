@@ -1621,12 +1621,12 @@
             </li>
             <li>
               <a href="https://itsairborne.com/building-a-pc-fan-corsi-rosenthal-box-68e7cd1ca570" target="_blank" rel="noreferrer">
-                Building a PC-fan Corsi-Rosenthal box
+                Building a PC-fan box purifier
               </a>
             </li>
             <li>
               <a href="https://itsairborne.com/pc-fan-corsi-rosenthal-guide-a611dabf7e0c" target="_blank" rel="noreferrer">
-                PC-fan Corsi-Rosenthal guide
+                PC-fan purifier guide
               </a>
             </li>
           </ul>

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { printPreviewGridY, printPreviewPartY } from "@/rendering/three/printSheetThreePreview";
 import { chooseStaticPrintOrientationForSize } from "@/rendering/three/staticPrintAssets";
-import { staticPrintReferences } from "@/resources/static-print-references/references";
 
 describe("Print sheet 3D preview", () => {
   test("renders printable parts above the bed grid to avoid z-fighting", () => {
@@ -27,27 +26,5 @@ describe("Print sheet 3D preview", () => {
 
     expect(orientation.height).toBe(160);
     expect(orientation.footprintWidth * orientation.footprintDepth).toBe(220 * 40);
-  });
-
-  test("turns the static 14x20 print plates right-side-up", () => {
-    const plateAssets = staticPrintReferences["static-cr-14x20-base"].platePreviewAssets;
-    const bedSideByName = new Map(
-      plateAssets.map((asset) => [
-        asset.name,
-        asset.printPlateOrientation.type === "source-bed-side" ? asset.printPlateOrientation.bedSide : "auto",
-      ]),
-    );
-
-    expect(plateAssets).toHaveLength(19);
-    expect(bedSideByName.get("1 filter housing fan mounts top power side.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("2 filter housing fan mounts top power side.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("91 filter housing corner guard power up.stl")).toBe("source-min-z");
-    expect(bedSideByName.get("3.2 filter housing power side upper less tight.stl")).toBe("source-max-x");
-    expect(bedSideByName.get("5 filter housing bottom power base.stl")).toBe("source-max-z");
-    expect(bedSideByName.get("6 filter housing bottom not power base.stl")).toBe("source-max-z");
-    expect(bedSideByName.get("8.2 filter housing no power side upper less tight.stl")).toBe("source-min-x");
-    expect(bedSideByName.get("xxxx 97 filter housing corner guard only if filter fits bad (janky)).stl")).toBe(
-      "source-min-z",
-    );
   });
 });

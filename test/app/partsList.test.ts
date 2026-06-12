@@ -35,7 +35,7 @@ describe("parts list", () => {
   });
 
   test("lists curated source files, filters, fans, and license for a static reference", () => {
-    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
     const items = createPartsListItems(staticLayout, "print-3mf", staticLayout.rawSettings, "bed-256");
     const categories = items.map((item) => item.category);
 

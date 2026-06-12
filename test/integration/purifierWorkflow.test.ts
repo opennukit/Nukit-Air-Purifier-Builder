@@ -9,7 +9,6 @@ import {
 import { defaultRectangularFilterDimensions } from "@/domain/purifier/filter";
 import {
   defaultFilterDimensionsByTempestArrangement,
-  isStaticReferencePrintDesignId,
   printDesignPresets,
   publicPrintDesignPresets,
   publicThreeDimensionalPrintDesignPresets,
@@ -337,7 +336,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("keeps structured design variants stable when normalized again", () => {
-    for (const printDesign of ["donut-hepa-adapter", "static-cr-14x20-base"] as const) {
+    for (const printDesign of ["donut-hepa-adapter", "static-modular-20x20-reference"] as const) {
       const normalized = normalizeSettings(applyPrintDesignPreset(defaultSettings, printDesign));
       const normalizedAgain = normalizeSettings(normalized);
 
@@ -483,7 +482,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
   test("models fabrication artifacts as explicit layout variants", () => {
     const cutPanelLayout = createLayout(defaultSettings);
     const donutLayout = createLayout(applyPrintDesignPreset(defaultSettings, "donut-hepa-adapter"));
-    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
 
     expect(cutPanelLayout.fabrication.type).toBe("cut-panel-source");
     expect(cutPanelLayout.summary.fabrication.type).toBe("cut-panel-source");
@@ -512,54 +511,13 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(publicPrintDesignPresets.map((preset) => preset.id)).toEqual([
       "nukit-open-air",
       "nukit-tempest",
-      "static-cr-14x20-base",
     ]);
     expect(publicThreeDimensionalPrintDesignPresets.map((preset) => preset.id)).toEqual([
       "nukit-tempest",
-      "static-cr-14x20-base",
     ]);
     expect(printDesignPresets.map((preset) => preset.id)).toContain("donut-hepa-adapter");
     expect(printDesignPresets.map((preset) => preset.id)).toContain("nukit-tempest");
     expect(publicPrintDesignPresets[0]?.detail).toContain("Laser-cut");
-    expect(publicPrintDesignPresets.filter((preset) => isStaticReferencePrintDesignId(preset.id))).toHaveLength(1);
-    expect(publicPrintDesignPresets.find((preset) => preset.id === "static-cr-14x20-base")).toBeDefined();
-    const staticCr16x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-16x20-140");
-    const staticCr14x20Preset = printDesignPresets.find((preset) => preset.id === "static-cr-14x20-base");
-    const staticCr16x20Reference = staticCr16x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr16x20Preset);
-    const staticCr14x20Reference = staticCr14x20Preset === undefined ? undefined : staticPrintReferenceForPreset(staticCr14x20Preset);
-
-    expect(staticCr16x20Preset?.releaseVisibility).toBe("internal");
-    expect(staticCr14x20Preset?.releaseVisibility).toBe("public");
-    expect(staticPrintReferenceHasPlatePreview(staticCr16x20Reference)).toBe(true);
-    expect(staticPrintReferenceHasAssembledPreview(staticCr16x20Reference)).toBe(false);
-    expect(staticPrintReferenceHasPlatePreview(staticCr14x20Reference)).toBe(true);
-    expect(staticPrintReferenceHasAssembledPreview(staticCr14x20Reference)).toBe(true);
-    expect(staticCr16x20Reference?.previewAssets).toHaveLength(15);
-    expect(staticCr14x20Reference?.assembledPreview).toEqual({
-      type: "source-part-set",
-      assets: expect.any(Array),
-    });
-    expect(staticCr14x20Reference?.assembledPreviewOrientation).toBe("source-fans-up");
-    expect(
-      staticCr14x20Reference?.assembledPreview?.type === "source-part-set"
-        ? staticCr14x20Reference.assembledPreview.assets
-        : [],
-    ).toHaveLength(12);
-    expect(staticCr14x20Reference?.platePreviewAssets).toHaveLength(19);
-    expect(staticCr14x20Reference?.previewAssets).toHaveLength(20);
-    expect(staticCr14x20Preset?.implementation.type).toBe("static-reference");
-    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.fanCount : undefined).toBe(4);
-    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterCount : undefined).toBe(2);
-    expect(staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filter : undefined).toEqual({
-      width: 495.3,
-      depth: 342.9,
-      thickness: 19.1,
-    });
-    expect(
-      staticCr14x20Preset?.implementation.type === "static-reference" ? staticCr14x20Preset.implementation.defaults.filterNominalSize : undefined,
-    ).toBe("14 x 20 x 1 in");
-    expect(staticCr14x20Reference?.printEstimate?.estimatedFilamentKilograms).toBe(1);
-    expect(staticCr14x20Reference?.printEstimate?.assumptions.infillPercent).toBe(15);
     const externalStaticReferencePreset = printDesignPresets.find((preset) => preset.id === "static-modular-20x20-reference");
     const externalStaticReference =
       externalStaticReferencePreset === undefined ? undefined : staticPrintReferenceForPreset(externalStaticReferencePreset);
@@ -607,24 +565,24 @@ describe("FilterBoxBuilder purifier workflow", () => {
   }, 10000);
 
   test("applies static reference defaults without making them parametric generators", () => {
-    const settings = applyPrintDesignPreset(defaultSettings, "static-cr-16x20-140");
+    const settings = applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference");
     const decoded = decodeSettings(encodeSettings(settings));
     const layout = createLayout(settings);
 
-    expect(settings.printDesign).toBe("static-cr-16x20-140");
+    expect(settings.printDesign).toBe("static-modular-20x20-reference");
     expect(settings.filterWidth).toBe(495.3);
-    expect(settings.filterDepth).toBe(393.7);
+    expect(settings.filterDepth).toBe(495.3);
     expect(settings.filterThickness).toBe(19.1);
     expect(settings.fanDiameter).toBe(140);
-    expect(settings.fansTop).toBe(5);
+    expect(settings.fansTop).toBe(4);
     expect(settings.splitFrames).toBe(false);
-    expect(decoded.printDesign).toBe("static-cr-16x20-140");
+    expect(decoded.printDesign).toBe("static-modular-20x20-reference");
     expect(layout.configuration.design.type).toBe("static-reference");
-    expect(layout.configuration.design.type === "static-reference" ? layout.configuration.design.fanCount : undefined).toBe(5);
+    expect(layout.configuration.design.type === "static-reference" ? layout.configuration.design.fanCount : undefined).toBe(4);
     expect(layout.configuration.design.type === "static-reference" ? layout.configuration.design.capabilities.localPrintPlatePreview.type : undefined).toBe(
-      "available",
+      "unavailable",
     );
-    expect(staticPrintReferenceForPreset(layout.configuration.printDesign)?.printablesId).toBe("1251061");
+    expect(staticPrintReferenceForPreset(layout.configuration.printDesign)?.printablesId).toBe("610219");
     expect(() => createPrintDesignKit(layout, "bed-256")).toThrow(/Static reference designs/);
   });
 

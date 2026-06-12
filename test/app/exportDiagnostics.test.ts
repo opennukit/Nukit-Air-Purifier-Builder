@@ -64,7 +64,7 @@ describe("export diagnostics severity", () => {
   });
 
   test("static reference designs skip generated-build diagnostics and read as ready to open files", () => {
-    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
     const diagnostics = evaluateActiveExportDiagnostics(staticLayout, "print-3mf", null);
 
     expect(diagnostics).toEqual([]);

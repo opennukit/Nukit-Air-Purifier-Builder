@@ -21,7 +21,7 @@ These are the presets worth exposing in the UI before a fully custom print-volum
 | Prusa XL | 360 x 360 x 360 mm | Original Prusa XL | Large, high-quality multi-tool user base. |
 | Large format | 420 x 420 x 480 mm | Elegoo Neptune 4 Max, Anycubic Kobra 3 Max class | Lets the generator produce very large pieces, but should still offer split parts for reliability. |
 
-Default recommendation: keep `256 x 256 x 256 mm` as the default print preset. It covers the Bambu A/P/X family and matches the strongest signal from the downloaded 16x20 model: the author designed all parts to fit on a 256 mm plate, while warning that the larger panels leave little skirt room.
+Default recommendation: keep `256 x 256 x 256 mm` as the default print preset. It covers the Bambu A/P/X family, and community purifier designs commonly target a 256 mm plate while warning that larger panels leave little skirt room.
 
 ## Downloaded References
 
@@ -43,28 +43,6 @@ Important design notes from the page metadata:
 - License shown in metadata: `BY-NC`.
 
 Integration consequence: use this as a design reference, but do not copy geometry into the app without explicit permission and license review. Our generator should improve on the seam problem by generating dovetails, keyed laps, screw tabs, or spline pockets.
-
-### Printables 1251061 - Corsi-Rosenthal Air Filter 140mm PC Fans 16x20x1
-
-Source: https://www.printables.com/model/1251061-corsi-rosenthal-air-filter-140mm-pc-fans-16x20x1-f
-
-Local archive: `references/external-models/printables-1251061-corsi-rosenthal-16x20-140mm.zip`
-
-Downloaded bundle contents:
-
-- Split top, bottom, front, and rear panels as STL.
-- Fan and seam brackets as STL.
-- `pc-corsi-rosenthal-16x20-140mm-multi-plate.3mf`
-- Fusion 360 source file.
-- PDF documentation.
-
-Important design notes:
-
-- Designed around 16x20x1 filters and 5 140 mm fans.
-- Page says everything fits on a 256 mm plate, but the larger panels do not leave enough room for a skirt.
-- License shown on page: Creative Commons Attribution 4.0.
-
-Integration consequence: this is the cleanest candidate for studying printable part splitting, bracket placement, and multi-plate packaging.
 
 ### Printables 610219 - Modular 20x20 Air Filter
 
@@ -174,7 +152,6 @@ Printer specs:
 Model references:
 
 - MakerWorld 2470181: https://makerworld.com/en/models/2470181-nukit-tempest-euro-frame-air-purifier-starkvind
-- Printables 1251061: https://www.printables.com/model/1251061-corsi-rosenthal-air-filter-140mm-pc-fans-16x20x1-f
 - Printables 610219: https://www.printables.com/model/610219-modular-20x20-air-filter
 - Nukit Open Upper Room UVGI OpenSCAD folder: https://github.com/opennukit/Nukit-Open-Upper-Room-UVGI/tree/main/3D%20Printed
 
