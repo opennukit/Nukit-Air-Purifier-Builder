@@ -18,7 +18,6 @@
     defaultThreeDimensionalPrintDesignId,
     isPublicThreeDimensionalPrintDesignId,
     isStaticReferencePrintDesignId,
-    type PrintDesignId,
     type TempestArrangementPreset,
   } from "@/domain/purifier/designPresets";
   import {
@@ -37,8 +36,6 @@
     filterDimensionControls,
     generatedGeometryControls,
     nukitPanelFitControls,
-    parametricPrintDesignPresets,
-    staticPrintDesignPresets,
     tempestArrangementOptions,
     tempestFitControls,
     type BooleanSettingName,
@@ -64,7 +61,6 @@
     readCheckboxInput,
     readFanCountControlValue,
     readNumberInput,
-    readPrintDesignControlValue,
     requireSelect,
   } from "@/app/controls/inputReaders";
   import { createActivePrintSheetPlan } from "@/app/printSheetPlans";
@@ -207,11 +203,9 @@
   let partsItems: readonly PartsListItem[] = [];
   let generatedPrintSheetPlan: PrintableSheetPlan | null = null;
   let activePrintSheetPlan: PrintSheetThreePreviewPlan | null = null;
-  let activePrintDesignPreset = workbenchView.printDesignPreset;
   let activeDesignContext: WorkbenchDesignContext = workbenchView.design;
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
-  let activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
   // UI-only: keeps the "Custom" size segment active while the typed diameter
   // still matches a recommended size; the settings store only the diameter.
   let customFanSizePinned = false;
@@ -275,11 +269,9 @@
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
-  $: activePrintDesignPreset = workbenchView.printDesignPreset;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
-  $: activeStaticPrintReference = activeDesignContext.type === "static-reference" ? activeDesignContext.reference : undefined;
   $: selectedFanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
   $: showCutSheetPreviewMode = activeFabricationPreview.type === "cut-sheet";
@@ -367,18 +359,6 @@
     syncUrl();
   }
 
-  function applyPrintDesignSelection(printDesign: PrintDesignId): void {
-    const switched = switchPrintDesignSettings(printDesignSettingsMemory, draft, publicThreeDimensionalPrintDesignId(printDesign));
-    const nextDraft = normalizePurifierDraft(switched.settings);
-    draft = nextDraft;
-    settings = serializePurifierDraft(nextDraft);
-    printDesignSettingsMemory = switched.memory;
-    workbenchState = normalizeWorkbenchStateForSettings(workbenchState, nextDraft);
-    customFanSizePinned = false;
-    syncDerivedWorkbenchState();
-    syncUrl();
-  }
-
   // ##############################
   // Form Control Updates
   // ##############################
@@ -400,10 +380,6 @@
       ...settings,
       fanColor: color,
     });
-  }
-
-  function updatePrintDesign(event: Event): void {
-    applyPrintDesignSelection(readPrintDesignControlValue(event));
   }
 
   function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
@@ -534,10 +510,6 @@
   // #######################################
   // View Availability
   // #######################################
-
-  function publicThreeDimensionalPrintDesignId(printDesign: PrintDesignId): PrintDesignId {
-    return isPublicThreeDimensionalPrintDesignId(printDesign) ? printDesign : defaultThreeDimensionalPrintDesignId;
-  }
 
   // #######################################
   // Export and Dialog Actions
@@ -1088,53 +1060,6 @@
         </section>
 
         <div class="controls-sections">
-          {#if fabricationMethod === "print-3mf"}
-            <section class="control-section design-model-section" data-print-design-control>
-              <div class="section-heading">
-                <p class="eyebrow">Design</p>
-                <h2>Printable model</h2>
-              </div>
-              <label class="field print-design-select">
-                <span>Printable design</span>
-                <select name="printDesign" onchange={updatePrintDesign}>
-                  {#if parametricPrintDesignPresets.length > 0}
-                    <optgroup label="Generated designs">
-                      {#each parametricPrintDesignPresets as preset}
-                        <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
-                      {/each}
-                    </optgroup>
-                  {/if}
-                  {#if staticPrintDesignPresets.length > 0}
-                    <optgroup label="Fixed community designs">
-                      {#each staticPrintDesignPresets as preset}
-                        <option value={preset.id} selected={settings.printDesign === preset.id}>{preset.label}</option>
-                      {/each}
-                    </optgroup>
-                  {/if}
-                </select>
-              </label>
-              {#if activePrintDesignPreset.detail !== undefined || activePrintDesignPreset.source !== undefined || activeStaticPrintReference !== undefined}
-                <div class="print-design-card" id="printDesignDetail">
-                  {#if activePrintDesignPreset.detail !== undefined}
-                    <strong>{activePrintDesignPreset.detail}</strong>
-                  {/if}
-                  {#if activeStaticPrintReference !== undefined}
-                    <span>{activeStaticPrintReference.fileSummary} · {activeStaticPrintReference.attribution}</span>
-                    <small>{activeStaticPrintReference.usePolicy.note}</small>
-                  {/if}
-                  {#if activePrintDesignPreset.source !== undefined || activePrintDesignPreset.sourceUrl !== undefined}
-                    <small>
-                      {activePrintDesignPreset.source}
-                      {#if activePrintDesignPreset.sourceUrl !== undefined}
-                        <a href={activePrintDesignPreset.sourceUrl} target="_blank" rel="noreferrer">Source</a>
-                      {/if}
-                    </small>
-                  {/if}
-                </div>
-              {/if}
-            </section>
-          {/if}
-
           {#if !isStaticReferenceControlsActive}
             <section class="control-section layout-section" data-generated-layout-controls>
               <div class="section-heading">

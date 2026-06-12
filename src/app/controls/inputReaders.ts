@@ -2,19 +2,7 @@
 // domain values (preset ids, numbers, booleans), falling back to defaults
 // when the raw input is not a valid value.
 
-import {
-  defaultThreeDimensionalPrintDesignId,
-  publicThreeDimensionalPrintDesignPresets,
-  type PrintDesignId,
-} from "@/domain/purifier/designPresets";
 import { automaticFanCount } from "@/domain/purifier/fans";
-
-export function readPrintDesignControlValue(event: Event): PrintDesignId {
-  const preset = publicThreeDimensionalPrintDesignPresets.find(
-    (entry) => entry.id === requireSelect(event, "readPrintDesignControlValue").value,
-  );
-  return preset?.id ?? defaultThreeDimensionalPrintDesignId;
-}
 
 export function readFanCountControlValue(event: Event): number {
   const parsed = Number(requireSelect(event, "readFanCountControlValue").value);

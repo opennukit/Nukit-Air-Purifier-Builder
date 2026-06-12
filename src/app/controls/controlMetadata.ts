@@ -2,11 +2,7 @@
 // numeric/boolean settings each panel edits, with labels, units, and steps,
 // plus the setting-name types those tables are keyed by.
 
-import {
-  isStaticReferencePrintDesignId,
-  publicThreeDimensionalPrintDesignPresets,
-  type TempestArrangementPreset,
-} from "@/domain/purifier/designPresets";
+import type { TempestArrangementPreset } from "@/domain/purifier/designPresets";
 import type { CordHolePlacement, RawPurifierSettings } from "@/domain/purifier/settingsModel";
 
 export type NumericSettingName = {
@@ -43,12 +39,6 @@ export type DimensionControl<Name extends NumericSettingName> = {
   readonly step: string;
 };
 
-export const parametricPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter(
-  (preset) => !isStaticReferencePrintDesignId(preset.id),
-);
-export const staticPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter((preset) =>
-  isStaticReferencePrintDesignId(preset.id),
-);
 export const fanPlacementControls: readonly { readonly name: FanCountSettingName; readonly label: string }[] = [
   { name: "fansLeft", label: "Left" },
   { name: "fansRight", label: "Right" },

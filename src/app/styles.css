@@ -968,39 +968,6 @@ Unit Inputs
 }
 
 /* ##############################
-Preset Cards
-############################## */
-
-.print-design-card {
-  display: grid;
-  gap: 4px;
-  margin: -3px 0 10px;
-  padding: 8px 10px;
-  border-left: 3px solid var(--accent-line-strong);
-  background: var(--accent-wash);
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 750;
-  line-height: 1.28;
-}
-
-.print-design-card strong {
-  color: var(--ink);
-  font-size: 0.86rem;
-}
-
-.print-design-card span {
-  overflow-wrap: anywhere;
-}
-
-.print-design-card small,
-.print-design-card a {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-/* ##############################
 Parts List
 ############################## */
 
@@ -1156,15 +1123,6 @@ Section Notes and Guides
   outline-offset: 2px;
 }
 
-.print-design-card a {
-  color: var(--accent-strong);
-  text-decoration: none;
-}
-
-.print-design-card a:hover {
-  text-decoration: underline;
-}
-
 /* ##############################
 Conditional Visibility
 ############################## */
@@ -1177,7 +1135,6 @@ Conditional Visibility
   display: none;
 }
 
-[data-print-design-control][hidden],
 [data-print-volume-section][hidden],
 [data-print-volume-control][hidden],
 [data-rectangular-filter-controls][hidden],
@@ -1748,14 +1705,6 @@ Desktop Fixed View
   .field input,
   .field select {
     min-height: 38px;
-  }
-
-  .print-design-card {
-    gap: 3px;
-    margin: -2px 0 9px;
-    padding: 8px 10px;
-    font-size: 0.78rem;
-    line-height: 1.28;
   }
 
   .workspace {
