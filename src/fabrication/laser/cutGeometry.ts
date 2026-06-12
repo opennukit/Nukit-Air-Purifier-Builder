@@ -140,8 +140,8 @@ export function edgeSections(pattern: string, lengths?: readonly number[]): Edge
 }
 
 export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
-  const outline = buildRectangularOutline(input);
   const kerfFit = input.kerfFit ?? 0;
+  const outline = offsetOutlineOutward(buildRectangularOutline(input), kerfFit);
   const jointSettings = input.jointSettings ?? defaultCutJointSettings;
   const cuts = [
     ...(input.cuts ?? []),
@@ -419,6 +419,48 @@ function appendDovetailProfile(
   appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
 }
 
+// #######################################
+// Outline Kerf Offset
+// #######################################
+
+// Mirrors the boxes.py burn correction: the exported outline is the tool path,
+// displaced outward by the kerf so the part that survives the cut keeps its
+// nominal size. Tenons widen and recesses narrow as a side effect of the
+// parallel offset, matching how upstream offsets continuously while drawing.
+// Holes are compensated separately when each cut feature is created.
+function offsetOutlineOutward(points: readonly CutPoint[], distance: number): CutPoint[] {
+  if (distance === 0 || points.length < 3) {
+    return [...points];
+  }
+  return points.map((point, index) => {
+    const incoming = outwardNormal(cyclicPoint(points, index - 1), point);
+    const outgoing = outwardNormal(point, cyclicPoint(points, index + 1));
+    const miterScale = 1 + incoming.x * outgoing.x + incoming.y * outgoing.y;
+    if (miterScale < 1e-9) {
+      throw new Error("offsetOutlineOutward: outline reverses direction");
+    }
+    return {
+      x: point.x + ((incoming.x + outgoing.x) * distance) / miterScale,
+      y: point.y + ((incoming.y + outgoing.y) * distance) / miterScale,
+    };
+  });
+}
+
+function outwardNormal(from: CutPoint, to: CutPoint): CutPoint {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  return { x: dy / length, y: -dx / length };
+}
+
+function cyclicPoint(points: readonly CutPoint[], index: number): CutPoint {
+  const point = points[((index % points.length) + points.length) % points.length];
+  if (point === undefined) {
+    throw new Error("cyclicPoint: no points available");
+  }
+  return point;
+}
+
 function createFingerHoleCutsForEdges(
   width: number,
   height: number,
@@ -428,7 +470,7 @@ function createFingerHoleCutsForEdges(
   jointSettings: CutJointSettings,
 ): CutFeature[] {
   const cuts: RectCut[] = [];
-  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier + kerfFit;
+  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier;
   for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
     const sections = edges[edgeIndex];
     const hasFingerHoleEdge = sections.some((section) => section.kind === "finger-holes");
