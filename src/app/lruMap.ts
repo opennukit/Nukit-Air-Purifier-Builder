@@ -3,7 +3,9 @@
 // survive while stale ones fall off. Backs the workbench's expensive-build
 // caches (assembled preview kits, generated sheet plans).
 
-export class LruMap<K, V> {
+// V excludes null and undefined: get uses undefined as its miss sentinel, so a
+// stored undefined would be invisible to the recency refresh.
+export class LruMap<K, V extends NonNullable<unknown>> {
   private readonly entries = new Map<K, V>();
 
   constructor(private readonly capacity: number) {
