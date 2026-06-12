@@ -1,0 +1,78 @@
+import { describe, expect, test } from "bun:test";
+import { createPreviewSummaryItems } from "@/app/summaries";
+import { createLayout } from "@/fabrication/purifierLayout";
+import {
+  createPrintableSheetPlanFromKit,
+  findPrintVolumePreset,
+  type PrintableKit,
+} from "@/fabrication/printing/printableKit";
+import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
+
+// #######################################
+// Preview Summary Branches
+// #######################################
+
+const emptyTempestKit: PrintableKit = {
+  preset: findPrintVolumePreset("bed-256"),
+  parts: [],
+  summary: { partCount: 12, oversizedPartCount: 0 },
+};
+
+function valueFor(items: readonly { label: string; value: string }[], label: string): string | undefined {
+  return items.find((item) => item.label === label)?.value;
+}
+
+describe("createPreviewSummaryItems", () => {
+  test("print-sheets for a generated tempest reads plates, chunks, and bed off the plan", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const plan = createPrintableSheetPlanFromKit(emptyTempestKit);
+    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", plan);
+
+    expect(valueFor(items, "Print plates")).toBe(String(plan.sheets.length));
+    expect(valueFor(items, "Print chunks")).toBe("12");
+    expect(valueFor(items, "Bed")).toBe(findPrintVolumePreset("bed-256").label);
+  });
+
+  test("print-sheets without a plan yet shows pending placeholders", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", null);
+
+    expect(valueFor(items, "Print plates")).toBe("…");
+    expect(valueFor(items, "Print chunks")).toBe("…");
+    expect(valueFor(items, "Bed")).toBe("…");
+  });
+
+  test("print-sheets for a static reference describes the curated files, not a generated plan", () => {
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const items = createPreviewSummaryItems(staticLayout, "print-sheets", "print-3mf", "bed-350", null);
+    const labels = items.map((item) => item.label);
+
+    expect(valueFor(items, "Bed")).toBe(findPrintVolumePreset("bed-350").label);
+    expect(labels).toContain("Source STLs");
+    expect(labels).toContain("License");
+    expect(labels).not.toContain("Print plates");
+  });
+
+  test("the enclosure view of a tempest print summarizes the design instead of the plan", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null);
+    const labels = items.map((item) => item.label);
+
+    expect(valueFor(items, "Design")).toBe(tempestLayout.configuration.printDesign.label);
+    expect(labels).toContain("Arrangement");
+    expect(labels).toContain("Fans");
+    expect(valueFor(items, "Print chunks")).toBe("…");
+  });
+
+  test("the laser path summarizes panels and the required sheet", () => {
+    const laserLayout = createLayout(defaultSettings);
+    const items = createPreviewSummaryItems(laserLayout, "enclosure", "laser-svg", "bed-256", null);
+
+    if (laserLayout.summary.fabrication.type !== "cut-panel-source") {
+      throw new Error("expected the laser layout to carry a cut sheet");
+    }
+    expect(valueFor(items, "Panels")).toBe(String(laserLayout.summary.fabrication.panelCount));
+    expect(valueFor(items, "Sheet")).toContain(`${laserLayout.summary.fabrication.sheetWidth}`);
+    expect(valueFor(items, "Fans")).toBeDefined();
+  });
+});

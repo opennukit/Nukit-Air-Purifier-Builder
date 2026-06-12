@@ -5,6 +5,9 @@ import {
   fabricationMethodForWorkbenchState,
   previewModeForWorkbenchState,
   printVolumePresetIdForWorkbenchState,
+  withFabricationMethod,
+  withPreviewMode,
+  withPrintVolumePreset,
 } from "@/app/workbench/workbenchState";
 import {
   createWorkbenchViewModel,
@@ -53,6 +56,65 @@ describe("Workbench state", () => {
 
     expect(fabricationMethodForWorkbenchState(state)).toBe("laser-svg");
     expect(encoded.has("printVolume")).toBe(false);
+  });
+
+  test("switching to the enclosure preview keeps the fabrication choice intact", () => {
+    const printState = decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&printVolume=bed-180&previewMode=print-sheets"));
+    const enclosureState = withPreviewMode(printState, "enclosure");
+
+    expect(previewModeForWorkbenchState(enclosureState)).toBe("enclosure");
+    expect(fabricationMethodForWorkbenchState(enclosureState)).toBe("print-3mf");
+    expect(printVolumePresetIdForWorkbenchState(enclosureState)).toBe("bed-180");
+  });
+
+  test("switching to a fabrication preview adopts that preview's method", () => {
+    const printState = decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&printVolume=bed-180"));
+    const cutSheetState = withPreviewMode(printState, "cut-sheet");
+
+    expect(previewModeForWorkbenchState(cutSheetState)).toBe("cut-sheet");
+    expect(fabricationMethodForWorkbenchState(cutSheetState)).toBe("laser-svg");
+
+    const backToPrint = withPreviewMode(cutSheetState, "print-sheets");
+    expect(previewModeForWorkbenchState(backToPrint)).toBe("print-sheets");
+    expect(fabricationMethodForWorkbenchState(backToPrint)).toBe("print-3mf");
+  });
+
+  test("changing the fabrication method keeps the current print volume preset", () => {
+    const printState = decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&printVolume=bed-180&previewMode=print-sheets"));
+    const samePresetState = withFabricationMethod(printState, "print-3mf");
+
+    expect(printVolumePresetIdForWorkbenchState(samePresetState)).toBe("bed-180");
+
+    const laserState = withFabricationMethod(printState, "laser-svg");
+    expect(fabricationMethodForWorkbenchState(laserState)).toBe("laser-svg");
+    expect(previewModeForWorkbenchState(laserState)).toBe("cut-sheet");
+  });
+
+  test("choosing a print volume switches laser fabrication over to printing", () => {
+    const laserState = decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg&previewMode=cut-sheet"));
+    const printState = withPrintVolumePreset(laserState, "bed-350");
+
+    expect(fabricationMethodForWorkbenchState(printState)).toBe("print-3mf");
+    expect(printVolumePresetIdForWorkbenchState(printState)).toBe("bed-350");
+
+    const repicked = withPrintVolumePreset(printState, "unsplit");
+    expect(printVolumePresetIdForWorkbenchState(repicked)).toBe("unsplit");
+  });
+
+  test("encode and decode round-trip every reachable state", () => {
+    const states = [
+      decodeWorkbenchState(new URLSearchParams("")),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg&previewMode=cut-sheet")),
+      withPrintVolumePreset(
+        withPreviewMode(decodeWorkbenchState(new URLSearchParams("")), "print-sheets"),
+        "bed-420",
+      ),
+    ];
+
+    for (const state of states) {
+      const roundTripped = decodeWorkbenchState(encodeWorkbenchState(state));
+      expect(roundTripped).toEqual(state);
+    }
   });
 
   test("normalizes laser sessions back to the laser-capable Nukit design", () => {
