@@ -43,7 +43,7 @@ describe("createPreviewSummaryItems", () => {
   });
 
   test("print-sheets for a static reference describes the curated files, not a generated plan", () => {
-    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
     const items = createPreviewSummaryItems(staticLayout, "print-sheets", "print-3mf", "bed-350", null);
     const labels = items.map((item) => item.label);
 

@@ -2,11 +2,7 @@
 // numeric/boolean settings each panel edits, with labels, units, and steps,
 // plus the setting-name types those tables are keyed by.
 
-import {
-  isStaticReferencePrintDesignId,
-  publicThreeDimensionalPrintDesignPresets,
-  type TempestArrangementPreset,
-} from "@/domain/purifier/designPresets";
+import type { TempestArrangementPreset } from "@/domain/purifier/designPresets";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 
 export type NumericSettingName = {
@@ -43,12 +39,6 @@ export type DimensionControl<Name extends NumericSettingName> = {
   readonly step: string;
 };
 
-export const parametricPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter(
-  (preset) => !isStaticReferencePrintDesignId(preset.id),
-);
-export const staticPrintDesignPresets = publicThreeDimensionalPrintDesignPresets.filter((preset) =>
-  isStaticReferencePrintDesignId(preset.id),
-);
 export const fanPlacementControls: readonly { readonly name: FanCountSettingName; readonly label: string }[] = [
   { name: "fansLeft", label: "Left" },
   { name: "fansRight", label: "Right" },
@@ -103,3 +93,5 @@ export const tempestArrangementOptions: readonly {
   { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
   { id: "four-side-filter-tower", label: "4 side filters" },
 ];
+export const cordHoleInfo =
+  "Diameter of the hole the fan power cables exit through, near the bottom of the right wall. The 4-side tower routes it through the matching top-plate corner instead.";

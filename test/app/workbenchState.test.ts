@@ -119,8 +119,8 @@ describe("Workbench state", () => {
 
   test("normalizes laser sessions back to the laser-capable Nukit design", () => {
     const session = normalizeWorkbenchSession(
-      applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"),
-      decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg&previewMode=print-sheets&printDesign=static-cr-14x20-base")),
+      applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"),
+      decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg&previewMode=print-sheets&printDesign=static-modular-20x20-reference")),
     );
 
     expect(session.settings.design.printDesign).toBe("nukit-open-air");
@@ -130,7 +130,7 @@ describe("Workbench state", () => {
 
   test("keeps the active preset aligned with the laser design context before session normalization", () => {
     const viewModel = createWorkbenchViewModel(
-      applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"),
+      applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"),
       decodeWorkbenchState(new URLSearchParams("fabricationMethod=laser-svg")),
     );
 
@@ -160,28 +160,6 @@ describe("Workbench state", () => {
     expect(viewModel.fabricationPreview).toEqual({ type: "print-sheets", source: "generated" });
     expect(viewModel.controlPanels.setup).toEqual({ type: "available" });
     expect(viewModel.controlPanels.advanced).toEqual({ type: "hidden", reason: "not-supported-by-design" });
-  });
-
-  test("models static references with local plates as static print-sheet previews", () => {
-    const viewModel = createWorkbenchViewModel(
-      applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"),
-      decodeWorkbenchState(new URLSearchParams("fabricationMethod=print-3mf&previewMode=print-sheets")),
-    );
-
-    expect(viewModel.design.type).toBe("static-reference");
-    if (viewModel.design.type !== "static-reference" || viewModel.fabricationPreview.type !== "print-sheets") {
-      throw new Error("expected a static reference with print-sheet preview");
-    }
-
-    expect(viewModel.design.preset.id).toBe("static-cr-14x20-base");
-    expect(viewModel.design.reference.printablesId).toBe("955827");
-    expect(viewModel.design.platePreview).toEqual({ type: "available" });
-    expect(viewModel.fabricationPreview.source).toBe("static-reference");
-    if (viewModel.fabricationPreview.source !== "static-reference") {
-      throw new Error("expected a static reference print-sheet source");
-    }
-    expect(viewModel.fabricationPreview.reference.printablesId).toBe("955827");
-    expect(viewModel.controlPanels.setup).toEqual({ type: "available" });
   });
 
   test("models static references without local plates as source-only", () => {

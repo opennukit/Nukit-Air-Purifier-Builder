@@ -31,11 +31,13 @@ describe("parts list", () => {
       "Super glue or epoxy",
       "Filament alignment pins",
     ]);
+    // 2 x 10 mm hole depth minus the 2 mm glue room.
+    expect(items.find((item) => item.label === "Filament alignment pins")?.detail).toContain("18 mm");
     expect(categories).not.toContain("Sheet");
   });
 
   test("lists curated source files, filters, fans, and license for a static reference", () => {
-    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
     const items = createPartsListItems(staticLayout, "print-3mf", staticLayout.rawSettings, "bed-256");
     const categories = items.map((item) => item.category);
 

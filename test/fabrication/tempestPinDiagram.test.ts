@@ -64,7 +64,8 @@ describe("tempest assembly pin diagram", () => {
     }
 
     expect(diagram.pinDiameter).toBeGreaterThan(0);
-    expect(diagram.pinLength).toBeGreaterThan(0);
+    // 2 x 10 mm hole depth minus the 2 mm glue room.
+    expect(diagram.pinLength).toBe(18);
 
     const posedInteriorBoundaries = {
       x: plan.printableChunkGrid.boundariesX.slice(1, -1),

@@ -47,6 +47,7 @@ import {
   type ReferenceScale,
 } from "@/fabrication/laser/cutSettings";
 import type { Millimeters } from "@/domain/units";
+import { defaultTempestCordPassThrough } from "@/domain/designs/tempest/shared";
 import type {
   StaticPrintReferenceCapabilities,
   StaticPrintReference,
@@ -176,6 +177,8 @@ export type RawPurifierSettings = {
   // Tempest-only: clearance added per side around the MEASURED filter so it
   // slides into its cavity; separate from the measurement on purpose.
   filterFitClearance: Millimeters;
+  // Tempest-only: bore diameter of the power-cord hole in the right wall.
+  cordHoleDiameter: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -245,6 +248,7 @@ export type TempestPrintDesignDraft = {
   readonly arrangement: TempestArrangementPreset;
   readonly filter: FilterDimensions;
   readonly filterFitClearance: Millimeters;
+  readonly cordHoleDiameter: Millimeters;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -292,6 +296,7 @@ export type ConfiguredPrintDesign =
       readonly arrangement: TempestArrangementPreset;
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
+      readonly cordHoleDiameter: Millimeters;
     }
   | {
       readonly type: "static-reference";
@@ -363,6 +368,7 @@ export const defaultSettings: RawPurifierSettings = {
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
   filterFitClearance: 1,
+  cordHoleDiameter: defaultTempestCordPassThrough.diameter,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,

@@ -23,17 +23,7 @@ The app code is GPL-3.0. Some browser preview assets have their own upstream sou
 
 ## Static Print Reference Assets
 
-These STL files are mirrored only so curated static reference previews work offline in the browser.
-
-- `public/vendor/static-print-references/printables/1251061`
-- Source: Printables model 1251061, `Corsi-Rosenthal Air Filter 140mm PC Fans 16x20x1" Furnace Filters` by neurocean.
-- License: CC-BY.
-
-- `public/vendor/static-print-references/printables/955827`
-- Source: Printables model 955827, `Air Filter/purifier based on the Corsi-Rosenthal box` by Safetydave1.
-- License: CC-BY.
-
-The modular 20x20 reference is intentionally not mirrored because its Printables license is CC-BY-NC-SA. The UI links to the upstream files instead.
+No third-party static reference files are mirrored in this repository. The modular 20x20 reference is intentionally not mirrored because its Printables license is CC-BY-NC-SA. The UI links to the upstream files instead.
 
 ## Reference Folder
 

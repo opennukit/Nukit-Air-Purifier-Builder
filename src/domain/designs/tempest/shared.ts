@@ -128,6 +128,17 @@ export type TempestCordPassThrough =
       readonly cornerOffset: Millimeters;
     };
 
+// The shipped cord hole: an 8 mm bore hugging the right corner of the right
+// wall. The raw purifier settings expose only the diameter as a user choice;
+// the placement is fixed.
+export const defaultTempestCordPassThrough = {
+  type: "wall",
+  diameter: 8,
+  wall: "right",
+  side: "right",
+  cornerOffset: 17,
+} as const satisfies TempestCordPassThrough;
+
 export type TempestAlignmentPinSettings =
   | {
       readonly type: "disabled";
@@ -138,6 +149,15 @@ export type TempestAlignmentPinSettings =
       readonly holeDepth: Millimeters;
       readonly spacing: Millimeters;
     };
+
+// The cut filament piece is shorter than the combined hole depth so the seam
+// can close fully with glue in the holes; the holes themselves stay holeDepth
+// deep on each side.
+export const PIN_GLUE_ROOM_MM: Millimeters = 2;
+
+export function alignmentPinPieceLength(holeDepth: Millimeters): Millimeters {
+  return 2 * holeDepth - PIN_GLUE_ROOM_MM;
+}
 
 export type TempestPrintBedVolume = {
   readonly width: Millimeters;

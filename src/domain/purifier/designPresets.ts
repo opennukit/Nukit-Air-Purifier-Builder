@@ -275,66 +275,6 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     ],
   },
   {
-    id: "static-cr-16x20-140",
-    label: "Static CR 16x20 140 mm kit",
-    detail:
-      "Curated fixed Printables design for 16x20x1 filters and five 140 mm PC fans.",
-    source: "Printables static reference",
-    sourceUrl: staticPrintReferences["static-cr-16x20-140"].sourceUrl,
-    license: "CC-BY",
-    licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
-    releaseVisibility: "internal",
-    implementation: {
-      type: "static-reference",
-      reference: staticPrintReferences["static-cr-16x20-140"],
-      defaults: {
-        // 16x20x1 in MERV 13 actual size.
-        filter: { width: 495.3, depth: 393.7, thickness: 19.1 },
-        filterNominalSize: "16 x 20 x 1 in",
-        fanDiameter: 140,
-        fanCount: 5,
-        filterCount: 1,
-        splitFrames: false,
-      },
-    },
-    assemblyNotes: [
-      "Static curated reference, not generated from the current parameters",
-      "Preview shows the mirrored STL file set as print parts",
-      "Export opens the original Printables files page for the authoritative download",
-    ],
-  },
-  {
-    id: "static-cr-14x20-base",
-    label: "Corsi-Rosenthal box 14x20 (community files)",
-    detail:
-      "Fixed community design from Printables with STEP source for a Corsi-Rosenthal filter housing.",
-    source: "Printables static reference",
-    sourceUrl: staticPrintReferences["static-cr-14x20-base"].sourceUrl,
-    license: "CC-BY",
-    licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
-    releaseVisibility: "public",
-    implementation: {
-      type: "static-reference",
-      reference: staticPrintReferences["static-cr-14x20-base"],
-      defaults: {
-        // 14x20x1 in MERV 13 actual size.
-        filter: { width: 495.3, depth: 342.9, thickness: 19.1 },
-        filterNominalSize: "14 x 20 x 1 in",
-        fanDiameter: 120,
-        fanCount: 4,
-        filterCount: 2,
-        splitFrames: false,
-      },
-    },
-    assemblyNotes: [
-      "Static curated reference, not generated from the current parameters",
-      "Assembled preview uses the complete source STL from the Printables project",
-      "Print plates show the individual source STL parts laid out on the selected bed",
-      "Includes a STEP reference in the original Printables project",
-      "Export opens the original Printables files page for the authoritative download",
-    ],
-  },
-  {
     id: "static-modular-20x20-reference",
     label: "Static modular 20x20 reference",
     detail:

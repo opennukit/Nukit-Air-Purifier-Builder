@@ -7,6 +7,7 @@ import {
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
 import { createTempestModel } from "@/domain/designs/tempest/model";
+import { assertNever } from "@/domain/designs/tempest/topology";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import { staticPrintReferenceHasAssembledPreview } from "@/resources/static-print-references/references";
@@ -165,7 +166,7 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
     );
   }
   if (isTempestPrintDesignId(settings.printDesign.id)) {
-    return tempestLargestDimensionMillimeters(layout);
+    return tempestFramingDimensionMillimeters(layout);
   }
 
   return Math.max(
@@ -178,9 +179,26 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
 // The tempest arrangements differ wildly in shape (a flat sandwich vs a tall
 // four-filter tower), so framing must follow the real derived box — the laser
 // summary fields underestimate the tower and the camera ends up zoomed in.
-function tempestLargestDimensionMillimeters(layout: LayoutResult): number {
-  const box = createTempestModel(createTempestSettingsFromLayout(layout)).box;
-  return Math.max(box.width, box.depth, box.height);
+//
+// The largest single dimension is nearly identical across arrangements
+// (~635 mm at defaults), but the tower is bulky on EVERY axis (568x568x637 vs
+// the sandwiches' flat 634x507x~200), so equal framing puts the camera far too
+// close on the tower. Pad it by the bounding-sphere ratio between the shapes.
+const towerPreviewFramingMultiplier = 1.25;
+
+function tempestFramingDimensionMillimeters(layout: LayoutResult): number {
+  const settings = createTempestSettingsFromLayout(layout);
+  const box = createTempestModel(settings).box;
+  const largestDimension = Math.max(box.width, box.depth, box.height);
+  switch (settings.arrangement.type) {
+    case "single-horizontal-top-filter":
+    case "dual-horizontal-sandwich":
+      return largestDimension;
+    case "four-side-filter-tower":
+      return largestDimension * towerPreviewFramingMultiplier;
+    default:
+      return assertNever(settings.arrangement);
+  }
 }
 
 
@@ -216,7 +234,7 @@ function modelViewScale(layout: LayoutResult): number {
     return baseScale + scalePadding;
   }
   if (isTempestPrintDesignId(settings.printDesign.id)) {
-    return tempestLargestDimensionMillimeters(layout) * sceneScale + scalePadding;
+    return tempestFramingDimensionMillimeters(layout) * sceneScale + scalePadding;
   }
   return (
     Math.max(

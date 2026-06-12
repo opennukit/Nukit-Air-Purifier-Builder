@@ -135,6 +135,7 @@ export function normalizeRawSettings(
     // Preserved like tempestArrangement: the value survives even while a
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
+    cordHoleDiameter: normalizeCordHoleDiameter(input.cordHoleDiameter),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -262,6 +263,7 @@ export function serializePurifierDraft(
       ...serializedFilterFields(draft.design.filter),
       tempestArrangement: draft.design.arrangement,
       filterFitClearance: draft.design.filterFitClearance,
+      cordHoleDiameter: draft.design.cordHoleDiameter,
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -318,6 +320,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     tempestArrangement: defaultSettings.tempestArrangement,
     filterFitClearance: defaultSettings.filterFitClearance,
+    cordHoleDiameter: defaultSettings.cordHoleDiameter,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -393,6 +396,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...serializedFilterFields(input.design.filter),
       tempestArrangement: input.design.arrangement,
       filterFitClearance: input.design.filterFitClearance,
+      cordHoleDiameter: input.design.cordHoleDiameter,
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -462,6 +466,7 @@ function createConfiguredPrintDesign(input: {
       arrangement: canonicalTempestArrangement(input.raw.tempestArrangement),
       filter: input.filter,
       filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
+      cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
     };
   }
 
@@ -557,6 +562,7 @@ function createPurifierDesignDraft(
       arrangement: configuration.design.arrangement,
       filter: configuration.design.filter,
       filterFitClearance: configuration.design.filterFitClearance,
+      cordHoleDiameter: configuration.design.cordHoleDiameter,
     };
   }
 
@@ -643,6 +649,10 @@ function normalizeDonutCapRim(
 
 function normalizeFilterFitClearance(value: Millimeters): Millimeters {
   return clamp(value, 0, 5);
+}
+
+function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
+  return clamp(value, 3, 25);
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {

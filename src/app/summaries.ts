@@ -4,6 +4,7 @@
 
 import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
 import { createTempestModel } from "@/domain/designs/tempest/model";
+import { alignmentPinPieceLength } from "@/domain/designs/tempest/shared";
 import {
   isDonutFilterPrintDesignId,
   isStaticReferencePrintDesignId,
@@ -290,7 +291,7 @@ function tempestPrintPartsItems(
                 {
                   category: "Assembly",
                   label: "Filament alignment pins",
-                  detail: `Short ${formatMillimeters(2 * pins.holeDepth)} pieces of 1.75 mm filament for the holes along each seam`,
+                  detail: `Short ${formatMillimeters(alignmentPinPieceLength(pins.holeDepth))} pieces of 1.75 mm filament for the holes along each seam`,
                 },
               ]
             : []),
