@@ -80,4 +80,39 @@ describe("kit worker wire format", () => {
     expect(transfer).toEqual([]);
     expect(unpackKitBuildResult(result)).toEqual(failed);
   });
+
+  test("a zero-part kit round trips with an empty transfer list", () => {
+    const emptyKit: PrintableKit = {
+      preset: findPrintVolumePreset("bed-256"),
+      parts: [],
+      summary: { partCount: 0, oversizedPartCount: 0 },
+    };
+    const built: KitBuildResult = { type: "built", kit: emptyKit };
+    const { result, transfer } = packKitBuildResult(built);
+    expect(transfer).toEqual([]);
+    expect(unpackKitBuildResult(result)).toEqual(built);
+  });
+
+  test("an empty mesh round trips and still transfers its (zero-length) buffers", () => {
+    const emptyMesh: PrintableMesh = { vertices: [], triangles: [] };
+    const kitWithEmptyMesh: PrintableKit = {
+      preset: findPrintVolumePreset("bed-256"),
+      parts: [
+        {
+          kind: "donut-filter-cap",
+          id: "cap-empty",
+          name: "Degenerate cap",
+          width: 0,
+          depth: 0,
+          height: 0,
+          mesh: emptyMesh,
+        },
+      ],
+      summary: { partCount: 1, oversizedPartCount: 0 },
+    };
+    const built: KitBuildResult = { type: "built", kit: kitWithEmptyMesh };
+    const { result, transfer } = packKitBuildResult(built);
+    expect(transfer.length).toBe(2);
+    expect(unpackKitBuildResult(result)).toEqual(built);
+  });
 });

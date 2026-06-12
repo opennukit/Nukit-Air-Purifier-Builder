@@ -15,7 +15,7 @@ import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/setti
 const emptyTempestKit: PrintableKit = {
   preset: findPrintVolumePreset("bed-256"),
   parts: [],
-  summary: { partCount: 12, oversizedPartCount: 0 },
+  summary: { partCount: 0, oversizedPartCount: 0 },
 };
 
 function valueFor(items: readonly { label: string; value: string }[], label: string): string | undefined {
@@ -29,7 +29,7 @@ describe("createPreviewSummaryItems", () => {
     const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", plan);
 
     expect(valueFor(items, "Print plates")).toBe(String(plan.sheets.length));
-    expect(valueFor(items, "Print chunks")).toBe("12");
+    expect(valueFor(items, "Print chunks")).toBe(String(emptyTempestKit.summary.partCount));
     expect(valueFor(items, "Bed")).toBe(findPrintVolumePreset("bed-256").label);
   });
 
