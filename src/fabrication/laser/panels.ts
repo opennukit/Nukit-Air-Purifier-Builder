@@ -595,8 +595,11 @@ function rearFanWallCenterY(filterCount: FilterCount, chamberHeight: number, fan
   return 0;
 }
 
+// Upstream boxes.py folds 2*burn into its part spacing because its drawn parts
+// grow by burn per side; our panel outlines bake that growth into their own
+// bounds, so only the material-based clearance remains here.
 function boxesPartSpacing(settings: PurifierSettings): number {
-  return 2 * settings.cutting.kerfFit + settings.cutting.materialThickness * 0.5;
+  return settings.cutting.materialThickness * 0.5;
 }
 
 function kerfCorrectedRadius(radius: number, kerfFit: number): number {

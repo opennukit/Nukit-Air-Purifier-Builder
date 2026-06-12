@@ -34,6 +34,21 @@ describe("parts list", () => {
     expect(categories).not.toContain("Sheet");
   });
 
+  test("lists curated source files, filters, fans, and license for a static reference", () => {
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const items = createPartsListItems(staticLayout, "print-3mf", staticLayout.rawSettings, "bed-256");
+    const categories = items.map((item) => item.category);
+
+    expect(categories).toContain("Source files");
+    expect(categories).toContain("Filters");
+    expect(categories).toContain("Fans");
+    expect(categories).toContain("License");
+    expect(items.find((item) => item.category === "Source files")?.url).toBeDefined();
+    expect(items.find((item) => item.category === "License")?.url).toBeDefined();
+    expect(categories).not.toContain("Sheet");
+    expect(categories).not.toContain("Assembly");
+  });
+
   test("drops the seam consumables when the print volume keeps the model whole", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
     const items = createPartsListItems(tempestLayout, "print-3mf", tempestLayout.rawSettings, "unsplit");

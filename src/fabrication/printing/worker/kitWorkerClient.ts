@@ -8,7 +8,11 @@ import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import type { PrintableKit, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
 import { printKitCacheKey } from "@/fabrication/printing/printDesignKit";
 import { buildKitResult, type KitBuildResult } from "@/fabrication/printing/worker/kitBuild";
-import type { KitWorkerRequest, KitWorkerResponse } from "@/fabrication/printing/worker/kitWorkerProtocol";
+import {
+  unpackKitBuildResult,
+  type KitWorkerRequest,
+  type KitWorkerResponse,
+} from "@/fabrication/printing/worker/kitWorkerProtocol";
 
 // How a kit request ends for its caller. "superseded" means a newer request on
 // the same channel replaced it before its result landed; the caller simply
@@ -51,7 +55,7 @@ function kitWorker(): Worker {
         return;
       }
       resultHandlerByRequestId.delete(event.data.requestId);
-      handleResult(event.data.result);
+      handleResult(unpackKitBuildResult(event.data.result));
     };
     sharedWorker.onerror = (event) => {
       failAllPendingRequests(`kit worker crashed: ${event.message !== "" ? event.message : "unknown error"}`);

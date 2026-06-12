@@ -12,11 +12,6 @@ import {
 } from "@/fabrication/printing/printableKit";
 import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
 
-export type GeneratedPrintSheetPlanCacheEntry = {
-  readonly key: string;
-  readonly plan: PrintableSheetPlan;
-};
-
 export function createActivePrintSheetPlan(
   currentLayout: LayoutResult,
   currentPrintVolumePresetId: PrintVolumePresetId,
