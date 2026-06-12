@@ -128,6 +128,44 @@ describe("createPrintKitChannel", () => {
     expect(posted.length).toBe(2);
   });
 
+  // Mirrors failAllPendingRequests after a worker crash: every request the
+  // port is holding fails in one batch with the same message, and whatever a
+  // channel reposts goes to a fresh backend (here: back into the same manual
+  // port) — the retry path.
+  test("a worker-level failure settles every pending channel and reposts queued successors", async () => {
+    const { port, posted } = createManualPort();
+    const dedupingPort = createDedupingPort(port);
+    const sheetChannel = createPrintKitChannel(dedupingPort);
+    const assembledChannel = createPrintKitChannel(dedupingPort);
+
+    const staleSheetRequest = sheetChannel.request(settings, "bed-220");
+    const queuedSheetRequest = sheetChannel.request(settings, "bed-180");
+    const assembledRequest = assembledChannel.request(settings, "bed-300");
+    expect(await staleSheetRequest).toEqual({ type: "superseded" });
+    expect(posted.length).toBe(2);
+
+    // The crash: fail everything pending in one batch. Reposts triggered by
+    // the failures land back in `posted` after the splice.
+    for (const pending of posted.splice(0)) {
+      pending.respond(buildFailure("kit worker crashed: boom"));
+    }
+
+    expect(await assembledRequest).toEqual({ type: "failed", message: "kit worker crashed: boom" });
+
+    // The sheet channel's superseded in-flight request dropped its failure and
+    // freed the port for the queued successor, which retries on the fresh
+    // backend instead of failing.
+    expect(posted.length).toBe(1);
+    expect(posted[0].input.presetId).toBe("bed-180");
+    posted[0].respond(buildFailure("fresh"));
+    expect(await queuedSheetRequest).toEqual({ type: "failed", message: "fresh" });
+
+    // Both channels are idle again and accept new work.
+    void sheetChannel.request(settings, "bed-220");
+    void assembledChannel.request(settings, "bed-300");
+    expect(posted.length).toBe(3);
+  });
+
   test("a synchronous port settles the caller within the same request", async () => {
     const syncPort: KitBuildPort = {
       post: (_input, onResult) => onResult(buildFailure("sync")),

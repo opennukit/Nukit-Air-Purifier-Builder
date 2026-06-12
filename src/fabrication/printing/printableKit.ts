@@ -61,24 +61,29 @@ export type PrintablePartKind =
   | "donut-filter-cap"
   | "tempest-print-chunk";
 
-type PrintablePartBase = {
+type PrintablePartBase<Mesh> = {
   readonly id: string;
   readonly name: string;
   readonly width: number;
   readonly depth: number;
   readonly height: number;
-  readonly mesh: PrintableMesh;
+  readonly mesh: Mesh;
 };
 
-export type PrintablePart =
-  | (PrintablePartBase & {
+// A part's identity, dimensions, and placement are independent of how its mesh
+// is represented; the worker protocol reuses this shape with meshes packed
+// into transferable typed arrays.
+export type PrintablePartWithMesh<Mesh> =
+  | (PrintablePartBase<Mesh> & {
       readonly kind: "tempest-print-chunk";
       readonly sourcePlacement: TempestChunkPlacement;
     })
-  | (PrintablePartBase & {
+  | (PrintablePartBase<Mesh> & {
       readonly kind: Exclude<PrintablePartKind, "tempest-print-chunk">;
       readonly sourcePlacement?: never;
     });
+
+export type PrintablePart = PrintablePartWithMesh<PrintableMesh>;
 
 // Where a tempest chunk's local origin (the chunk grid cell's origin; the mesh is cell-relative and may start inside it) sits inside the
 // posed assembly, in millimeters. Plain data so kits survive the worker's

@@ -51,6 +51,42 @@ describe("export diagnostics severity", () => {
     expect(summary.title).toBe("1 issue blocks export");
   });
 
+  test("a clean layout summarizes as ready to export", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const plan = createPrintableSheetPlanFromKit(kitWithSummary(cleanKitSummary));
+    const diagnostics = evaluateActiveExportDiagnostics(tempestLayout, "print-3mf", plan);
+
+    expect(diagnostics).toEqual([]);
+
+    const summary = summarizeActiveBuildReadiness(tempestLayout, diagnostics, "print-3mf");
+    expect(summary.severity).toBe("info");
+    expect(summary.title).toBe("Ready to export");
+  });
+
+  test("static reference designs skip generated-build diagnostics and read as ready to open files", () => {
+    const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-cr-14x20-base"));
+    const diagnostics = evaluateActiveExportDiagnostics(staticLayout, "print-3mf", null);
+
+    expect(diagnostics).toEqual([]);
+
+    const summary = summarizeActiveBuildReadiness(staticLayout, diagnostics, "print-3mf");
+    expect(summary.severity).toBe("info");
+    expect(summary.title).toBe("Ready to open files");
+  });
+
+  test("a still-building plan adds no print blockers", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const withoutPlan = evaluateActiveExportDiagnostics(tempestLayout, "print-3mf", null);
+    const withCleanPlan = evaluateActiveExportDiagnostics(
+      tempestLayout,
+      "print-3mf",
+      createPrintableSheetPlanFromKit(kitWithSummary(cleanKitSummary)),
+    );
+
+    expect(withoutPlan).toEqual(withCleanPlan);
+    expect(withoutPlan.some((diagnostic) => diagnostic.id === "oversized-print-part")).toBe(false);
+  });
+
   test("surfaces the filter dimension advisory for generated print designs", () => {
     const unusualTempestLayout = createLayout({
       ...applyPrintDesignPreset(defaultSettings, "nukit-tempest"),
