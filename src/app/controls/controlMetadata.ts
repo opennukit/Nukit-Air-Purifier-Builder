@@ -3,7 +3,7 @@
 // plus the setting-name types those tables are keyed by.
 
 import type { TempestArrangementPreset } from "@/domain/purifier/designPresets";
-import type { CordHolePlacement, RawPurifierSettings } from "@/domain/purifier/settingsModel";
+import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 
 export type NumericSettingName = {
   [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends number ? Key : never;
@@ -93,15 +93,5 @@ export const tempestArrangementOptions: readonly {
   { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
   { id: "four-side-filter-tower", label: "4 side filters" },
 ];
-export const cordHolePlacementOptions: readonly {
-  readonly id: CordHolePlacement;
-  readonly label: string;
-}[] = [
-  { id: "none", label: "None" },
-  { id: "front", label: "Front wall" },
-  { id: "back", label: "Back wall" },
-  { id: "left", label: "Left wall" },
-  { id: "right", label: "Right wall" },
-];
 export const cordHoleInfo =
-  "Hole for the fan power cables to exit the housing. The 4-side tower routes it through the matching top-plate corner; the other layouts drill the chosen wall.";
+  "Diameter of the hole the fan power cables exit through, near the bottom of the right wall. The 4-side tower routes it through the matching top-plate corner instead.";

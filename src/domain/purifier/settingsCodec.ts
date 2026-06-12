@@ -25,7 +25,6 @@ import {
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   cameraPresets,
-  canonicalCordHolePlacement,
   canonicalTempestArrangement,
   defaultSettings,
   findPreviewMaterialColorPreset,
@@ -68,7 +67,6 @@ export function encodeSettings(
   }
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
-  params.set("cordHolePlacement", settings.cordHolePlacement);
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
   params.set(
     "donutFilterOuterDiameter",
@@ -150,9 +148,6 @@ export function decodeSettings(search: string): RawPurifierSettings {
     fanColor: readFanColor(params),
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
-    cordHolePlacement: canonicalCordHolePlacement(
-      params.get("cordHolePlacement"),
-    ),
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,

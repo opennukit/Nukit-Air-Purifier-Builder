@@ -57,10 +57,9 @@ describe("Purifier draft model", () => {
     }
 
     expect(draft.design.arrangement).toBe("four-side-filter-tower");
-    expect(draft.design.cordHole).toEqual({ placement: "right", diameter: 8 });
+    expect(draft.design.cordHoleDiameter).toBe(8);
     expect(serializePurifierDraft(draft).printDesign).toBe("nukit-tempest");
     expect(serializePurifierDraft(draft).tempestArrangement).toBe("four-side-filter-tower");
-    expect(serializePurifierDraft(draft).cordHolePlacement).toBe("right");
     expect(serializePurifierDraft(draft).cordHoleDiameter).toBe(8);
   });
 
