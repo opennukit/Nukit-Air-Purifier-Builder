@@ -51,7 +51,7 @@ export class Boxes {
     const overallHeight = height + edges[0].spacing() + edges[2].spacing();
 
     this.ctx.save();
-    this.ctx.translate(edges[3].spacing() + this.spacing / 2, edges[0].margin() + this.spacing / 2);
+    this.ctx.translate(edges[3].spacing() + this.partSpacing() / 2, edges[0].margin() + this.partSpacing() / 2);
     // Upstream displaces the tool path outward by `burn` while drawing, so the
     // part outline it emits is one burn larger on every side.
     this.ctx.addRect(-this.burn, -this.burn, width + 2 * this.burn, height + 2 * this.burn, "cut");
