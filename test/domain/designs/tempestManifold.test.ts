@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { defaultTempestSettings, defaultTempestTowerFilter } from "@/domain/designs/tempest/model";
+import { createTempestModel, defaultTempestSettings, defaultTempestTowerFilter } from "@/domain/designs/tempest/model";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
-import { towerCornerChamfer } from "@/fabrication/printing/designs/tempest/geometry";
-import { cleanManifold, manifoldReport, totalGenus } from "../../helpers/manifoldChecks";
+import { buildTempestGeometry, towerCornerChamfer } from "@/fabrication/printing/designs/tempest/geometry";
+import { cuboidFromMinSize } from "@/fabrication/printing/designs/tempest/geometry/primitives";
+import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geometry/context";
+import { type Geom2, type Geom3, manifoldModeling } from "@/fabrication/printing/modeling/manifoldOps";
+import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
+import { extractWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
+import { cleanManifold, manifoldReport, meshVolume, totalGenus } from "../../helpers/manifoldChecks";
 
 describe("Tempest meshes are 2-manifold", () => {
   test("two-filter housing exports a watertight single body", () => {
@@ -24,6 +29,46 @@ describe("Tempest meshes are 2-manifold", () => {
     // CSG backend; guard that the manifold kernel keeps it clean.
     expect(defaultTempestSettings.fan.opening.type).toBe("honeycomb");
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
+  });
+
+  test("filter-slot ends stay sealed at the wall corners", () => {
+    // The loading slot reaches past the adjacent wall's inner face (endMargin 4 <
+    // wall 5). When the wall body's inner-face corners carried chamfers, the slot
+    // exposed those chamfer triangles as ~1mm through-slits at the box corners,
+    // and the filter media showed through from outside. Probe the corner blocks
+    // inside both slot bands and require them fully solid.
+    const model = createTempestModel(defaultTempestSettings);
+    if (model.topology !== "sandwich") {
+      throw new Error("Expected the sandwich topology");
+    }
+    const wall = model.frame.wallThickness;
+    const flange = model.frame.outsideFlangeThickness;
+    const slotZBands = model.filterLayout.loading.slots.map((slot) => [flange + slot.localZBottom, flange + slot.localZTop]);
+    withGeometryArena(() => {
+      const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
+      const solid = buildTempestGeometry(manifoldModeling, model);
+      // The slot wall is "back"; its corner blocks sit against the left and right
+      // walls. Probe the strip between each side wall's inner face and the slot
+      // end, just inside the back wall's inner face (clear of the exterior bevel).
+      for (const [zBottom, zTop] of slotZBands) {
+        for (const xMin of [model.settings.filterSlot.endMargin, model.box.width - wall]) {
+          const probe = cuboidFromMinSize(
+            ctx,
+            xMin,
+            model.box.depth - wall,
+            zBottom + 1,
+            wall - model.settings.filterSlot.endMargin,
+            wall - 0.5,
+            zTop - zBottom - 2,
+          );
+          const probeVolume =
+            (wall - model.settings.filterSlot.endMargin) * (wall - 0.5) * (zTop - zBottom - 2);
+          const overlap = meshVolume(extractWeldedMesh(manifoldModeling.booleans.intersect(solid, probe)));
+          expect(overlap).toBeCloseTo(probeVolume, 3);
+        }
+      }
+      return [];
+    });
   });
 
   test("four-filter tower exports a watertight single body", () => {
