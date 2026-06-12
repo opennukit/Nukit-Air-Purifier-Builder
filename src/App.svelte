@@ -1170,6 +1170,25 @@
             </section>
           {/if}
 
+          {#if showPrintSetupControls}
+            <section class="control-section print-volume-section" data-print-volume-section>
+              <div class="section-heading">
+                <p class="eyebrow">Printer</p>
+                <h2>Print setup</h2>
+              </div>
+              <div data-print-volume-control>
+                <label class="field">
+                  <span>Print volume</span>
+                  <select name="printVolume" onchange={setPrintVolume}>
+                    {#each printVolumePresets as preset}
+                      <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              </div>
+            </section>
+          {/if}
+
           {#if !isStaticReferenceControlsActive}
             <section class="control-section parts-section">
               <div class="section-heading">
@@ -1335,19 +1354,6 @@
             </section>
           {/if}
 
-          {#snippet printSetupFields()}
-            <div data-print-volume-control>
-              <label class="field">
-                <span>Print volume</span>
-                <select name="printVolume" onchange={setPrintVolume}>
-                  {#each printVolumePresets as preset}
-                    <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
-                  {/each}
-                </select>
-              </label>
-            </div>
-          {/snippet}
-
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
@@ -1458,19 +1464,6 @@
                   </label>
                 </div>
               {/if}
-              {#if showPrintSetupControls}
-                {@render printSetupFields()}
-              {/if}
-            </section>
-          {/if}
-
-          {#if showPrintSetupControls && isStaticReferenceControlsActive}
-            <section class="control-section print-volume-section" data-print-volume-section>
-              <div class="section-heading">
-                <p class="eyebrow">Printer</p>
-                <h2>Print setup</h2>
-              </div>
-              {@render printSetupFields()}
             </section>
           {/if}
 
