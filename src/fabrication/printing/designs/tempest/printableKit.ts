@@ -14,7 +14,7 @@ import {
   type TempestModel,
   type TempestPrintablePose,
 } from "@/domain/designs/tempest/model";
-import type { TempestSettings } from "@/domain/designs/tempest/shared";
+import { alignmentPinPieceLength, type TempestSettings } from "@/domain/designs/tempest/shared";
 import {
   findPrintVolumePreset,
   printBedFitForPart,
@@ -135,7 +135,8 @@ export type TempestPosedPinPlacement = {
 
 export type TempestAssemblyPinDiagram = {
   readonly pinDiameter: number;
-  // The physical pin: holeDepth into the chunk on each side of the seam.
+  // The physical pin piece: it reaches into the chunk on each side of the
+  // seam, cut shorter than the combined hole depth to leave glue room.
   readonly pinLength: number;
   readonly placements: readonly TempestPosedPinPlacement[];
 };
@@ -155,7 +156,7 @@ export function createTempestAssemblyPinDiagram(
   }
   return {
     pinDiameter: pins.diameter,
-    pinLength: 2 * pins.holeDepth,
+    pinLength: alignmentPinPieceLength(pins.holeDepth),
     placements,
   };
 }

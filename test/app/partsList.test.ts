@@ -31,6 +31,8 @@ describe("parts list", () => {
       "Super glue or epoxy",
       "Filament alignment pins",
     ]);
+    // 2 x 10 mm hole depth minus the 2 mm glue room.
+    expect(items.find((item) => item.label === "Filament alignment pins")?.detail).toContain("18 mm");
     expect(categories).not.toContain("Sheet");
   });
 

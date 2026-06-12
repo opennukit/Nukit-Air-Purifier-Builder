@@ -139,6 +139,15 @@ export type TempestAlignmentPinSettings =
       readonly spacing: Millimeters;
     };
 
+// The cut filament piece is shorter than the combined hole depth so the seam
+// can close fully with glue in the holes; the holes themselves stay holeDepth
+// deep on each side.
+export const PIN_GLUE_ROOM_MM: Millimeters = 2;
+
+export function alignmentPinPieceLength(holeDepth: Millimeters): Millimeters {
+  return 2 * holeDepth - PIN_GLUE_ROOM_MM;
+}
+
 export type TempestPrintBedVolume = {
   readonly width: Millimeters;
   readonly depth: Millimeters;
