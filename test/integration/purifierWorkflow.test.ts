@@ -316,8 +316,11 @@ describe("FilterBoxBuilder purifier workflow", () => {
       baselinePanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length,
     );
     expect(roundedInteriorYValues(tunedRail)).not.toEqual(roundedInteriorYValues(baselineRail));
+    // Outlines are burn-compensated tool paths: the recess floor sits one kerf
+    // outward and the whole panel is shifted one kerf by normalization, so the
+    // nominal depth reappears only after the laser removes the kerf.
     expect(Math.min(...roundedInteriorYValues(tunedRail))).toBeCloseTo(
-      defaultSettings.rim - defaultSettings.materialThickness * 1.4,
+      defaultSettings.rim - defaultSettings.materialThickness * 1.4 + 2 * defaultSettings.kerfFit,
     );
   });
 
