@@ -1,3 +1,17 @@
+// Cross-checks the app's cut sheet against the real Python boxes.py AirPurifier.
+//
+// Verified working setup (macOS, python3.14):
+//   git clone https://github.com/florianfesti/boxes /tmp/boxes.py
+//   python3 -m pip install -r /tmp/boxes.py/requirements.txt
+//   BOXES_PY_PATH=/tmp/boxes.py bun run oracle:airpurifier
+// Use BOXES_PY_PYTHON to point at a specific interpreter (a ./.venv-boxes/bin/python
+// in the repo root is picked up automatically).
+//
+// Reading the output: path counts must match 1:1. Absolute sheet dims differ by
+// design (our margins/spacing constants are not upstream's), but the burn
+// response must track: rerun with a different kerfFit/--burn and both sheets
+// must grow ~2*burn in width and ~2*burn per part in height.
+
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
