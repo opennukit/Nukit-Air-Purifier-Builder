@@ -470,7 +470,7 @@ function createFingerHoleCutsForEdges(
   jointSettings: CutJointSettings,
 ): CutFeature[] {
   const cuts: RectCut[] = [];
-  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier + kerfFit;
+  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier;
   for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
     const sections = edges[edgeIndex];
     const hasFingerHoleEdge = sections.some((section) => section.kind === "finger-holes");
