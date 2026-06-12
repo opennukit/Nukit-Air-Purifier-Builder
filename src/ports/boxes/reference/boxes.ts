@@ -52,7 +52,9 @@ export class Boxes {
 
     this.ctx.save();
     this.ctx.translate(edges[3].spacing() + this.spacing / 2, edges[0].margin() + this.spacing / 2);
-    this.ctx.addRect(0, 0, width, height, "cut");
+    // Upstream displaces the tool path outward by `burn` while drawing, so the
+    // part outline it emits is one burn larger on every side.
+    this.ctx.addRect(-this.burn, -this.burn, width + 2 * this.burn, height + 2 * this.burn, "cut");
     this.runCallbacks(options.callback);
     if (this.labels && options.label) {
       this.ctx.addText(width / 2, height / 2, options.label, 6, "annotation");
@@ -77,9 +79,16 @@ export class Boxes {
     const radius = Math.min(options.r ?? 0, width / 2, height / 2);
     const centerX = options.centerX ?? true;
     const centerY = options.centerY ?? true;
-    const startX = centerX ? x - width / 2 : x;
-    const startY = centerY ? y - height / 2 : y;
-    this.ctx.addRoundedRect(startX, startY, width, height, radius, "inner-cut");
+    const startX = (centerX ? x - width / 2 : x) + this.burn;
+    const startY = (centerY ? y - height / 2 : y) + this.burn;
+    this.ctx.addRoundedRect(
+      startX,
+      startY,
+      width - 2 * this.burn,
+      height - 2 * this.burn,
+      Math.max(0, radius - this.burn),
+      "inner-cut",
+    );
   }
 
   fingerHolesAt(x: number, y: number, length: number, angle = 0): void {
@@ -90,11 +99,13 @@ export class Boxes {
     this.ctx.save();
     this.ctx.translate(x, y);
     for (let index = 0; index < count; index += 1) {
-      const slotX = index * step + (step - slotLength) / 2;
+      const slotX = index * step + (step - slotLength) / 2 + this.burn;
+      const slotWidth = slotLength - 2 * this.burn;
+      const slotHeight = this.thickness - 2 * this.burn;
       if (angle === 90 || angle === -90) {
-        this.ctx.addRect(-this.thickness / 2, slotX, this.thickness, slotLength, "inner-cut");
+        this.ctx.addRect(-slotHeight / 2, slotX, slotHeight, slotWidth, "inner-cut");
       } else {
-        this.ctx.addRect(slotX, -this.thickness / 2, slotLength, this.thickness, "inner-cut");
+        this.ctx.addRect(slotX, -slotHeight / 2, slotWidth, slotHeight, "inner-cut");
       }
     }
     this.ctx.restore();
@@ -102,30 +113,36 @@ export class Boxes {
 
   move(width: number, height: number, where: MoveDirection = "up"): void {
     if (where === "right") {
-      this.ctx.translate(width + this.spacing, 0);
+      this.ctx.translate(width + this.partSpacing(), 0);
       return;
     }
     if (where === "left") {
-      this.ctx.translate(-(width + this.spacing), 0);
+      this.ctx.translate(-(width + this.partSpacing()), 0);
       return;
     }
     if (where === "down") {
-      this.ctx.translate(0, -(height + this.spacing));
+      this.ctx.translate(0, -(height + this.partSpacing()));
       return;
     }
     if (where !== "up") {
       throw new Error(`Boxes.move: Unknown move direction ${String(where)}`);
     }
-    this.ctx.translate(0, height + this.spacing);
+    this.ctx.translate(0, height + this.partSpacing());
   }
 
   toDocument(): BoxesDocument {
     const bounds = getShapeBounds(this.ctx.shapes);
     return {
-      width: bounds.width + this.spacing,
-      height: bounds.height + this.spacing,
+      width: bounds.width + this.partSpacing(),
+      height: bounds.height + this.partSpacing(),
       shapes: [...this.ctx.shapes],
     };
+  }
+
+  // Upstream folds 2*burn into self.spacing when the canvas opens; this port
+  // keeps `spacing` as the configured base and adds the burn where it is used.
+  private partSpacing(): number {
+    return this.spacing + 2 * this.burn;
   }
 
   protected resolveEdge(edge: string): Edge {
