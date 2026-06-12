@@ -51,6 +51,40 @@ export function chamferedRectangle2d<Solid, Region>(
   });
 }
 
+// A sandwich wall body: a length x thickness footprint extruded to height, with
+// chamfers only down the two OUTER-face corners (y = 0); together with the
+// adjacent wall's outer chamfer they form the box's exterior corner bevel. The
+// INNER-face corners stay square on purpose: at a box corner they are buried
+// inside the adjacent wall, and chamfering them opens a thin through-slit
+// wherever a through-cut that reaches the wall end (the filter loading slot)
+// removes the adjacent wall material that covered the chamfer triangle.
+export function outerChamferedWallPrism<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  length: number,
+  thickness: number,
+  height: number,
+  chamfer: number,
+): Solid {
+  const { primitives, extrusions } = ctx.modeling;
+  const safeLength = Math.max(0.001, length);
+  const safeThickness = Math.max(0.001, thickness);
+  const safeChamfer = Math.max(0, Math.min(chamfer, safeLength / 2 - 0.01, safeThickness - 0.01));
+  const footprint =
+    safeChamfer <= 0
+      ? rectangle2d(ctx, 0, 0, safeLength, safeThickness)
+      : primitives.polygon({
+          points: [
+            [safeChamfer, 0],
+            [safeLength - safeChamfer, 0],
+            [safeLength, safeChamfer],
+            [safeLength, safeThickness],
+            [0, safeThickness],
+            [0, safeChamfer],
+          ],
+        });
+  return extrusions.extrudeLinear({ height: Math.max(0.001, height) }, footprint);
+}
+
 export function rectangle2d<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   x: number,

@@ -9,6 +9,7 @@ import {
   chamferedOpeningCutAlongZ,
   chamferedPrism,
   cuboidFromMinSize,
+  outerChamferedWallPrism,
   subtractAll,
 } from "./primitives";
 import { fanPatternCut, filterOpening2d } from "./patterns2d";
@@ -71,7 +72,7 @@ export function wall<Solid, Region>(
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
   localFanCenter: number,
 ): Solid {
-  const body = chamferedPrism(ctx, 0, 0, 0, length, model.frame.wallThickness, model.box.wallHeight, model.frame.chamferSize);
+  const body = outerChamferedWallPrism(ctx, length, model.frame.wallThickness, model.box.wallHeight, model.frame.chamferSize);
   const fanHoles = fanLayout.positionsAlongWall.map((position) =>
     fanPatternCut(
       ctx,
@@ -99,13 +100,17 @@ export function horizontalFilterSlotHole<Solid, Region>(
   if (localZTop <= localZBottom) {
     return [];
   }
+  // The slot may reach up to the adjacent walls' inner faces but never into the
+  // exterior corner bevel: past `chamferSize` from the wall end, the through-cut
+  // would pierce the bevel face the two walls share and open a corner slit.
+  const endMargin = Math.max(model.settings.filterSlot.endMargin, model.frame.chamferSize);
   return [
     cuboidFromMinSize(
       ctx,
-      model.settings.filterSlot.endMargin,
+      endMargin,
       -SHELL_OVERLAP_MM,
       localZBottom,
-      Math.max(0.001, wallLength - 2 * model.settings.filterSlot.endMargin),
+      Math.max(0.001, wallLength - 2 * endMargin),
       model.frame.wallThickness + 2 * SHELL_OVERLAP_MM,
       localZTop - localZBottom,
     ),

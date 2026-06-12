@@ -73,6 +73,20 @@ export function totalGenus(mesh: Mesh): number {
   return (2 * roots.size - (used.size - edges.size + mesh.triangles.length)) / 2;
 }
 
+// Signed enclosed volume of a watertight mesh via the divergence theorem.
+// Lets a test assert a region is solid (or open) by intersecting and comparing.
+export function meshVolume(mesh: Mesh): number {
+  let volume = 0;
+  for (const t of mesh.triangles) {
+    const a = mesh.vertices[t.v1];
+    const b = mesh.vertices[t.v2];
+    const c = mesh.vertices[t.v3];
+    volume +=
+      (a.x * (b.y * c.z - c.y * b.z) - a.y * (b.x * c.z - c.x * b.z) + a.z * (b.x * c.y - c.x * b.y)) / 6;
+  }
+  return volume;
+}
+
 // Number of connected shells. A part meant to print as one body must report 1 —
 // a watertight mesh can still be several disjoint pieces (e.g. a grill that
 // never touches its frame), which prints as loose parts.
