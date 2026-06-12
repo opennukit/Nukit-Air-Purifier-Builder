@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import { LruMap } from "@/app/lruMap";
   import type { PrintableKit } from "@/fabrication/printing/printableKit";
   import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
 
@@ -11,19 +12,7 @@
   // toggling exploded view (which alternates between the unsplit and the
   // active-preset kit) re-renders instantly once both kits are warm.
   const assembledKitChannel = createPrintKitChannel();
-  const assembledKitCacheLimit = 4;
-  const assembledKitCache = new Map<string, PrintableKit>();
-
-  function cacheAssembledKit(key: string, kit: PrintableKit): void {
-    assembledKitCache.delete(key);
-    assembledKitCache.set(key, kit);
-    for (const oldestKey of assembledKitCache.keys()) {
-      if (assembledKitCache.size <= assembledKitCacheLimit) {
-        break;
-      }
-      assembledKitCache.delete(oldestKey);
-    }
-  }
+  const assembledKitCache = new LruMap<string, PrintableKit>(4);
   // A key that failed to build is not retried until the settings change or
   // the user asks (retryFailedAssembledKitBuild); afterUpdate fires on every
   // render, so retrying a persistent failure there would loop worker rebuilds
@@ -100,10 +89,6 @@
     const kitKey = printKitCacheKey(currentLayout.rawSettings, presetId);
     const cachedKit = assembledKitCache.get(kitKey);
     if (cachedKit !== undefined) {
-      // Refresh recency so frequently toggled kits (unsplit <-> active preset)
-      // survive eviction.
-      assembledKitCache.delete(kitKey);
-      assembledKitCache.set(kitKey, cachedKit);
       // The newest render request is satisfied right here; an older build
       // still in flight must not apply later and revert the preview. Serving
       // from cache also moots any lingering failure for another key.
@@ -145,7 +130,7 @@
         return;
       }
       lastFailedAssembledKitKey = null;
-      cacheAssembledKit(kitKey, outcome.kit);
+      assembledKitCache.set(kitKey, outcome.kit);
       // A build outliving this instance still warmed the module cache above,
       // but it must not clobber the phase a newer instance is reporting.
       if (destroyed) {

@@ -64,10 +64,8 @@
     readPrintDesignControlValue,
     requireSelect,
   } from "@/app/controls/inputReaders";
-  import {
-    createActivePrintSheetPlan,
-    type GeneratedPrintSheetPlanCacheEntry,
-  } from "@/app/printSheetPlans";
+  import { createActivePrintSheetPlan } from "@/app/printSheetPlans";
+  import { LruMap } from "@/app/lruMap";
   import { createPrintKitChannel } from "@/fabrication/printing/worker/kitWorkerClient";
   import { evaluateActiveExportDiagnostics, summarizeActiveBuildReadiness } from "@/app/diagnostics";
   import { staticReferenceFilesUrl } from "@/app/externalLinks";
@@ -177,7 +175,9 @@
   let isSheetDialogOpen = false;
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
-  let generatedPrintSheetPlanCache: GeneratedPrintSheetPlanCacheEntry | null = null;
+  // A few warm plans, keyed like the assembled-kit cache, so toggling between
+  // bed presets (or settings the user just left) re-renders without a rebuild.
+  const generatedPrintSheetPlanCache = new LruMap<string, PrintableSheetPlan>(4);
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
   // Reported up by PurifierPreview about its assembled tempest kit build.
@@ -714,14 +714,15 @@
       return null;
     }
     const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
-    if (generatedPrintSheetPlanCache?.key === cacheKey) {
+    const cachedPlan = generatedPrintSheetPlanCache.get(cacheKey);
+    if (cachedPlan !== undefined) {
       // A recorded failure always belongs to some other key (failures never
       // reach the cache), and it is moot once the current key serves from
       // cache — clear it so the export path sees a fresh plan.
       if (printSheetKitBuild.type === "failed") {
         printSheetKitBuild = { type: "idle" };
       }
-      return generatedPrintSheetPlanCache.plan;
+      return cachedPlan;
     }
     if (currentPreviewMode !== "print-sheets") {
       return null;
@@ -750,13 +751,14 @@
         printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
         return;
       }
-      generatedPrintSheetPlanCache = { key: cacheKey, plan: createPrintableSheetPlanFromKit(outcome.kit) };
+      const plan = createPrintableSheetPlanFromKit(outcome.kit);
+      generatedPrintSheetPlanCache.set(cacheKey, plan);
       printSheetKitBuild = { type: "idle" };
       // The finished build always warms the cache, but it only goes on screen
       // if it still answers the current settings — e.g. switching to the laser
       // method mid-build must keep the plan null, not resurrect a print plan.
       if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
-        generatedPrintSheetPlan = generatedPrintSheetPlanCache.plan;
+        generatedPrintSheetPlan = plan;
       }
     });
   }
