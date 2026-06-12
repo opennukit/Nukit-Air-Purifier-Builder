@@ -62,16 +62,48 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 253.5, 405]);
     expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 253.5, 405]);
 
+    // The dual sandwich stands upright (build +y up, front wall = floor), so the
+    // cord hole sits one corner-safe offset (17) above the wall's floor end and on
+    // the standing depth midline (131 = height/2), inside the fan chamber.
     expect(model.cordPassThrough).toMatchObject({
       topology: "sandwich",
       type: "wall-cylinder",
       wall: "right",
       side: "right",
       diameter: 8,
-      positionAlongWall: 490,
+      positionAlongWall: 17,
       verticalCenter: 131,
       axis: "x",
     });
+  });
+
+  test("dual sandwich cord hole lands near the standing floor after the upright pose", () => {
+    const model = createTempestModel();
+    expect(model.printablePose.type).toBe("upright-dual-filter");
+    if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
+      throw new Error("Expected a sandwich wall cord");
+    }
+    // upright-dual-filter maps source (x, y, z) -> posed (x, boxHeight - z, y), so
+    // the cord hole's standing height is its position along the left/right wall.
+    const standingHeight = model.cordPassThrough.positionAlongWall;
+    const floorClearance =
+      model.frame.wallThickness + model.cordPassThrough.diameter / 2;
+    expect(standingHeight).toBeGreaterThanOrEqual(floorClearance);
+    expect(standingHeight).toBeLessThanOrEqual(floorClearance + 10);
+  });
+
+  test("single-filter sandwich keeps its as-modelled pose and side-positioned cord", () => {
+    const model = createTempestModel({
+      ...defaultTempestSettings,
+      arrangement: { type: "single-horizontal-top-filter", filter: defaultTempestHorizontalFilter },
+    });
+    expect(model.printablePose.type).toBe("source");
+    if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
+      throw new Error("Expected a sandwich wall cord");
+    }
+    // side "right" along the 507 wall with the 17 corner offset.
+    expect(model.cordPassThrough.positionAlongWall).toBe(490);
+    expect(model.cordPassThrough.verticalCenter).toBe(model.box.height / 2);
   });
 
   test("models the four-filter tower as a different arrangement instead of widening horizontal filter count", () => {
