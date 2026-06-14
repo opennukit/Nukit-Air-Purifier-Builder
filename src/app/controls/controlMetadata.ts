@@ -85,11 +85,11 @@ export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>
 // fan choice). A 0 size/radius means "auto" — see tempest-builder.html.
 export const tempestBoxExhaustControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "boxFanHoleSize", label: "Fan hole diameter", suffix: "mm", step: "1" },
-  { name: "boxRingOneScrewHoles", label: "Ring 1 screw size", suffix: "x", step: "1" },
-  { name: "boxRingOneScrewDiameter", label: "Ring 1 screw ø", suffix: "mm", step: "0.5" },
+  { name: "boxRingOneScrewHoles", label: "Ring 1 screw quantity", suffix: "x", step: "1" },
+  { name: "boxRingOneScrewDiameter", label: "Ring 1 screw size", suffix: "mm", step: "0.5" },
   { name: "boxRingOneDiameter", label: "Ring 1 diameter", suffix: "mm", step: "1" },
-  { name: "boxRingTwoScrewHoles", label: "Ring 2 screw size", suffix: "x", step: "1" },
-  { name: "boxRingTwoScrewDiameter", label: "Ring 2 screw ø", suffix: "mm", step: "0.5" },
+  { name: "boxRingTwoScrewHoles", label: "Ring 2 screw quantity", suffix: "x", step: "1" },
+  { name: "boxRingTwoScrewDiameter", label: "Ring 2 screw size", suffix: "mm", step: "0.5" },
   { name: "boxRingTwoDiameter", label: "Ring 2 diameter", suffix: "mm", step: "1" },
 ];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
