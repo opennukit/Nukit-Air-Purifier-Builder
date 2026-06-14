@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy } from "svelte";
   import {
     normalizePurifierDraft,
     printDesignIdForPurifierDraft,
@@ -132,6 +132,14 @@
     | { readonly type: "building"; readonly key: string }
     | { readonly type: "failed"; readonly key: string; readonly message: string };
 
+  // The result of asking for the current settings' plan. "superseded" is a
+  // normal outcome (the settings changed mid-build), distinct from a real
+  // "failed" — the Download path must not show an error for it.
+  type PlanRequestOutcome =
+    | { readonly type: "ready"; readonly plan: PrintableSheetPlan }
+    | { readonly type: "failed" }
+    | { readonly type: "superseded" };
+
   // #######################################
   // Svelte State
   // #######################################
@@ -168,8 +176,6 @@
   let workbenchState: WorkbenchState = initialSession.workbenchState;
   let workbenchView: WorkbenchViewModel = createWorkbenchViewModel(draft, workbenchState);
   let printDesignSettingsMemory: PrintDesignSettingsMemory = createPrintDesignSettingsMemory(draft);
-  let sheetDialog: HTMLDialogElement;
-  let isSheetDialogOpen = false;
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
   // A few warm plans, keyed like the assembled-kit cache, so toggling between
@@ -177,8 +183,20 @@
   const generatedPrintSheetPlanCache = new LruMap<string, PrintableSheetPlan>(4);
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
+  // In-flight split-plan builds keyed by cacheKey, so a second caller for the
+  // same key (e.g. a Download click during a background build) awaits the same
+  // build instead of starting a redundant one. Cleared when the build settles.
+  const inFlightPlanByCacheKey = new Map<string, Promise<PlanRequestOutcome>>();
   // Reported up by PurifierPreview about its assembled tempest kit build.
-  let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  type AssembledBuildPhase = "idle" | "building" | "failed";
+  let assembledPreviewBuildPhase: AssembledBuildPhase = "idle";
+  // Flips true the first time the assembled preview reports a rendered model
+  // ("idle"). The split plan only background-builds after this, so it never
+  // competes with the initial unsplit build for the worker.
+  let assembledFirstRenderDone = false;
+  // Guards the Download button against a re-entrant click while the plan for
+  // the current settings is still being prepared (which would download twice).
+  let exportInProgress = false;
   let purifierPreview: PurifierPreview | undefined;
   // First load shows a centered "Building model…" state until the first build
   // SUCCEEDS; after that, rebuilds only show the corner pill over the old
@@ -237,15 +255,22 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, assembledFirstRenderDone);
   // The sheet-plan half only counts for 3D printing: the laser path renders
   // synchronously, so no pill or overlay belongs there even if a print build
   // is still settling in the background.
+  // Only a build for the settings currently on screen counts: a background
+  // build for some other key (e.g. one left mid-flight when the user switched
+  // back to an already-cached setting) must not light the "Updating…" pill.
   $: isPreviewUpdating =
-    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "building") ||
+    (fabricationMethod === "print-3mf" &&
+      printSheetKitBuild.type === "building" &&
+      printSheetKitBuild.key === printKitCacheKey(layout.rawSettings, printVolumePresetId)) ||
     assembledPreviewBuildPhase === "building";
   $: hasPreviewBuildFailure =
-    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "failed") ||
+    (fabricationMethod === "print-3mf" &&
+      printSheetKitBuild.type === "failed" &&
+      printSheetKitBuild.key === printKitCacheKey(layout.rawSettings, printVolumePresetId)) ||
     assembledPreviewBuildPhase === "failed";
   $: if (isPreviewUpdating && firstPreviewBuild === "not-started") {
     firstPreviewBuild = "in-progress";
@@ -265,7 +290,7 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId, generatedPrintSheetPlan);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
@@ -486,6 +511,98 @@
     }
   }
 
+  // Desktop affordance: hovering the button reveals the tip without a click.
+  // Mouse only — on touch, pointerenter fires on tap and would fight the click
+  // toggle, so touch keeps tap-to-open / tap-outside-to-close.
+  function openInfoTipOnHover(tipId: string, event: PointerEvent): void {
+    if (event.pointerType === "mouse") {
+      openInfoTipId = tipId;
+    }
+  }
+
+  function closeInfoTipOnHoverLeave(tipId: string, event: PointerEvent): void {
+    if (event.pointerType === "mouse") {
+      closeInfoTip(tipId);
+    }
+  }
+
+  // Closes the open tip when a tap or focus lands outside it. iOS Safari never
+  // focuses the button on tap, so the button's own blur can't dismiss it; this
+  // covers both the pointerdown (touch/mouse) and focusin (keyboard) paths.
+  function closeInfoTipIfOutside(event: Event): void {
+    if (openInfoTipId === null) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest(".info-tip") === null) {
+      openInfoTipId = null;
+    }
+  }
+
+  function closeInfoTipOnEscape(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      openInfoTipId = null;
+    }
+  }
+
+  // Places the open tip right above its button. The tooltip is `position:
+  // fixed`, so no scrolling/overflow ancestor can clip it (there are no
+  // transformed ancestors to capture the fixed element). Centred over the
+  // button, clamped to the viewport horizontally, and dropped below only if
+  // there is no room above. Re-runs while open so scrolling keeps it attached.
+  function positionInfoTip(
+    node: HTMLElement,
+    isOpen: boolean,
+  ): { update(open: boolean): void; destroy(): void } {
+    const button = node.parentElement?.querySelector("button") ?? null;
+    let frame = 0;
+    function place(): void {
+      if (button === null) {
+        return;
+      }
+      const anchor = button.getBoundingClientRect();
+      const tip = node.getBoundingClientRect();
+      if (tip.width === 0) {
+        return;
+      }
+      const margin = 8;
+      const left = Math.min(
+        Math.max(margin, anchor.left + anchor.width / 2 - tip.width / 2),
+        window.innerWidth - tip.width - margin,
+      );
+      const above = anchor.top - tip.height - 6;
+      const top = above >= margin ? above : anchor.bottom + 6;
+      node.style.left = `${Math.max(margin, left)}px`;
+      node.style.top = `${top}px`;
+    }
+    const schedule = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
+    };
+    if (isOpen) {
+      schedule();
+      window.addEventListener("scroll", schedule, true);
+      window.addEventListener("resize", schedule);
+    }
+    return {
+      update(open: boolean): void {
+        if (open) {
+          schedule();
+          window.addEventListener("scroll", schedule, true);
+          window.addEventListener("resize", schedule);
+        } else {
+          window.removeEventListener("scroll", schedule, true);
+          window.removeEventListener("resize", schedule);
+        }
+      },
+      destroy(): void {
+        cancelAnimationFrame(frame);
+        window.removeEventListener("scroll", schedule, true);
+        window.removeEventListener("resize", schedule);
+      },
+    };
+  }
+
   // ##############################
   // Workbench Navigation
   // ##############################
@@ -506,7 +623,7 @@
   // Export and Dialog Actions
   // #######################################
 
-  function exportDrawing(buttonKey: TransientButtonKey): void {
+  async function exportDrawing(buttonKey: TransientButtonKey): Promise<void> {
     // Only blocking diagnostics refuse the export; advisories stay visible in
     // the checks list but leave the download available.
     if (exportBlockingDiagnostics(exportDiagnostics).length > 0) {
@@ -515,7 +632,7 @@
     }
 
     if (fabricationMethod === "print-3mf") {
-      showTransientButtonLabel(buttonKey, exportPrintKit(layout, generatedPrintSheetPlan, printSheetKitBuild), 1400);
+      await exportPrintKit(buttonKey, layout);
       return;
     }
 
@@ -536,33 +653,50 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function exportPrintKit(
-    currentLayout: LayoutResult,
-    currentGeneratedPlan: PrintableSheetPlan | null,
-    currentKitBuild: PrintKitBuildState,
-  ): string {
+  // A single Download click resolves the plan and downloads it: the static
+  // reference opens its source files; everything else awaits the shared plan
+  // path (cache hit, in-flight build, or a fresh build). The button only shows
+  // "Preparing…" when a build is actually in flight — the plan is usually
+  // pre-built in the background, so the click just downloads and the browser's
+  // own download UI is the confirmation (no past-tense relabel every time).
+  async function exportPrintKit(buttonKey: TransientButtonKey, currentLayout: LayoutResult): Promise<void> {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
-      return "Opened source files";
+      showTransientButtonLabel(buttonKey, "Opened source files", 1400);
+      return;
     }
-    // Only a fresh plan may be exported. While a rebuild is in flight the
-    // cached plan still reflects the previous settings, so ask the user to
-    // retry shortly; after a failure there is no plan for these settings at
-    // all.
-    if (currentKitBuild.type === "building") {
-      return "Still updating…";
+    // A second click while the plan is still being prepared would download the
+    // file twice, so ignore re-entry until this export settles.
+    if (exportInProgress) {
+      return;
     }
-    if (currentKitBuild.type === "failed") {
-      return "Build failed";
+    exportInProgress = true;
+    const cacheKey = printKitCacheKey(layout.rawSettings, printVolumePresetId);
+    const planReady = generatedPrintSheetPlanCache.get(cacheKey) !== undefined;
+    if (!planReady) {
+      showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
     }
-    if (currentGeneratedPlan === null) {
-      // The plan resolves lazily, so nothing may be building yet (e.g.
-      // exporting straight from the assembled view): start the build now and
-      // ask the user to retry shortly.
-      requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
-      return "Still updating…";
+    try {
+      const outcome = await ensurePlanForCurrentSettings();
+      if (outcome.type === "failed") {
+        showTransientButtonLabel(buttonKey, "Build failed", 1600);
+        return;
+      }
+      if (outcome.type === "superseded") {
+        // The settings changed while this build was in flight; the new plan is
+        // already building, so just drop the label — no false error.
+        clearTransientButtonLabel(buttonKey);
+        return;
+      }
+      downloadPrintKit(currentLayout, outcome.plan);
+      clearTransientButtonLabel(buttonKey);
+    } finally {
+      exportInProgress = false;
     }
-    const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, currentGeneratedPlan.kit);
+  }
+
+  function downloadPrintKit(currentLayout: LayoutResult, plan: PrintableSheetPlan): void {
+    const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, plan.kit);
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -572,7 +706,6 @@
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return "Downloaded 3MF";
   }
 
   function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -590,35 +723,6 @@
     } catch (error) {
       console.warn("copyUrl: Clipboard write failed", error);
       showTransientButtonLabel(buttonKey, "Copy failed", 1600);
-    }
-  }
-
-  function openSheetDialog(): void {
-    if (previewMode === "enclosure") {
-      return;
-    }
-    isSheetDialogOpen = true;
-    void tick().then(() => {
-      if (!sheetDialog.open) {
-        sheetDialog.showModal();
-      }
-    });
-  }
-
-  function closeSheetDialog(): void {
-    isSheetDialogOpen = false;
-    if (sheetDialog.open) {
-      sheetDialog.close();
-    }
-  }
-
-  function handleDialogClose(): void {
-    isSheetDialogOpen = false;
-  }
-
-  function closeDialogOnBackdrop(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      closeSheetDialog();
     }
   }
 
@@ -642,6 +746,17 @@
       transientLabelTimers.delete(key);
     }, durationMs);
     transientLabelTimers.set(key, nextTimer);
+  }
+
+  // Drops any transient label immediately, reverting the button to its default.
+  function clearTransientButtonLabel(key: TransientButtonKey): void {
+    const timer = transientLabelTimers.get(key);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      transientLabelTimers.delete(key);
+    }
+    const { [key]: _removed, ...rest } = transientButtonLabels;
+    transientButtonLabels = rest;
   }
 
   // #######################################
@@ -670,18 +785,31 @@
   // Print Sheet Plans
   // ##############################
 
+  // The assembled preview reports "idle" only once a model is actually on
+  // screen (cache hit or finished build), "building" while it waits, "failed"
+  // on error. The first "idle" therefore marks the first assembled render as
+  // done — the gate that lets the split plan background-build without racing
+  // the initial unsplit build for the worker.
+  function handleAssembledBuildPhaseChange(phase: AssembledBuildPhase): void {
+    assembledPreviewBuildPhase = phase;
+    if (phase === "idle") {
+      assembledFirstRenderDone = true;
+    }
+  }
+
   // Resolves the plan synchronously from the cache when possible. On a cache
-  // miss a worker build only starts when a view actually shows the plan —
-  // posting the visible assembled tempest request first in the worker's FIFO
-  // queue — and the previous plan stays on screen until the new one lands
-  // (the "Updating…" indicator covers the gap). While nothing shows the plan,
-  // the summaries render their pending placeholders and the export button
-  // starts a build on demand.
+  // miss a worker build starts once a view shows the plan (print-sheets mode)
+  // or the assembled view has rendered its own model (so the split build never
+  // races the initial unsplit build), and the previous plan stays on screen
+  // until the new one lands (the "Updating…" indicator covers the gap). The
+  // summaries render their pending placeholders until the background build
+  // populates them.
   function resolveGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
     currentPreviewMode: PreviewMode,
+    firstAssembledRenderDone: boolean,
   ): PrintableSheetPlan | null {
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
@@ -697,32 +825,54 @@
       }
       return cachedPlan;
     }
-    if (currentPreviewMode !== "print-sheets") {
+    // The print-sheets view shows the plan and so always drives its build; the
+    // assembled view drives it too, but only after its own model is on screen,
+    // so the split build never competes with the initial unsplit build. Either
+    // way the request is deduped per key by ensurePlanForCurrentSettings.
+    if (currentPreviewMode !== "print-sheets" && !firstAssembledRenderDone) {
       return null;
     }
-    const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
-    if (!keyAlreadyHandled) {
-      requestGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId, cacheKey);
-    }
+    void ensurePlanForCurrentSettings();
     return generatedPrintSheetPlan;
   }
 
-  function requestGeneratedPrintSheetPlan(
-    currentLayout: LayoutResult,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-    cacheKey: string,
-  ): void {
+  // The one path that turns the current settings into a plan: serve a warm
+  // cache hit, otherwise build through the channel exactly once per key and
+  // reuse that in-flight build for any concurrent caller (background resolve
+  // and a Download click share it). Warms the cache and, when the key still
+  // answers the current settings, puts the plan on screen.
+  function ensurePlanForCurrentSettings(): Promise<PlanRequestOutcome> {
+    const currentLayout = layout;
+    const currentPrintVolumePresetId = printVolumePresetId;
+    const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
+    const cachedPlan = generatedPrintSheetPlanCache.get(cacheKey);
+    if (cachedPlan !== undefined) {
+      if (printSheetKitBuild.type === "failed") {
+        printSheetKitBuild = { type: "idle" };
+      }
+      return Promise.resolve({ type: "ready", plan: cachedPlan });
+    }
+    const inFlight = inFlightPlanByCacheKey.get(cacheKey);
+    if (inFlight !== undefined) {
+      return inFlight;
+    }
+    // A recorded failure for this key blocks rebuilds until the user retries
+    // (retryFailedPreviewBuild) or the settings change; honor that here too.
+    if (printSheetKitBuild.type === "failed" && printSheetKitBuild.key === cacheKey) {
+      return Promise.resolve({ type: "failed" });
+    }
     printSheetKitBuild = { type: "building", key: cacheKey };
-    void printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
+    const build = printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome): PlanRequestOutcome => {
+      inFlightPlanByCacheKey.delete(cacheKey);
       // A superseded request was replaced by a newer one that now owns the
       // build state, so it changes nothing here.
       if (outcome.type === "superseded") {
-        return;
+        return { type: "superseded" };
       }
       if (outcome.type === "failed") {
-        console.error(`requestGeneratedPrintSheetPlan: print kit build failed: ${outcome.message}`);
+        console.error(`ensurePlanForCurrentSettings: print kit build failed: ${outcome.message}`);
         printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
-        return;
+        return { type: "failed" };
       }
       const plan = createPrintableSheetPlanFromKit(outcome.kit);
       generatedPrintSheetPlanCache.set(cacheKey, plan);
@@ -733,19 +883,21 @@
       if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
         generatedPrintSheetPlan = plan;
       }
+      return { type: "ready", plan };
     });
+    inFlightPlanByCacheKey.set(cacheKey, build);
+    return build;
   }
 
   // "Try again" on the failure pill. A failed key is otherwise never retried
   // until the settings change, leaving the pill a dead end. The sheet-plan
-  // side resets its build state and re-resolves through the same path the
-  // reactive statement uses (which re-requests the build, since the failed
-  // key no longer blocks it); the assembled preview retries through its own
-  // component, which owns the failed-key memory.
+  // side clears its build state and drives a fresh build through the shared
+  // plan path (the failed key no longer blocks it); the assembled preview
+  // retries through its own component, which owns the failed-key memory.
   function retryFailedPreviewBuild(): void {
     if (printSheetKitBuild.type === "failed") {
       printSheetKitBuild = { type: "idle" };
-      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
+      void ensurePlanForCurrentSettings();
     }
     purifierPreview?.retryFailedAssembledKitBuild();
   }
@@ -753,6 +905,12 @@
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
   syncDerivedWorkbenchState();
 </script>
+
+<svelte:window
+  onpointerdown={closeInfoTipIfOutside}
+  onfocusin={closeInfoTipIfOutside}
+  onkeydown={closeInfoTipOnEscape}
+/>
 
 <main class="app-shell">
   <!-- #######################################
@@ -843,18 +1001,6 @@
               </button>
             {/if}
           </div>
-          <span class="preview-toolbar-action-slot">
-            <button
-              class="ghost-button preview-large-view-button"
-              type="button"
-              disabled={previewMode === "enclosure"}
-              aria-hidden={previewMode === "enclosure"}
-              tabindex={previewMode === "enclosure" ? -1 : 0}
-              onclick={openSheetDialog}
-            >
-              Open large view
-            </button>
-          </span>
         </div>
 
         <div
@@ -993,7 +1139,7 @@
               bind:this={purifierPreview}
               {layout}
               {printVolumePresetId}
-              onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
+              onAssembledBuildPhaseChange={handleAssembledBuildPhaseChange}
             />
           {:else if previewMode === "print-sheets"}
             {#if activePrintSheetPlan !== null}
@@ -1210,10 +1356,11 @@
                           aria-describedby="measureInfoNote"
                           aria-expanded={openInfoTipId === "measureInfoNote"}
                           onclick={() => toggleInfoTip("measureInfoNote")}
-                          onblur={() => closeInfoTip("measureInfoNote")}
+                          onpointerenter={(event) => openInfoTipOnHover("measureInfoNote", event)}
+                          onpointerleave={(event) => closeInfoTipOnHoverLeave("measureInfoNote", event)}
                           onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
                         >i</button>
-                        <p id="measureInfoNote" role="tooltip">
+                        <p id="measureInfoNote" role="tooltip" use:positionInfoTip={openInfoTipId === "measureInfoNote"}>
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
                           vary by a few millimeters. Measure your filter and enter the real numbers.
@@ -1410,10 +1557,11 @@
                               aria-describedby="info-{control.name}"
                               aria-expanded={openInfoTipId === `info-${control.name}`}
                               onclick={() => toggleInfoTip(`info-${control.name}`)}
-                              onblur={() => closeInfoTip(`info-${control.name}`)}
+                              onpointerenter={(event) => openInfoTipOnHover(`info-${control.name}`, event)}
+                              onpointerleave={(event) => closeInfoTipOnHoverLeave(`info-${control.name}`, event)}
                               onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
                             >i</button>
-                            <p id="info-{control.name}" role="tooltip">{control.info}</p>
+                            <p id="info-{control.name}" role="tooltip" use:positionInfoTip={openInfoTipId === `info-${control.name}`}>{control.info}</p>
                           </span>
                         {/if}
                       </span>
@@ -1442,10 +1590,11 @@
                           aria-describedby="info-cordHoleDiameter"
                           aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
+                          onpointerenter={(event) => openInfoTipOnHover("info-cordHoleDiameter", event)}
+                          onpointerleave={(event) => closeInfoTipOnHoverLeave("info-cordHoleDiameter", event)}
                           onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
                         >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
+                        <p id="info-cordHoleDiameter" role="tooltip" use:positionInfoTip={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
                       </span>
                     </span>
                     <span class="input-shell">
@@ -1583,42 +1732,6 @@
       </aside>
     </section>
   </section>
-
-  <!-- #######################################
-  Sheet Dialog
-  ####################################### -->
-
-  <dialog
-    class="sheet-dialog"
-    id="sheetDialog"
-    aria-labelledby="sheetDialogTitle"
-    bind:this={sheetDialog}
-    onclose={handleDialogClose}
-    onclick={closeDialogOnBackdrop}
-  >
-    <div class="sheet-dialog-surface">
-      <header class="sheet-dialog-bar">
-        <div>
-          <p class="eyebrow" id="sheetDialogEyebrow">{previewMode === "print-sheets" ? "3D printing" : "Laser cutting"}</p>
-          <h2 id="sheetDialogTitle">{previewMode === "print-sheets" ? "Print plates" : "Laser drawing"}</h2>
-        </div>
-        <button class="ghost-button" type="button" onclick={closeSheetDialog}>Close</button>
-      </header>
-      <div class="sheet-dialog-preview" id="sheetDialogPreview">
-        {#if isSheetDialogOpen}
-          {#if previewMode === "print-sheets" && activePrintSheetPlan !== null}
-            <PrintSheetPreview
-              plan={activePrintSheetPlan}
-              label="3D print plate dialog preview"
-              className="print-sheet-dialog-host"
-            />
-          {:else}
-            {@html createLaserSvg(layout)}
-          {/if}
-        {/if}
-      </div>
-    </div>
-  </dialog>
 
   <!-- #######################################
   Mobile Actions

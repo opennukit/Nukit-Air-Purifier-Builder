@@ -107,6 +107,9 @@ export type PrintableMesh = {
 export type PrintableKitSummary = {
   readonly partCount: number;
   readonly oversizedPartCount: number;
+  // Total solid volume of all printed parts (mm^3), summed from the true
+  // extracted meshes. Drives the parts-list filament-grams estimate.
+  readonly materialVolumeMm3: number;
 };
 
 export type PrintableKit = {

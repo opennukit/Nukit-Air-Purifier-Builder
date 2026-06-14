@@ -20,7 +20,7 @@ import {
   type PrintablePart,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
+import { meshVolumeMm3, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
 // #######################################
 // Donut Printable Model
@@ -56,6 +56,7 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
     summary: {
       partCount: parts.length,
       oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
+      materialVolumeMm3: parts.reduce((sum, p) => sum + Math.abs(meshVolumeMm3(p.mesh)), 0),
     },
   };
 }

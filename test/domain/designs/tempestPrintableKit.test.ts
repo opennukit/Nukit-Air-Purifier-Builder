@@ -24,10 +24,10 @@ describe("Tempest CSG printable kit", () => {
     // Feature-aware slicing threads seams between the 140 mm fan grills, which
     // needs a third chunk on the fan-dense axis (2×2×3) rather than a uniform 2×2×2.
     expect(kit.parts).toHaveLength(12);
-    expect(kit.summary).toEqual({
-      partCount: 12,
-      oversizedPartCount: 0,
-    });
+    expect(Object.keys(kit.summary).sort()).toEqual(["materialVolumeMm3", "oversizedPartCount", "partCount"]);
+    expect(kit.summary.partCount).toBe(12);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);
     expect(kit.parts.every((part) => part.mesh.vertices.length > 0 && part.mesh.triangles.length > 0)).toBe(true);
@@ -92,10 +92,10 @@ describe("Tempest CSG printable kit", () => {
     );
 
     expect(kit.parts).toHaveLength(18);
-    expect(kit.summary).toEqual({
-      partCount: 18,
-      oversizedPartCount: 0,
-    });
+    expect(Object.keys(kit.summary).sort()).toEqual(["materialVolumeMm3", "oversizedPartCount", "partCount"]);
+    expect(kit.summary.partCount).toBe(18);
+    expect(kit.summary.oversizedPartCount).toBe(0);
+    expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
     expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);
     expect(kit.parts.every((part) => part.mesh.vertices.length > 0 && part.mesh.triangles.length > 0)).toBe(true);
     expect(kit.parts.every((part) => meshFitsDeclaredBounds(part))).toBe(true);
