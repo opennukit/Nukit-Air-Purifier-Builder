@@ -416,6 +416,15 @@
       ...settings,
       [name]: readDimensionInputMillimeters(event, settings[name]),
     });
+    // Svelte only rewrites the input when the bound value changes, so a typed
+    // value that normalizes to the SAME stored millimeters (e.g. re-entering an
+    // out-of-range number that re-clamps to the cap, or a custom fan size that
+    // snaps to the same supported size) would otherwise linger in the box.
+    // Reflect the canonical stored value back so the field always matches it.
+    const input = event.currentTarget;
+    if (input instanceof HTMLInputElement) {
+      input.value = String(millimetersToDisplayValue(settings[name], dimensionUnit));
+    }
   }
 
   // Reads a length input in the active display unit and converts it back
