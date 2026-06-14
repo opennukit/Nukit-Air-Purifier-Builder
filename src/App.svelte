@@ -37,10 +37,8 @@
     tempestArrangementOptions,
     tempestFitControls,
     type BooleanSettingName,
-    type DonutFilterDimensionName,
-    type DonutNumberSettingName,
     type FanCountSettingName,
-    type FilterDimensionName,
+    type LengthSettingName,
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
   import {
@@ -289,8 +287,8 @@
       : "";
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
-  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId, generatedPrintSheetPlan);
+  $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan, dimensionUnit);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId, generatedPrintSheetPlan, dimensionUnit);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
@@ -409,27 +407,27 @@
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
   }
 
-  function updateMeasuredDimension(
-    name: FilterDimensionName | DonutFilterDimensionName,
-    event: Event,
-  ): void {
+  // Every length input renders in the active display unit, so its typed value
+  // is read in that unit and converted back to the canonical millimeters the
+  // settings store. Multipliers and counts are not lengths and keep
+  // updateNumberSetting.
+  function updateMeasuredLength(name: LengthSettingName, event: Event): void {
     commitSettings({
       ...settings,
       [name]: readDimensionInputMillimeters(event, settings[name]),
     });
+    // Svelte only rewrites the input when the bound value changes, so a typed
+    // value that normalizes to the SAME stored millimeters (e.g. re-entering an
+    // out-of-range number that re-clamps to the cap, or a custom fan size that
+    // snaps to the same supported size) would otherwise linger in the box.
+    // Reflect the canonical stored value back so the field always matches it.
+    const input = event.currentTarget;
+    if (input instanceof HTMLInputElement) {
+      input.value = String(millimetersToDisplayValue(settings[name], dimensionUnit));
+    }
   }
 
-  function updateDonutNumberSetting(
-    name: DonutNumberSettingName,
-    event: Event,
-  ): void {
-    commitSettings({
-      ...settings,
-      [name]: readNumberInput(event, settings[name]),
-    });
-  }
-
-  // Reads a dimension input in the active display unit and converts it back
+  // Reads a length input in the active display unit and converts it back
   // to the canonical millimeter value; invalid input keeps the stored value.
   function readDimensionInputMillimeters(event: Event, storedMillimeters: number): number {
     const enteredDisplayValue = readNumberInput(event, Number.NaN);
@@ -1200,7 +1198,6 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section layout-section" data-generated-layout-controls>
               <div class="section-heading">
-                <p class="eyebrow">Layout</p>
                 <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
               </div>
               <div class="fan-grid">
@@ -1228,12 +1225,12 @@
                         <input
                           type="number"
                           name="donutAdapterInsertLength"
-                          step="0.1"
+                          step={dimensionInputStep("0.1", dimensionUnit)}
                           inputmode="decimal"
-                          value={settings.donutAdapterInsertLength}
-                          onchange={(event) => updateDonutNumberSetting("donutAdapterInsertLength", event)}
+                          value={millimetersToDisplayValue(settings.donutAdapterInsertLength, dimensionUnit)}
+                          onchange={(event) => updateMeasuredLength("donutAdapterInsertLength", event)}
                         />
-                        <small>mm</small>
+                        <small>{dimensionUnit}</small>
                       </span>
                     </label>
                     <label class="toggle-field">
@@ -1251,12 +1248,12 @@
                         <input
                           type="number"
                           name="donutCapRim"
-                          step="0.1"
+                          step={dimensionInputStep("0.1", dimensionUnit)}
                           inputmode="decimal"
-                          value={settings.donutCapRim}
-                          onchange={(event) => updateDonutNumberSetting("donutCapRim", event)}
+                          value={millimetersToDisplayValue(settings.donutCapRim, dimensionUnit)}
+                          onchange={(event) => updateMeasuredLength("donutCapRim", event)}
                         />
-                        <small>mm</small>
+                        <small>{dimensionUnit}</small>
                       </span>
                     </label>
                   </div>
@@ -1319,7 +1316,6 @@
           {#if showPrintSetupControls}
             <section class="control-section print-volume-section" data-print-volume-section>
               <div class="section-heading">
-                <p class="eyebrow">Printer</p>
                 <h2>Print setup</h2>
               </div>
               <div data-print-volume-control>
@@ -1337,37 +1333,10 @@
 
           {#if !isStaticReferenceControlsActive}
             <section class="control-section parts-section">
-              <div class="section-heading">
-                <p class="eyebrow">Parts</p>
+              <div class="section-heading section-heading-row">
                 <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
-              </div>
-              <p class="section-note">
-                Get your filter and fans first, measure them, then enter the numbers here.
-              </p>
-              <div data-generated-part-controls>
-                <fieldset class="segmented-field">
-                  <legend>
-                    <span class="legend-row">
-                      Measurement unit
-                      <span class="info-tip" class:is-open={openInfoTipId === "measureInfoNote"}>
-                        <button
-                          type="button"
-                          aria-label="Why measure instead of using the printed label?"
-                          aria-describedby="measureInfoNote"
-                          aria-expanded={openInfoTipId === "measureInfoNote"}
-                          onclick={() => toggleInfoTip("measureInfoNote")}
-                          onpointerenter={(event) => openInfoTipOnHover("measureInfoNote", event)}
-                          onpointerleave={(event) => closeInfoTipOnHoverLeave("measureInfoNote", event)}
-                          onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
-                        >i</button>
-                        <p id="measureInfoNote" role="tooltip" use:positionInfoTip={openInfoTipId === "measureInfoNote"}>
-                          <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
-                          actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
-                          vary by a few millimeters. Measure your filter and enter the real numbers.
-                        </p>
-                      </span>
-                    </span>
-                  </legend>
+                <fieldset class="segmented-field unit-toggle">
+                  <legend class="sr-only">Measurement unit</legend>
                   <div>
                     {#each dimensionUnits as unit}
                       <label>
@@ -1383,6 +1352,12 @@
                     {/each}
                   </div>
                 </fieldset>
+              </div>
+              <p class="section-note">
+                <strong>Don't copy the size printed on the filter</strong> — measure it and enter
+                the real numbers. A "20x25x1" filter actually measures about 622 x 495 x 19 mm.
+              </p>
+              <div data-generated-part-controls>
 
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
@@ -1397,7 +1372,7 @@
                               step={dimensionInputStep(control.step, dimensionUnit)}
                               inputmode="decimal"
                               value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                              onchange={(event) => updateMeasuredDimension(control.name, event)}
+                              onchange={(event) => updateMeasuredLength(control.name, event)}
                             />
                             <small>{dimensionUnit}</small>
                           </span>
@@ -1420,7 +1395,7 @@
                               step={dimensionInputStep(control.step, dimensionUnit)}
                               inputmode="decimal"
                               value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
-                              onchange={(event) => updateMeasuredDimension(control.name, event)}
+                              onchange={(event) => updateMeasuredLength(control.name, event)}
                             />
                             <small>{dimensionUnit}</small>
                           </span>
@@ -1466,15 +1441,15 @@
                         <input
                           type="number"
                           name="fanDiameter"
-                          min="40"
-                          max="140"
-                          step="1"
+                          min={millimetersToDisplayValue(40, dimensionUnit)}
+                          max={millimetersToDisplayValue(140, dimensionUnit)}
+                          step={dimensionInputStep("1", dimensionUnit)}
                           inputmode="decimal"
-                          title="Snaps to the nearest supported size: 40/60/80/92/120/140"
-                          value={settings.fanDiameter}
-                          onchange={(event) => updateNumberSetting("fanDiameter", event)}
+                          title="Snaps to the nearest supported size: 40/60/80/92/120/140 mm"
+                          value={millimetersToDisplayValue(settings.fanDiameter, dimensionUnit)}
+                          onchange={(event) => updateMeasuredLength("fanDiameter", event)}
                         />
-                        <small>mm</small>
+                        <small>{dimensionUnit}</small>
                       </span>
                     </label>
                   {/if}
@@ -1504,7 +1479,6 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
-                <p class="eyebrow">Geometry</p>
                 <h2>Material and fit</h2>
               </div>
               {#each generatedGeometryControls as control}
@@ -1514,12 +1488,14 @@
                     <input
                       type="number"
                       name={control.name}
-                      step={control.step}
+                      min={control.minMm !== undefined ? millimetersToDisplayValue(control.minMm, dimensionUnit) : undefined}
+                      max={control.maxMm !== undefined ? millimetersToDisplayValue(control.maxMm, dimensionUnit) : undefined}
+                      step={dimensionInputStep(control.step, dimensionUnit)}
                       inputmode="decimal"
-                      value={settings[control.name]}
-                      onchange={(event) => updateNumberSetting(control.name, event)}
+                      value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                      onchange={(event) => updateMeasuredLength(control.name, event)}
                     />
-                    <small>{control.suffix}</small>
+                    <small>{dimensionUnit}</small>
                   </span>
                 </label>
               {/each}
@@ -1532,12 +1508,14 @@
                         <input
                           type="number"
                           name={control.name}
-                          step={control.step}
+                          min={control.minMm !== undefined ? millimetersToDisplayValue(control.minMm, dimensionUnit) : undefined}
+                          max={control.maxMm !== undefined ? millimetersToDisplayValue(control.maxMm, dimensionUnit) : undefined}
+                          step={dimensionInputStep(control.step, dimensionUnit)}
                           inputmode="decimal"
-                          value={settings[control.name]}
-                          onchange={(event) => updateNumberSetting(control.name, event)}
+                          value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                          onchange={(event) => updateMeasuredLength(control.name, event)}
                         />
-                        <small>{control.suffix}</small>
+                        <small>{dimensionUnit}</small>
                       </span>
                     </label>
                   {/each}
@@ -1569,14 +1547,14 @@
                         <input
                           type="number"
                           name={control.name}
-                          min="0"
-                          max="5"
-                          step={control.step}
+                          min={millimetersToDisplayValue(0, dimensionUnit)}
+                          max={millimetersToDisplayValue(5, dimensionUnit)}
+                          step={dimensionInputStep(control.step, dimensionUnit)}
                           inputmode="decimal"
-                          value={settings[control.name]}
-                          onchange={(event) => updateNumberSetting(control.name, event)}
+                          value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                          onchange={(event) => updateMeasuredLength(control.name, event)}
                         />
-                        <small>{control.suffix}</small>
+                        <small>{dimensionUnit}</small>
                       </span>
                     </label>
                   {/each}
@@ -1601,14 +1579,14 @@
                       <input
                         type="number"
                         name="cordHoleDiameter"
-                        min="3"
-                        max="25"
-                        step="0.5"
+                        min={millimetersToDisplayValue(3, dimensionUnit)}
+                        max={millimetersToDisplayValue(25, dimensionUnit)}
+                        step={dimensionInputStep("0.5", dimensionUnit)}
                         inputmode="decimal"
-                        value={settings.cordHoleDiameter}
-                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                        value={millimetersToDisplayValue(settings.cordHoleDiameter, dimensionUnit)}
+                        onchange={(event) => updateMeasuredLength("cordHoleDiameter", event)}
                       />
-                      <small>mm</small>
+                      <small>{dimensionUnit}</small>
                     </span>
                   </label>
                 </div>
@@ -1619,7 +1597,6 @@
           {#if fabricationMethod === "laser-svg"}
             <section class="control-section laser-output-section" data-laser-output-controls>
               <div class="section-heading">
-                <p class="eyebrow">Laser setup</p>
                 <h2>Drawing output</h2>
               </div>
               <label class="toggle-field">
@@ -1637,12 +1614,12 @@
                   <input
                     type="number"
                     name="referenceScale"
-                    step="1"
+                    step={dimensionInputStep("1", dimensionUnit)}
                     inputmode="decimal"
-                    value={settings.referenceScale}
-                    onchange={(event) => updateNumberSetting("referenceScale", event)}
+                    value={millimetersToDisplayValue(settings.referenceScale, dimensionUnit)}
+                    onchange={(event) => updateMeasuredLength("referenceScale", event)}
                   />
-                  <small>mm</small>
+                  <small>{dimensionUnit}</small>
                 </span>
               </label>
             </section>
@@ -1651,7 +1628,6 @@
           {#if showAdvancedControls}
             <section class="control-section joint-tuning-section" data-generated-advanced-controls>
               <div class="section-heading">
-                <p class="eyebrow">Advanced</p>
                 <h2>Joint tuning</h2>
               </div>
               <div class="advanced-field-grid">

@@ -85,13 +85,9 @@ Header Bar
   margin: 0 auto 14px;
 }
 
-.topbar h1,
-.section-heading h2 {
+.topbar h1 {
   margin: 0;
   letter-spacing: 0;
-}
-
-.topbar h1 {
   font-size: clamp(1.9rem, 3vw, 3.65rem);
   line-height: 1;
 }
@@ -815,6 +811,9 @@ Panel Grids
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  /* Laser mode has no Printer section, leaving the top-right cell empty; dense
+  packing pulls the next section up into it instead of dropping a gap. */
+  grid-auto-flow: dense;
 }
 
 .parts-section {
@@ -892,8 +891,24 @@ Section Headings
   margin-bottom: 10px;
 }
 
+/* The single section heading wears the overline style: small, uppercase, and
+accent-coloured for contrast — the descriptive text in the kicker's clothes. */
 .section-heading h2 {
-  font-size: 1.08rem;
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Heading that carries an inline control (the compact unit toggle) on its
+right: the title sits left, the control hugs the right edge on one baseline. */
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 /* #######################################
@@ -1418,6 +1433,30 @@ hover/focus alone can't reveal it. */
   color: var(--accent-strong);
 }
 
+/* Compact app-wide display-unit toggle that rides the section heading: a small
+two-segment mm | in switch, sized to its labels rather than the column width. */
+.unit-toggle {
+  flex: none;
+  margin: 0;
+}
+
+.unit-toggle div {
+  grid-template-columns: repeat(2, auto);
+  gap: 0;
+}
+
+.unit-toggle label > span {
+  min-height: 26px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  text-transform: lowercase;
+}
+
+/* Collapse the shared border between the two segments into one hairline. */
+.unit-toggle label + label > span {
+  border-left: 0;
+}
+
 /* ##############################
 Layout Grids
 ############################## */
@@ -1603,10 +1642,6 @@ Desktop Fixed View
 
   .section-heading {
     margin-bottom: 10px;
-  }
-
-  .section-heading h2 {
-    font-size: 1.08rem;
   }
 
   .field,

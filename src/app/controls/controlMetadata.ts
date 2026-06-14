@@ -4,6 +4,7 @@
 
 import type { TempestArrangementPreset } from "@/domain/purifier/designPresets";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
+import { minimumRim } from "@/domain/purifier/geometry";
 
 export type NumericSettingName = {
   [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends number ? Key : never;
@@ -13,21 +14,42 @@ export type BooleanSettingName = {
 }[keyof RawPurifierSettings];
 export type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
 export type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
-export type DonutFilterDimensionName =
-  | "donutFilterOuterDiameter"
-  | "donutFilterLength"
-  | "donutFilterHoleDiameter";
-export type DonutNumberSettingName =
+// Every setting whose stored millimeter value is a real-world length, so its
+// input renders and parses through the active display unit. Joint-tuning
+// multipliers (suffix "x") and counts are deliberately excluded: they are not
+// lengths and never convert.
+export type LengthSettingName =
+  | FilterDimensionName
   | "donutFilterOuterDiameter"
   | "donutFilterLength"
   | "donutFilterHoleDiameter"
   | "donutAdapterInsertLength"
-  | "donutCapRim";
+  | "donutCapRim"
+  | "materialThickness"
+  | "screwHoleDiameter"
+  | "rim"
+  | "kerfFit"
+  | "filterFitClearance"
+  | "cordHoleDiameter"
+  | "fanDiameter"
+  // NOTE: referenceScale carries a millimeter length, but 0 is an overloaded
+  // "disabled" sentinel rather than a 0 mm length; converting 0 is a no-op so it
+  // rides the same display-unit path safely.
+  | "referenceScale";
+export type DonutFilterDimensionName =
+  | "donutFilterOuterDiameter"
+  | "donutFilterLength"
+  | "donutFilterHoleDiameter";
 export type NumberControl<Name extends NumericSettingName> = {
   readonly name: Name;
   readonly label: string;
   readonly suffix: string;
   readonly step: string;
+  // The clamp range the setting is normalized to, in millimeters; rendered as
+  // the input's min/max (converted to the active display unit) so the limit is
+  // visible instead of a silent jump when an out-of-range value is typed.
+  readonly minMm?: number;
+  readonly maxMm?: number;
   // Optional hover explainer rendered as a small "i" next to the label.
   readonly info?: string;
 };
@@ -55,17 +77,21 @@ export const donutFilterDimensionControls: readonly DimensionControl<DonutFilter
   { name: "donutFilterLength", label: "Length", step: "1" },
   { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },
 ];
-export const generatedGeometryControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },
-  { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1" },
+// SETTING_CLAMP_TAG: each minMm/maxMm below mirrors a clamp(...) in
+// src/domain/purifier/airPurifier.ts (the domain enforces it; these only make
+// the limit visible). Change both together. The rim floor is imported from
+// geometry.ts so at least that bound has a single source.
+export const generatedGeometryControls: readonly NumberControl<LengthSettingName>[] = [
+  { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1", minMm: 1.5, maxMm: 9 },
+  { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1", minMm: 2, maxMm: 10 },
 ];
-export const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
-  { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01" },
+export const nukitPanelFitControls: readonly NumberControl<LengthSettingName>[] = [
+  { name: "rim", label: "Filter rim", suffix: "mm", step: "1", minMm: minimumRim },
+  { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01", minMm: 0, maxMm: 1 },
 ];
-// Slide-in clearance around the measured filter; mm-only like the other
-// generated-geometry inputs.
-export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = [
+// Slide-in clearance around the measured filter; a length, so it renders and
+// parses through the active display unit.
+export const tempestFitControls: readonly NumberControl<LengthSettingName>[] = [
   {
     name: "filterFitClearance",
     label: "Filter fit clearance",
