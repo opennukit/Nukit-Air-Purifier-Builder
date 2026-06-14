@@ -486,6 +486,77 @@
     }
   }
 
+  // A tap anywhere outside the open tip closes it. iOS Safari never focuses the
+  // button on tap, so the button's own blur can't be relied on to dismiss it.
+  function closeInfoTipOnOutsidePointer(event: Event): void {
+    if (openInfoTipId === null) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest(".info-tip") === null) {
+      openInfoTipId = null;
+    }
+  }
+
+  function closeInfoTipOnEscape(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      openInfoTipId = null;
+    }
+  }
+
+  // The tip is anchored to a tiny button that can sit near either panel edge (or
+  // a third of the way across a narrow phone), so a fixed-width popover spills
+  // off-screen. Once revealed, nudge it horizontally until it sits inside the
+  // viewport. Re-run on every reveal — hover, focus, and tap share one element.
+  function clampInfoTipToViewport(
+    node: HTMLElement,
+    isOpen: boolean,
+  ): { update(open: boolean): void; destroy(): void } {
+    const host = node.parentElement;
+    function reposition(): void {
+      node.style.transform = "";
+      const rect = node.getBoundingClientRect();
+      if (rect.width === 0) {
+        return;
+      }
+      const margin = 8;
+      let shift = 0;
+      const overshootRight = rect.right - (window.innerWidth - margin);
+      if (overshootRight > 0) {
+        shift = -overshootRight;
+      }
+      if (rect.left + shift < margin) {
+        shift = margin - rect.left;
+      }
+      if (shift !== 0) {
+        node.style.transform = `translateX(${shift}px)`;
+      }
+    }
+    const onReveal = (): void => {
+      requestAnimationFrame(reposition);
+    };
+    host?.addEventListener("pointerenter", onReveal);
+    host?.addEventListener("focusin", onReveal);
+    window.addEventListener("resize", onReveal);
+    if (isOpen) {
+      onReveal();
+    }
+    return {
+      update(open: boolean): void {
+        if (open) {
+          onReveal();
+        } else {
+          node.style.transform = "";
+        }
+      },
+      destroy(): void {
+        host?.removeEventListener("pointerenter", onReveal);
+        host?.removeEventListener("focusin", onReveal);
+        window.removeEventListener("resize", onReveal);
+      },
+    };
+  }
+
   // ##############################
   // Workbench Navigation
   // ##############################
@@ -753,6 +824,8 @@
   workbenchState = normalizeWorkbenchStateForSettings(workbenchState, draft);
   syncDerivedWorkbenchState();
 </script>
+
+<svelte:window onpointerdown={closeInfoTipOnOutsidePointer} onkeydown={closeInfoTipOnEscape} />
 
 <main class="app-shell">
   <!-- #######################################
@@ -1210,10 +1283,9 @@
                           aria-describedby="measureInfoNote"
                           aria-expanded={openInfoTipId === "measureInfoNote"}
                           onclick={() => toggleInfoTip("measureInfoNote")}
-                          onblur={() => closeInfoTip("measureInfoNote")}
                           onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
                         >i</button>
-                        <p id="measureInfoNote" role="tooltip">
+                        <p id="measureInfoNote" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "measureInfoNote"}>
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
                           vary by a few millimeters. Measure your filter and enter the real numbers.
@@ -1410,10 +1482,9 @@
                               aria-describedby="info-{control.name}"
                               aria-expanded={openInfoTipId === `info-${control.name}`}
                               onclick={() => toggleInfoTip(`info-${control.name}`)}
-                              onblur={() => closeInfoTip(`info-${control.name}`)}
                               onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
                             >i</button>
-                            <p id="info-{control.name}" role="tooltip">{control.info}</p>
+                            <p id="info-{control.name}" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === `info-${control.name}`}>{control.info}</p>
                           </span>
                         {/if}
                       </span>
@@ -1442,10 +1513,9 @@
                           aria-describedby="info-cordHoleDiameter"
                           aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
                           onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
                         >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
+                        <p id="info-cordHoleDiameter" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
                       </span>
                     </span>
                     <span class="input-shell">
