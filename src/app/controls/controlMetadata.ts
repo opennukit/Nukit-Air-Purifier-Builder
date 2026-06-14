@@ -47,7 +47,7 @@ export const fanPlacementControls: readonly { readonly name: FanCountSettingName
 ];
 export const filterDimensionControls: readonly DimensionControl<FilterDimensionName>[] = [
   { name: "filterWidth", label: "Filter width", step: "1" },
-  { name: "filterDepth", label: "Filter depth", step: "1" },
+  { name: "filterDepth", label: "Filter length", step: "1" },
   { name: "filterThickness", label: "Filter thickness", step: "0.1" },
 ];
 export const donutFilterDimensionControls: readonly DimensionControl<DonutFilterDimensionName>[] = [
