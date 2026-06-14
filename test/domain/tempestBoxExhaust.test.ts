@@ -37,6 +37,7 @@ describe("tempest box/exhaust settings", () => {
   test("box/exhaust renders no PC fans (external box fan instead)", () => {
     const settings = createTempestSettingsFromLayout(createLayout(decodeSettings(towerBoxExhaust)));
     const fanLayout = createTempestModel(settings).fanLayout;
+    if (fanLayout.topology !== "quad") throw new Error("expected a quad tower layout");
     expect(fanLayout.fanCount).toBe(0);
     expect(fanLayout.positionsX.length).toBe(0);
     expect(fanLayout.positionsY.length).toBe(0);
@@ -47,6 +48,7 @@ describe("tempest box/exhaust settings", () => {
         createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterWidth=300&filterDepth=300&filterThickness=25")),
       ),
     ).fanLayout;
+    if (grid.topology !== "quad") throw new Error("expected a quad tower layout");
     expect(grid.fanCount).toBeGreaterThan(0);
   });
 });

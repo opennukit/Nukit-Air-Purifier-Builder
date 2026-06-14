@@ -58,7 +58,7 @@ describe("createPreviewSummaryItems", () => {
     const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null);
     const labels = items.map((item) => item.label);
 
-    expect(valueFor(items, "Design")).toBe(tempestLayout.configuration.printDesign.label);
+    expect(valueFor(items, "Design")).toBe("Custom");
     expect(labels).toContain("Arrangement");
     expect(labels).toContain("Fans");
     expect(valueFor(items, "Print chunks")).toBe("…");

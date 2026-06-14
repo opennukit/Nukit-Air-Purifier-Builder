@@ -11,11 +11,14 @@
     cordHoleSides,
     cordHoleWalls,
     previewMaterialColorPresets,
+    tempestDesigns,
+    tempestDesignLabels,
     type CordHoleSide,
     type CordHoleWall,
     type PreviewMaterialColorId,
     type PurifierDraft,
     type RawPurifierSettings,
+    type TempestDesign,
   } from "@/domain/purifier/settingsModel";
   import {
     defaultThreeDimensionalPrintDesignId,
@@ -391,6 +394,10 @@
 
   function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
+  }
+
+  function updateTempestDesign(event: Event): void {
+    commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
   }
 
   const filterDimensionNames = new Set<string>(filterDimensionControls.map((control) => control.name));
@@ -1141,6 +1148,14 @@
 
                 {#if isTempestControlsActive}
                   <div data-tempest-layout>
+                    <label class="field compact-field" data-tempest-design>
+                      <span>Design</span>
+                      <select name="tempestDesign" onchange={updateTempestDesign}>
+                        {#each tempestDesigns as design}
+                          <option value={design} selected={settings.tempestDesign === design}>{tempestDesignLabels[design]}</option>
+                        {/each}
+                      </select>
+                    </label>
                     <fieldset class="segmented-field segmented-field-three">
                       <legend>Filter layout</legend>
                       <div>

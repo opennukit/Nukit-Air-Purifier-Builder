@@ -26,6 +26,7 @@ import {
   applyTempestArrangementDefaults,
   cameraPresets,
   canonicalTempestArrangement,
+  canonicalTempestDesign,
   cordHoleSides,
   cordHoleWalls,
   defaultSettings,
@@ -37,6 +38,7 @@ import {
   type PreviewMaterialColorId,
   type PurifierDraft,
   type RawPurifierSettings,
+  type TempestDesign,
   type TopExhaust,
 } from "@/domain/purifier/settingsModel";
 import {
@@ -72,6 +74,7 @@ export function encodeSettings(
   params.set("fansTop", String(settings.fansTop));
   params.set("fansBottom", String(settings.fansBottom));
   params.set("tempestArrangement", settings.tempestArrangement);
+  params.set("tempestDesign", settings.tempestDesign);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
   params.set("cordHoleWall", settings.cordHoleWall);
@@ -168,6 +171,7 @@ export function decodeSettings(search: string): RawPurifierSettings {
     fanColor: readFanColor(params),
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
+    tempestDesign: readTempestDesign(params),
     cordHoleWall: readCordHoleWall(params),
     cordHoleSide: readCordHoleSide(params),
     topExhaust: readTopExhaust(params),
@@ -259,6 +263,10 @@ function readTempestArrangement(
   params: URLSearchParams,
 ): TempestArrangementPreset {
   return canonicalTempestArrangement(params.get("tempestArrangement"));
+}
+
+function readTempestDesign(params: URLSearchParams): TempestDesign {
+  return canonicalTempestDesign(params.get("tempestDesign"));
 }
 
 // ##############################

@@ -17,6 +17,7 @@ import type {
   StaticReferencePrintDesignDefaults,
 } from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
+import { tempestDesignLabels } from "@/domain/purifier/settingsModel";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
 import type { PreviewMode } from "@/app/workbench/previewMode";
@@ -110,8 +111,15 @@ export function createPreviewSummaryItems(
 
   if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
     const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
+    const design = currentLayout.configuration.design;
     return [
-      { label: "Design", value: currentLayout.configuration.printDesign.label },
+      {
+        label: "Design",
+        value:
+          design.type === "tempest"
+            ? tempestDesignLabels[design.design]
+            : currentLayout.configuration.printDesign.label,
+      },
       { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },

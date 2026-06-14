@@ -164,6 +164,15 @@ export type CutSheetPreviewOptions = {
 export const topExhausts = ["fan-grid", "box-exhaust"] as const;
 export type TopExhaust = (typeof topExhausts)[number];
 
+// Tempest preset designs. "custom" is the fully user-driven build; pre-made
+// designs will be added here later. The selection is shown in the preview's
+// "Design" readout but does not (yet) change geometry on its own.
+export const tempestDesigns = ["custom"] as const;
+export type TempestDesign = (typeof tempestDesigns)[number];
+export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
+  custom: "Custom",
+};
+
 // Tempest cord pass-through choices (mirrors tempest-builder.html).
 export const cordHoleWalls = ["none", "front", "back", "left", "right"] as const;
 export type CordHoleWall = (typeof cordHoleWalls)[number];
@@ -185,6 +194,8 @@ export type RawPurifierSettings = {
   fansTop: number;
   fansBottom: number;
   tempestArrangement: TempestArrangementPreset;
+  // Tempest-only: which preset design is selected ("custom" = user-driven).
+  tempestDesign: TempestDesign;
   // Tempest-only: clearance added per side around the MEASURED filter so it
   // slides into its cavity; separate from the measurement on purpose.
   filterFitClearance: Millimeters;
@@ -277,6 +288,7 @@ export type TempestPrintDesignDraft = {
   readonly printDesign: TempestPrintDesignPreset["id"];
   readonly preset: TempestPrintDesignPreset;
   readonly arrangement: TempestArrangementPreset;
+  readonly design: TempestDesign;
   readonly filter: FilterDimensions;
   // Per-wall fan banks for the horizontal (1-top / 2-sandwich) layouts; ignored by
   // the four-side tower (which exhausts through the top).
@@ -342,6 +354,7 @@ export type ConfiguredPrintDesign =
       readonly type: "tempest";
       readonly preset: TempestPrintDesignPreset;
       readonly arrangement: TempestArrangementPreset;
+      readonly design: TempestDesign;
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
       readonly cordHoleDiameter: Millimeters;
@@ -429,6 +442,7 @@ export const defaultSettings: RawPurifierSettings = {
   fansTop: 0,
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
+  tempestDesign: "custom",
   filterFitClearance: 1,
   cordHoleDiameter: defaultTempestCordPassThrough.diameter,
   cordHoleWall: defaultTempestCordPassThrough.wall,
@@ -677,6 +691,12 @@ export function canonicalTempestArrangement(
     (arrangement) => arrangement === value,
   );
   return found ?? defaultSettings.tempestArrangement;
+}
+
+export function canonicalTempestDesign(
+  value: TempestDesign | string | null | undefined,
+): TempestDesign {
+  return tempestDesigns.find((design) => design === value) ?? defaultSettings.tempestDesign;
 }
 
 function requiredPreviewMaterialColorPreset(
