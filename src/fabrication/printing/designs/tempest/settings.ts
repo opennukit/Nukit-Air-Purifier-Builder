@@ -118,10 +118,15 @@ function tempestArrangementFromConfiguration(configuration: PurifierSettings): T
   };
 }
 
+// Each tower wall is one filter standing upright: its measured width runs
+// horizontally (so it sets the square footprint) and its measured length runs
+// vertically (so it sets the tower height). The orientation follows the entered
+// dimensions — a wide filter makes a wide, squat box; a long one makes a tall
+// box — rather than always standing the filter on its short edge.
 function uprightTowerFilterFace(filter: FilterDimensions): { readonly width: number; readonly height: number } {
   return {
-    width: Math.min(filter.width, filter.depth),
-    height: Math.max(filter.width, filter.depth),
+    width: filter.width,
+    height: filter.depth,
   };
 }
 
