@@ -529,28 +529,47 @@
 
   // The tip is anchored to a tiny button that can sit near either panel edge (or
   // a third of the way across a narrow phone), so a fixed-width popover spills
-  // off-screen. Once revealed, nudge it horizontally until it sits inside the
-  // viewport. Re-run on every reveal — hover, focus, and tap share one element.
+  // out of its container. The controls column clips overflow-x (it scrolls
+  // vertically), so the viewport edge is not the real limit — clamp to the
+  // nearest clipping ancestor, capping the width to fit, then nudge it inside.
+  // Re-run on every reveal — hover, focus, and tap share one element.
   function clampInfoTipToViewport(
     node: HTMLElement,
     isOpen: boolean,
   ): { update(open: boolean): void; destroy(): void } {
     const host = node.parentElement;
     let frame = 0;
+    function clipBounds(): { left: number; right: number } {
+      const margin = 8;
+      let left = margin;
+      let right = window.innerWidth - margin;
+      for (let ancestor = node.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (style.overflowX !== "visible" || style.overflowY !== "visible") {
+          const box = ancestor.getBoundingClientRect();
+          left = Math.max(left, box.left + margin);
+          right = Math.min(right, box.right - margin);
+          break;
+        }
+      }
+      return { left, right };
+    }
     function reposition(): void {
       node.style.transform = "";
+      node.style.maxWidth = "";
+      const { left, right } = clipBounds();
+      node.style.maxWidth = `${Math.max(0, right - left)}px`;
       const rect = node.getBoundingClientRect();
       if (rect.width === 0) {
         return;
       }
-      const margin = 8;
       let shift = 0;
-      const overshootRight = rect.right - (window.innerWidth - margin);
+      const overshootRight = rect.right - right;
       if (overshootRight > 0) {
         shift = -overshootRight;
       }
-      if (rect.left + shift < margin) {
-        shift = margin - rect.left;
+      if (rect.left + shift < left) {
+        shift = left - rect.left;
       }
       if (shift !== 0) {
         node.style.transform = `translateX(${shift}px)`;
@@ -572,6 +591,7 @@
           onReveal();
         } else {
           node.style.transform = "";
+          node.style.maxWidth = "";
         }
       },
       destroy(): void {
