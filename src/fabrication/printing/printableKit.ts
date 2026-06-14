@@ -360,21 +360,50 @@ export function createPrintablePartThreeMf(
   bed: PrintBed,
   displayColor?: string,
 ): Uint8Array {
-  // Chunks are split full-depth along the assembly's Y axis, so they can be
-  // auto-oriented for the bed (see partOrientation.ts). Other parts (e.g. the
-  // donut adaptor) are already authored print-ready and exported as modeled.
-  const vertices =
-    part.kind === "tempest-print-chunk"
-      ? orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles)
-      : part.mesh.vertices;
-  const bounds = meshBounds(vertices);
+  const oriented = orientPrintablePart(part);
+  const bounds = meshBounds(oriented.mesh.vertices);
   const object: MeshObject = {
-    name: part.name,
-    vertices,
-    triangles: part.mesh.triangles,
+    name: oriented.name,
+    vertices: oriented.mesh.vertices,
+    triangles: oriented.mesh.triangles,
     position: bedCenteredPosition(bounds, bed),
   };
   return createThreeMfPackage(title, [object], [], displayColor);
+}
+
+// ##############################
+// Part Auto-Orientation
+// ##############################
+
+// Rotate a chunk into its lowest-support print orientation and re-seat its mesh
+// at the origin, so the same orientation drives the print-plate preview, the
+// per-chunk ZIP, and the legacy multi-plate 3MF. Parts that are not Tempest
+// chunks (e.g. the donut adaptor) are already authored print-ready and pass
+// through untouched. The kit itself is never mutated — only the export and
+// preview paths call this — so the assembled-box view keeps its assembly pose.
+export function orientPrintablePart(part: PrintablePart): PrintablePart {
+  if (part.kind !== "tempest-print-chunk") {
+    return part;
+  }
+
+  const rotated = orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles);
+  const bounds = meshBounds(rotated);
+  // Re-seat the rotated mesh's min corner at the origin: sheet packing and the
+  // preview both place a part by its (0,0,0) corner, and bed-centering expects
+  // it too.
+  const vertices = rotated.map((vertex) => ({
+    x: vertex.x - bounds.minX,
+    y: vertex.y - bounds.minY,
+    z: vertex.z - bounds.minZ,
+  }));
+
+  return {
+    ...part,
+    mesh: { vertices, triangles: part.mesh.triangles },
+    width: bounds.maxX - bounds.minX,
+    depth: bounds.maxY - bounds.minY,
+    height: bounds.maxZ - bounds.minZ,
+  };
 }
 
 // ##############################
@@ -387,25 +416,28 @@ type MeshBounds = {
   readonly minY: number;
   readonly maxY: number;
   readonly minZ: number;
+  readonly maxZ: number;
 };
 
 function meshBounds(vertices: readonly MeshVertex[]): MeshBounds {
   if (vertices.length === 0) {
-    return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0 };
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
   }
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
   let minZ = Infinity;
+  let maxZ = -Infinity;
   for (const vertex of vertices) {
     minX = Math.min(minX, vertex.x);
     maxX = Math.max(maxX, vertex.x);
     minY = Math.min(minY, vertex.y);
     maxY = Math.max(maxY, vertex.y);
     minZ = Math.min(minZ, vertex.z);
+    maxZ = Math.max(maxZ, vertex.z);
   }
-  return { minX, maxX, minY, maxY, minZ };
+  return { minX, maxX, minY, maxY, minZ, maxZ };
 }
 
 // Translation that drops the part onto z=0 and centers its footprint on the
@@ -452,9 +484,13 @@ function fileNameSlug(value: string): string {
 // #######################################
 
 export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableSheetPlan {
+  // Pack the print-ready (auto-oriented) parts so the plate preview and the
+  // legacy multi-plate 3MF show each chunk in the same orientation as the
+  // per-chunk ZIP download. `kit` keeps the original parts for the assembled view.
+  const orientedParts = kit.parts.map(orientPrintablePart);
   return {
     kit,
-    sheets: arrangePrintSheets(kit.parts, kit.preset.bed),
+    sheets: arrangePrintSheets(orientedParts, kit.preset.bed),
   };
 }
 

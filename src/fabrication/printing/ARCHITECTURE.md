@@ -50,8 +50,12 @@ the steep downward (overhang) area it would strand above the bed, minus a reward
 for resting a large flat face on the plate, and the lowest-support one is kept.
 The 0° orientation is always a candidate and wins ties, so orientation can only
 reduce support versus the as-modelled pose, never add it — which is what lets the
-same rule apply to every configuration. Orientation is applied only on the export
-path, so the assembled/print-sheet previews still show chunks in assembly pose.
+same rule apply to every configuration. `orientPrintablePart` (in
+`printableKit.ts`) wraps this for a whole part — rotate, re-seat at the origin,
+recompute width/depth/height — and is applied both to the per-chunk ZIP and to
+the sheet plan, so the **print-plate preview shows each chunk in the same
+orientation it will export in**. Only the export/preview paths call it; the kit
+itself is never mutated, so the assembled-box view keeps its assembly pose.
 
 The geometry layer never names a kernel. `buildTempestGeometry` is generic over
 `<Solid, Region>` and takes a `ModelingApi<Solid, Region>`; whichever backend you

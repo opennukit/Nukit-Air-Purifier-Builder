@@ -10,7 +10,9 @@ import { featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/t
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
 import {
+  createPrintableSheetPlanFromKit,
   createPrintableThreeMfExportFromKit,
+  orientPrintablePart,
   type PrintableKit,
   type PrintablePart,
 } from "@/fabrication/printing/printableKit";
@@ -18,6 +20,28 @@ import {
 const openScadTowerCornerPostChamfer = 55;
 
 describe("Tempest CSG printable kit", () => {
+  test("plate preview packs the same auto-oriented chunks the export ships", () => {
+    const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
+    const sheetPlan = createPrintableSheetPlanFromKit(kit);
+
+    const placements = sheetPlan.sheets.flatMap((sheet) => sheet.placements);
+    expect(placements).toHaveLength(kit.parts.length);
+
+    const dims = (part: PrintablePart) => [part.width, part.depth, part.height];
+    // Every placed part is the auto-oriented form of a kit part (same id), so the
+    // preview shows exactly what the per-chunk ZIP exports.
+    for (const placement of placements) {
+      const source = kit.parts.find((part) => part.id === placement.part.id)!;
+      expect(dims(placement.part)).toEqual(dims(orientPrintablePart(source)));
+    }
+    // The kit itself is untouched (assembled view keeps assembly pose), and the
+    // orientation actually does something: at least one chunk is re-oriented.
+    const rotatedCount = kit.parts.filter(
+      (part) => JSON.stringify(dims(part)) !== JSON.stringify(dims(orientPrintablePart(part))),
+    ).length;
+    expect(rotatedCount).toBeGreaterThan(0);
+  });
+
   test("generates bed-sized CSG chunks for the default two-filter housing", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
 
