@@ -779,20 +779,21 @@ Summary Metrics
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Reflow to fewer, wider columns as the preview pane narrows so values like
+     "Dual horizontal filters" wrap at spaces instead of breaking mid-word or
+     spilling out. The 1px gap over a line-coloured background draws the cell
+     separators, which works for any column count and any number of rows. */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px;
   border: 1px solid var(--line);
   border-top: 0;
-  background: var(--surface-strong);
+  background: var(--line);
 }
 
 .summary-grid div {
   min-width: 0;
   padding: 10px 12px;
-  border-right: 1px solid var(--line);
-}
-
-.summary-grid div:last-child {
-  border-right: 0;
+  background: var(--surface-strong);
 }
 
 .summary-grid span {
@@ -1926,18 +1927,6 @@ Mobile Layout
     min-width: 34px;
     height: 34px;
     min-height: 34px;
-  }
-
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .summary-grid div {
-    border-bottom: 1px solid var(--line);
-  }
-
-  .summary-grid div:nth-child(2n) {
-    border-right: 0;
   }
 
   .fan-grid > [data-nukit-fan-placement] {
