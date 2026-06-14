@@ -204,6 +204,7 @@
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
   let isFourFilterTower = false;
+  let showTempestWallFanControls = false;
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForSettings(settings.fanDiameter, settings.topExhaust);
   let isStaticReferenceControlsActive = false;
   let showCutSheetPreviewMode = false;
@@ -267,6 +268,9 @@
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
   $: isFourFilterTower = isTempestControlsActive && settings.tempestArrangement === "four-side-filter-tower";
+  // The horizontal layouts (1 top / 2 sandwich) take per-wall fans; the tower
+  // exhausts through the top instead.
+  $: showTempestWallFanControls = isTempestControlsActive && !isFourFilterTower;
   $: selectedFanSizeChoice = fanSizeChoiceForSettings(
     settings.fanDiameter,
     isFourFilterTower ? settings.topExhaust : "fan-grid",
@@ -1152,6 +1156,21 @@
                         {/each}
                       </div>
                     </fieldset>
+                    {#if showTempestWallFanControls}
+                      <div data-tempest-fan-placement>
+                        {#each fanPlacementControls as control}
+                          <label class="field compact-field">
+                            <span>{control.label}</span>
+                            <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
+                              <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
+                              {#each fixedFanCountOptions as count}
+                                <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
+                              {/each}
+                            </select>
+                          </label>
+                        {/each}
+                      </div>
+                    {/if}
                   </div>
                 {/if}
               </div>

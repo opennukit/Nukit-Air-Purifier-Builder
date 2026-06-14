@@ -278,6 +278,9 @@ export type TempestPrintDesignDraft = {
   readonly preset: TempestPrintDesignPreset;
   readonly arrangement: TempestArrangementPreset;
   readonly filter: FilterDimensions;
+  // Per-wall fan banks for the horizontal (1-top / 2-sandwich) layouts; ignored by
+  // the four-side tower (which exhausts through the top).
+  readonly fanBanks: FanBanks<FanCountRequest>;
   readonly filterFitClearance: Millimeters;
   readonly cordHoleDiameter: Millimeters;
   readonly cordHoleWall: CordHoleWall;

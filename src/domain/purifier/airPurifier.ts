@@ -21,7 +21,6 @@ import {
   fanCountRequestFromRawSetting,
   fanCountRequestToRawSetting,
   findPreviewMaterialColorPreset,
-  tempestRawFanBanksForArrangement,
   type ConfiguredPrintDesign,
   type CutSheetPreviewOptions,
   type CuttingSettings,
@@ -264,7 +263,6 @@ export function serializePurifierDraft(
   }
 
   if (draft.design.type === "tempest") {
-    const fanBanks = tempestRawFanBanksForArrangement(draft.design.arrangement);
     return normalizeRawSettings({
       ...base,
       ...serializedFilterFields(draft.design.filter),
@@ -281,10 +279,12 @@ export function serializePurifierDraft(
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
-      fansLeft: fanBanks.left,
-      fansRight: fanBanks.right,
-      fansTop: fanBanks.top,
-      fansBottom: fanBanks.bottom,
+      // Persisted per-wall banks (editable for 1-top / 2-sandwich); the tower
+      // resets these to its own defaults on arrangement switch.
+      fansLeft: fanCountRequestToRawSetting(draft.design.fanBanks.left),
+      fansRight: fanCountRequestToRawSetting(draft.design.fanBanks.right),
+      fansTop: fanCountRequestToRawSetting(draft.design.fanBanks.top),
+      fansBottom: fanCountRequestToRawSetting(draft.design.fanBanks.bottom),
     });
   }
 
@@ -411,7 +411,6 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
   }
 
   if (input.design.type === "tempest") {
-    const fanBanks = tempestRawFanBanksForArrangement(input.design.arrangement);
     return {
       ...base,
       ...serializedFilterFields(input.design.filter),
@@ -428,10 +427,11 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
-      fansLeft: fanBanks.left,
-      fansRight: fanBanks.right,
-      fansTop: fanBanks.top,
-      fansBottom: fanBanks.bottom,
+      // Editable per-wall banks flow from the base (input.fan.banks).
+      fansLeft: fanCountRequestToRawSetting(input.fan.banks.left),
+      fansRight: fanCountRequestToRawSetting(input.fan.banks.right),
+      fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
+      fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     };
   }
 
@@ -596,6 +596,7 @@ function createPurifierDesignDraft(
       preset: configuration.design.preset,
       arrangement: configuration.design.arrangement,
       filter: configuration.design.filter,
+      fanBanks: configuration.fan.banks,
       filterFitClearance: configuration.design.filterFitClearance,
       cordHoleDiameter: configuration.design.cordHoleDiameter,
       cordHoleWall: configuration.design.cordHoleWall,
@@ -771,10 +772,22 @@ function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
 function canonicalizePrintDesignRawSettings(
   settings: RawPurifierSettings,
 ): RawPurifierSettings {
-  if (isTempestPrintDesignId(settings.printDesign)) {
-    return applyTempestArrangement(settings, settings.tempestArrangement);
+  if (!isTempestPrintDesignId(settings.printDesign)) {
+    return settings;
   }
-  return settings;
+  const arrangement = canonicalTempestArrangement(settings.tempestArrangement);
+  // The tower has no editable per-wall fans, so it always carries its own
+  // bank defaults. The 1-top and 2-filter sandwich modes keep the user's
+  // per-wall fan counts (a true arrangement switch resets them explicitly via
+  // applyTempestArrangementDefaults in the UI / URL defaults).
+  if (arrangement === "four-side-filter-tower") {
+    return applyTempestArrangement(settings, arrangement);
+  }
+  return {
+    ...settings,
+    tempestArrangement: arrangement,
+    filters: arrangement === "single-horizontal-top-filter" ? 1 : 2,
+  };
 }
 
 // ##############################

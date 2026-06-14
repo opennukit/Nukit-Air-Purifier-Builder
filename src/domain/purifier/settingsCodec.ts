@@ -66,11 +66,11 @@ export function encodeSettings(
   if (!isTempestPrintDesignId(settings.printDesign)) {
     params.set("filters", String(settings.filters));
     params.set("splitFrames", String(settings.splitFrames));
-    params.set("fansLeft", String(settings.fansLeft));
-    params.set("fansRight", String(settings.fansRight));
-    params.set("fansTop", String(settings.fansTop));
-    params.set("fansBottom", String(settings.fansBottom));
   }
+  params.set("fansLeft", String(settings.fansLeft));
+  params.set("fansRight", String(settings.fansRight));
+  params.set("fansTop", String(settings.fansTop));
+  params.set("fansBottom", String(settings.fansBottom));
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
