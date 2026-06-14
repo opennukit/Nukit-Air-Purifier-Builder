@@ -10,6 +10,7 @@ import {
   tempestAlignmentPinPlacements,
   tempestPinPlacementsClearOfFans,
 } from "@/fabrication/printing/designs/tempest/geometry/pins";
+import { towerCornerChamfer } from "@/fabrication/printing/designs/tempest/geometry";
 
 // #######################################
 // Tempest Assembly Pin Diagram
@@ -121,6 +122,59 @@ describe("tempest assembly pin diagram", () => {
       for (const seam of perpendicularSeams) {
         expect(Math.abs(acrossCoordinate - seam)).toBeGreaterThanOrEqual(cornerClearance);
       }
+    }
+  });
+
+  test("clears tower pins out of the open side filter windows", () => {
+    const plan = createTempestChunkPlan(towerSettings, "bed-180");
+    const candidates = tempestAlignmentPinPlacements(plan.model, plan.sourceChunkGrid);
+    const cleared = tempestPinPlacementsClearOfFans(plan.model, plan.sourceChunkGrid);
+
+    // Some candidates fall in the open windows and are dropped; the rest survive.
+    expect(cleared.length).toBeLessThan(candidates.length);
+    expect(cleared.length).toBeGreaterThan(0);
+    for (const placement of cleared) {
+      expect(candidates).toContainEqual(placement);
+    }
+
+    // No surviving pin sits inside a side window (where it would float with no hole).
+    const fl = plan.model.filterLayout;
+    if (fl.topology !== "quad") {
+      throw new Error("expected a quad tower layout");
+    }
+    const openWidth = fl.filter.faceWidth - 2 * plan.model.frame.rim;
+    const openHeight = fl.filter.faceHeight - 2 * plan.model.frame.rim;
+    const centerZ = fl.bottomPlateThickness + fl.filter.faceHeight / 2;
+    const zMin = centerZ - openHeight / 2;
+    const zMax = centerZ + openHeight / 2;
+    const off = fl.structuralOffset;
+    const { width, depth } = plan.model.box;
+    const windows = [
+      { lengthAxis: "x" as const, center: width / 2, normalAxis: "y" as const, n0: 0, n1: off },
+      { lengthAxis: "x" as const, center: width / 2, normalAxis: "y" as const, n0: depth - off, n1: depth },
+      { lengthAxis: "y" as const, center: depth / 2, normalAxis: "x" as const, n0: 0, n1: off },
+      { lengthAxis: "y" as const, center: depth / 2, normalAxis: "x" as const, n0: width - off, n1: width },
+    ];
+    for (const placement of cleared) {
+      const [x, y, z] = placement.position;
+      for (const w of windows) {
+        const length = w.lengthAxis === "x" ? x : y;
+        const normal = w.normalAxis === "x" ? x : y;
+        const inside =
+          z > zMin && z < zMax &&
+          length > w.center - openWidth / 2 && length < w.center + openWidth / 2 &&
+          normal > w.n0 && normal < w.n1;
+        expect(inside).toBe(false);
+      }
+      // No pin over an open filter pocket/slot column.
+      for (const rect of Object.values(fl.wallRects)) {
+        const inPocket = x > rect.xMin && x < rect.xMax && y > rect.yMin && y < rect.yMax && z > fl.bottomPlateThickness && z < plan.model.box.height;
+        expect(inPocket).toBe(false);
+      }
+      // No pin inside the bevelled outer corner.
+      const chamfer = towerCornerChamfer(plan.model.frame.towerCornerPostChamfer, off, plan.model.frame.outsideFlangeThickness);
+      const cornerDistance = Math.min(x, width - x) + Math.min(y, depth - y);
+      expect(cornerDistance < chamfer).toBe(false);
     }
   });
 

@@ -4,6 +4,7 @@ import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
 import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
+import { towerCornerChamfer } from "./quadAssembly";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
 
@@ -84,7 +85,26 @@ export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: 
       const bores = sandwichFanBores(m, m.fanLayout);
       return placements.filter((placement) => !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness)));
     },
-    quad: () => placements,
+    quad: (m) => {
+      // Drop any pin centered in an open region — it would have no material to
+      // bite into and the CSG cuts no hole there, so the exploded preview would
+      // float it. Three open regions: the side filter windows, the filter
+      // pocket/slot columns (open up through the top plate), and the bevelled
+      // outer corners.
+      const windows = quadSideWindows(m, m.filterLayout);
+      const pockets = quadFilterPocketColumns(m, m.filterLayout);
+      const chamfer = towerCornerChamfer(
+        m.frame.towerCornerPostChamfer,
+        m.filterLayout.structuralOffset,
+        m.frame.outsideFlangeThickness,
+      );
+      return placements.filter(
+        (placement) =>
+          !windows.some((window) => windowSwallowsPin(window, placement)) &&
+          !pockets.some((pocket) => boxSwallowsPin(pocket, placement)) &&
+          !cornerBevelSwallowsPin(placement, m.box.width, m.box.depth, chamfer),
+      );
+    },
   });
 }
 
@@ -482,6 +502,113 @@ function boreSwallowsPin(bore: SandwichFanBore, placement: TempestAlignmentPinPl
   }
   const planarDistance = bore.normalAxis === "x" ? Math.hypot(pinY - boreY, pinZ - boreZ) : Math.hypot(pinX - boreX, pinZ - boreZ);
   return planarDistance < bore.radius;
+}
+
+// #######################################
+// Quad Side Filter Windows
+// #######################################
+
+// One side wall's open filter window as data: the in-plane rectangle (along the
+// wall's length axis and Z) and the wall+pocket band along the wall normal. A pin
+// whose center sits inside this volume has no material to grip, so it is dropped.
+type QuadSideWindow = {
+  readonly lengthAxis: "x" | "y";
+  readonly lengthMin: number;
+  readonly lengthMax: number;
+  readonly normalAxis: "x" | "y";
+  readonly normalMin: number;
+  readonly normalMax: number;
+  readonly zMin: number;
+  readonly zMax: number;
+};
+
+function quadSideWindows(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+): QuadSideWindow[] {
+  // The cut matches towerSideOpening: the filter face minus the rim on every side.
+  const openWidth = filterLayout.filter.faceWidth - 2 * model.frame.rim;
+  const openHeight = filterLayout.filter.faceHeight - 2 * model.frame.rim;
+  if (openWidth <= 0 || openHeight <= 0) {
+    return [];
+  }
+  const centerZ = filterLayout.bottomPlateThickness + filterLayout.filter.faceHeight / 2;
+  const zMin = centerZ - openHeight / 2;
+  const zMax = centerZ + openHeight / 2;
+  const offset = filterLayout.structuralOffset;
+  const { width, depth } = model.box;
+  const lengthSpan = (center: number) => ({ lengthMin: center - openWidth / 2, lengthMax: center + openWidth / 2 });
+
+  return [
+    { lengthAxis: "x", ...lengthSpan(width / 2), normalAxis: "y", normalMin: 0, normalMax: offset, zMin, zMax },
+    { lengthAxis: "x", ...lengthSpan(width / 2), normalAxis: "y", normalMin: depth - offset, normalMax: depth, zMin, zMax },
+    { lengthAxis: "y", ...lengthSpan(depth / 2), normalAxis: "x", normalMin: 0, normalMax: offset, zMin, zMax },
+    { lengthAxis: "y", ...lengthSpan(depth / 2), normalAxis: "x", normalMin: width - offset, normalMax: width, zMin, zMax },
+  ];
+}
+
+function windowSwallowsPin(window: QuadSideWindow, placement: TempestAlignmentPinPlacement): boolean {
+  const [x, y, z] = placement.position;
+  if (z <= window.zMin || z >= window.zMax) {
+    return false;
+  }
+  const lengthCoordinate = window.lengthAxis === "x" ? x : y;
+  if (lengthCoordinate <= window.lengthMin || lengthCoordinate >= window.lengthMax) {
+    return false;
+  }
+  const normalCoordinate = window.normalAxis === "x" ? x : y;
+  return normalCoordinate > window.normalMin && normalCoordinate < window.normalMax;
+}
+
+// Each filter pocket is an open column from above the bottom plate up through the
+// top-plate loading slot, so a pin anywhere in that footprint floats. (The slots
+// sit above the side windows' z-range, which is why the window filter misses them.)
+type QuadPocketColumn = {
+  readonly xMin: number;
+  readonly xMax: number;
+  readonly yMin: number;
+  readonly yMax: number;
+  readonly zMin: number;
+  readonly zMax: number;
+};
+
+function quadFilterPocketColumns(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+): QuadPocketColumn[] {
+  const zMin = filterLayout.bottomPlateThickness;
+  const zMax = model.box.height;
+  return Object.values(filterLayout.wallRects).map((rect) => ({
+    xMin: rect.xMin,
+    xMax: rect.xMax,
+    yMin: rect.yMin,
+    yMax: rect.yMax,
+    zMin,
+    zMax,
+  }));
+}
+
+function boxSwallowsPin(box: QuadPocketColumn, placement: TempestAlignmentPinPlacement): boolean {
+  const [x, y, z] = placement.position;
+  return x > box.xMin && x < box.xMax && y > box.yMin && y < box.yMax && z > box.zMin && z < box.zMax;
+}
+
+// The outer vertical corners are bevelled at 45° (chamferedPrism), so a pin whose
+// combined distance from the two meeting outer faces is inside the bevel has no
+// material — it would float past the corner post.
+function cornerBevelSwallowsPin(
+  placement: TempestAlignmentPinPlacement,
+  width: number,
+  depth: number,
+  chamfer: number,
+): boolean {
+  if (chamfer <= 0) {
+    return false;
+  }
+  const [x, y] = placement.position;
+  const distanceFromNearestXFace = Math.min(x, width - x);
+  const distanceFromNearestYFace = Math.min(y, depth - y);
+  return distanceFromNearestXFace + distanceFromNearestYFace < chamfer;
 }
 
 // #######################################
