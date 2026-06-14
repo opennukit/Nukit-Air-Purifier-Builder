@@ -1479,6 +1479,8 @@
                     <input
                       type="number"
                       name={control.name}
+                      min={control.minMm !== undefined ? millimetersToDisplayValue(control.minMm, dimensionUnit) : undefined}
+                      max={control.maxMm !== undefined ? millimetersToDisplayValue(control.maxMm, dimensionUnit) : undefined}
                       step={dimensionInputStep(control.step, dimensionUnit)}
                       inputmode="decimal"
                       value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
@@ -1497,6 +1499,8 @@
                         <input
                           type="number"
                           name={control.name}
+                          min={control.minMm !== undefined ? millimetersToDisplayValue(control.minMm, dimensionUnit) : undefined}
+                          max={control.maxMm !== undefined ? millimetersToDisplayValue(control.maxMm, dimensionUnit) : undefined}
                           step={dimensionInputStep(control.step, dimensionUnit)}
                           inputmode="decimal"
                           value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}

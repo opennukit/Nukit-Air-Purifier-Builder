@@ -41,6 +41,11 @@ export type NumberControl<Name extends NumericSettingName> = {
   readonly label: string;
   readonly suffix: string;
   readonly step: string;
+  // The clamp range the setting is normalized to, in millimeters; rendered as
+  // the input's min/max (converted to the active display unit) so the limit is
+  // visible instead of a silent jump when an out-of-range value is typed.
+  readonly minMm?: number;
+  readonly maxMm?: number;
   // Optional hover explainer rendered as a small "i" next to the label.
   readonly info?: string;
 };
@@ -69,12 +74,12 @@ export const donutFilterDimensionControls: readonly DimensionControl<DonutFilter
   { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },
 ];
 export const generatedGeometryControls: readonly NumberControl<LengthSettingName>[] = [
-  { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },
-  { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1" },
+  { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1", minMm: 1.5, maxMm: 9 },
+  { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1", minMm: 2, maxMm: 10 },
 ];
 export const nukitPanelFitControls: readonly NumberControl<LengthSettingName>[] = [
-  { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
-  { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01" },
+  { name: "rim", label: "Filter rim", suffix: "mm", step: "1", minMm: 0 },
+  { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01", minMm: 0, maxMm: 1 },
 ];
 // Slide-in clearance around the measured filter; a length, so it renders and
 // parses through the active display unit.
