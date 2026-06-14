@@ -652,9 +652,10 @@
 
   // A single Download click resolves the plan and downloads it: the static
   // reference opens its source files; everything else awaits the shared plan
-  // path (cache hit, in-flight build, or a fresh build), showing "Preparing…"
-  // while it waits, then "Downloaded 3MF" or a failure label. The awaited
-  // build warms the cache and the on-screen plan through that same path.
+  // path (cache hit, in-flight build, or a fresh build). The button only shows
+  // "Preparing…" when a build is actually in flight — the plan is usually
+  // pre-built in the background, so the click just downloads and the browser's
+  // own download UI is the confirmation (no past-tense relabel every time).
   async function exportPrintKit(buttonKey: TransientButtonKey, currentLayout: LayoutResult): Promise<void> {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       window.open(staticReferenceFilesUrl(currentLayout), "_blank", "noopener,noreferrer");
@@ -667,7 +668,11 @@
       return;
     }
     exportInProgress = true;
-    showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
+    const cacheKey = printKitCacheKey(layout.rawSettings, printVolumePresetId);
+    const planReady = generatedPrintSheetPlanCache.get(cacheKey) !== undefined;
+    if (!planReady) {
+      showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
+    }
     try {
       const plan = await ensurePlanForCurrentSettings();
       if (plan === null) {
@@ -675,7 +680,7 @@
         return;
       }
       downloadPrintKit(currentLayout, plan);
-      showTransientButtonLabel(buttonKey, "Downloaded 3MF", 1400);
+      clearTransientButtonLabel(buttonKey);
     } finally {
       exportInProgress = false;
     }
@@ -761,6 +766,17 @@
       transientLabelTimers.delete(key);
     }, durationMs);
     transientLabelTimers.set(key, nextTimer);
+  }
+
+  // Drops any transient label immediately, reverting the button to its default.
+  function clearTransientButtonLabel(key: TransientButtonKey): void {
+    const timer = transientLabelTimers.get(key);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      transientLabelTimers.delete(key);
+    }
+    const { [key]: _removed, ...rest } = transientButtonLabels;
+    transientButtonLabels = rest;
   }
 
   // #######################################
