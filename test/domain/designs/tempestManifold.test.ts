@@ -7,7 +7,8 @@ import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geo
 import { type Geom2, type Geom3, manifoldModeling } from "@/fabrication/printing/modeling/manifoldOps";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
 import { extractWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
-import { cleanManifold, manifoldReport, meshVolume, totalGenus } from "../../helpers/manifoldChecks";
+import { meshVolumeMm3 } from "@/fabrication/printing/threeMf";
+import { cleanManifold, manifoldReport, totalGenus } from "../../helpers/manifoldChecks";
 
 describe("Tempest meshes are 2-manifold", () => {
   test("two-filter housing exports a watertight single body", () => {
@@ -63,7 +64,7 @@ describe("Tempest meshes are 2-manifold", () => {
           );
           const probeVolume =
             (wall - model.settings.filterSlot.endMargin) * (wall - 0.5) * (zTop - zBottom - 2);
-          const overlap = meshVolume(extractWeldedMesh(manifoldModeling.booleans.intersect(solid, probe)));
+          const overlap = meshVolumeMm3(extractWeldedMesh(manifoldModeling.booleans.intersect(solid, probe)));
           expect(overlap).toBeCloseTo(probeVolume, 3);
         }
       }

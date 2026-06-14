@@ -31,6 +31,7 @@ import {
   type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import { meshVolumeMm3 } from "@/fabrication/printing/threeMf";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 
@@ -86,6 +87,7 @@ export function createTempestPrintableKit(
     summary: {
       partCount: parts.length,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
+      materialVolumeMm3: parts.reduce((sum, p) => sum + Math.abs(meshVolumeMm3(p.mesh)), 0),
     },
   };
 }

@@ -72,12 +72,14 @@ export function createPreviewSummaryItems(
       return [
         { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
         { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+        { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
         { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
       ];
     }
     return [
       { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
       { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -104,6 +106,7 @@ export function createPreviewSummaryItems(
       { label: "Center hole", value: formatMillimeters(model.filter.holeDiameter) },
       { label: "Fan", value: `${model.fanSize} mm` },
       { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -115,6 +118,7 @@ export function createPreviewSummaryItems(
       { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -137,6 +141,12 @@ export function createPreviewSummaryItems(
 // first build lands.
 function planValue(plan: PrintableSheetPlan | null, read: (plan: PrintableSheetPlan) => string): string {
   return plan === null ? "…" : read(plan);
+}
+
+// The preview "Filament" row: the kit's true material volume as an "about N g"
+// estimate once the lazy plan exists, the pending placeholder until then.
+function filamentSummaryValue(plan: PrintableSheetPlan | null): string {
+  return planValue(plan, (built) => formatGrams(filamentGramsFromVolume(built.kit.summary.materialVolumeMm3)));
 }
 
 // Attribution row for curated static designs; omitted when neither the
@@ -167,11 +177,32 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 // states the electrical requirement rather than a product.
 const FAN_POWER_NOTE = "4-pin PWM, 12 V";
 
+// Solid PLA is ~1.24 g/cm^3; PETG (~1.27) is within the ballpark, so one
+// constant covers the "A spool of PLA or PETG" estimate.
+const FILAMENT_DENSITY_G_PER_CM3 = 1.24;
+
+// Solid-mesh grams from the kit's true material volume. The result is an
+// upper bound on filament use (no infill/wall hollowing) so it reads as
+// "about", deliberately approximate.
+function filamentGramsFromVolume(materialVolumeMm3: number): number {
+  return (materialVolumeMm3 / 1000) * FILAMENT_DENSITY_G_PER_CM3;
+}
+
+// A ballpark figure a maker can act on: round to the nearest 5 g under a
+// kilogram, switch to one-decimal kilograms once a single spool is in play.
+function formatGrams(grams: number): string {
+  if (grams >= 1000) {
+    return `about ${trimNumber(grams / 1000)} kg`;
+  }
+  return `about ${(Math.round(grams / 5) * 5).toFixed(0)} g`;
+}
+
 export function createPartsListItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
   currentSettings: RawPurifierSettings,
   currentPrintVolumePresetId: PrintVolumePresetId,
+  currentGeneratedPlan: PrintableSheetPlan | null,
 ): readonly PartsListItem[] {
   if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
@@ -237,6 +268,7 @@ export function createPartsListItems(
         label: "Round HEPA filter",
         detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
       },
+      filamentPartsItem(currentGeneratedPlan, "the adaptor, fan guard, and cap"),
       ...baseItems,
       {
         category: "Seal",
@@ -254,7 +286,7 @@ export function createPartsListItems(
         detail: "Measured width x depth x thickness",
       },
       ...baseItems,
-      ...tempestPrintPartsItems(currentLayout, currentPrintVolumePresetId),
+      ...tempestPrintPartsItems(currentLayout, currentPrintVolumePresetId, currentGeneratedPlan),
     ];
   }
 
@@ -269,12 +301,32 @@ export function createPartsListItems(
   ];
 }
 
+// The filament line for a generated print: once a plan exists the kit's true
+// material volume gives an "about N g" estimate; until the lazy build lands
+// (plan null) it stays the generic spool line. `usage` names what prints, so
+// the detail reads naturally for either design.
+function filamentPartsItem(plan: PrintableSheetPlan | null, usage: string): PartsListItem {
+  if (plan === null) {
+    return {
+      category: "Filament",
+      label: "A spool of PLA or PETG",
+      detail: `Prints ${usage} on the selected bed`,
+    };
+  }
+  return {
+    category: "Filament",
+    label: "A spool of PLA or PETG",
+    detail: `${formatGrams(filamentGramsFromVolume(plan.kit.summary.materialVolumeMm3))} of filament for ${usage} (PLA density)`,
+  };
+}
+
 // The consumables behind a tempest print: filament for the housing, the
 // fans' own screws, and — only when the active print volume splits the
 // model — seam glue and filament pin stock.
 function tempestPrintPartsItems(
   currentLayout: LayoutResult,
   currentPrintVolumePresetId: PrintVolumePresetId,
+  currentGeneratedPlan: PrintableSheetPlan | null,
 ): readonly PartsListItem[] {
   const plan = createTempestChunkPlan(createTempestSettingsFromLayout(currentLayout), currentPrintVolumePresetId);
   const pins = plan.model.settings.alignmentPins;
@@ -298,11 +350,7 @@ function tempestPrintPartsItems(
         ]
       : [];
   return [
-    {
-      category: "Filament",
-      label: "A spool of PLA or PETG",
-      detail: "Prints the housing on the selected bed",
-    },
+    filamentPartsItem(currentGeneratedPlan, "the housing"),
     {
       category: "Fasteners",
       label: "Fan screws",
