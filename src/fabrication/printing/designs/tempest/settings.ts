@@ -70,7 +70,7 @@ function requireTempestDesign(configuration: PurifierSettings): Extract<Purifier
 }
 
 // The box/exhaust sizes are concrete diameters that the UI auto-populates from
-// the filter width (fan hole 75%, ring 1 70%, ring 2 80%) and that only change
+// the filter width (fan hole 75%, ring 1 84%, ring 2 90%) and that only change
 // when the width changes. The fields hold diameters; the geometry needs radii,
 // so the rings are halved. A non-positive value falls back to the width-derived
 // default so the geometry never breaks.
@@ -86,12 +86,12 @@ function resolveBoxExhaust(
     ringOne: {
       screwHoles: design.boxRingOneScrewHoles,
       screwDiameter: design.boxRingOneScrewDiameter,
-      radius: ringRadius(design.boxRingOneDiameter, 0.35),
+      radius: ringRadius(design.boxRingOneDiameter, 0.42),
     },
     ringTwo: {
       screwHoles: design.boxRingTwoScrewHoles,
       screwDiameter: design.boxRingTwoScrewDiameter,
-      radius: ringRadius(design.boxRingTwoDiameter, 0.4),
+      radius: ringRadius(design.boxRingTwoDiameter, 0.45),
     },
   };
 }

@@ -10,23 +10,23 @@ const towerBoxExhaust =
 
 describe("tempest box/exhaust settings", () => {
   test("the width-derived diameters become the fan hole and ring radii", () => {
-    // boxExhaustDiametersForWidth(300): fan hole 225, ring 1 210, ring 2 240.
+    // boxExhaustDiametersForWidth(300): fan hole 225, ring 1 252, ring 2 270.
     const url =
-      "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25&boxFanHoleSize=225&boxRingOneDiameter=210&boxRingTwoDiameter=240";
+      "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25&boxFanHoleSize=225&boxRingOneDiameter=252&boxRingTwoDiameter=270";
     const fan = createTempestSettingsFromLayout(createLayout(decodeSettings(url))).fan;
     expect(fan.topExhaust).toBe("box-exhaust");
     expect(fan.boxExhaust.fanHoleSize).toBe(225); // 75% of 300
-    expect(fan.boxExhaust.ringOne.radius).toBe(105); // diameter 210 / 2 -> 35% of 300
-    expect(fan.boxExhaust.ringTwo.radius).toBe(120); // diameter 240 / 2 -> 40% of 300
+    expect(fan.boxExhaust.ringOne.radius).toBe(126); // diameter 252 / 2 -> 42% of 300
+    expect(fan.boxExhaust.ringTwo.radius).toBe(135); // diameter 270 / 2 -> 45% of 300
     expect(fan.boxExhaust.ringOne.screwHoles).toBe(4);
     expect(fan.boxExhaust.ringOne.screwDiameter).toBe(6);
   });
 
-  test("the helper auto-populates fan hole 75% / ring 70% / ring 80% of the width", () => {
+  test("the helper auto-populates fan hole 75% / ring 84% / ring 90% of the width", () => {
     expect(boxExhaustDiametersForWidth(300)).toEqual({
       boxFanHoleSize: 225,
-      boxRingOneDiameter: 210,
-      boxRingTwoDiameter: 240,
+      boxRingOneDiameter: 252,
+      boxRingTwoDiameter: 270,
     });
   });
 
@@ -34,7 +34,7 @@ describe("tempest box/exhaust settings", () => {
     const fan = createTempestSettingsFromLayout(
       createLayout(decodeSettings(`${towerBoxExhaust}&boxRingOneDiameter=0&boxRingTwoScrewHoles=6`)),
     ).fan;
-    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(0.35 * 300, 1); // 35% of width
+    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(0.42 * 300, 1); // 42% of width
     expect(fan.boxExhaust.ringTwo.screwHoles).toBe(6);
   });
 
