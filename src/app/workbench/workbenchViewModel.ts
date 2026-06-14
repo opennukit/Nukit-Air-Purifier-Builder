@@ -61,7 +61,7 @@ export type WorkbenchDesignContext =
   | {
       readonly type: "tempest";
       readonly preset: TempestPrintDesignPreset;
-      readonly layoutSectionTitle: "Tempest layout";
+      readonly layoutSectionTitle: "";
       readonly partsSectionTitle: "Filter and fan";
     }
   | {
@@ -220,7 +220,7 @@ function createWorkbenchDesignContext(
       return {
         type: "tempest",
         preset: { ...preset, implementation: preset.implementation },
-        layoutSectionTitle: "Tempest layout",
+        layoutSectionTitle: "",
         partsSectionTitle: "Filter and fan",
       };
     case "static-reference": {
@@ -243,7 +243,7 @@ function createWorkbenchDesignContext(
       return {
         type: "tempest",
         preset: findDefaultThreeDimensionalPrintDesignPreset(),
-        layoutSectionTitle: "Tempest layout",
+        layoutSectionTitle: "",
         partsSectionTitle: "Filter and fan",
       };
   }

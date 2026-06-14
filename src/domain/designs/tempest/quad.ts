@@ -174,15 +174,24 @@ export function createQuadFanLayout(
 ): Extract<TempestFanLayout, { readonly topology: "quad" }> {
   const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
+  const topExhaust = settings.fan.topExhaust ?? "fan-grid";
   const minimumCenterFromEdge = quadFilter.structuralOffset + settings.fan.diameter / 2;
-  const positionsX = towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
-  const positionsY = towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
+  // Box/Exhaust feeds the tower from an external box fan bolted over the central
+  // hole, so there is no grid of PC fans to lay out or render.
+  const positionsX =
+    topExhaust === "box-exhaust"
+      ? []
+      : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
+  const positionsY =
+    topExhaust === "box-exhaust"
+      ? []
+      : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
   return {
     topology: "quad",
     bodyDepth,
     screwPitch,
     minimumCenterFromEdge,
-    topExhaust: settings.fan.topExhaust ?? "fan-grid",
+    topExhaust,
     columns: positionsX.length,
     rows: positionsY.length,
     positionsX,

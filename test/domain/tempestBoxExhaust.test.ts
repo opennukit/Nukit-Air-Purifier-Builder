@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
+import { createTempestModel } from "@/domain/designs/tempest/model";
 
 const towerBoxExhaust =
   "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25";
@@ -31,5 +32,21 @@ describe("tempest box/exhaust settings", () => {
     expect(fanGrid.topExhaust).toBe("fan-grid");
     const params = new URLSearchParams(encodeSettings(decodeSettings(towerBoxExhaust)));
     expect(params.get("topExhaust")).toBe("box-exhaust");
+  });
+
+  test("box/exhaust renders no PC fans (external box fan instead)", () => {
+    const settings = createTempestSettingsFromLayout(createLayout(decodeSettings(towerBoxExhaust)));
+    const fanLayout = createTempestModel(settings).fanLayout;
+    expect(fanLayout.fanCount).toBe(0);
+    expect(fanLayout.positionsX.length).toBe(0);
+    expect(fanLayout.positionsY.length).toBe(0);
+
+    // sanity: the fan grid still places fans
+    const grid = createTempestModel(
+      createTempestSettingsFromLayout(
+        createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterWidth=300&filterDepth=300&filterThickness=25")),
+      ),
+    ).fanLayout;
+    expect(grid.fanCount).toBeGreaterThan(0);
   });
 });

@@ -1076,7 +1076,9 @@
             <section class="control-section layout-section" data-generated-layout-controls>
               <div class="section-heading">
                 <p class="eyebrow">Layout</p>
-                <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
+                {#if layoutSectionTitleText}
+                  <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
+                {/if}
               </div>
               <div class="fan-grid">
                 {#if isNukitControlsActive}
