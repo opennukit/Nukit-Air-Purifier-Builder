@@ -13,16 +13,29 @@ export type BooleanSettingName = {
 }[keyof RawPurifierSettings];
 export type FanCountSettingName = "fansLeft" | "fansRight" | "fansTop" | "fansBottom";
 export type FilterDimensionName = "filterWidth" | "filterDepth" | "filterThickness";
-export type DonutFilterDimensionName =
-  | "donutFilterOuterDiameter"
-  | "donutFilterLength"
-  | "donutFilterHoleDiameter";
-export type DonutNumberSettingName =
+// Every setting whose stored millimeter value is a real-world length, so its
+// input renders and parses through the active display unit. Joint-tuning
+// multipliers (suffix "x") and counts are deliberately excluded: they are not
+// lengths and never convert.
+export type LengthSettingName =
+  | FilterDimensionName
   | "donutFilterOuterDiameter"
   | "donutFilterLength"
   | "donutFilterHoleDiameter"
   | "donutAdapterInsertLength"
-  | "donutCapRim";
+  | "donutCapRim"
+  | "materialThickness"
+  | "screwHoleDiameter"
+  | "rim"
+  | "kerfFit"
+  | "filterFitClearance"
+  | "cordHoleDiameter"
+  | "fanDiameter"
+  | "referenceScale";
+export type DonutFilterDimensionName =
+  | "donutFilterOuterDiameter"
+  | "donutFilterLength"
+  | "donutFilterHoleDiameter";
 export type NumberControl<Name extends NumericSettingName> = {
   readonly name: Name;
   readonly label: string;
@@ -55,17 +68,17 @@ export const donutFilterDimensionControls: readonly DimensionControl<DonutFilter
   { name: "donutFilterLength", label: "Length", step: "1" },
   { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },
 ];
-export const generatedGeometryControls: readonly NumberControl<NumericSettingName>[] = [
+export const generatedGeometryControls: readonly NumberControl<LengthSettingName>[] = [
   { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },
   { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1" },
 ];
-export const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[] = [
+export const nukitPanelFitControls: readonly NumberControl<LengthSettingName>[] = [
   { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
   { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01" },
 ];
-// Slide-in clearance around the measured filter; mm-only like the other
-// generated-geometry inputs.
-export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = [
+// Slide-in clearance around the measured filter; a length, so it renders and
+// parses through the active display unit.
+export const tempestFitControls: readonly NumberControl<LengthSettingName>[] = [
   {
     name: "filterFitClearance",
     label: "Filter fit clearance",
