@@ -862,6 +862,35 @@ Panel Grids
   column-gap: 12px;
 }
 
+.advanced-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 8px 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.advanced-accordion-toggle .eyebrow {
+  margin: 0;
+}
+
+.advanced-accordion-chevron {
+  width: 18px;
+  height: 18px;
+  fill: var(--accent-strong);
+  transition: transform 0.15s ease;
+}
+
+.advanced-accordion-chevron.is-open {
+  transform: rotate(180deg);
+}
+
 .control-section {
   min-width: 0;
   padding: 0;

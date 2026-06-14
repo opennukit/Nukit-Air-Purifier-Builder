@@ -208,6 +208,11 @@
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
   let isFourFilterTower = false;
   let showTempestWallFanControls = false;
+  // The tempest "Advanced" accordion is collapsed by default; it reveals the
+  // box/exhaust option and its variables, hex size/spacing, fan screw holes,
+  // material thickness, and the cord wall/position/offset controls.
+  let showTempestAdvanced = false;
+  let showBoxExhaustOption = false;
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForSettings(settings.fanDiameter, settings.topExhaust);
   let isStaticReferenceControlsActive = false;
   let showCutSheetPreviewMode = false;
@@ -283,6 +288,10 @@
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
+  // Box/exhaust is an advanced option: show the segment button when Advanced is
+  // open, or whenever it is already the active choice (so the segment is never
+  // left with no selection highlighted).
+  $: showBoxExhaustOption = isFourFilterTower && (showTempestAdvanced || selectedFanSizeChoice === "box-exhaust");
   $: showHexGrillControls = isTempestControlsActive && selectedFanSizeChoice !== "box-exhaust";
   // Box/exhaust uses its own ring screws, so the PC-fan screw-hole input is hidden.
   $: visibleGeometryControls =
@@ -1307,7 +1316,7 @@
                 {/if}
 
                 <div class="fan-selection">
-                  <fieldset class="segmented-field" class:segmented-field-three={isFourFilterTower}>
+                  <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
                     <legend>Fan size</legend>
                     <div>
                       {#each recommendedFanDiameterOptions as diameter}
@@ -1322,7 +1331,7 @@
                           <span>{diameter} mm</span>
                         </label>
                       {/each}
-                      {#if isFourFilterTower}
+                      {#if showBoxExhaustOption}
                         <label>
                           <input
                             type="radio"
@@ -1337,7 +1346,7 @@
                     </div>
                   </fieldset>
 
-                  {#if selectedFanSizeChoice === "box-exhaust"}
+                  {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
                     <div data-box-exhaust-controls>
                       {#each tempestBoxExhaustControls as control}
                         <label class="field">
@@ -1387,22 +1396,24 @@
                 <p class="eyebrow">Geometry</p>
                 <h2>Material and fit</h2>
               </div>
-              {#each visibleGeometryControls as control}
-                <label class="field">
-                  <span>{control.label}</span>
-                  <span class="input-shell">
-                    <input
-                      type="number"
-                      name={control.name}
-                      step={control.step}
-                      inputmode="decimal"
-                      value={settings[control.name]}
-                      onchange={(event) => updateNumberSetting(control.name, event)}
-                    />
-                    <small>{control.suffix}</small>
-                  </span>
-                </label>
-              {/each}
+              {#if !isTempestControlsActive}
+                {#each visibleGeometryControls as control}
+                  <label class="field">
+                    <span>{control.label}</span>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name={control.name}
+                        step={control.step}
+                        inputmode="decimal"
+                        value={settings[control.name]}
+                        onchange={(event) => updateNumberSetting(control.name, event)}
+                      />
+                      <small>{control.suffix}</small>
+                    </span>
+                  </label>
+                {/each}
+              {/if}
               {#if isNukitControlsActive}
                 <div data-nukit-panel-fit-controls>
                   {#each nukitPanelFitControls as control}
@@ -1459,31 +1470,23 @@
                       </span>
                     </label>
                   {/each}
-                  <label class="field">
-                    <span>
-                      Power cord wall
-                      <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
-                        <button
-                          type="button"
-                          aria-label="What does the power cord pass-through do?"
-                          aria-describedby="info-cordHoleDiameter"
-                          aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
-                          onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
-                          onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
-                        >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
-                      </span>
-                    </span>
-                    <select name="cordHoleWall" onchange={updateCordHoleWall}>
-                      {#each cordHoleWalls as wall}
-                        <option value={wall} selected={settings.cordHoleWall === wall}>{wall === "none" ? "None" : titleCase(wall)}</option>
-                      {/each}
-                    </select>
-                  </label>
                   {#if settings.cordHoleWall !== "none"}
                     <label class="field">
-                      <span>Cord hole diameter</span>
+                      <span>
+                        Cord hole diameter
+                        <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
+                          <button
+                            type="button"
+                            aria-label="What does the power cord pass-through do?"
+                            aria-describedby="info-cordHoleDiameter"
+                            aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
+                            onclick={() => toggleInfoTip("info-cordHoleDiameter")}
+                            onblur={() => closeInfoTip("info-cordHoleDiameter")}
+                            onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
+                          >i</button>
+                          <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
+                        </span>
+                      </span>
                       <span class="input-shell">
                         <input
                           type="number"
@@ -1494,29 +1497,6 @@
                           inputmode="decimal"
                           value={settings.cordHoleDiameter}
                           onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                        />
-                        <small>mm</small>
-                      </span>
-                    </label>
-                    <label class="field">
-                      <span>Cord position</span>
-                      <select name="cordHoleSide" onchange={updateCordHoleSide}>
-                        {#each cordHoleSides as side}
-                          <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
-                        {/each}
-                      </select>
-                    </label>
-                    <label class="field">
-                      <span>Cord corner offset</span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name="cordHoleCornerOffset"
-                          min="0"
-                          step="1"
-                          inputmode="numeric"
-                          value={settings.cordHoleCornerOffset}
-                          onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
                         />
                         <small>mm</small>
                       </span>
@@ -1532,15 +1512,27 @@
                       />
                       <span>Honeycomb grill</span>
                     </label>
-                    {#if settings.hexGrill}
-                      {#each tempestHexGrillControls as control}
+                  {/if}
+
+                  <button
+                    type="button"
+                    class="advanced-accordion-toggle"
+                    aria-expanded={showTempestAdvanced}
+                    onclick={() => (showTempestAdvanced = !showTempestAdvanced)}
+                  >
+                    <span class="eyebrow">Advanced</span>
+                    <svg class="advanced-accordion-chevron" class:is-open={showTempestAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
+                  </button>
+
+                  {#if showTempestAdvanced}
+                    <div data-tempest-advanced-controls>
+                      {#each visibleGeometryControls as control}
                         <label class="field">
                           <span>{control.label}</span>
                           <span class="input-shell">
                             <input
                               type="number"
                               name={control.name}
-                              min="0"
                               step={control.step}
                               inputmode="decimal"
                               value={settings[control.name]}
@@ -1550,7 +1542,59 @@
                           </span>
                         </label>
                       {/each}
-                    {/if}
+                      <label class="field">
+                        <span>Power cord wall</span>
+                        <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                          {#each cordHoleWalls as wall}
+                            <option value={wall} selected={settings.cordHoleWall === wall}>{wall === "none" ? "None" : titleCase(wall)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                      {#if settings.cordHoleWall !== "none"}
+                        <label class="field">
+                          <span>Cord position</span>
+                          <select name="cordHoleSide" onchange={updateCordHoleSide}>
+                            {#each cordHoleSides as side}
+                              <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
+                            {/each}
+                          </select>
+                        </label>
+                        <label class="field">
+                          <span>Cord corner offset</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name="cordHoleCornerOffset"
+                              min="0"
+                              step="1"
+                              inputmode="numeric"
+                              value={settings.cordHoleCornerOffset}
+                              onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
+                            />
+                            <small>mm</small>
+                          </span>
+                        </label>
+                      {/if}
+                      {#if showHexGrillControls && settings.hexGrill}
+                        {#each tempestHexGrillControls as control}
+                          <label class="field">
+                            <span>{control.label}</span>
+                            <span class="input-shell">
+                              <input
+                                type="number"
+                                name={control.name}
+                                min="0"
+                                step={control.step}
+                                inputmode="decimal"
+                                value={settings[control.name]}
+                                onchange={(event) => updateNumberSetting(control.name, event)}
+                              />
+                              <small>{control.suffix}</small>
+                            </span>
+                          </label>
+                        {/each}
+                      {/if}
+                    </div>
                   {/if}
                 </div>
               {/if}
