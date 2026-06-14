@@ -24,7 +24,7 @@ describe("tempest per-wall fan placement (1-top / 2-sandwich)", () => {
     const fan = createTempestSettingsFromLayout(
       createLayout(decodeSettings(`${sandwich}&fansTop=2&fansLeft=-1`)),
     ).fan;
-    expect(fan.wallRequests.front).toEqual({ type: "fixed", count: 2 }); // top -> front
+    expect(fan.wallRequests.back).toEqual({ type: "fixed", count: 2 }); // "Top" -> back wall (visual top)
     expect(fan.wallRequests.left.type).toBe("automatic"); // -1 -> automatic
   });
 

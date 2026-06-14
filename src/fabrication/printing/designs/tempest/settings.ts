@@ -29,8 +29,12 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
         design.arrangement === "four-side-filter-tower"
           ? defaultTempestSettings.fan.wallRequests
           : {
-              front: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.top),
-              back: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.bottom),
+              // The preview renders the back wall (y=Y) at the visual top and the
+              // front wall (y=0) at the visual bottom, so map the "Top" control to
+              // the back wall and "Bottom" to the front wall to match what the user
+              // sees.
+              front: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.bottom),
+              back: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.top),
               left: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.left),
               right: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.right),
             },
