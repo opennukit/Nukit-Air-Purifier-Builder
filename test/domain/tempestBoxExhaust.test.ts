@@ -10,32 +10,32 @@ const towerBoxExhaust =
 
 describe("tempest box/exhaust settings", () => {
   test("the width-derived diameters become the fan hole and ring radii", () => {
-    // boxExhaustDiametersForWidth(300): fan hole 225, ring 1 124, ring 2 135.
+    // boxExhaustDiametersForWidth(300): fan hole 225, ring 1 300, ring 2 360.
     const url =
-      "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25&boxFanHoleSize=225&boxRingOneDiameter=124&boxRingTwoDiameter=135";
+      "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25&boxFanHoleSize=225&boxRingOneDiameter=300&boxRingTwoDiameter=360";
     const fan = createTempestSettingsFromLayout(createLayout(decodeSettings(url))).fan;
     expect(fan.topExhaust).toBe("box-exhaust");
     expect(fan.boxExhaust.fanHoleSize).toBe(225); // 75% of 300
-    expect(fan.boxExhaust.ringOne.radius).toBe(62); // diameter 124 / 2
-    expect(fan.boxExhaust.ringTwo.radius).toBe(67.5); // diameter 135 / 2
+    expect(fan.boxExhaust.ringOne.radius).toBe(150); // diameter 300 / 2 -> 50% of 300
+    expect(fan.boxExhaust.ringTwo.radius).toBe(180); // diameter 360 / 2 -> 60% of 300
     expect(fan.boxExhaust.ringOne.screwHoles).toBe(4);
     expect(fan.boxExhaust.ringOne.screwDiameter).toBe(6);
   });
 
-  test("the helper sets fan hole 75% of width and ring radii 55% / 60% of the fan-hole radius", () => {
-    // width 300 -> fan hole 225; ring diameters 55% / 60% of 225 -> 124 / 135.
+  test("the helper sets fan hole 75% of width and ring radii 50% / 60% of the width", () => {
+    // width 300 -> fan hole 225; ring diameters 100% / 120% of 300 -> 300 / 360.
     expect(boxExhaustDiametersForWidth(300)).toEqual({
       boxFanHoleSize: 225,
-      boxRingOneDiameter: 124,
-      boxRingTwoDiameter: 135,
+      boxRingOneDiameter: 300,
+      boxRingTwoDiameter: 360,
     });
   });
 
-  test("a non-positive diameter falls back to a fan-hole-radius-derived ring radius", () => {
+  test("a non-positive diameter falls back to the width-derived ring radius", () => {
     const fan = createTempestSettingsFromLayout(
-      createLayout(decodeSettings(`${towerBoxExhaust}&boxFanHoleSize=200&boxRingOneDiameter=0&boxRingTwoScrewHoles=6`)),
+      createLayout(decodeSettings(`${towerBoxExhaust}&boxRingOneDiameter=0&boxRingTwoScrewHoles=6`)),
     ).fan;
-    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(0.55 * 100, 1); // 55% of the 100 mm fan-hole radius
+    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(0.5 * 300, 1); // 50% of width
     expect(fan.boxExhaust.ringTwo.screwHoles).toBe(6);
   });
 
