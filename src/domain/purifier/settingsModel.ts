@@ -700,18 +700,19 @@ export function canonicalTempestDesign(
 }
 
 // Box/exhaust sizes auto-populate from the filter width: the central fan hole is
-// 75% of the width and the two screw rings are 84% / 90% (diameters), so their
-// radii land at 42% / 45% of the width. These are concrete numbers the UI shows
-// and only refreshes when the filter width changes.
+// 75% of the width, and the two screw-ring radii are 55% / 60% of the fan-hole
+// radius (so the ring diameters are 55% / 60% of the fan-hole diameter). These
+// are concrete numbers the UI shows and only refreshes when the width changes.
 export function boxExhaustDiametersForWidth(width: Millimeters): {
   readonly boxFanHoleSize: Millimeters;
   readonly boxRingOneDiameter: Millimeters;
   readonly boxRingTwoDiameter: Millimeters;
 } {
+  const boxFanHoleSize = Math.round(0.75 * width);
   return {
-    boxFanHoleSize: Math.round(0.75 * width),
-    boxRingOneDiameter: Math.round(0.84 * width),
-    boxRingTwoDiameter: Math.round(0.9 * width),
+    boxFanHoleSize,
+    boxRingOneDiameter: Math.round(0.55 * boxFanHoleSize),
+    boxRingTwoDiameter: Math.round(0.6 * boxFanHoleSize),
   };
 }
 
