@@ -132,6 +132,14 @@
     | { readonly type: "building"; readonly key: string }
     | { readonly type: "failed"; readonly key: string; readonly message: string };
 
+  // The result of asking for the current settings' plan. "superseded" is a
+  // normal outcome (the settings changed mid-build), distinct from a real
+  // "failed" — the Download path must not show an error for it.
+  type PlanRequestOutcome =
+    | { readonly type: "ready"; readonly plan: PrintableSheetPlan }
+    | { readonly type: "failed" }
+    | { readonly type: "superseded" };
+
   // #######################################
   // Svelte State
   // #######################################
@@ -178,9 +186,10 @@
   // In-flight split-plan builds keyed by cacheKey, so a second caller for the
   // same key (e.g. a Download click during a background build) awaits the same
   // build instead of starting a redundant one. Cleared when the build settles.
-  const inFlightPlanByCacheKey = new Map<string, Promise<PrintableSheetPlan | null>>();
+  const inFlightPlanByCacheKey = new Map<string, Promise<PlanRequestOutcome>>();
   // Reported up by PurifierPreview about its assembled tempest kit build.
-  let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  type AssembledBuildPhase = "idle" | "building" | "failed";
+  let assembledPreviewBuildPhase: AssembledBuildPhase = "idle";
   // Flips true the first time the assembled preview reports a rendered model
   // ("idle"). The split plan only background-builds after this, so it never
   // competes with the initial unsplit build for the worker.
@@ -250,11 +259,18 @@
   // The sheet-plan half only counts for 3D printing: the laser path renders
   // synchronously, so no pill or overlay belongs there even if a print build
   // is still settling in the background.
+  // Only a build for the settings currently on screen counts: a background
+  // build for some other key (e.g. one left mid-flight when the user switched
+  // back to an already-cached setting) must not light the "Updating…" pill.
   $: isPreviewUpdating =
-    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "building") ||
+    (fabricationMethod === "print-3mf" &&
+      printSheetKitBuild.type === "building" &&
+      printSheetKitBuild.key === printKitCacheKey(layout.rawSettings, printVolumePresetId)) ||
     assembledPreviewBuildPhase === "building";
   $: hasPreviewBuildFailure =
-    (fabricationMethod === "print-3mf" && printSheetKitBuild.type === "failed") ||
+    (fabricationMethod === "print-3mf" &&
+      printSheetKitBuild.type === "failed" &&
+      printSheetKitBuild.key === printKitCacheKey(layout.rawSettings, printVolumePresetId)) ||
     assembledPreviewBuildPhase === "failed";
   $: if (isPreviewUpdating && firstPreviewBuild === "not-started") {
     firstPreviewBuild = "in-progress";
@@ -510,9 +526,10 @@
     }
   }
 
-  // A tap anywhere outside the open tip closes it. iOS Safari never focuses the
-  // button on tap, so the button's own blur can't be relied on to dismiss it.
-  function closeInfoTipOnOutsidePointer(event: Event): void {
+  // Closes the open tip when a tap or focus lands outside it. iOS Safari never
+  // focuses the button on tap, so the button's own blur can't dismiss it; this
+  // covers both the pointerdown (touch/mouse) and focusin (keyboard) paths.
+  function closeInfoTipIfOutside(event: Event): void {
     if (openInfoTipId === null) {
       return;
     }
@@ -524,18 +541,6 @@
 
   function closeInfoTipOnEscape(event: KeyboardEvent): void {
     if (event.key === "Escape") {
-      openInfoTipId = null;
-    }
-  }
-
-  // Keyboard dismissal: moving focus out of the open tip closes it (the button
-  // blur this replaces no longer fires reliably on touch).
-  function closeInfoTipOnOutsideFocus(event: FocusEvent): void {
-    if (openInfoTipId === null) {
-      return;
-    }
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest(".info-tip") === null) {
       openInfoTipId = null;
     }
   }
@@ -672,12 +677,18 @@
       showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
     }
     try {
-      const plan = await ensurePlanForCurrentSettings();
-      if (plan === null) {
+      const outcome = await ensurePlanForCurrentSettings();
+      if (outcome.type === "failed") {
         showTransientButtonLabel(buttonKey, "Build failed", 1600);
         return;
       }
-      downloadPrintKit(currentLayout, plan);
+      if (outcome.type === "superseded") {
+        // The settings changed while this build was in flight; the new plan is
+        // already building, so just drop the label — no false error.
+        clearTransientButtonLabel(buttonKey);
+        return;
+      }
+      downloadPrintKit(currentLayout, outcome.plan);
       clearTransientButtonLabel(buttonKey);
     } finally {
       exportInProgress = false;
@@ -779,7 +790,7 @@
   // on error. The first "idle" therefore marks the first assembled render as
   // done — the gate that lets the split plan background-build without racing
   // the initial unsplit build for the worker.
-  function handleAssembledBuildPhaseChange(phase: "idle" | "building" | "failed"): void {
+  function handleAssembledBuildPhaseChange(phase: AssembledBuildPhase): void {
     assembledPreviewBuildPhase = phase;
     if (phase === "idle") {
       assembledFirstRenderDone = true;
@@ -830,7 +841,7 @@
   // reuse that in-flight build for any concurrent caller (background resolve
   // and a Download click share it). Warms the cache and, when the key still
   // answers the current settings, puts the plan on screen.
-  function ensurePlanForCurrentSettings(): Promise<PrintableSheetPlan | null> {
+  function ensurePlanForCurrentSettings(): Promise<PlanRequestOutcome> {
     const currentLayout = layout;
     const currentPrintVolumePresetId = printVolumePresetId;
     const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
@@ -839,7 +850,7 @@
       if (printSheetKitBuild.type === "failed") {
         printSheetKitBuild = { type: "idle" };
       }
-      return Promise.resolve(cachedPlan);
+      return Promise.resolve({ type: "ready", plan: cachedPlan });
     }
     const inFlight = inFlightPlanByCacheKey.get(cacheKey);
     if (inFlight !== undefined) {
@@ -848,20 +859,20 @@
     // A recorded failure for this key blocks rebuilds until the user retries
     // (retryFailedPreviewBuild) or the settings change; honor that here too.
     if (printSheetKitBuild.type === "failed" && printSheetKitBuild.key === cacheKey) {
-      return Promise.resolve(null);
+      return Promise.resolve({ type: "failed" });
     }
     printSheetKitBuild = { type: "building", key: cacheKey };
-    const build = printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
+    const build = printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome): PlanRequestOutcome => {
       inFlightPlanByCacheKey.delete(cacheKey);
       // A superseded request was replaced by a newer one that now owns the
       // build state, so it changes nothing here.
       if (outcome.type === "superseded") {
-        return null;
+        return { type: "superseded" };
       }
       if (outcome.type === "failed") {
         console.error(`ensurePlanForCurrentSettings: print kit build failed: ${outcome.message}`);
         printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
-        return null;
+        return { type: "failed" };
       }
       const plan = createPrintableSheetPlanFromKit(outcome.kit);
       generatedPrintSheetPlanCache.set(cacheKey, plan);
@@ -872,7 +883,7 @@
       if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
         generatedPrintSheetPlan = plan;
       }
-      return plan;
+      return { type: "ready", plan };
     });
     inFlightPlanByCacheKey.set(cacheKey, build);
     return build;
@@ -896,8 +907,8 @@
 </script>
 
 <svelte:window
-  onpointerdown={closeInfoTipOnOutsidePointer}
-  onfocusin={closeInfoTipOnOutsideFocus}
+  onpointerdown={closeInfoTipIfOutside}
+  onfocusin={closeInfoTipIfOutside}
   onkeydown={closeInfoTipOnEscape}
 />
 
