@@ -44,14 +44,6 @@
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
   import {
-    dimensionInputStep,
-    dimensionUnits,
-    displayValueToMillimeters,
-    filterDimensionDisplayValue,
-    millimetersToDisplayValue,
-    type DimensionUnit,
-  } from "@/app/controls/dimensionUnits";
-  import {
     fanSizeChoiceForDiameter,
     recommendedFanDiameterOptions,
     type FanSizeChoice,
@@ -208,9 +200,6 @@
   // UI-only: keeps the "Custom" size segment active while the typed diameter
   // still matches a recommended size; the settings store only the diameter.
   let customFanSizePinned = false;
-  // UI-only display unit for the measured filter dimension inputs; the
-  // settings and share URLs always store millimeters.
-  let dimensionUnit: DimensionUnit = "mm";
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
   let isStaticReferenceControlsActive = false;
   let showCutSheetPreviewMode = false;
@@ -391,9 +380,14 @@
     name: FilterDimensionName | DonutFilterDimensionName,
     event: Event,
   ): void {
-    const entered = readDimensionInputMillimeters(event, settings[name]);
-    // Filter measurements are whole millimetres; inches keep their decimals.
-    const value = filterDimensionNames.has(name) && dimensionUnit === "mm" ? Math.round(entered) : entered;
+    const entered = readNumberInput(event, Number.NaN);
+    if (Number.isNaN(entered)) {
+      return;
+    }
+    // All measurements are millimetres (no unit toggle). The rectangular filter
+    // dimensions are whole millimetres; the round-shaped donut filter keeps its
+    // decimals.
+    const value = filterDimensionNames.has(name) ? Math.round(entered) : entered;
     commitSettings({
       ...settings,
       [name]: value,
@@ -408,16 +402,6 @@
       ...settings,
       [name]: readNumberInput(event, settings[name]),
     });
-  }
-
-  // Reads a dimension input in the active display unit and converts it back
-  // to the canonical millimeter value; invalid input keeps the stored value.
-  function readDimensionInputMillimeters(event: Event, storedMillimeters: number): number {
-    const enteredDisplayValue = readNumberInput(event, Number.NaN);
-    if (Number.isNaN(enteredDisplayValue)) {
-      return storedMillimeters;
-    }
-    return displayValueToMillimeters(enteredDisplayValue, dimensionUnit);
   }
 
   function updateNumberSetting(name: NumericSettingName, event: Event): void {
@@ -1205,44 +1189,13 @@
                 Get your filter and fans first, measure them, then enter the numbers here.
               </p>
               <div data-generated-part-controls>
-                <fieldset class="segmented-field">
-                  <legend>
-                    <span class="legend-row">
-                      Measurement unit
-                      <span class="info-tip" class:is-open={openInfoTipId === "measureInfoNote"}>
-                        <button
-                          type="button"
-                          aria-label="Why measure instead of using the printed label?"
-                          aria-describedby="measureInfoNote"
-                          aria-expanded={openInfoTipId === "measureInfoNote"}
-                          onclick={() => toggleInfoTip("measureInfoNote")}
-                          onblur={() => closeInfoTip("measureInfoNote")}
-                          onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
-                        >i</button>
-                        <p id="measureInfoNote" role="tooltip">
-                          <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
-                          actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
-                          vary by a few millimeters. Measure your filter and enter the real numbers.
-                        </p>
-                      </span>
-                    </span>
-                  </legend>
-                  <div>
-                    {#each dimensionUnits as unit}
-                      <label>
-                        <input
-                          type="radio"
-                          name="dimensionUnit"
-                          value={unit}
-                          checked={dimensionUnit === unit}
-                          onchange={() => (dimensionUnit = unit)}
-                        />
-                        <span>{unit}</span>
-                      </label>
-                    {/each}
-                  </div>
-                </fieldset>
-
+                <!--
+                  Measurements are millimetres only — there is intentionally no
+                  mm/in unit toggle. Filters are labelled with nominal sizes in
+                  inches (a "20x25x1" is really ~622 x 495 x 19 mm), so an inch
+                  field invites entering the nominal label instead of the actual
+                  measured size. Millimetres push people to measure the real part.
+                -->
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
                     <div class="custom-dimensions" data-custom-filter-dimensions>
@@ -1253,13 +1206,13 @@
                             <input
                               type="number"
                               name={control.name}
-                              step={dimensionInputStep(control.step, dimensionUnit)}
-                              max={dimensionUnit === "mm" ? "999" : undefined}
-                              inputmode={dimensionUnit === "mm" ? "numeric" : "decimal"}
-                              value={filterDimensionDisplayValue(settings[control.name], dimensionUnit)}
+                              step={control.step}
+                              max="999"
+                              inputmode="numeric"
+                              value={Math.round(settings[control.name])}
                               onchange={(event) => updateMeasuredDimension(control.name, event)}
                             />
-                            <small>{dimensionUnit}</small>
+                            <small>mm</small>
                           </span>
                         </label>
                       {/each}
@@ -1277,12 +1230,12 @@
                             <input
                               type="number"
                               name={control.name}
-                              step={dimensionInputStep(control.step, dimensionUnit)}
+                              step={control.step}
                               inputmode="decimal"
-                              value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                              value={settings[control.name]}
                               onchange={(event) => updateMeasuredDimension(control.name, event)}
                             />
-                            <small>{dimensionUnit}</small>
+                            <small>mm</small>
                           </span>
                         </label>
                       {/each}

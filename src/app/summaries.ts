@@ -332,7 +332,10 @@ function laserSheetPartsItems(
 }
 
 function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
-  return `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`;
+  // Filters are entered as whole measured millimetres, so the summary shows them
+  // rounded — no stray decimal from a value pasted in via a shared URL.
+  const whole = (value: number) => formatMillimeters(Math.round(value));
+  return `${whole(currentSettings.filterWidth)} x ${whole(currentSettings.filterDepth)} x ${whole(currentSettings.filterThickness)}`;
 }
 
 // The static design's recommended filter has a nominal trade size; once the
