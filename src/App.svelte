@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy } from "svelte";
   import {
     normalizePurifierDraft,
     printDesignIdForPurifierDraft,
@@ -168,8 +168,6 @@
   let workbenchState: WorkbenchState = initialSession.workbenchState;
   let workbenchView: WorkbenchViewModel = createWorkbenchViewModel(draft, workbenchState);
   let printDesignSettingsMemory: PrintDesignSettingsMemory = createPrintDesignSettingsMemory(draft);
-  let sheetDialog: HTMLDialogElement;
-  let isSheetDialogOpen = false;
   let transientButtonLabels: TransientButtonLabels = {};
   const transientLabelTimers = new Map<TransientButtonKey, number>();
   // A few warm plans, keyed like the assembled-kit cache, so toggling between
@@ -717,35 +715,6 @@
     }
   }
 
-  function openSheetDialog(): void {
-    if (previewMode === "enclosure") {
-      return;
-    }
-    isSheetDialogOpen = true;
-    void tick().then(() => {
-      if (!sheetDialog.open) {
-        sheetDialog.showModal();
-      }
-    });
-  }
-
-  function closeSheetDialog(): void {
-    isSheetDialogOpen = false;
-    if (sheetDialog.open) {
-      sheetDialog.close();
-    }
-  }
-
-  function handleDialogClose(): void {
-    isSheetDialogOpen = false;
-  }
-
-  function closeDialogOnBackdrop(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      closeSheetDialog();
-    }
-  }
-
   function flashDownloadButtons(label: string): void {
     showTransientButtonLabel("export-main", label, 1400);
     showTransientButtonLabel("export-mobile", label, 1400);
@@ -1021,18 +990,6 @@
               </button>
             {/if}
           </div>
-          <span class="preview-toolbar-action-slot">
-            <button
-              class="ghost-button preview-large-view-button"
-              type="button"
-              disabled={previewMode === "enclosure"}
-              aria-hidden={previewMode === "enclosure"}
-              tabindex={previewMode === "enclosure" ? -1 : 0}
-              onclick={openSheetDialog}
-            >
-              Open large view
-            </button>
-          </span>
         </div>
 
         <div
@@ -1764,42 +1721,6 @@
       </aside>
     </section>
   </section>
-
-  <!-- #######################################
-  Sheet Dialog
-  ####################################### -->
-
-  <dialog
-    class="sheet-dialog"
-    id="sheetDialog"
-    aria-labelledby="sheetDialogTitle"
-    bind:this={sheetDialog}
-    onclose={handleDialogClose}
-    onclick={closeDialogOnBackdrop}
-  >
-    <div class="sheet-dialog-surface">
-      <header class="sheet-dialog-bar">
-        <div>
-          <p class="eyebrow" id="sheetDialogEyebrow">{previewMode === "print-sheets" ? "3D printing" : "Laser cutting"}</p>
-          <h2 id="sheetDialogTitle">{previewMode === "print-sheets" ? "Print plates" : "Laser drawing"}</h2>
-        </div>
-        <button class="ghost-button" type="button" onclick={closeSheetDialog}>Close</button>
-      </header>
-      <div class="sheet-dialog-preview" id="sheetDialogPreview">
-        {#if isSheetDialogOpen}
-          {#if previewMode === "print-sheets" && activePrintSheetPlan !== null}
-            <PrintSheetPreview
-              plan={activePrintSheetPlan}
-              label="3D print plate dialog preview"
-              className="print-sheet-dialog-host"
-            />
-          {:else}
-            {@html createLaserSvg(layout)}
-          {/if}
-        {/if}
-      </div>
-    </div>
-  </dialog>
 
   <!-- #######################################
   Mobile Actions
