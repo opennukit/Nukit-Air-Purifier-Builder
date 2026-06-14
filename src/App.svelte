@@ -187,6 +187,9 @@
   // ("idle"). The split plan only background-builds after this, so it never
   // competes with the initial unsplit build for the worker.
   let assembledFirstRenderDone = false;
+  // Guards the Download button against a re-entrant click while the plan for
+  // the current settings is still being prepared (which would download twice).
+  let exportInProgress = false;
   let purifierPreview: PurifierPreview | undefined;
   // First load shows a centered "Building model…" state until the first build
   // SUCCEEDS; after that, rebuilds only show the corner pill over the old
@@ -641,14 +644,24 @@
       showTransientButtonLabel(buttonKey, "Opened source files", 1400);
       return;
     }
-    showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
-    const plan = await ensurePlanForCurrentSettings();
-    if (plan === null) {
-      showTransientButtonLabel(buttonKey, "Build failed", 1600);
+    // A second click while the plan is still being prepared would download the
+    // file twice, so ignore re-entry until this export settles.
+    if (exportInProgress) {
       return;
     }
-    downloadPrintKit(currentLayout, plan);
-    showTransientButtonLabel(buttonKey, "Downloaded 3MF", 1400);
+    exportInProgress = true;
+    showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
+    try {
+      const plan = await ensurePlanForCurrentSettings();
+      if (plan === null) {
+        showTransientButtonLabel(buttonKey, "Build failed", 1600);
+        return;
+      }
+      downloadPrintKit(currentLayout, plan);
+      showTransientButtonLabel(buttonKey, "Downloaded 3MF", 1400);
+    } finally {
+      exportInProgress = false;
+    }
   }
 
   function downloadPrintKit(currentLayout: LayoutResult, plan: PrintableSheetPlan): void {
