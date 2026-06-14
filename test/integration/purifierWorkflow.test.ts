@@ -244,7 +244,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(previewEdgesEnabled.showPreviewEdges).toBe(true);
     expect("showPrintSeams" in removedPrintSeams).toBe(false);
     expect(encodeSettings(removedPrintSeams)).not.toContain("showPrintSeams");
-    expect(defaultPreviewColor.previewMaterialColor).toBe("matte-black");
+    expect(defaultPreviewColor.previewMaterialColor).toBe("matte-gray");
     expect(grayPreviewColor.previewMaterialColor).toBe("matte-gray");
     expect(previewColor.previewMaterialColor).toBe("natural-tan");
     expect(invalidPreviewColor.previewMaterialColor).toBe(defaultSettings.previewMaterialColor);

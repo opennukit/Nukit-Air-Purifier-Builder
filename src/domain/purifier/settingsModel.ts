@@ -137,18 +137,18 @@ export type EnclosurePreviewOptions = {
 };
 
 export const previewMaterialColorPresets = [
-  { id: "matte-black", label: "Black", color: 0x111817 },
   { id: "matte-gray", label: "Gray", color: 0x82858a },
   { id: "warm-white", label: "White", color: 0xf3f0e6 },
   { id: "natural-tan", label: "Tan", color: 0xc7965a },
   { id: "forest-green", label: "Green", color: 0x1f6f56 },
+  { id: "matte-black", label: "Black", color: 0x111817 },
 ] as const;
 
 export type PreviewMaterialColorPreset =
   (typeof previewMaterialColorPresets)[number];
 export type PreviewMaterialColorId = PreviewMaterialColorPreset["id"];
 
-const defaultPreviewMaterialColorId: PreviewMaterialColorId = "matte-black";
+const defaultPreviewMaterialColorId: PreviewMaterialColorId = "matte-gray";
 
 export type CutSheetPreviewOptions = {
   readonly showLabels: boolean;
