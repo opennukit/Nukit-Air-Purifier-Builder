@@ -815,6 +815,9 @@ Panel Grids
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  /* Laser mode has no Printer section, leaving the top-right cell empty; dense
+  packing pulls the next section up into it instead of dropping a gap. */
+  grid-auto-flow: dense;
 }
 
 .parts-section {

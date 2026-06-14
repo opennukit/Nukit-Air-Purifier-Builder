@@ -1200,7 +1200,6 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section layout-section" data-generated-layout-controls>
               <div class="section-heading">
-                <p class="eyebrow">Layout</p>
                 <h2 id="layoutSectionTitle">{layoutSectionTitleText}</h2>
               </div>
               <div class="fan-grid">
@@ -1319,7 +1318,6 @@
           {#if showPrintSetupControls}
             <section class="control-section print-volume-section" data-print-volume-section>
               <div class="section-heading">
-                <p class="eyebrow">Printer</p>
                 <h2>Print setup</h2>
               </div>
               <div data-print-volume-control>
@@ -1338,7 +1336,6 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section parts-section">
               <div class="section-heading">
-                <p class="eyebrow">Parts</p>
                 <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
               </div>
               <p class="section-note">
@@ -1504,7 +1501,6 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
-                <p class="eyebrow">Geometry</p>
                 <h2>Material and fit</h2>
               </div>
               {#each generatedGeometryControls as control}
@@ -1619,7 +1615,6 @@
           {#if fabricationMethod === "laser-svg"}
             <section class="control-section laser-output-section" data-laser-output-controls>
               <div class="section-heading">
-                <p class="eyebrow">Laser setup</p>
                 <h2>Drawing output</h2>
               </div>
               <label class="toggle-field">
@@ -1651,7 +1646,6 @@
           {#if showAdvancedControls}
             <section class="control-section joint-tuning-section" data-generated-advanced-controls>
               <div class="section-heading">
-                <p class="eyebrow">Advanced</p>
                 <h2>Joint tuning</h2>
               </div>
               <div class="advanced-field-grid">
