@@ -72,14 +72,14 @@ export function createPreviewSummaryItems(
       return [
         { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
         { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-        { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
+        { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan, currentLayout.configuration.cutting.materialThickness) },
         { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
       ];
     }
     return [
       { label: "Print plates", value: planValue(currentGeneratedPlan, (plan) => String(plan.sheets.length)) },
       { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan, currentLayout.configuration.cutting.materialThickness) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -106,7 +106,7 @@ export function createPreviewSummaryItems(
       { label: "Center hole", value: formatMillimeters(model.filter.holeDiameter) },
       { label: "Fan", value: `${model.fanSize} mm` },
       { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan, currentLayout.configuration.cutting.materialThickness) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -118,7 +118,7 @@ export function createPreviewSummaryItems(
       { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan) },
+      { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan, currentLayout.configuration.cutting.materialThickness) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
     ];
   }
@@ -143,10 +143,12 @@ function planValue(plan: PrintableSheetPlan | null, read: (plan: PrintableSheetP
   return plan === null ? "…" : read(plan);
 }
 
-// The preview "Filament" row: the kit's true material volume as an "about N g"
-// estimate once the lazy plan exists, the pending placeholder until then.
-function filamentSummaryValue(plan: PrintableSheetPlan | null): string {
-  return planValue(plan, (built) => formatGrams(filamentGramsFromVolume(built.kit.summary.materialVolumeMm3)));
+// The preview "Filament" row: the infill-discounted estimate once the lazy
+// plan exists, the pending placeholder until then.
+function filamentSummaryValue(plan: PrintableSheetPlan | null, wallThicknessMm: number): string {
+  return planValue(plan, (built) =>
+    formatGrams(filamentGramsFromVolume(built.kit.summary.materialVolumeMm3, wallThicknessMm)),
+  );
 }
 
 // Attribution row for curated static designs; omitted when neither the
@@ -180,12 +182,31 @@ const FAN_POWER_NOTE = "4-pin PWM, 12 V";
 // Solid PLA is ~1.24 g/cm^3; PETG (~1.27) is within the ballpark, so one
 // constant covers the "A spool of PLA or PETG" estimate.
 const FILAMENT_DENSITY_G_PER_CM3 = 1.24;
+// A maker does not print these walls 100% solid, so the kit's true (solid)
+// material volume overstates filament use by ~2x. Model a typical sliced wall:
+// the perimeter shells print solid on both faces, the enclosed core fills at a
+// sparse infill fraction. Thin walls are nearly all perimeter (factor -> 1);
+// thick walls benefit most from infill.
+const FILAMENT_INFILL_FRACTION = 0.15;
+const PRINT_PERIMETER_COUNT = 2;
+const PRINT_LINE_WIDTH_MM = 0.45;
+const FILAMENT_INFILL_PERCENT_LABEL = `~${Math.round(FILAMENT_INFILL_FRACTION * 100)}% infill`;
 
-// Solid-mesh grams from the kit's true material volume. The result is an
-// upper bound on filament use (no infill/wall hollowing) so it reads as
-// "about", deliberately approximate.
-function filamentGramsFromVolume(materialVolumeMm3: number): number {
-  return (materialVolumeMm3 / 1000) * FILAMENT_DENSITY_G_PER_CM3;
+// Fraction of a solid wall of the given thickness that ends up as deposited
+// filament once sliced with the assumptions above.
+function printedSolidFraction(wallThicknessMm: number): number {
+  if (wallThicknessMm <= 0) {
+    return 1;
+  }
+  const perimeterSolidMm = Math.min(wallThicknessMm, 2 * PRINT_PERIMETER_COUNT * PRINT_LINE_WIDTH_MM);
+  const coreMm = wallThicknessMm - perimeterSolidMm;
+  return (perimeterSolidMm + coreMm * FILAMENT_INFILL_FRACTION) / wallThicknessMm;
+}
+
+// Approximate deposited-filament grams from the kit's solid material volume,
+// discounted by the sliced wall model. Deliberately a ballpark — reads "about".
+function filamentGramsFromVolume(materialVolumeMm3: number, wallThicknessMm: number): number {
+  return (materialVolumeMm3 / 1000) * FILAMENT_DENSITY_G_PER_CM3 * printedSolidFraction(wallThicknessMm);
 }
 
 // A ballpark figure a maker can act on: round to the nearest 5 g under a
@@ -268,7 +289,7 @@ export function createPartsListItems(
         label: "Round HEPA filter",
         detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
       },
-      filamentPartsItem(currentGeneratedPlan, "the adaptor, fan guard, and cap"),
+      filamentPartsItem(currentGeneratedPlan, "the adaptor, fan guard, and cap", currentLayout.configuration.cutting.materialThickness),
       ...baseItems,
       {
         category: "Seal",
@@ -301,11 +322,15 @@ export function createPartsListItems(
   ];
 }
 
-// The filament line for a generated print: once a plan exists the kit's true
-// material volume gives an "about N g" estimate; until the lazy build lands
-// (plan null) it stays the generic spool line. `usage` names what prints, so
-// the detail reads naturally for either design.
-function filamentPartsItem(plan: PrintableSheetPlan | null, usage: string): PartsListItem {
+// The filament line for a generated print: once a plan exists the kit's
+// material volume gives an "about N g" estimate, discounted for sparse infill;
+// until the lazy build lands (plan null) it stays the generic spool line.
+// `usage` names what prints so the placeholder reads naturally for either design.
+function filamentPartsItem(
+  plan: PrintableSheetPlan | null,
+  usage: string,
+  wallThicknessMm: number,
+): PartsListItem {
   if (plan === null) {
     return {
       category: "Filament",
@@ -316,7 +341,7 @@ function filamentPartsItem(plan: PrintableSheetPlan | null, usage: string): Part
   return {
     category: "Filament",
     label: "A spool of PLA or PETG",
-    detail: `${formatGrams(filamentGramsFromVolume(plan.kit.summary.materialVolumeMm3))} of filament for ${usage} (PLA density)`,
+    detail: `${formatGrams(filamentGramsFromVolume(plan.kit.summary.materialVolumeMm3, wallThicknessMm))} at ${FILAMENT_INFILL_PERCENT_LABEL} (PLA density)`,
   };
 }
 
@@ -350,7 +375,7 @@ function tempestPrintPartsItems(
         ]
       : [];
   return [
-    filamentPartsItem(currentGeneratedPlan, "the housing"),
+    filamentPartsItem(currentGeneratedPlan, "the housing", currentLayout.configuration.cutting.materialThickness),
     {
       category: "Fasteners",
       label: "Fan screws",

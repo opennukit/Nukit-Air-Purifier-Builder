@@ -56,9 +56,10 @@ describe("parts list", () => {
     const items = createPartsListItems(tempestLayout, "print-3mf", tempestLayout.rawSettings, "bed-256", plan);
     const filament = items.find((item) => item.category === "Filament");
 
-    // "about 740 g" / "about 1.2 kg" — the figure carries a g or kg unit.
+    // "about 740 g" / "about 1.2 kg" — the figure carries a g or kg unit,
+    // discounted for sparse infill rather than the solid-model upper bound.
     expect(filament?.detail).toMatch(/about [\d.]+ (g|kg)/);
-    expect(filament?.detail).toContain("the housing");
+    expect(filament?.detail).toContain("infill");
   });
 
   test("lists curated source files, filters, fans, and license for a static reference", () => {
