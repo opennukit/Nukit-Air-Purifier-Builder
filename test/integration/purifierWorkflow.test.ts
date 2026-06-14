@@ -19,7 +19,7 @@ import { createLaserSvg, createLayout, requireCutPanelFabricationPlan } from "@/
 import { createAssemblyModel } from "@/fabrication/assemblyModel";
 import { evaluateBuildDiagnostics, summarizeBuildReadiness } from "@/fabrication/buildDiagnostics";
 import { findPrintVolumePreset, partFitsPrintBed } from "@/fabrication/printing/printableKit";
-import { createPrintDesignKit, createPrintDesignThreeMfExport } from "@/fabrication/printing/printDesignKit";
+import { createPrintDesignKit, createPrintDesignThreeMfExport, createPrintDesignThreeMfZip } from "@/fabrication/printing/printDesignKit";
 import { createDonutFilterModel, donutAdapterTotalHeight, donutCapTotalHeight } from "@/domain/designs/donut-filter/model";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
@@ -777,6 +777,57 @@ describe("FilterBoxBuilder purifier workflow", () => {
         expect(bounds.maxX).toBeLessThanOrEqual(sheet.width + 0.01);
         expect(bounds.maxY).toBeLessThanOrEqual(sheet.depth + 0.01);
       }
+    }
+  }, 30000);
+
+  test("exports the print kit as one centered single-object 3MF per chunk inside a ZIP", () => {
+    const layout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const kit = createPrintDesignKit(layout, "bed-256");
+    const zip = createPrintDesignThreeMfZip(layout, "bed-256");
+    const bed = kit.preset.bed;
+    if (bed.type !== "bounded") {
+      throw new Error("expected a bounded bed for the bed-256 preset");
+    }
+
+    expect(zip.filename).toBe("nukit-tempest-print-kit.zip");
+    expect(zip.mimeType).toBe("application/zip");
+    // ZIP local-file-header signature "PK\x03\x04".
+    expect(zip.bytes[0]).toBe(0x50);
+    expect(zip.bytes[1]).toBe(0x4b);
+
+    // One entry per chunk, every entry a distinct .3mf.
+    expect(zip.entries).toHaveLength(kit.parts.length);
+    expect(kit.parts.length).toBeGreaterThan(1);
+    const entryNames = listStoredZipFileNames(zip.bytes);
+    expect(entryNames).toEqual(zip.entries.map((entry) => entry.filename));
+    expect(new Set(entryNames).size).toBe(entryNames.length);
+    expect(entryNames.every((name) => name.endsWith(".3mf"))).toBe(true);
+
+    for (const name of entryNames) {
+      const innerBytes = readStoredZipEntry(zip.bytes, name);
+      // Each chunk is its own single-object 3MF with no plate metadata, so any
+      // slicer loads exactly one part centered on the bed.
+      expect(listStoredZipFileNames(innerBytes)).toEqual(["[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"]);
+      const model = parseThreeMfModel(innerBytes);
+      expect(model.objects).toHaveLength(1);
+      expect(model.buildItems).toHaveLength(1);
+
+      const object = model.objects[0];
+      const buildItem = model.buildItems[0];
+      if (object === undefined || buildItem === undefined) {
+        throw new Error(`Missing object/build item in chunk 3MF ${name}`);
+      }
+      expectTriangleIndicesValid(object);
+
+      const bounds = transformedBounds(meshBounds(object.vertices), buildItem.position);
+      expect(bounds.minX).toBeGreaterThanOrEqual(-0.01);
+      expect(bounds.minY).toBeGreaterThanOrEqual(-0.01);
+      expect(bounds.minZ).toBeGreaterThanOrEqual(-0.01);
+      expect(bounds.maxX).toBeLessThanOrEqual(bed.width + 0.01);
+      expect(bounds.maxY).toBeLessThanOrEqual(bed.depth + 0.01);
+      // Footprint centered on the bed: equal clearance on opposite edges.
+      expect(bounds.minX).toBeCloseTo(bed.width - bounds.maxX, 3);
+      expect(bounds.minY).toBeCloseTo(bed.depth - bounds.maxY, 3);
     }
   }, 30000);
 

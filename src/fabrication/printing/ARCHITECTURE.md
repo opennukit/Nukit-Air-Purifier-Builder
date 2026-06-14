@@ -31,9 +31,17 @@ without touching the model.
         │
         │  printableKit.ts (generic) + printDesignKit.ts (per-design dispatch)
         ▼
-   PrintableKit ──► createPrintDesignThreeMfExport ──► threeMf.ts ──► .3mf
-                    (carries enclosure colour as a 3MF displaycolor)
+   PrintableKit ──► createPrintDesignThreeMfZip ──► threeMf.ts ──► .zip of per-chunk .3mf
+                    (one single-object 3MF per chunk, each centered on
+                     the bed; carries enclosure colour as a 3MF displaycolor)
 ```
+
+The download is **one 3MF per print chunk, bundled in a ZIP** rather than a
+single multi-plate 3MF. Slicers that ignore Bambu/Orca plate metadata
+(PrusaSlicer, Cura) otherwise stack every chunk on one bed, so the kit was
+unprintable there; a lone single-object 3MF places cleanly in every slicer.
+`createPrintDesignThreeMfExport` (the single multi-plate `.3mf`) is retained —
+the in-app print-sheet preview still builds on its sheet plan.
 
 The geometry layer never names a kernel. `buildTempestGeometry` is generic over
 `<Solid, Region>` and takes a `ModelingApi<Solid, Region>`; whichever backend you
@@ -61,9 +69,9 @@ printing/
 │   ├── kitWorker.ts           Web Worker shell: own kernel init + FIFO builds
 │   └── kitWorkerClient.ts     latest-wins channels, dedupe, worker lifecycle
 │
-├── printableKit.ts            generic PrintableKit type + 3MF export from a kit
-├── printDesignKit.ts          dispatch by design id; kit cache key; enclosure colour
-└── threeMf.ts                 write the 3MF package (objects, plates, basematerials)
+├── printableKit.ts            generic PrintableKit type; 3MF export + per-chunk 3MF-in-ZIP export from a kit
+├── printDesignKit.ts          dispatch by design id; kit cache key; enclosure colour; ZIP/3MF exporters
+└── threeMf.ts                 write the 3MF package (objects, plates, basematerials) + stored-ZIP writer
 ```
 
 ## designs/tempest/geometry/ — the parametric shape

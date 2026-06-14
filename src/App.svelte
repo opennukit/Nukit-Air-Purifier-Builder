@@ -108,7 +108,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignThreeMfExportFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignThreeMfZipFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
@@ -221,11 +221,11 @@
   let showAdvancedControls = true;
   let layoutSectionTitleText = "Fan placement";
   let partsSectionTitleText = "Filter and fan";
-  let exportActionText = "Download 3MF";
+  let exportActionText = "Download print kit";
   let copyTopButtonText = "Copy URL";
   let copyMobileButtonText = "Copy URL";
-  let exportMainButtonText = "Download 3MF";
-  let exportMobileButtonText = "Download 3MF";
+  let exportMainButtonText = "Download print kit";
+  let exportMobileButtonText = "Download print kit";
 
   // ##############################
   // Reactive Derivations
@@ -562,7 +562,7 @@
       requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
       return "Still updating…";
     }
-    const printExport = createPrintDesignThreeMfExportFromKit(currentLayout, currentGeneratedPlan.kit);
+    const printExport = createPrintDesignThreeMfZipFromKit(currentLayout, currentGeneratedPlan.kit);
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -572,7 +572,7 @@
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return "Downloaded 3MF";
+    return "Downloaded kit";
   }
 
   function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

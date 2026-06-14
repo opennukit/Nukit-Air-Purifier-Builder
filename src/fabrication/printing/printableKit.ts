@@ -1,4 +1,12 @@
-import { createThreeMfPackage, type MeshObject, type MeshPlate, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
+import {
+  createStoredZipPackage,
+  createThreeMfPackage,
+  type MeshObject,
+  type MeshPlate,
+  type MeshTriangle,
+  type MeshVertex,
+  type StoredZipFile,
+} from "@/fabrication/printing/threeMf";
 
 // #######################################
 // Print Volume Model
@@ -121,6 +129,26 @@ export type PrintableThreeMfExport = {
   readonly bytes: Uint8Array;
   readonly kit: PrintableKit;
   readonly sheetPlan: PrintableSheetPlan;
+};
+
+// One printable part rendered to its own standalone single-object 3MF, named
+// for the file it becomes inside the kit ZIP.
+export type PrintablePartThreeMf = {
+  readonly part: PrintablePart;
+  readonly filename: string;
+  readonly bytes: Uint8Array;
+};
+
+// A kit delivered as one 3MF per part, bundled into a single ZIP. Every slicer
+// reliably loads a single-object 3MF, so splitting the kit this way avoids
+// slicers that ignore Bambu/Orca plate metadata and stack every chunk on one
+// bed.
+export type PrintableThreeMfZip = {
+  readonly filename: string;
+  readonly mimeType: string;
+  readonly bytes: Uint8Array;
+  readonly kit: PrintableKit;
+  readonly entries: readonly PrintablePartThreeMf[];
 };
 
 // ##############################
@@ -290,6 +318,125 @@ export function createPrintableThreeMfExportFromKit(
     kit,
     sheetPlan,
   };
+}
+
+// Build one standalone 3MF per part, each a single object centered on the bed,
+// and bundle them into a single (stored, uncompressed) ZIP. `baseName` is the
+// kit slug used for entry filenames; the returned `filename` is `${baseName}.zip`.
+export function createPrintableThreeMfZipFromKit(
+  kit: PrintableKit,
+  title: string,
+  baseName: string,
+  displayColor?: string,
+): PrintableThreeMfZip {
+  const usedNames = new Set<string>();
+  const entries: PrintablePartThreeMf[] = kit.parts.map((part, index) => {
+    const filename = uniquePartFileName(usedNames, baseName, part, index);
+    return {
+      part,
+      filename,
+      bytes: createPrintablePartThreeMf(part, `${title} – ${part.name}`, kit.preset.bed, displayColor),
+    };
+  });
+
+  const zipFiles: StoredZipFile[] = entries.map((entry) => ({ name: entry.filename, content: entry.bytes }));
+
+  return {
+    filename: `${baseName}.zip`,
+    mimeType: "application/zip",
+    bytes: createStoredZipPackage(zipFiles),
+    kit,
+    entries,
+  };
+}
+
+// A single part as its own 3MF: one object, no plate metadata (every slicer
+// auto-places a lone object), translated so its footprint sits centered on the
+// bed with its base on z=0.
+export function createPrintablePartThreeMf(
+  part: PrintablePart,
+  title: string,
+  bed: PrintBed,
+  displayColor?: string,
+): Uint8Array {
+  const bounds = meshBounds(part.mesh.vertices);
+  const object: MeshObject = {
+    name: part.name,
+    vertices: part.mesh.vertices,
+    triangles: part.mesh.triangles,
+    position: bedCenteredPosition(bounds, bed),
+  };
+  return createThreeMfPackage(title, [object], [], displayColor);
+}
+
+// ##############################
+// Per-Part Placement
+// ##############################
+
+type MeshBounds = {
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minY: number;
+  readonly maxY: number;
+  readonly minZ: number;
+};
+
+function meshBounds(vertices: readonly MeshVertex[]): MeshBounds {
+  if (vertices.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0 };
+  }
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  for (const vertex of vertices) {
+    minX = Math.min(minX, vertex.x);
+    maxX = Math.max(maxX, vertex.x);
+    minY = Math.min(minY, vertex.y);
+    maxY = Math.max(maxY, vertex.y);
+    minZ = Math.min(minZ, vertex.z);
+  }
+  return { minX, maxX, minY, maxY, minZ };
+}
+
+// Translation that drops the part onto z=0 and centers its footprint on the
+// bed. An unbounded bed has no center, so the part's near corner goes to the
+// origin instead.
+function bedCenteredPosition(bounds: MeshBounds, bed: PrintBed): MeshVertex {
+  if (bed.type === "unbounded") {
+    return { x: -bounds.minX, y: -bounds.minY, z: -bounds.minZ };
+  }
+  return {
+    x: (bed.width - (bounds.maxX - bounds.minX)) / 2 - bounds.minX,
+    y: (bed.depth - (bounds.maxY - bounds.minY)) / 2 - bounds.minY,
+    z: -bounds.minZ,
+  };
+}
+
+// ##############################
+// Per-Part Filenames
+// ##############################
+
+function uniquePartFileName(used: Set<string>, baseName: string, part: PrintablePart, index: number): string {
+  const ordinal = String(index + 1).padStart(2, "0");
+  const slug = fileNameSlug(part.name);
+  let candidate = `${baseName}-${ordinal}-${slug}.3mf`;
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${baseName}-${ordinal}-${slug}-${suffix}.3mf`;
+    suffix += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+function fileNameSlug(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+  return slug.length > 0 ? slug : "part";
 }
 
 // #######################################

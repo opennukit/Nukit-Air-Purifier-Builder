@@ -4,8 +4,10 @@ import { findPreviewMaterialColorPreset, type RawPurifierSettings } from "@/doma
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   createPrintableThreeMfExportFromKit,
+  createPrintableThreeMfZipFromKit,
   type PrintableKit,
   type PrintableThreeMfExport,
+  type PrintableThreeMfZip,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 
@@ -72,6 +74,28 @@ export function createPrintDesignThreeMfExportFromKit(
     kit,
     `${layout.configuration.printDesign.label} print kit`,
     `${layout.configuration.printDesign.id}-print-kit.3mf`,
+    enclosureDisplayColor(layout),
+  );
+}
+
+// The download the workbench ships: one 3MF per print chunk, zipped. Splitting
+// the kit keeps every chunk on its own bed in any slicer (not only the ones
+// that read Bambu/Orca plate metadata).
+export function createPrintDesignThreeMfZip(
+  layout: LayoutResult,
+  presetId: PrintVolumePresetId,
+): PrintableThreeMfZip {
+  return createPrintDesignThreeMfZipFromKit(layout, createPrintDesignKit(layout, presetId));
+}
+
+export function createPrintDesignThreeMfZipFromKit(
+  layout: LayoutResult,
+  kit: PrintableKit,
+): PrintableThreeMfZip {
+  return createPrintableThreeMfZipFromKit(
+    kit,
+    `${layout.configuration.printDesign.label} print kit`,
+    `${layout.configuration.printDesign.id}-print-kit`,
     enclosureDisplayColor(layout),
   );
 }

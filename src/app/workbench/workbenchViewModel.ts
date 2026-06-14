@@ -306,7 +306,7 @@ function exportActionLabelForDesign(
   if (fabricationMethod === "print-3mf" && design.type === "static-reference") {
     return "Open Printables Files";
   }
-  return fabricationMethod === "print-3mf" ? "Download 3MF" : "Export Laser Drawing";
+  return fabricationMethod === "print-3mf" ? "Download print kit" : "Export Laser Drawing";
 }
 
 function findLaserCutDesignPreset(): LaserCutDesignPreset {
