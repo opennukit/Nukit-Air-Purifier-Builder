@@ -16,8 +16,8 @@ import type {
   PrintDesignPreset,
   StaticReferencePrintDesignDefaults,
 } from "@/domain/purifier/designPresets";
-import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
+import { formatLength, type DimensionUnit } from "@/app/controls/dimensionUnits";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -56,6 +56,7 @@ export function createPreviewSummaryItems(
   currentFabricationMethod: ExportFormat,
   currentPrintVolumePresetId: PrintVolumePresetId,
   currentGeneratedPlan: PrintableSheetPlan | null,
+  currentDimensionUnit: DimensionUnit,
 ): readonly SummaryItem[] {
   if (currentPreviewMode === "print-sheets") {
     if (isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
@@ -101,9 +102,9 @@ export function createPreviewSummaryItems(
       { label: "Design", value: currentLayout.configuration.printDesign.label },
       {
         label: "Filter",
-        value: `${formatMillimeters(model.filter.outerDiameter)} dia x ${formatMillimeters(model.filter.length)}`,
+        value: `${formatLength(model.filter.outerDiameter, currentDimensionUnit)} dia x ${formatLength(model.filter.length, currentDimensionUnit)}`,
       },
-      { label: "Center hole", value: formatMillimeters(model.filter.holeDiameter) },
+      { label: "Center hole", value: formatLength(model.filter.holeDiameter, currentDimensionUnit) },
       { label: "Fan", value: `${model.fanSize} mm` },
       { label: "Print parts", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
       { label: "Filament", value: filamentSummaryValue(currentGeneratedPlan, currentLayout.configuration.cutting.materialThickness) },
@@ -125,12 +126,12 @@ export function createPreviewSummaryItems(
   const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
   return [
     { label: "Panels", value: String(cutPanelSummary.panelCount) },
-    { label: "Chamber height", value: formatMillimeters(currentLayout.summary.chamberHeight) },
-    { label: "Working depth", value: formatMillimeters(currentLayout.summary.workingDepth) },
+    { label: "Chamber height", value: formatLength(currentLayout.summary.chamberHeight, currentDimensionUnit) },
+    { label: "Working depth", value: formatLength(currentLayout.summary.workingDepth, currentDimensionUnit) },
     { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
     {
       label: "Sheet",
-      value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
+      value: `${formatLength(cutPanelSummary.sheetWidth, currentDimensionUnit)} x ${formatLength(cutPanelSummary.sheetHeight, currentDimensionUnit)}`,
     },
   ];
 }
@@ -223,6 +224,7 @@ export function createPartsListItems(
   currentSettings: RawPurifierSettings,
   currentPrintVolumePresetId: PrintVolumePresetId,
   currentGeneratedPlan: PrintableSheetPlan | null,
+  currentDimensionUnit: DimensionUnit,
 ): readonly PartsListItem[] {
   if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(currentLayout.configuration.printDesign);
@@ -245,7 +247,7 @@ export function createPartsListItems(
       ...staticPrintEstimatePartsItems(reference.printEstimate),
       {
         category: "Filters",
-        label: `${filterCount} x ${rectangularFilterSize(currentSettings)}`,
+        label: `${filterCount} x ${rectangularFilterSize(currentSettings, currentDimensionUnit)}`,
         detail: staticReferenceFilterDetail(staticDefaults, currentSettings),
       },
       {
@@ -286,7 +288,7 @@ export function createPartsListItems(
       {
         category: "Filter",
         label: "Round HEPA filter",
-        detail: `${formatMillimeters(currentSettings.donutFilterOuterDiameter)} dia x ${formatMillimeters(currentSettings.donutFilterLength)}`,
+        detail: `${formatLength(currentSettings.donutFilterOuterDiameter, currentDimensionUnit)} dia x ${formatLength(currentSettings.donutFilterLength, currentDimensionUnit)}`,
       },
       filamentPartsItem(currentGeneratedPlan, "the adaptor, fan guard, and cap", currentLayout.configuration.cutting.materialThickness),
       ...baseItems,
@@ -302,22 +304,22 @@ export function createPartsListItems(
     return [
       {
         category: "Filter",
-        label: rectangularFilterSize(currentSettings),
+        label: rectangularFilterSize(currentSettings, currentDimensionUnit),
         detail: "Measured width x depth x thickness",
       },
       ...baseItems,
-      ...tempestPrintPartsItems(currentLayout, currentPrintVolumePresetId, currentGeneratedPlan),
+      ...tempestPrintPartsItems(currentLayout, currentPrintVolumePresetId, currentGeneratedPlan, currentDimensionUnit),
     ];
   }
 
   return [
     {
       category: "Filter",
-      label: rectangularFilterSize(currentSettings),
+      label: rectangularFilterSize(currentSettings, currentDimensionUnit),
       detail: "Measured width x depth x thickness",
     },
     ...baseItems,
-    ...laserSheetPartsItems(currentLayout, currentFabricationMethod),
+    ...laserSheetPartsItems(currentLayout, currentFabricationMethod, currentDimensionUnit),
   ];
 }
 
@@ -351,6 +353,7 @@ function tempestPrintPartsItems(
   currentLayout: LayoutResult,
   currentPrintVolumePresetId: PrintVolumePresetId,
   currentGeneratedPlan: PrintableSheetPlan | null,
+  currentDimensionUnit: DimensionUnit,
 ): readonly PartsListItem[] {
   const plan = createTempestChunkPlan(createTempestSettingsFromLayout(currentLayout), currentPrintVolumePresetId);
   const pins = plan.model.settings.alignmentPins;
@@ -367,7 +370,7 @@ function tempestPrintPartsItems(
                 {
                   category: "Assembly",
                   label: "Filament alignment pins",
-                  detail: `Short ${formatMillimeters(alignmentPinPieceLength(pins.holeDepth))} pieces of 1.75 mm filament for the holes along each seam`,
+                  detail: `Short ${formatLength(alignmentPinPieceLength(pins.holeDepth), currentDimensionUnit)} pieces of 1.75 mm filament for the holes along each seam`,
                 },
               ]
             : []),
@@ -389,6 +392,7 @@ function tempestPrintPartsItems(
 function laserSheetPartsItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
+  currentDimensionUnit: DimensionUnit,
 ): readonly PartsListItem[] {
   if (currentFabricationMethod !== "laser-svg" || currentLayout.summary.fabrication.type !== "cut-panel-source") {
     return [];
@@ -397,14 +401,14 @@ function laserSheetPartsItems(
   return [
     {
       category: "Sheet",
-      label: `${formatMillimeters(sheetWidth)} x ${formatMillimeters(sheetHeight)}`,
-      detail: `Rigid sheet stock, ${formatMillimeters(currentLayout.configuration.cutting.materialThickness)} thick`,
+      label: `${formatLength(sheetWidth, currentDimensionUnit)} x ${formatLength(sheetHeight, currentDimensionUnit)}`,
+      detail: `Rigid sheet stock, ${formatLength(currentLayout.configuration.cutting.materialThickness, currentDimensionUnit)} thick`,
     },
   ];
 }
 
-function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
-  return `${formatMillimeters(currentSettings.filterWidth)} x ${formatMillimeters(currentSettings.filterDepth)} x ${formatMillimeters(currentSettings.filterThickness)}`;
+function rectangularFilterSize(currentSettings: RawPurifierSettings, unit: DimensionUnit): string {
+  return `${formatLength(currentSettings.filterWidth, unit)} x ${formatLength(currentSettings.filterDepth, unit)} x ${formatLength(currentSettings.filterThickness, unit)}`;
 }
 
 // The static design's recommended filter has a nominal trade size; once the

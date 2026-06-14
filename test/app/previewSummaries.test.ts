@@ -26,7 +26,7 @@ describe("createPreviewSummaryItems", () => {
   test("print-sheets for a generated tempest reads plates, chunks, and bed off the plan", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
     const plan = createPrintableSheetPlanFromKit(emptyTempestKit);
-    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", plan);
+    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", plan, "mm");
 
     expect(valueFor(items, "Print plates")).toBe(String(plan.sheets.length));
     expect(valueFor(items, "Print chunks")).toBe(String(emptyTempestKit.summary.partCount));
@@ -35,7 +35,7 @@ describe("createPreviewSummaryItems", () => {
 
   test("print-sheets without a plan yet shows pending placeholders", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
-    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", null);
+    const items = createPreviewSummaryItems(tempestLayout, "print-sheets", "print-3mf", "bed-256", null, "mm");
 
     expect(valueFor(items, "Print plates")).toBe("…");
     expect(valueFor(items, "Print chunks")).toBe("…");
@@ -44,7 +44,7 @@ describe("createPreviewSummaryItems", () => {
 
   test("print-sheets for a static reference describes the curated files, not a generated plan", () => {
     const staticLayout = createLayout(applyPrintDesignPreset(defaultSettings, "static-modular-20x20-reference"));
-    const items = createPreviewSummaryItems(staticLayout, "print-sheets", "print-3mf", "bed-350", null);
+    const items = createPreviewSummaryItems(staticLayout, "print-sheets", "print-3mf", "bed-350", null, "mm");
     const labels = items.map((item) => item.label);
 
     expect(valueFor(items, "Bed")).toBe(findPrintVolumePreset("bed-350").label);
@@ -55,7 +55,7 @@ describe("createPreviewSummaryItems", () => {
 
   test("the enclosure view of a tempest print summarizes the arrangement, not the redundant design name", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
-    const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null);
+    const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null, "mm");
     const labels = items.map((item) => item.label);
 
     expect(labels).not.toContain("Design");
@@ -66,7 +66,7 @@ describe("createPreviewSummaryItems", () => {
 
   test("the laser path summarizes panels and the required sheet", () => {
     const laserLayout = createLayout(defaultSettings);
-    const items = createPreviewSummaryItems(laserLayout, "enclosure", "laser-svg", "bed-256", null);
+    const items = createPreviewSummaryItems(laserLayout, "enclosure", "laser-svg", "bed-256", null, "mm");
 
     if (laserLayout.summary.fabrication.type !== "cut-panel-source") {
       throw new Error("expected the laser layout to carry a cut sheet");

@@ -1,3 +1,4 @@
+import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import { inchesToMillimeters, millimetersToInches, type Inches, type Millimeters } from "@/domain/units";
 
 // Display units for the measured-dimension inputs. Settings and share URLs
@@ -33,6 +34,16 @@ export function dimensionInputStep(
   unit: DimensionUnit,
 ): string {
   return unit === "mm" ? millimeterStep : "0.01";
+}
+
+// Renders a stored millimeter length in the active display unit, e.g.
+// "622.3 mm" or "24.5 in". Read-only summaries call this so their length
+// readouts track the toggle the same way the inputs do.
+export function formatLength(millimeters: Millimeters, unit: DimensionUnit): string {
+  if (unit === "mm") {
+    return formatMillimeters(millimeters);
+  }
+  return `${millimetersToDisplayValue(millimeters, unit)} in`;
 }
 
 function roundTo(value: number, decimals: number): number {
