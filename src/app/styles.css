@@ -1424,12 +1424,17 @@ hover/focus-within alone never shows the tooltip there. */
   place-items: center;
   min-height: 36px;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid var(--line);
   background: var(--surface-strong);
+  /* Smaller than the body text so multi-word options ("2-filter sandwich")
+     stay centred inside the narrow segment instead of spilling past its edge;
+     break-word is a safety net for the very tightest column widths. */
+  font-size: 0.78rem;
   font-weight: 800;
-  line-height: 1.08;
+  line-height: 1.12;
   text-align: center;
+  overflow-wrap: break-word;
   cursor: pointer;
 }
 
