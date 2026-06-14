@@ -714,10 +714,10 @@ type TempestExhaustFields = Pick<
   | "boxFanHoleSize"
   | "boxRingOneScrewHoles"
   | "boxRingOneScrewDiameter"
-  | "boxRingOneRadius"
+  | "boxRingOneDiameter"
   | "boxRingTwoScrewHoles"
   | "boxRingTwoScrewDiameter"
-  | "boxRingTwoRadius"
+  | "boxRingTwoDiameter"
 >;
 
 function copyTempestExhaustFields(source: TempestExhaustFields): TempestExhaustFields {
@@ -726,10 +726,10 @@ function copyTempestExhaustFields(source: TempestExhaustFields): TempestExhaustF
     boxFanHoleSize: source.boxFanHoleSize,
     boxRingOneScrewHoles: source.boxRingOneScrewHoles,
     boxRingOneScrewDiameter: source.boxRingOneScrewDiameter,
-    boxRingOneRadius: source.boxRingOneRadius,
+    boxRingOneDiameter: source.boxRingOneDiameter,
     boxRingTwoScrewHoles: source.boxRingTwoScrewHoles,
     boxRingTwoScrewDiameter: source.boxRingTwoScrewDiameter,
-    boxRingTwoRadius: source.boxRingTwoRadius,
+    boxRingTwoDiameter: source.boxRingTwoDiameter,
   };
 }
 
@@ -739,10 +739,10 @@ function normalizeTempestExhaustFields(source: TempestExhaustFields): TempestExh
     boxFanHoleSize: clamp(source.boxFanHoleSize, 0, 500),
     boxRingOneScrewHoles: Math.max(0, Math.round(source.boxRingOneScrewHoles)),
     boxRingOneScrewDiameter: clamp(source.boxRingOneScrewDiameter, 0, 50),
-    boxRingOneRadius: clamp(source.boxRingOneRadius, 0, 500),
+    boxRingOneDiameter: clamp(source.boxRingOneDiameter, 0, 1000),
     boxRingTwoScrewHoles: Math.max(0, Math.round(source.boxRingTwoScrewHoles)),
     boxRingTwoScrewDiameter: clamp(source.boxRingTwoScrewDiameter, 0, 50),
-    boxRingTwoRadius: clamp(source.boxRingTwoRadius, 0, 500),
+    boxRingTwoDiameter: clamp(source.boxRingTwoDiameter, 0, 1000),
   };
 }
 

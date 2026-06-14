@@ -87,10 +87,10 @@ export type PurifierSettingsFieldFallbacks = {
   readonly boxFanHoleSize: number;
   readonly boxRingOneScrewHoles: number;
   readonly boxRingOneScrewDiameter: number;
-  readonly boxRingOneRadius: number;
+  readonly boxRingOneDiameter: number;
   readonly boxRingTwoScrewHoles: number;
   readonly boxRingTwoScrewDiameter: number;
-  readonly boxRingTwoRadius: number;
+  readonly boxRingTwoDiameter: number;
   readonly rim: number;
   readonly filters: FilterCount;
   readonly splitFrames: boolean;
@@ -147,10 +147,10 @@ export const createPurifierSettingsFieldsSchema = (
     boxFanHoleSize: zNumberField(fallbacks.boxFanHoleSize),
     boxRingOneScrewHoles: zIntegerField(fallbacks.boxRingOneScrewHoles),
     boxRingOneScrewDiameter: zNumberField(fallbacks.boxRingOneScrewDiameter),
-    boxRingOneRadius: zNumberField(fallbacks.boxRingOneRadius),
+    boxRingOneDiameter: zNumberField(fallbacks.boxRingOneDiameter),
     boxRingTwoScrewHoles: zIntegerField(fallbacks.boxRingTwoScrewHoles),
     boxRingTwoScrewDiameter: zNumberField(fallbacks.boxRingTwoScrewDiameter),
-    boxRingTwoRadius: zNumberField(fallbacks.boxRingTwoRadius),
+    boxRingTwoDiameter: zNumberField(fallbacks.boxRingTwoDiameter),
     rim: zNumberField(fallbacks.rim),
     filters: zFilterCountField(fallbacks.filters),
     splitFrames: zBooleanField(fallbacks.splitFrames),

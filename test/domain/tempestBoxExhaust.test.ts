@@ -3,27 +3,38 @@ import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec"
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import { createTempestModel } from "@/domain/designs/tempest/model";
+import { boxExhaustDiametersForWidth } from "@/domain/purifier/settingsModel";
 
 const towerBoxExhaust =
   "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25";
 
 describe("tempest box/exhaust settings", () => {
-  test("auto defaults derive from the filter width (matches tempest-builder.html)", () => {
-    const fan = createTempestSettingsFromLayout(createLayout(decodeSettings(towerBoxExhaust))).fan;
+  test("the width-derived diameters become the fan hole and ring radii", () => {
+    // boxExhaustDiametersForWidth(300): fan hole 210, ring 1 240, ring 2 270.
+    const url =
+      "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&topExhaust=box-exhaust&filterWidth=300&filterDepth=300&filterThickness=25&boxFanHoleSize=210&boxRingOneDiameter=240&boxRingTwoDiameter=270";
+    const fan = createTempestSettingsFromLayout(createLayout(decodeSettings(url))).fan;
     expect(fan.topExhaust).toBe("box-exhaust");
-    expect(fan.boxExhaust.fanHoleSize).toBeCloseTo(250, 1); // 5/6 * 300
-    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(150, 1); // 1.2 * (250/2)
-    expect(fan.boxExhaust.ringTwo.radius).toBeCloseTo(175, 1); // 1.4 * (250/2)
+    expect(fan.boxExhaust.fanHoleSize).toBe(210); // 70% of 300
+    expect(fan.boxExhaust.ringOne.radius).toBe(120); // diameter 240 / 2 -> 40% of 300
+    expect(fan.boxExhaust.ringTwo.radius).toBe(135); // diameter 270 / 2 -> 45% of 300
     expect(fan.boxExhaust.ringOne.screwHoles).toBe(4);
     expect(fan.boxExhaust.ringOne.screwDiameter).toBe(6);
   });
 
-  test("explicit values override the auto defaults", () => {
+  test("the helper auto-populates fan hole 70% / ring 80% / ring 90% of the width", () => {
+    expect(boxExhaustDiametersForWidth(300)).toEqual({
+      boxFanHoleSize: 210,
+      boxRingOneDiameter: 240,
+      boxRingTwoDiameter: 270,
+    });
+  });
+
+  test("a non-positive diameter falls back to the width-derived ring radius", () => {
     const fan = createTempestSettingsFromLayout(
-      createLayout(decodeSettings(`${towerBoxExhaust}&boxFanHoleSize=180&boxRingOneRadius=100&boxRingTwoScrewHoles=6`)),
+      createLayout(decodeSettings(`${towerBoxExhaust}&boxRingOneDiameter=0&boxRingTwoScrewHoles=6`)),
     ).fan;
-    expect(fan.boxExhaust.fanHoleSize).toBe(180);
-    expect(fan.boxExhaust.ringOne.radius).toBe(100);
+    expect(fan.boxExhaust.ringOne.radius).toBeCloseTo(0.4 * 300, 1); // 40% of width
     expect(fan.boxExhaust.ringTwo.screwHoles).toBe(6);
   });
 

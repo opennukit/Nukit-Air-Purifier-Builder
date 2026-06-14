@@ -8,6 +8,7 @@
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
     applyTempestArrangementDefaults,
+    boxExhaustDiametersForWidth,
     cordHoleSides,
     cordHoleWalls,
     previewMaterialColorPresets,
@@ -429,9 +430,15 @@
     // dimensions are whole millimetres; the round-shaped donut filter keeps its
     // decimals.
     const value = filterDimensionNames.has(name) ? Math.round(entered) : entered;
+    // The box/exhaust sizes auto-populate from the filter width and only change
+    // when the width does, so re-derive them here (fan hole 70%, ring 1 80%,
+    // ring 2 90%) and the fields show concrete, width-driven numbers.
+    const boxExhaustDefaults =
+      name === "filterWidth" ? boxExhaustDiametersForWidth(value) : {};
     commitSettings({
       ...settings,
       [name]: value,
+      ...boxExhaustDefaults,
     });
   }
 

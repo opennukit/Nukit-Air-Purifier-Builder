@@ -84,13 +84,13 @@ export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>
 // Tempest 4-filter tower box/exhaust geometry (shown only when Box-Exhaust is the
 // fan choice). A 0 size/radius means "auto" — see tempest-builder.html.
 export const tempestBoxExhaustControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "boxFanHoleSize", label: "Fan hole size", suffix: "mm", step: "1" },
-  { name: "boxRingOneScrewHoles", label: "Ring 1 screws", suffix: "x", step: "1" },
+  { name: "boxFanHoleSize", label: "Fan hole diameter", suffix: "mm", step: "1" },
+  { name: "boxRingOneScrewHoles", label: "Ring 1 screw size", suffix: "x", step: "1" },
   { name: "boxRingOneScrewDiameter", label: "Ring 1 screw ø", suffix: "mm", step: "0.5" },
-  { name: "boxRingOneRadius", label: "Ring 1 radius", suffix: "mm", step: "1" },
-  { name: "boxRingTwoScrewHoles", label: "Ring 2 screws", suffix: "x", step: "1" },
+  { name: "boxRingOneDiameter", label: "Ring 1 diameter", suffix: "mm", step: "1" },
+  { name: "boxRingTwoScrewHoles", label: "Ring 2 screw size", suffix: "x", step: "1" },
   { name: "boxRingTwoScrewDiameter", label: "Ring 2 screw ø", suffix: "mm", step: "0.5" },
-  { name: "boxRingTwoRadius", label: "Ring 2 radius", suffix: "mm", step: "1" },
+  { name: "boxRingTwoDiameter", label: "Ring 2 diameter", suffix: "mm", step: "1" },
 ];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },

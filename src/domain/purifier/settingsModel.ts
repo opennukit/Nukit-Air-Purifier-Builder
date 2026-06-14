@@ -217,10 +217,10 @@ export type RawPurifierSettings = {
   boxFanHoleSize: Millimeters;
   boxRingOneScrewHoles: number;
   boxRingOneScrewDiameter: Millimeters;
-  boxRingOneRadius: Millimeters;
+  boxRingOneDiameter: Millimeters;
   boxRingTwoScrewHoles: number;
   boxRingTwoScrewDiameter: Millimeters;
-  boxRingTwoRadius: Millimeters;
+  boxRingTwoDiameter: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -305,10 +305,10 @@ export type TempestPrintDesignDraft = {
   readonly boxFanHoleSize: Millimeters;
   readonly boxRingOneScrewHoles: number;
   readonly boxRingOneScrewDiameter: Millimeters;
-  readonly boxRingOneRadius: Millimeters;
+  readonly boxRingOneDiameter: Millimeters;
   readonly boxRingTwoScrewHoles: number;
   readonly boxRingTwoScrewDiameter: Millimeters;
-  readonly boxRingTwoRadius: Millimeters;
+  readonly boxRingTwoDiameter: Millimeters;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -368,10 +368,10 @@ export type ConfiguredPrintDesign =
       readonly boxFanHoleSize: Millimeters;
       readonly boxRingOneScrewHoles: number;
       readonly boxRingOneScrewDiameter: Millimeters;
-      readonly boxRingOneRadius: Millimeters;
+      readonly boxRingOneDiameter: Millimeters;
       readonly boxRingTwoScrewHoles: number;
       readonly boxRingTwoScrewDiameter: Millimeters;
-      readonly boxRingTwoRadius: Millimeters;
+      readonly boxRingTwoDiameter: Millimeters;
     }
   | {
       readonly type: "static-reference";
@@ -452,13 +452,13 @@ export const defaultSettings: RawPurifierSettings = {
   hexSize: 10,
   hexSpacing: 1.6,
   topExhaust: "fan-grid",
-  boxFanHoleSize: 0,
+  // Box/exhaust sizes are concrete diameters, auto-populated from the filter
+  // width (fan hole 70%, ring 1 80%, ring 2 90%) — here for the default width.
+  ...boxExhaustDiametersForWidth(defaultRectangularFilterDimensions.width),
   boxRingOneScrewHoles: 4,
   boxRingOneScrewDiameter: 6,
-  boxRingOneRadius: 0,
   boxRingTwoScrewHoles: 4,
   boxRingTwoScrewDiameter: 6,
-  boxRingTwoRadius: 0,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,
@@ -697,6 +697,22 @@ export function canonicalTempestDesign(
   value: TempestDesign | string | null | undefined,
 ): TempestDesign {
   return tempestDesigns.find((design) => design === value) ?? defaultSettings.tempestDesign;
+}
+
+// Box/exhaust sizes auto-populate from the filter width: the central fan hole is
+// 70% of the width and the two screw rings are 80% / 90% (diameters), so their
+// radii land at 40% / 45% of the width. These are concrete numbers the UI shows
+// and only refreshes when the filter width changes.
+export function boxExhaustDiametersForWidth(width: Millimeters): {
+  readonly boxFanHoleSize: Millimeters;
+  readonly boxRingOneDiameter: Millimeters;
+  readonly boxRingTwoDiameter: Millimeters;
+} {
+  return {
+    boxFanHoleSize: Math.round(0.7 * width),
+    boxRingOneDiameter: Math.round(0.8 * width),
+    boxRingTwoDiameter: Math.round(0.9 * width),
+  };
 }
 
 function requiredPreviewMaterialColorPreset(

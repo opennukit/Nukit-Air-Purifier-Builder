@@ -87,10 +87,10 @@ export function encodeSettings(
   params.set("boxFanHoleSize", formatNumber(settings.boxFanHoleSize));
   params.set("boxRingOneScrewHoles", String(settings.boxRingOneScrewHoles));
   params.set("boxRingOneScrewDiameter", formatNumber(settings.boxRingOneScrewDiameter));
-  params.set("boxRingOneRadius", formatNumber(settings.boxRingOneRadius));
+  params.set("boxRingOneDiameter", formatNumber(settings.boxRingOneDiameter));
   params.set("boxRingTwoScrewHoles", String(settings.boxRingTwoScrewHoles));
   params.set("boxRingTwoScrewDiameter", formatNumber(settings.boxRingTwoScrewDiameter));
-  params.set("boxRingTwoRadius", formatNumber(settings.boxRingTwoRadius));
+  params.set("boxRingTwoDiameter", formatNumber(settings.boxRingTwoDiameter));
   params.set(
     "donutFilterOuterDiameter",
     formatNumber(settings.donutFilterOuterDiameter),
@@ -416,10 +416,10 @@ const purifierSettingsFieldKeys: Record<
   boxFanHoleSize: "boxFanHoleSize",
   boxRingOneScrewHoles: "boxRingOneScrewHoles",
   boxRingOneScrewDiameter: "boxRingOneScrewDiameter",
-  boxRingOneRadius: "boxRingOneRadius",
+  boxRingOneDiameter: "boxRingOneDiameter",
   boxRingTwoScrewHoles: "boxRingTwoScrewHoles",
   boxRingTwoScrewDiameter: "boxRingTwoScrewDiameter",
-  boxRingTwoRadius: "boxRingTwoRadius",
+  boxRingTwoDiameter: "boxRingTwoDiameter",
   rim: "rim",
   filters: "filters",
   splitFrames: ["splitFrames", "split_frames"],
