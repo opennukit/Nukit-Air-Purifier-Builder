@@ -527,78 +527,60 @@
     }
   }
 
-  // The tip is anchored to a tiny button that can sit near either panel edge (or
-  // a third of the way across a narrow phone), so a fixed-width popover spills
-  // out of its container. The controls column clips overflow-x (it scrolls
-  // vertically), so the viewport edge is not the real limit — clamp to the
-  // nearest clipping ancestor, capping the width to fit, then nudge it inside.
-  // Re-run on every reveal — hover, focus, and tap share one element.
-  function clampInfoTipToViewport(
+  // Places the open tip right above its button. The tooltip is `position:
+  // fixed`, so no scrolling/overflow ancestor can clip it (there are no
+  // transformed ancestors to capture the fixed element). Centred over the
+  // button, clamped to the viewport horizontally, and dropped below only if
+  // there is no room above. Re-runs while open so scrolling keeps it attached.
+  function positionInfoTip(
     node: HTMLElement,
     isOpen: boolean,
   ): { update(open: boolean): void; destroy(): void } {
-    const host = node.parentElement;
+    const button = node.parentElement?.querySelector("button") ?? null;
     let frame = 0;
-    function clipBounds(): { left: number; right: number } {
-      const margin = 8;
-      let left = margin;
-      let right = window.innerWidth - margin;
-      for (let ancestor = node.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
-        const style = getComputedStyle(ancestor);
-        if (style.overflowX !== "visible" || style.overflowY !== "visible") {
-          const box = ancestor.getBoundingClientRect();
-          left = Math.max(left, box.left + margin);
-          right = Math.min(right, box.right - margin);
-          break;
-        }
-      }
-      return { left, right };
-    }
-    function reposition(): void {
-      node.style.transform = "";
-      node.style.maxWidth = "";
-      const { left, right } = clipBounds();
-      node.style.maxWidth = `${Math.max(0, right - left)}px`;
-      const rect = node.getBoundingClientRect();
-      if (rect.width === 0) {
+    function place(): void {
+      if (button === null) {
         return;
       }
-      let shift = 0;
-      const overshootRight = rect.right - right;
-      if (overshootRight > 0) {
-        shift = -overshootRight;
+      const anchor = button.getBoundingClientRect();
+      const tip = node.getBoundingClientRect();
+      if (tip.width === 0) {
+        return;
       }
-      if (rect.left + shift < left) {
-        shift = left - rect.left;
-      }
-      if (shift !== 0) {
-        node.style.transform = `translateX(${shift}px)`;
-      }
+      const margin = 8;
+      const left = Math.min(
+        Math.max(margin, anchor.left + anchor.width / 2 - tip.width / 2),
+        window.innerWidth - tip.width - margin,
+      );
+      const above = anchor.top - tip.height - 6;
+      const top = above >= margin ? above : anchor.bottom + 6;
+      node.style.left = `${Math.max(margin, left)}px`;
+      node.style.top = `${top}px`;
     }
-    const onReveal = (): void => {
+    const schedule = (): void => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(reposition);
+      frame = requestAnimationFrame(place);
     };
-    host?.addEventListener("pointerenter", onReveal);
-    host?.addEventListener("focusin", onReveal);
-    window.addEventListener("resize", onReveal);
     if (isOpen) {
-      onReveal();
+      schedule();
+      window.addEventListener("scroll", schedule, true);
+      window.addEventListener("resize", schedule);
     }
     return {
       update(open: boolean): void {
         if (open) {
-          onReveal();
+          schedule();
+          window.addEventListener("scroll", schedule, true);
+          window.addEventListener("resize", schedule);
         } else {
-          node.style.transform = "";
-          node.style.maxWidth = "";
+          window.removeEventListener("scroll", schedule, true);
+          window.removeEventListener("resize", schedule);
         }
       },
       destroy(): void {
         cancelAnimationFrame(frame);
-        host?.removeEventListener("pointerenter", onReveal);
-        host?.removeEventListener("focusin", onReveal);
-        window.removeEventListener("resize", onReveal);
+        window.removeEventListener("scroll", schedule, true);
+        window.removeEventListener("resize", schedule);
       },
     };
   }
@@ -1377,7 +1359,7 @@
                           onclick={() => toggleInfoTip("measureInfoNote")}
                           onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
                         >i</button>
-                        <p id="measureInfoNote" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "measureInfoNote"}>
+                        <p id="measureInfoNote" role="tooltip" use:positionInfoTip={openInfoTipId === "measureInfoNote"}>
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
                           vary by a few millimeters. Measure your filter and enter the real numbers.
@@ -1576,7 +1558,7 @@
                               onclick={() => toggleInfoTip(`info-${control.name}`)}
                               onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
                             >i</button>
-                            <p id="info-{control.name}" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === `info-${control.name}`}>{control.info}</p>
+                            <p id="info-{control.name}" role="tooltip" use:positionInfoTip={openInfoTipId === `info-${control.name}`}>{control.info}</p>
                           </span>
                         {/if}
                       </span>
@@ -1607,7 +1589,7 @@
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
                           onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
                         >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
+                        <p id="info-cordHoleDiameter" role="tooltip" use:positionInfoTip={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
                       </span>
                     </span>
                     <span class="input-shell">
