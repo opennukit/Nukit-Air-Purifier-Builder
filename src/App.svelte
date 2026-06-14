@@ -47,6 +47,7 @@
     dimensionInputStep,
     dimensionUnits,
     displayValueToMillimeters,
+    filterDimensionDisplayValue,
     millimetersToDisplayValue,
     type DimensionUnit,
   } from "@/app/controls/dimensionUnits";
@@ -384,13 +385,18 @@
     commitSettings(applyTempestArrangementDefaults(settings, arrangement));
   }
 
+  const filterDimensionNames = new Set<string>(filterDimensionControls.map((control) => control.name));
+
   function updateMeasuredDimension(
     name: FilterDimensionName | DonutFilterDimensionName,
     event: Event,
   ): void {
+    const entered = readDimensionInputMillimeters(event, settings[name]);
+    // Filter measurements are whole millimetres; inches keep their decimals.
+    const value = filterDimensionNames.has(name) && dimensionUnit === "mm" ? Math.round(entered) : entered;
     commitSettings({
       ...settings,
-      [name]: readDimensionInputMillimeters(event, settings[name]),
+      [name]: value,
     });
   }
 
@@ -1248,8 +1254,9 @@
                               type="number"
                               name={control.name}
                               step={dimensionInputStep(control.step, dimensionUnit)}
-                              inputmode="decimal"
-                              value={millimetersToDisplayValue(settings[control.name], dimensionUnit)}
+                              max={dimensionUnit === "mm" ? "999" : undefined}
+                              inputmode={dimensionUnit === "mm" ? "numeric" : "decimal"}
+                              value={filterDimensionDisplayValue(settings[control.name], dimensionUnit)}
                               onchange={(event) => updateMeasuredDimension(control.name, event)}
                             />
                             <small>{dimensionUnit}</small>

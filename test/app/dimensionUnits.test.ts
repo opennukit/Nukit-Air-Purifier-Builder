@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   dimensionInputStep,
   displayValueToMillimeters,
+  filterDimensionDisplayValue,
   millimetersToDisplayValue,
 } from "@/app/controls/dimensionUnits";
 
@@ -24,5 +25,12 @@ describe("Dimension display units", () => {
   test("switches the input step with the unit", () => {
     expect(dimensionInputStep("1", "mm")).toBe("1");
     expect(dimensionInputStep("1", "in")).toBe("0.01");
+  });
+
+  test("shows filter dimensions as whole millimeters but keeps inch decimals", () => {
+    expect(filterDimensionDisplayValue(622.3, "mm")).toBe(622);
+    expect(filterDimensionDisplayValue(19.1, "mm")).toBe(19);
+    expect(filterDimensionDisplayValue(495.5, "mm")).toBe(496);
+    expect(filterDimensionDisplayValue(622.3, "in")).toBe(24.5);
   });
 });

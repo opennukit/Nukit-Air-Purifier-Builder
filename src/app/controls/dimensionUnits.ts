@@ -19,6 +19,16 @@ export function millimetersToDisplayValue(
   return roundTo(millimetersToInches(millimeters), 2);
 }
 
+// The rectangular filter measurements (width / length / thickness) are shown as
+// whole millimetres — no decimals, so the values stay legible in their narrow
+// inputs. Inches keep two decimals, where the precision actually matters.
+export function filterDimensionDisplayValue(
+  millimeters: Millimeters,
+  unit: DimensionUnit,
+): number {
+  return unit === "mm" ? Math.round(millimeters) : roundTo(millimetersToInches(millimeters), 2);
+}
+
 // The input's raw value is in whichever unit the toggle selects; the cast to
 // Inches is the one sanctioned entry point for inch-flavored values.
 export function displayValueToMillimeters(
