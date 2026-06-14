@@ -17,6 +17,7 @@ import {
   filterMediaPreviewClearanceMillimeters,
   filterMediaPreviewSurfaceGapMillimeters,
   previewFanWallInset,
+  previewTopFanGrillGap,
   recessedMillimeterFilterMediaThickness,
   sceneScale,
   visualFilterMediaDimension,
@@ -206,6 +207,43 @@ export function moveTempestFanInsideWall(fan: Group, model: TempestModel, pose: 
   const bounds = new Box3().setFromObject(fan);
   const plane = tempestWallInteriorPlane(model, pose, wall);
   fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+// Recess a tower's top fan below the top grill the same way wall fans are inset
+// behind their grill, so it sits inside the box instead of level with the top.
+// `topInteriorZ` is the underside of the top plate in CSG coordinates (passed in
+// because only the quad layout carries a top plate).
+export function moveTempestFanInsideTop(
+  fan: Group,
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  topInteriorZ: number,
+): void {
+  const bounds = new Box3().setFromObject(fan);
+  const plane = tempestTopInteriorPlane(model, pose, topInteriorZ);
+  fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+// The underside of the top plate, expressed as a scene-space interior plane —
+// same shape as the wall planes, but with a real gap so the fan drops clear of
+// the top fan-grid (the walls stop below the grid) rather than poking up level
+// with it.
+function tempestTopInteriorPlane(
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  topInteriorZ: number,
+): PreviewInteriorPlane {
+  const facePoint: TempestCsgPoint = { x: model.box.width / 2, y: model.box.depth / 2, z: topInteriorZ };
+  const sceneFacePoint = tempestCsgPointToScene(facePoint, pose);
+  const insideDirection = tempestCsgPointToScene({ ...facePoint, z: facePoint.z - 1 }, pose).sub(sceneFacePoint);
+  const axis = dominantVectorAxis(insideDirection);
+  const insideSign = vectorAxisValue(insideDirection, axis) >= 0 ? 1 : -1;
+  return {
+    axis,
+    coordinate: vectorAxisValue(sceneFacePoint, axis),
+    insideSign,
+    inset: previewTopFanGrillGap,
+  };
 }
 
 // Every wall fan exhausts outward: the fan model's local +y is its exhaust/back

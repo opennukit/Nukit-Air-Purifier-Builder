@@ -124,6 +124,7 @@ import {
 import {
   createTempestPreviewBox,
   expectSandwichArrangementFilter,
+  moveTempestFanInsideTop,
   moveTempestFanInsideWall,
   tempestCsgAxisToSceneAxis,
   tempestCsgPointToScene,
@@ -1291,7 +1292,8 @@ export class PurifierThreePreview {
       },
       quad: (m) => {
         const { fanLayout } = m;
-        const topFanCenterZ = m.box.height - m.filterLayout.topPlateThickness - fanPreviewRearDepthMillimeters;
+        const topInteriorZ = m.box.height - m.filterLayout.topPlateThickness;
+        const topFanCenterZ = topInteriorZ - fanPreviewRearDepthMillimeters;
         for (const x of fanLayout.positionsX) {
           for (const y of fanLayout.positionsY) {
             const fan = createFan({
@@ -1301,6 +1303,7 @@ export class PurifierThreePreview {
               facing: "axis-positive",
               appearance: fanAppearance,
             });
+            moveTempestFanInsideTop(fan, m, pose, topInteriorZ);
             collectFanRotors(fan, this.fanRotors);
             this.modelGroup.add(fan);
           }
