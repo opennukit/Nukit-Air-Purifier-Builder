@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   dimensionInputStep,
   displayValueToMillimeters,
+  formatLength,
   millimetersToDisplayValue,
 } from "@/app/controls/dimensionUnits";
 
@@ -24,5 +25,10 @@ describe("Dimension display units", () => {
   test("switches the input step with the unit", () => {
     expect(dimensionInputStep("1", "mm")).toBe("1");
     expect(dimensionInputStep("1", "in")).toBe("0.01");
+  });
+
+  test("formats a length readout in the active unit", () => {
+    expect(formatLength(622.3, "mm")).toBe("622.3 mm");
+    expect(formatLength(622.3, "in")).toBe("24.5 in");
   });
 });

@@ -4,6 +4,7 @@
 
 import type { TempestArrangementPreset } from "@/domain/purifier/designPresets";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
+import { minimumRim } from "@/domain/purifier/geometry";
 
 export type NumericSettingName = {
   [Key in keyof RawPurifierSettings]: RawPurifierSettings[Key] extends number ? Key : never;
@@ -31,6 +32,9 @@ export type LengthSettingName =
   | "filterFitClearance"
   | "cordHoleDiameter"
   | "fanDiameter"
+  // NOTE: referenceScale carries a millimeter length, but 0 is an overloaded
+  // "disabled" sentinel rather than a 0 mm length; converting 0 is a no-op so it
+  // rides the same display-unit path safely.
   | "referenceScale";
 export type DonutFilterDimensionName =
   | "donutFilterOuterDiameter"
@@ -73,12 +77,16 @@ export const donutFilterDimensionControls: readonly DimensionControl<DonutFilter
   { name: "donutFilterLength", label: "Length", step: "1" },
   { name: "donutFilterHoleDiameter", label: "Center hole", step: "0.1" },
 ];
+// SETTING_CLAMP_TAG: each minMm/maxMm below mirrors a clamp(...) in
+// src/domain/purifier/airPurifier.ts (the domain enforces it; these only make
+// the limit visible). Change both together. The rim floor is imported from
+// geometry.ts so at least that bound has a single source.
 export const generatedGeometryControls: readonly NumberControl<LengthSettingName>[] = [
   { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1", minMm: 1.5, maxMm: 9 },
   { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1", minMm: 2, maxMm: 10 },
 ];
 export const nukitPanelFitControls: readonly NumberControl<LengthSettingName>[] = [
-  { name: "rim", label: "Filter rim", suffix: "mm", step: "1", minMm: 0 },
+  { name: "rim", label: "Filter rim", suffix: "mm", step: "1", minMm: minimumRim },
   { name: "kerfFit", label: "Fit allowance", suffix: "mm", step: "0.01", minMm: 0, maxMm: 1 },
 ];
 // Slide-in clearance around the measured filter; a length, so it renders and

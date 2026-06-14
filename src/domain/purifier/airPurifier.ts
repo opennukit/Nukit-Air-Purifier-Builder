@@ -55,6 +55,9 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       : input;
   const printDesign = findPrintDesignPreset(raw.printDesign);
   const dimensions = normalizeFilterDimensions(rawFilterDimensions(raw));
+  // SETTING_CLAMP_TAG: these ranges are mirrored as input min/max in
+  // controlMetadata.ts (generatedGeometryControls / nukitPanelFitControls and
+  // the normalize*() clamps below) — change both together.
   const materialThickness = clamp(raw.materialThickness, 1.5, 9);
   const fanSpec = findFanSpec(raw.fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;

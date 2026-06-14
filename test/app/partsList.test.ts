@@ -22,6 +22,20 @@ describe("parts list", () => {
     expect(sheet?.detail).toContain(`${laserLayout.configuration.cutting.materialThickness} mm`);
   });
 
+  test("renders the filter readout in the active display unit", () => {
+    const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
+    const inchItems = createPartsListItems(tempestLayout, "print-3mf", tempestLayout.rawSettings, "bed-256", null, "in");
+    const inchFilter = inchItems.find((item) => item.category === "Filter");
+
+    expect(inchFilter?.label).toContain("in");
+    expect(inchFilter?.label).not.toContain("mm");
+    // 622.3 mm filter width is 24.5 in.
+    expect(inchFilter?.label).toContain("24.5");
+
+    const mmItems = createPartsListItems(tempestLayout, "print-3mf", tempestLayout.rawSettings, "bed-256", null, "mm");
+    expect(mmItems.find((item) => item.category === "Filter")?.label).toContain("622.3 mm");
+  });
+
   test("lists filament, fan screws, glue, and pins for a split tempest print", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
     const items = createPartsListItems(tempestLayout, "print-3mf", tempestLayout.rawSettings, "bed-180", null, "mm");

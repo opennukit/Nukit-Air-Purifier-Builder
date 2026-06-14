@@ -24,7 +24,9 @@ export type AirPurifierGeometry = {
   filterFingerHoleYs: number[];
 };
 
-const minimumRim = 12;
+// MINIMUM_RIM_TAG: the rim floor is surfaced as the Filter rim input's min in
+// controlMetadata.ts; import this rather than re-typing 12 there.
+export const minimumRim = 12;
 const maximumRim = 90;
 const minimumFrameOpening = 1;
 
