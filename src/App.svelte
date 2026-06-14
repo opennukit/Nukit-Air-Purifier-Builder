@@ -1213,7 +1213,7 @@
                 <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
               </div>
               <p class="section-note">
-                Get your filter and fans first, measure them, then enter the numbers here.
+                Get your filters first, measure them, then enter the numbers here.
               </p>
               <div data-generated-part-controls>
                 <!--
