@@ -504,6 +504,18 @@
     }
   }
 
+  // Keyboard dismissal: moving focus out of the open tip closes it (the button
+  // blur this replaces no longer fires reliably on touch).
+  function closeInfoTipOnOutsideFocus(event: FocusEvent): void {
+    if (openInfoTipId === null) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest(".info-tip") === null) {
+      openInfoTipId = null;
+    }
+  }
+
   // The tip is anchored to a tiny button that can sit near either panel edge (or
   // a third of the way across a narrow phone), so a fixed-width popover spills
   // off-screen. Once revealed, nudge it horizontally until it sits inside the
@@ -513,6 +525,7 @@
     isOpen: boolean,
   ): { update(open: boolean): void; destroy(): void } {
     const host = node.parentElement;
+    let frame = 0;
     function reposition(): void {
       node.style.transform = "";
       const rect = node.getBoundingClientRect();
@@ -533,7 +546,8 @@
       }
     }
     const onReveal = (): void => {
-      requestAnimationFrame(reposition);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(reposition);
     };
     host?.addEventListener("pointerenter", onReveal);
     host?.addEventListener("focusin", onReveal);
@@ -550,6 +564,7 @@
         }
       },
       destroy(): void {
+        cancelAnimationFrame(frame);
         host?.removeEventListener("pointerenter", onReveal);
         host?.removeEventListener("focusin", onReveal);
         window.removeEventListener("resize", onReveal);
@@ -825,7 +840,11 @@
   syncDerivedWorkbenchState();
 </script>
 
-<svelte:window onpointerdown={closeInfoTipOnOutsidePointer} onkeydown={closeInfoTipOnEscape} />
+<svelte:window
+  onpointerdown={closeInfoTipOnOutsidePointer}
+  onfocusin={closeInfoTipOnOutsideFocus}
+  onkeydown={closeInfoTipOnEscape}
+/>
 
 <main class="app-shell">
   <!-- #######################################

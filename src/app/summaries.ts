@@ -114,7 +114,6 @@ export function createPreviewSummaryItems(
   if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
     const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
     return [
-      { label: "Design", value: currentLayout.configuration.printDesign.label },
       { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },

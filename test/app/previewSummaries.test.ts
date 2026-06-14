@@ -53,12 +53,12 @@ describe("createPreviewSummaryItems", () => {
     expect(labels).not.toContain("Print plates");
   });
 
-  test("the enclosure view of a tempest print summarizes the design instead of the plan", () => {
+  test("the enclosure view of a tempest print summarizes the arrangement, not the redundant design name", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
     const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null);
     const labels = items.map((item) => item.label);
 
-    expect(valueFor(items, "Design")).toBe(tempestLayout.configuration.printDesign.label);
+    expect(labels).not.toContain("Design");
     expect(labels).toContain("Arrangement");
     expect(labels).toContain("Fans");
     expect(valueFor(items, "Print chunks")).toBe("…");
