@@ -22,6 +22,9 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       ...defaultTempestSettings.fan,
       diameter: configuration.fan.spec.diameter,
       screwHoleDiameter: configuration.cutting.screwHoleDiameter,
+      opening: design.hexGrill
+        ? { type: "honeycomb", hexFlatToFlat: design.hexSize, ribThickness: design.hexSpacing }
+        : { type: "plain" },
       wallRequests:
         design.arrangement === "four-side-filter-tower"
           ? defaultTempestSettings.fan.wallRequests

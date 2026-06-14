@@ -179,6 +179,11 @@ export type RawPurifierSettings = {
   filterFitClearance: Millimeters;
   // Tempest-only: bore diameter of the power-cord hole in the right wall.
   cordHoleDiameter: Millimeters;
+  // Tempest-only: honeycomb fan grill. hexGrill off = a plain circular opening;
+  // hexSize is the hex flat-to-flat, hexSpacing the rib between cells.
+  hexGrill: boolean;
+  hexSize: Millimeters;
+  hexSpacing: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -249,6 +254,9 @@ export type TempestPrintDesignDraft = {
   readonly filter: FilterDimensions;
   readonly filterFitClearance: Millimeters;
   readonly cordHoleDiameter: Millimeters;
+  readonly hexGrill: boolean;
+  readonly hexSize: Millimeters;
+  readonly hexSpacing: Millimeters;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -297,6 +305,9 @@ export type ConfiguredPrintDesign =
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
       readonly cordHoleDiameter: Millimeters;
+      readonly hexGrill: boolean;
+      readonly hexSize: Millimeters;
+      readonly hexSpacing: Millimeters;
     }
   | {
       readonly type: "static-reference";
@@ -369,6 +380,9 @@ export const defaultSettings: RawPurifierSettings = {
   tempestArrangement: "dual-horizontal-sandwich",
   filterFitClearance: 1,
   cordHoleDiameter: defaultTempestCordPassThrough.diameter,
+  hexGrill: true,
+  hexSize: 10,
+  hexSpacing: 1.6,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,

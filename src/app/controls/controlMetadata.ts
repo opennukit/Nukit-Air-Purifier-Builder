@@ -75,6 +75,12 @@ export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = 
       "Extra space added around your measured filter so it slides in instead of press-fitting. 1 mm per side works for most printers; 0 makes the cavity exactly the measured size.",
   },
 ];
+// Tempest honeycomb fan grill (hidden in box/exhaust mode). hexSize is the hex
+// flat-to-flat, hexSpacing the rib between cells — matches tempest-builder.html.
+export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>[] = [
+  { name: "hexSize", label: "Hex size", suffix: "mm", step: "0.5" },
+  { name: "hexSpacing", label: "Hex spacing", suffix: "mm", step: "0.1" },
+];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },
   { name: "fingerSpaceMultiplier", label: "Finger space", suffix: "x", step: "0.1" },

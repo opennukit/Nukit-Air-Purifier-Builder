@@ -68,6 +68,9 @@ export function encodeSettings(
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
+  params.set("hexGrill", String(settings.hexGrill));
+  params.set("hexSize", formatNumber(settings.hexSize));
+  params.set("hexSpacing", formatNumber(settings.hexSpacing));
   params.set(
     "donutFilterOuterDiameter",
     formatNumber(settings.donutFilterOuterDiameter),
@@ -363,6 +366,9 @@ const purifierSettingsFieldKeys: Record<
   filterThickness: ["filterThickness", "filter_height"],
   filterFitClearance: "filterFitClearance",
   cordHoleDiameter: "cordHoleDiameter",
+  hexGrill: "hexGrill",
+  hexSize: "hexSize",
+  hexSpacing: "hexSpacing",
   rim: "rim",
   filters: "filters",
   splitFrames: ["splitFrames", "split_frames"],

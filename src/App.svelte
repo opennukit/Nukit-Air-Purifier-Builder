@@ -36,6 +36,7 @@
     nukitPanelFitControls,
     tempestArrangementOptions,
     tempestFitControls,
+    tempestHexGrillControls,
     type BooleanSettingName,
     type DonutFilterDimensionName,
     type DonutNumberSettingName,
@@ -206,6 +207,8 @@
   let showPrintSheetsPreviewMode = true;
   let isDonutControlsActive = false;
   let isTempestControlsActive = false;
+  // Honeycomb grill only applies to PC-fan exhausts; box/exhaust mode has no grill.
+  let showHexGrillControls = false;
   let isNukitControlsActive = true;
   let showPrintSetupControls = true;
   let showAdvancedControls = true;
@@ -266,6 +269,7 @@
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
+  $: showHexGrillControls = isTempestControlsActive;
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
   $: showPrintSetupControls = fabricationMethod === "print-3mf" && activeControlPanels.setup.type === "available";
   $: showAdvancedControls = activeControlPanels.advanced.type === "available";
@@ -1422,6 +1426,36 @@
                       <small>mm</small>
                     </span>
                   </label>
+                  {#if showHexGrillControls}
+                    <label class="toggle-field">
+                      <input
+                        type="checkbox"
+                        name="hexGrill"
+                        checked={settings.hexGrill}
+                        onchange={(event) => updateBooleanSetting("hexGrill", event)}
+                      />
+                      <span>Honeycomb grill</span>
+                    </label>
+                    {#if settings.hexGrill}
+                      {#each tempestHexGrillControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    {/if}
+                  {/if}
                 </div>
               {/if}
             </section>

@@ -136,6 +136,9 @@ export function normalizeRawSettings(
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
     cordHoleDiameter: normalizeCordHoleDiameter(input.cordHoleDiameter),
+    hexGrill: input.hexGrill,
+    hexSize: normalizeHexSize(input.hexSize),
+    hexSpacing: normalizeHexSpacing(input.hexSpacing),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -264,6 +267,9 @@ export function serializePurifierDraft(
       tempestArrangement: draft.design.arrangement,
       filterFitClearance: draft.design.filterFitClearance,
       cordHoleDiameter: draft.design.cordHoleDiameter,
+      hexGrill: draft.design.hexGrill,
+      hexSize: draft.design.hexSize,
+      hexSpacing: draft.design.hexSpacing,
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -321,6 +327,9 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     tempestArrangement: defaultSettings.tempestArrangement,
     filterFitClearance: defaultSettings.filterFitClearance,
     cordHoleDiameter: defaultSettings.cordHoleDiameter,
+    hexGrill: defaultSettings.hexGrill,
+    hexSize: defaultSettings.hexSize,
+    hexSpacing: defaultSettings.hexSpacing,
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -397,6 +406,9 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       tempestArrangement: input.design.arrangement,
       filterFitClearance: input.design.filterFitClearance,
       cordHoleDiameter: input.design.cordHoleDiameter,
+      hexGrill: input.design.hexGrill,
+      hexSize: input.design.hexSize,
+      hexSpacing: input.design.hexSpacing,
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -467,6 +479,9 @@ function createConfiguredPrintDesign(input: {
       filter: input.filter,
       filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
       cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
+      hexGrill: input.raw.hexGrill,
+      hexSize: normalizeHexSize(input.raw.hexSize),
+      hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
     };
   }
 
@@ -563,6 +578,9 @@ function createPurifierDesignDraft(
       filter: configuration.design.filter,
       filterFitClearance: configuration.design.filterFitClearance,
       cordHoleDiameter: configuration.design.cordHoleDiameter,
+      hexGrill: configuration.design.hexGrill,
+      hexSize: configuration.design.hexSize,
+      hexSpacing: configuration.design.hexSpacing,
     };
   }
 
@@ -653,6 +671,14 @@ function normalizeFilterFitClearance(value: Millimeters): Millimeters {
 
 function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
   return clamp(value, 3, 25);
+}
+
+function normalizeHexSize(value: Millimeters): Millimeters {
+  return clamp(value, 1, 50);
+}
+
+function normalizeHexSpacing(value: Millimeters): Millimeters {
+  return clamp(value, 0.1, 20);
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
