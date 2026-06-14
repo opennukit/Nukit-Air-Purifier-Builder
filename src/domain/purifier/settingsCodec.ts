@@ -26,9 +26,13 @@ import {
   applyTempestArrangementDefaults,
   cameraPresets,
   canonicalTempestArrangement,
+  cordHoleSides,
+  cordHoleWalls,
   defaultSettings,
   findPreviewMaterialColorPreset,
   type CameraPreset,
+  type CordHoleSide,
+  type CordHoleWall,
   type PreviewMaterialColorId,
   type PurifierDraft,
   type RawPurifierSettings,
@@ -68,6 +72,9 @@ export function encodeSettings(
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
+  params.set("cordHoleWall", settings.cordHoleWall);
+  params.set("cordHoleSide", settings.cordHoleSide);
+  params.set("cordHoleCornerOffset", formatNumber(settings.cordHoleCornerOffset));
   params.set("hexGrill", String(settings.hexGrill));
   params.set("hexSize", formatNumber(settings.hexSize));
   params.set("hexSpacing", formatNumber(settings.hexSpacing));
@@ -151,6 +158,8 @@ export function decodeSettings(search: string): RawPurifierSettings {
     fanColor: readFanColor(params),
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
+    cordHoleWall: readCordHoleWall(params),
+    cordHoleSide: readCordHoleSide(params),
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,
@@ -218,6 +227,16 @@ function hasDonutFilterMeasurementParams(params: URLSearchParams): boolean {
     params.has("donutCapRim") ||
     params.has("donutCapEnabled")
   );
+}
+
+function readCordHoleWall(params: URLSearchParams): CordHoleWall {
+  const value = params.get("cordHoleWall");
+  return cordHoleWalls.find((wall) => wall === value) ?? defaultSettings.cordHoleWall;
+}
+
+function readCordHoleSide(params: URLSearchParams): CordHoleSide {
+  const value = params.get("cordHoleSide");
+  return cordHoleSides.find((side) => side === value) ?? defaultSettings.cordHoleSide;
 }
 
 function readTempestArrangement(
@@ -366,6 +385,7 @@ const purifierSettingsFieldKeys: Record<
   filterThickness: ["filterThickness", "filter_height"],
   filterFitClearance: "filterFitClearance",
   cordHoleDiameter: "cordHoleDiameter",
+  cordHoleCornerOffset: "cordHoleCornerOffset",
   hexGrill: "hexGrill",
   hexSize: "hexSize",
   hexSpacing: "hexSpacing",

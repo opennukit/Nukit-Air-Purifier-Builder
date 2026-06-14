@@ -136,6 +136,9 @@ export function normalizeRawSettings(
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
     cordHoleDiameter: normalizeCordHoleDiameter(input.cordHoleDiameter),
+    cordHoleWall: input.cordHoleWall,
+    cordHoleSide: input.cordHoleSide,
+    cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.cordHoleCornerOffset),
     hexGrill: input.hexGrill,
     hexSize: normalizeHexSize(input.hexSize),
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
@@ -267,6 +270,9 @@ export function serializePurifierDraft(
       tempestArrangement: draft.design.arrangement,
       filterFitClearance: draft.design.filterFitClearance,
       cordHoleDiameter: draft.design.cordHoleDiameter,
+      cordHoleWall: draft.design.cordHoleWall,
+      cordHoleSide: draft.design.cordHoleSide,
+      cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
@@ -327,6 +333,9 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     tempestArrangement: defaultSettings.tempestArrangement,
     filterFitClearance: defaultSettings.filterFitClearance,
     cordHoleDiameter: defaultSettings.cordHoleDiameter,
+    cordHoleWall: defaultSettings.cordHoleWall,
+    cordHoleSide: defaultSettings.cordHoleSide,
+    cordHoleCornerOffset: defaultSettings.cordHoleCornerOffset,
     hexGrill: defaultSettings.hexGrill,
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
@@ -406,6 +415,9 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       tempestArrangement: input.design.arrangement,
       filterFitClearance: input.design.filterFitClearance,
       cordHoleDiameter: input.design.cordHoleDiameter,
+      cordHoleWall: input.design.cordHoleWall,
+      cordHoleSide: input.design.cordHoleSide,
+      cordHoleCornerOffset: input.design.cordHoleCornerOffset,
       hexGrill: input.design.hexGrill,
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
@@ -479,6 +491,9 @@ function createConfiguredPrintDesign(input: {
       filter: input.filter,
       filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
       cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
+      cordHoleWall: input.raw.cordHoleWall,
+      cordHoleSide: input.raw.cordHoleSide,
+      cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
@@ -578,6 +593,9 @@ function createPurifierDesignDraft(
       filter: configuration.design.filter,
       filterFitClearance: configuration.design.filterFitClearance,
       cordHoleDiameter: configuration.design.cordHoleDiameter,
+      cordHoleWall: configuration.design.cordHoleWall,
+      cordHoleSide: configuration.design.cordHoleSide,
+      cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
@@ -671,6 +689,10 @@ function normalizeFilterFitClearance(value: Millimeters): Millimeters {
 
 function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
   return clamp(value, 3, 25);
+}
+
+function normalizeCordHoleCornerOffset(value: Millimeters): Millimeters {
+  return clamp(value, 0, 200);
 }
 
 function normalizeHexSize(value: Millimeters): Millimeters {

@@ -1,6 +1,5 @@
 import { defaultTempestSettings } from "@/domain/designs/tempest/model";
 import {
-  defaultTempestCordPassThrough,
   type TempestFanCountRequest,
   type TempestSettings,
 } from "@/domain/designs/tempest/shared";
@@ -41,11 +40,16 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       rim: configuration.cutting.rim,
       filterFitClearance: design.filterFitClearance,
     },
-    // The user picks the bore; the placement keeps the shipped default.
-    cordPassThrough: {
-      ...defaultTempestCordPassThrough,
-      diameter: design.cordHoleDiameter,
-    },
+    cordPassThrough:
+      design.cordHoleWall === "none"
+        ? { type: "none" }
+        : {
+            type: "wall",
+            diameter: design.cordHoleDiameter,
+            wall: design.cordHoleWall,
+            side: design.cordHoleSide,
+            cornerOffset: design.cordHoleCornerOffset,
+          },
   };
 }
 

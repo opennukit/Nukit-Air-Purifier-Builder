@@ -8,7 +8,11 @@
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
     applyTempestArrangementDefaults,
+    cordHoleSides,
+    cordHoleWalls,
     previewMaterialColorPresets,
+    type CordHoleSide,
+    type CordHoleWall,
     type PreviewMaterialColorId,
     type PurifierDraft,
     type RawPurifierSettings,
@@ -414,6 +418,18 @@
       [name]: readNumberInput(event, settings[name]),
     };
     commitSettings(nextSettings);
+  }
+
+  function updateCordHoleWall(event: Event): void {
+    commitSettings({ ...settings, cordHoleWall: (event.target as HTMLSelectElement).value as CordHoleWall });
+  }
+
+  function updateCordHoleSide(event: Event): void {
+    commitSettings({ ...settings, cordHoleSide: (event.target as HTMLSelectElement).value as CordHoleSide });
+  }
+
+  function titleCase(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
   function updateBooleanSetting(name: BooleanSettingName, event: Event): void {
@@ -1398,11 +1414,11 @@
                   {/each}
                   <label class="field">
                     <span>
-                      Power cord hole
+                      Power cord wall
                       <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
                         <button
                           type="button"
-                          aria-label="What does Power cord hole do?"
+                          aria-label="What does the power cord pass-through do?"
                           aria-describedby="info-cordHoleDiameter"
                           aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
@@ -1412,20 +1428,53 @@
                         <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
                       </span>
                     </span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name="cordHoleDiameter"
-                        min="3"
-                        max="25"
-                        step="0.5"
-                        inputmode="decimal"
-                        value={settings.cordHoleDiameter}
-                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                      />
-                      <small>mm</small>
-                    </span>
+                    <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                      {#each cordHoleWalls as wall}
+                        <option value={wall} selected={settings.cordHoleWall === wall}>{wall === "none" ? "None" : titleCase(wall)}</option>
+                      {/each}
+                    </select>
                   </label>
+                  {#if settings.cordHoleWall !== "none"}
+                    <label class="field">
+                      <span>Cord hole diameter</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="cordHoleDiameter"
+                          min="3"
+                          max="25"
+                          step="0.5"
+                          inputmode="decimal"
+                          value={settings.cordHoleDiameter}
+                          onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                    <label class="field">
+                      <span>Cord position</span>
+                      <select name="cordHoleSide" onchange={updateCordHoleSide}>
+                        {#each cordHoleSides as side}
+                          <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
+                        {/each}
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Cord corner offset</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="cordHoleCornerOffset"
+                          min="0"
+                          step="1"
+                          inputmode="numeric"
+                          value={settings.cordHoleCornerOffset}
+                          onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                  {/if}
                   {#if showHexGrillControls}
                     <label class="toggle-field">
                       <input

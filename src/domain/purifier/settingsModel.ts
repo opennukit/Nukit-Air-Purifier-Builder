@@ -159,6 +159,12 @@ export type CutSheetPreviewOptions = {
 // Settings Model
 // #######################################
 
+// Tempest cord pass-through choices (mirrors tempest-builder.html).
+export const cordHoleWalls = ["none", "front", "back", "left", "right"] as const;
+export type CordHoleWall = (typeof cordHoleWalls)[number];
+export const cordHoleSides = ["left", "center", "right"] as const;
+export type CordHoleSide = (typeof cordHoleSides)[number];
+
 export type RawPurifierSettings = {
   printDesign: PrintDesignId;
   filterWidth: Millimeters;
@@ -179,6 +185,11 @@ export type RawPurifierSettings = {
   filterFitClearance: Millimeters;
   // Tempest-only: bore diameter of the power-cord hole in the right wall.
   cordHoleDiameter: Millimeters;
+  // Tempest-only: which wall the cord exits ("none" disables it), the position
+  // along that wall, and how far the hole sits from the corner.
+  cordHoleWall: CordHoleWall;
+  cordHoleSide: CordHoleSide;
+  cordHoleCornerOffset: Millimeters;
   // Tempest-only: honeycomb fan grill. hexGrill off = a plain circular opening;
   // hexSize is the hex flat-to-flat, hexSpacing the rib between cells.
   hexGrill: boolean;
@@ -254,6 +265,9 @@ export type TempestPrintDesignDraft = {
   readonly filter: FilterDimensions;
   readonly filterFitClearance: Millimeters;
   readonly cordHoleDiameter: Millimeters;
+  readonly cordHoleWall: CordHoleWall;
+  readonly cordHoleSide: CordHoleSide;
+  readonly cordHoleCornerOffset: Millimeters;
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
@@ -305,6 +319,9 @@ export type ConfiguredPrintDesign =
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
       readonly cordHoleDiameter: Millimeters;
+      readonly cordHoleWall: CordHoleWall;
+      readonly cordHoleSide: CordHoleSide;
+      readonly cordHoleCornerOffset: Millimeters;
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
@@ -380,6 +397,9 @@ export const defaultSettings: RawPurifierSettings = {
   tempestArrangement: "dual-horizontal-sandwich",
   filterFitClearance: 1,
   cordHoleDiameter: defaultTempestCordPassThrough.diameter,
+  cordHoleWall: defaultTempestCordPassThrough.wall,
+  cordHoleSide: defaultTempestCordPassThrough.side,
+  cordHoleCornerOffset: defaultTempestCordPassThrough.cornerOffset,
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
