@@ -251,7 +251,7 @@ export function createPartsListItems(
       {
         category: "Filter",
         label: rectangularFilterSize(currentSettings),
-        detail: "Measured width x depth x thickness",
+        detail: "Measured width x length x thickness",
       },
       ...baseItems,
       ...tempestPrintPartsItems(currentLayout, currentPrintVolumePresetId),
@@ -262,7 +262,7 @@ export function createPartsListItems(
     {
       category: "Filter",
       label: rectangularFilterSize(currentSettings),
-      detail: "Measured width x depth x thickness",
+      detail: "Measured width x length x thickness",
     },
     ...baseItems,
     ...laserSheetPartsItems(currentLayout, currentFabricationMethod),
