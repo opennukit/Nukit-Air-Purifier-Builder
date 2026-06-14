@@ -1161,7 +1161,9 @@ Dimension Grids
 
 .custom-dimensions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Reflow to fewer columns when the panel is narrow instead of squeezing all
+     three until the value + unit suffix crop. */
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 6px;
   margin: 0 0 10px;
 }
@@ -1175,17 +1177,21 @@ Dimension Grids
 
 .donut-filter-dimensions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 6px;
 }
 
 .custom-dimensions .field {
+  /* Label on top, input pinned to the bottom, so a wrapped label (e.g. "Filter
+     thickness") keeps every input box aligned across the row. */
+  grid-template-rows: 1fr auto;
   gap: 5px;
   margin: 0;
   font-size: 0.78rem;
 }
 
 .donut-filter-dimensions .field {
+  grid-template-rows: 1fr auto;
   gap: 5px;
   margin: 0;
   font-size: 0.78rem;
