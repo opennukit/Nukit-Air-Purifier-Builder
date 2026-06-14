@@ -28,17 +28,24 @@ describe("tempest per-wall fan placement (1-top / 2-sandwich)", () => {
     expect(fan.wallRequests.left.type).toBe("automatic"); // -1 -> automatic
   });
 
-  test("the four-side tower ignores per-wall edits (no editable wall fans)", () => {
+  test("the four-side tower forces side walls to 0 but keeps the top-fan toggle", () => {
     const raw = {
       ...defaultSettings,
       printDesign: "nukit-tempest",
       tempestArrangement: "four-side-filter-tower",
-      fansTop: 2,
+      fansTop: -1, // top grid on
       fansLeft: 3,
+      fansRight: 3,
+      fansBottom: 3,
     } as const;
     const out = normalizeRawSettings(raw);
-    expect(out.fansTop).toBe(0);
     expect(out.fansLeft).toBe(0);
+    expect(out.fansRight).toBe(0);
+    expect(out.fansBottom).toBe(0);
+    expect(out.fansTop).toBe(-1); // preserved: the top-panel fan grid toggle
+
+    // turning the top off (0) is preserved too
+    expect(normalizeRawSettings({ ...raw, fansTop: 0 }).fansTop).toBe(0);
   });
 
   test("switching arrangement resets the per-wall banks to its defaults", () => {

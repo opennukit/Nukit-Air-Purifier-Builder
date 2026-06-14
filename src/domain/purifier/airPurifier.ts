@@ -12,7 +12,6 @@ import {
   type PrintDesignPreset,
 } from "@/domain/purifier/designPresets";
 import {
-  applyTempestArrangement,
   cameraPresets,
   canonicalTempestArrangement,
   canonicalTempestDesign,
@@ -783,12 +782,20 @@ function canonicalizePrintDesignRawSettings(
     return settings;
   }
   const arrangement = canonicalTempestArrangement(settings.tempestArrangement);
-  // The tower has no editable per-wall fans, so it always carries its own
-  // bank defaults. The 1-top and 2-filter sandwich modes keep the user's
-  // per-wall fan counts (a true arrangement switch resets them explicitly via
-  // applyTempestArrangementDefaults in the UI / URL defaults).
+  // The tower has no side-wall fans (those faces are filters), so left/right/
+  // bottom are always 0; "top" is kept so the top-panel fan grid can be toggled
+  // on/off. The 1-top and 2-filter sandwich modes keep all of the user's
+  // per-wall fan counts. A true arrangement switch resets them explicitly via
+  // applyTempestArrangementDefaults in the UI / URL defaults.
   if (arrangement === "four-side-filter-tower") {
-    return applyTempestArrangement(settings, arrangement);
+    return {
+      ...settings,
+      tempestArrangement: arrangement,
+      filters: 2,
+      fansLeft: 0,
+      fansRight: 0,
+      fansBottom: 0,
+    };
   }
   return {
     ...settings,

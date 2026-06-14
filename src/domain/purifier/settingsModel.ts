@@ -733,10 +733,12 @@ export function tempestRawFanBanksForArrangement(
   arrangement: TempestArrangementPreset,
 ): FanBanks<number> {
   if (arrangement === "four-side-filter-tower") {
+    // The tower has no side-wall fans; "top" toggles the top-panel fan grid
+    // (automatic = grid on, 0 = no top fans).
     return {
       left: 0,
       right: 0,
-      top: 0,
+      top: automaticFanCount,
       bottom: 0,
     };
   }

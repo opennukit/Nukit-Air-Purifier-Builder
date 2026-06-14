@@ -292,6 +292,12 @@
   // open, or whenever it is already the active choice (so the segment is never
   // left with no selection highlighted).
   $: showBoxExhaustOption = isFourFilterTower && (showTempestAdvanced || selectedFanSizeChoice === "box-exhaust");
+  // Fan-placement checkboxes: all four walls for the horizontal layouts; only
+  // "Top" for the four-side tower (its other faces are filters), where it
+  // toggles the top-panel fan grid.
+  $: fanPlacementCheckboxControls = isFourFilterTower
+    ? fanPlacementControls.filter((control) => control.name === "fansTop")
+    : fanPlacementControls;
   $: showHexGrillControls = isTempestControlsActive && selectedFanSizeChoice !== "box-exhaust";
   // Box/exhaust uses its own ring screws, so the PC-fan screw-hole input is hidden.
   $: visibleGeometryControls =
@@ -489,6 +495,14 @@
       ...settings,
       [name]: readFanCountControlValue(event),
     });
+  }
+
+  // The "Fan placement" checkboxes outside Advanced toggle automatic placement
+  // for a wall: checked = Auto, unchecked = none. The per-wall selects in
+  // Advanced write the same setting and so override this.
+  function updateFanAuto(name: FanCountSettingName, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    commitSettings({ ...settings, [name]: checked ? automaticFanCount : 0 });
   }
 
   function toggleAutoRotate(): void {
@@ -1182,21 +1196,6 @@
                         {/each}
                       </div>
                     </fieldset>
-                    {#if showTempestWallFanControls}
-                      <div data-tempest-fan-placement>
-                        {#each fanPlacementControls as control}
-                          <label class="field compact-field">
-                            <span>{control.label}</span>
-                            <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
-                              <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
-                              {#each fixedFanCountOptions as count}
-                                <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
-                              {/each}
-                            </select>
-                          </label>
-                        {/each}
-                      </div>
-                    {/if}
                   </div>
                 {/if}
               </div>
@@ -1368,6 +1367,25 @@
                     </div>
                   {/if}
 
+                  {#if isTempestControlsActive}
+                    <fieldset class="fan-placement-field" data-tempest-fan-auto>
+                      <legend>Fan placement</legend>
+                      <div class="fan-placement-checks">
+                        {#each fanPlacementCheckboxControls as control}
+                          <label class="toggle-field">
+                            <input
+                              type="checkbox"
+                              name={`auto-${control.name}`}
+                              checked={settings[control.name] === automaticFanCount}
+                              onchange={(event) => updateFanAuto(control.name, event)}
+                            />
+                            <span>{control.label}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                  {/if}
+
                   <div class="field fan-color-field">
                     <span>Fan color</span>
                     <div class="fan-color-options" role="group" aria-label="Fan color">
@@ -1526,6 +1544,21 @@
 
                   {#if showTempestAdvanced}
                     <div data-tempest-advanced-controls>
+                      {#if showTempestWallFanControls}
+                        <div data-tempest-fan-placement>
+                          {#each fanPlacementControls as control}
+                            <label class="field compact-field">
+                              <span>{control.label} fans</span>
+                              <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
+                                <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
+                                {#each fixedFanCountOptions as count}
+                                  <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
+                                {/each}
+                              </select>
+                            </label>
+                          {/each}
+                        </div>
+                      {/if}
                       {#each visibleGeometryControls as control}
                         <label class="field">
                           <span>{control.label}</span>

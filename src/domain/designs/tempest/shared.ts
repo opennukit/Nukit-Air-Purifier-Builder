@@ -108,6 +108,10 @@ export type TempestFanSettings = {
   readonly screwHoleDiameter: Millimeters;
   readonly wallRequests: TempestWallMap<TempestFanCountRequest>;
   readonly opening: TempestFanOpening;
+  // Tower-only: toggles the top-panel fan grid. "automatic" (or omitted) keeps
+  // the grid; a fixed count of 0 removes the top fans. Ignored by horizontal
+  // layouts, which use wallRequests instead.
+  readonly topFans?: TempestFanCountRequest;
   // Tower-only; defaults to "fan-grid" when omitted, and ignored by horizontal layouts.
   readonly topExhaust?: TempestTowerTopExhaust;
   // Tower box/exhaust geometry; only used when topExhaust === "box-exhaust".

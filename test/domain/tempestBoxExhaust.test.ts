@@ -51,4 +51,14 @@ describe("tempest box/exhaust settings", () => {
     if (grid.topology !== "quad") throw new Error("expected a quad tower layout");
     expect(grid.fanCount).toBeGreaterThan(0);
   });
+
+  test("turning the tower top fans off removes the grid", () => {
+    const off = createTempestModel(
+      createTempestSettingsFromLayout(
+        createLayout(decodeSettings("printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&fansTop=0&filterWidth=300&filterDepth=300&filterThickness=25")),
+      ),
+    ).fanLayout;
+    if (off.topology !== "quad") throw new Error("expected a quad tower layout");
+    expect(off.fanCount).toBe(0);
+  });
 });

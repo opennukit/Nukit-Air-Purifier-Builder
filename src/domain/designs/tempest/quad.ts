@@ -176,16 +176,17 @@ export function createQuadFanLayout(
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
   const topExhaust = settings.fan.topExhaust ?? "fan-grid";
   const minimumCenterFromEdge = quadFilter.structuralOffset + settings.fan.diameter / 2;
-  // Box/Exhaust feeds the tower from an external box fan bolted over the central
-  // hole, so there is no grid of PC fans to lay out or render.
-  const positionsX =
-    topExhaust === "box-exhaust"
-      ? []
-      : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
-  const positionsY =
-    topExhaust === "box-exhaust"
-      ? []
-      : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
+  // No grid of PC fans when: Box/Exhaust feeds the tower from an external box fan
+  // over the central hole, or the user turned the top fans off (top bank = 0).
+  const topFans = settings.fan.topFans;
+  const topFansOff =
+    topExhaust === "box-exhaust" || (topFans?.type === "fixed" && topFans.count === 0);
+  const positionsX = topFansOff
+    ? []
+    : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
+  const positionsY = topFansOff
+    ? []
+    : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
   return {
     topology: "quad",
     bodyDepth,

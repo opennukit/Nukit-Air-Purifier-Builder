@@ -38,6 +38,8 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
               left: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.left),
               right: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.right),
             },
+      // Tower top-panel fan grid toggle (top bank: automatic = grid on, 0 = off).
+      topFans: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.top),
       topExhaust: design.topExhaust,
       boxExhaust: resolveBoxExhaust(design),
     },
