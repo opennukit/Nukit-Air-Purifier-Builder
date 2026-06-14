@@ -47,6 +47,10 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
 export type TempestAlignmentPinPlacement = {
   readonly position: readonly [number, number, number];
   readonly axis: TempestExtrudeAxis;
+  // Optional shallower half-depth into each chunk (millimeters). Absent means the
+  // full pin.holeDepth. Set for top-plate pins that must stop short of a
+  // perpendicular hole (fan-grid opening or screw hole).
+  readonly holeDepth?: number;
 };
 
 export function tempestAlignmentPinPlacements(model: TempestModel, chunkGrid: TempestChunkGrid): readonly TempestAlignmentPinPlacement[] {
@@ -65,7 +69,7 @@ export function tempestAlignmentPinPlacements(model: TempestModel, chunkGrid: Te
 
   return matchTopology(model, {
     sandwich: (m) => pinPlacementsSandwich(m, m.filterLayout, chunkGrid, pin),
-    quad: (m) => pinPlacementsQuad(m, m.filterLayout, chunkGrid, pin),
+    quad: (m) => pinPlacementsQuad(m, m.filterLayout, m.fanLayout, chunkGrid, pin),
   });
 }
 
@@ -120,9 +124,10 @@ function pinHoleCylinder<Solid, Region>(
   pin: AlignmentPinSpec,
 ): Solid {
   const [x, y, z] = placement.position;
+  const depth = placement.holeDepth ?? pin.holeDepth;
   const start: readonly [number, number, number] =
-    placement.axis === "x" ? [x - pin.holeDepth, y, z] : placement.axis === "y" ? [x, y - pin.holeDepth, z] : [x, y, z - pin.holeDepth];
-  return cylinderAlongFromStart(ctx, placement.axis, start, 2 * pin.holeDepth, pin.diameter / 2);
+    placement.axis === "x" ? [x - depth, y, z] : placement.axis === "y" ? [x, y - depth, z] : [x, y, z - depth];
+  return cylinderAlongFromStart(ctx, placement.axis, start, 2 * depth, pin.diameter / 2);
 }
 
 function pinPlacementsSandwich(
@@ -203,12 +208,24 @@ function pinPlacementsSandwich(
 function pinPlacementsQuad(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
 ): TempestAlignmentPinPlacement[] {
   const placements: TempestAlignmentPinPlacement[] = [];
   const wallZLow = filterLayout.bottomPlateThickness;
   const wallZHigh = model.box.height - filterLayout.topPlateThickness;
+  const topPlateMidZ = model.box.height - filterLayout.topPlateThickness / 2;
+  // Holes a top-plate pin must not pierce (fan-grid grills + their screw holes).
+  const topHoles = quadTopPlateHoles(model, fanLayout);
+  // A central top-plate pin this close to a perpendicular seam would collide with
+  // the perpendicular pin at that grid corner; drop it (other pins still align the
+  // pieces). Clearance covers the perpendicular pin's reach plus its width.
+  const cornerClearance = pin.holeDepth + pin.diameter;
+  const interiorSeamsX = chunkGrid.boundariesX.slice(1, -1);
+  const interiorSeamsY = chunkGrid.boundariesY.slice(1, -1);
+  const nearSeam = (coordinate: number, seams: readonly number[]): boolean =>
+    seams.some((seam) => Math.abs(coordinate - seam) < cornerClearance);
   // The structural wall between each filter pocket and the air chamber: its inner
   // face is the carried chamber-face plane, so its midline sits half a wall in.
   // (All four rects share innerPlaneOffset === structuralOffset.)
@@ -238,6 +255,17 @@ function pinPlacementsQuad(
       for (const gridY of rimPositions(model.box.depth - filterLayout.structuralOffset, model.box.depth - model.frame.outsideFlangeThickness, pin.spacing)) {
         placements.push({ position: [seamX, gridY, model.box.height - filterLayout.topPlateThickness / 2], axis: "x" });
       }
+      // Central top plate (over the air chamber): pin between fan grills/screws,
+      // each shortened to stop short of the holes it would otherwise pierce.
+      for (const gridY of rimPositions(filterLayout.structuralOffset, model.box.depth - filterLayout.structuralOffset, pin.spacing)) {
+        if (nearSeam(gridY, interiorSeamsY)) {
+          continue;
+        }
+        const depth = clampedTopPinDepth(topHoles, seamX, gridY, "x", pin.holeDepth);
+        if (depth !== null) {
+          placements.push({ position: [seamX, gridY, topPlateMidZ], axis: "x", holeDepth: depth });
+        }
+      }
     }
   }
 
@@ -262,6 +290,15 @@ function pinPlacementsQuad(
       }
       for (const gridX of rimPositions(model.box.width - filterLayout.structuralOffset, model.box.width - model.frame.outsideFlangeThickness, pin.spacing)) {
         placements.push({ position: [gridX, seamY, model.box.height - filterLayout.topPlateThickness / 2], axis: "y" });
+      }
+      for (const gridX of rimPositions(filterLayout.structuralOffset, model.box.width - filterLayout.structuralOffset, pin.spacing)) {
+        if (nearSeam(gridX, interiorSeamsX)) {
+          continue;
+        }
+        const depth = clampedTopPinDepth(topHoles, gridX, seamY, "y", pin.holeDepth);
+        if (depth !== null) {
+          placements.push({ position: [gridX, seamY, topPlateMidZ], axis: "y", holeDepth: depth });
+        }
       }
     }
   }
@@ -299,6 +336,83 @@ function pinPlacementsQuad(
   }
 
   return placements;
+}
+
+// #######################################
+// Top-Plate Pin Hole Clamping
+// #######################################
+
+// How far a shortened top-plate pin hole stops before a perpendicular hole.
+const TOP_PIN_HOLE_STANDOFF_MM = 1;
+// The shallowest hole still worth a pin; anything less is dropped.
+const TOP_PIN_MIN_DEPTH_MM = 3;
+
+type TopPlateHoleCircle = { readonly cx: number; readonly cy: number; readonly r: number };
+
+// The perpendicular holes a top-plate pin must avoid: each fan's grill opening
+// and its four screw holes. `single-box-fan` clears the whole centre, so it gets
+// no central pins (returns null).
+function quadTopPlateHoles(
+  model: TempestModel,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
+): readonly TopPlateHoleCircle[] | null {
+  if (fanLayout.topExhaust !== "fan-grid") {
+    return null;
+  }
+  const grillRadius = model.settings.fan.diameter / 2;
+  const screwRadius = model.settings.fan.screwHoleDiameter / 2;
+  const screwDelta = fanLayout.screwPitch / 2;
+  const circles: TopPlateHoleCircle[] = [];
+  for (const fx of fanLayout.positionsX) {
+    for (const fy of fanLayout.positionsY) {
+      circles.push({ cx: fx, cy: fy, r: grillRadius });
+      for (const sx of [fx - screwDelta, fx + screwDelta]) {
+        for (const sy of [fy - screwDelta, fy + screwDelta]) {
+          circles.push({ cx: sx, cy: sy, r: screwRadius });
+        }
+      }
+    }
+  }
+  return circles;
+}
+
+// The deepest (symmetric) half-depth a top-plate pin at (sx, sy) running along
+// `axis` can reach before coming within the standoff of any hole, on either
+// side of the seam. Returns null when the pin would start inside a hole or can't
+// reach the minimum useful depth.
+function clampedTopPinDepth(
+  holes: readonly TopPlateHoleCircle[] | null,
+  sx: number,
+  sy: number,
+  axis: "x" | "y",
+  fullDepth: number,
+): number | null {
+  if (holes === null) {
+    return null;
+  }
+  let depth = fullDepth;
+  for (const direction of [1, -1] as const) {
+    for (const hole of holes) {
+      const perpendicularOffset = axis === "x" ? sy - hole.cy : sx - hole.cx;
+      if (Math.abs(perpendicularOffset) >= hole.r) {
+        continue;
+      }
+      const halfChord = Math.sqrt(hole.r * hole.r - perpendicularOffset * perpendicularOffset);
+      const center = axis === "x" ? hole.cx : hole.cy;
+      const start = axis === "x" ? sx : sy;
+      const low = center - halfChord;
+      const high = center + halfChord;
+      if (start > low && start < high) {
+        return null;
+      }
+      const nearEdge = direction > 0 ? low : high;
+      const aheadDistance = (nearEdge - start) * direction;
+      if (aheadDistance >= 0) {
+        depth = Math.min(depth, aheadDistance - TOP_PIN_HOLE_STANDOFF_MM);
+      }
+    }
+  }
+  return depth >= TOP_PIN_MIN_DEPTH_MM ? depth : null;
 }
 
 // #######################################

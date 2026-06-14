@@ -88,6 +88,42 @@ describe("tempest assembly pin diagram", () => {
     expect(diagram.placements.length).toBeGreaterThan(0);
   });
 
+  test("shortens central top-plate tower pins to clear the fan grills and screws", () => {
+    const plan = createTempestChunkPlan(towerSettings, "bed-180");
+    const pin = plan.model.settings.alignmentPins;
+    if (pin.type !== "enabled") {
+      throw new Error("expected enabled alignment pins for the default tower");
+    }
+    const placements = tempestAlignmentPinPlacements(plan.model, plan.sourceChunkGrid);
+    const clamped = placements.filter((placement) => placement.holeDepth !== undefined);
+
+    // The central top-plate pins are the ones that needed shortening.
+    expect(clamped.length).toBeGreaterThan(0);
+    for (const placement of clamped) {
+      expect(placement.holeDepth!).toBeGreaterThanOrEqual(3);
+      expect(placement.holeDepth!).toBeLessThanOrEqual(pin.holeDepth);
+    }
+
+    // The diagram carries a matching per-pin length, so the preview is no longer
+    // one length for every pin.
+    const diagram = createTempestAssemblyPinDiagram(towerSettings, "bed-180");
+    const lengths = new Set(diagram?.placements.map((placement) => placement.length));
+    expect(lengths.size).toBeGreaterThan(1);
+
+    // No central pin sits near a perpendicular grid corner, where it would collide
+    // with the perpendicular pin (they are dropped — other pins still align).
+    const interiorSeamsX = plan.sourceChunkGrid.boundariesX.slice(1, -1);
+    const interiorSeamsY = plan.sourceChunkGrid.boundariesY.slice(1, -1);
+    const cornerClearance = pin.holeDepth + pin.diameter;
+    for (const placement of clamped) {
+      const perpendicularSeams = placement.axis === "x" ? interiorSeamsY : interiorSeamsX;
+      const acrossCoordinate = placement.axis === "x" ? placement.position[1] : placement.position[0];
+      for (const seam of perpendicularSeams) {
+        expect(Math.abs(acrossCoordinate - seam)).toBeGreaterThanOrEqual(cornerClearance);
+      }
+    }
+  });
+
   test("returns no diagram when the print volume keeps the model whole", () => {
     expect(createTempestAssemblyPinDiagram(tempestSettings, "unsplit")).toBeNull();
   });

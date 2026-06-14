@@ -131,6 +131,9 @@ export function createTempestChunkPlan(settings: TempestSettings, presetId: Prin
 export type TempestPosedPinPlacement = {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly axis: "x" | "y" | "z";
+  // The physical pin piece length for this seam, derived from its (possibly
+  // shortened) hole depth so the preview matches the cut holes pin-for-pin.
+  readonly length: number;
 };
 
 export type TempestAssemblyPinDiagram = {
@@ -150,7 +153,10 @@ export function createTempestAssemblyPinDiagram(
   if (pins.type === "disabled") {
     return null;
   }
-  const placements = tempestPinPlacementsClearOfFans(model, sourceChunkGrid).map((placement) => posePinPlacement(placement, pose));
+  const placements = tempestPinPlacementsClearOfFans(model, sourceChunkGrid).map((placement) => ({
+    ...posePinPlacement(placement, pose),
+    length: alignmentPinPieceLength(placement.holeDepth ?? pins.holeDepth),
+  }));
   if (placements.length === 0) {
     return null;
   }
@@ -164,7 +170,10 @@ export function createTempestAssemblyPinDiagram(
 // Source -> posed frame, matching posePrintableAssembly and
 // sourceChunkGridForPose: upright-dual-filter maps (x, y, z) to
 // (x, envelope.depth - z, y), so the axes follow the same rotation.
-function posePinPlacement(placement: TempestAlignmentPinPlacement, pose: TempestPrintablePose): TempestPosedPinPlacement {
+function posePinPlacement(
+  placement: TempestAlignmentPinPlacement,
+  pose: TempestPrintablePose,
+): Omit<TempestPosedPinPlacement, "length"> {
   const [x, y, z] = placement.position;
   if (pose.type === "source") {
     return { position: { x, y, z }, axis: placement.axis };

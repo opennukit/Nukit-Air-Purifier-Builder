@@ -1232,7 +1232,7 @@ export class PurifierThreePreview {
         z: placement.position.z + (lowOffset[2] + highOffset[2]) / 2,
       };
       const pinMesh = new Mesh(
-        new CylinderGeometry(radius, radius, (diagram.pinLength + seamGap) * sceneScale, filamentPinSegments),
+        new CylinderGeometry(radius, radius, (placement.length + seamGap) * sceneScale, filamentPinSegments),
         material,
       );
       pinMesh.name = "tempest-seam-pin";
