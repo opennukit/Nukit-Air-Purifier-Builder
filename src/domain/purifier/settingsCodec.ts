@@ -30,12 +30,14 @@ import {
   cordHoleWalls,
   defaultSettings,
   findPreviewMaterialColorPreset,
+  topExhausts,
   type CameraPreset,
   type CordHoleSide,
   type CordHoleWall,
   type PreviewMaterialColorId,
   type PurifierDraft,
   type RawPurifierSettings,
+  type TopExhaust,
 } from "@/domain/purifier/settingsModel";
 import {
   createPurifierSettingsFieldsSchema,
@@ -78,6 +80,14 @@ export function encodeSettings(
   params.set("hexGrill", String(settings.hexGrill));
   params.set("hexSize", formatNumber(settings.hexSize));
   params.set("hexSpacing", formatNumber(settings.hexSpacing));
+  params.set("topExhaust", settings.topExhaust);
+  params.set("boxFanHoleSize", formatNumber(settings.boxFanHoleSize));
+  params.set("boxRingOneScrewHoles", String(settings.boxRingOneScrewHoles));
+  params.set("boxRingOneScrewDiameter", formatNumber(settings.boxRingOneScrewDiameter));
+  params.set("boxRingOneRadius", formatNumber(settings.boxRingOneRadius));
+  params.set("boxRingTwoScrewHoles", String(settings.boxRingTwoScrewHoles));
+  params.set("boxRingTwoScrewDiameter", formatNumber(settings.boxRingTwoScrewDiameter));
+  params.set("boxRingTwoRadius", formatNumber(settings.boxRingTwoRadius));
   params.set(
     "donutFilterOuterDiameter",
     formatNumber(settings.donutFilterOuterDiameter),
@@ -160,6 +170,7 @@ export function decodeSettings(search: string): RawPurifierSettings {
     tempestArrangement: readTempestArrangement(params),
     cordHoleWall: readCordHoleWall(params),
     cordHoleSide: readCordHoleSide(params),
+    topExhaust: readTopExhaust(params),
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,
@@ -237,6 +248,11 @@ function readCordHoleWall(params: URLSearchParams): CordHoleWall {
 function readCordHoleSide(params: URLSearchParams): CordHoleSide {
   const value = params.get("cordHoleSide");
   return cordHoleSides.find((side) => side === value) ?? defaultSettings.cordHoleSide;
+}
+
+function readTopExhaust(params: URLSearchParams): TopExhaust {
+  const value = params.get("topExhaust");
+  return topExhausts.find((style) => style === value) ?? defaultSettings.topExhaust;
 }
 
 function readTempestArrangement(
@@ -389,6 +405,13 @@ const purifierSettingsFieldKeys: Record<
   hexGrill: "hexGrill",
   hexSize: "hexSize",
   hexSpacing: "hexSpacing",
+  boxFanHoleSize: "boxFanHoleSize",
+  boxRingOneScrewHoles: "boxRingOneScrewHoles",
+  boxRingOneScrewDiameter: "boxRingOneScrewDiameter",
+  boxRingOneRadius: "boxRingOneRadius",
+  boxRingTwoScrewHoles: "boxRingTwoScrewHoles",
+  boxRingTwoScrewDiameter: "boxRingTwoScrewDiameter",
+  boxRingTwoRadius: "boxRingTwoRadius",
   rim: "rim",
   filters: "filters",
   splitFrames: ["splitFrames", "split_frames"],

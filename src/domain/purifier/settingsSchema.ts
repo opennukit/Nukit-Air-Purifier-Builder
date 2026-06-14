@@ -84,6 +84,13 @@ export type PurifierSettingsFieldFallbacks = {
   readonly hexGrill: boolean;
   readonly hexSize: number;
   readonly hexSpacing: number;
+  readonly boxFanHoleSize: number;
+  readonly boxRingOneScrewHoles: number;
+  readonly boxRingOneScrewDiameter: number;
+  readonly boxRingOneRadius: number;
+  readonly boxRingTwoScrewHoles: number;
+  readonly boxRingTwoScrewDiameter: number;
+  readonly boxRingTwoRadius: number;
   readonly rim: number;
   readonly filters: FilterCount;
   readonly splitFrames: boolean;
@@ -137,6 +144,13 @@ export const createPurifierSettingsFieldsSchema = (
     hexGrill: zBooleanField(fallbacks.hexGrill),
     hexSize: zNumberField(fallbacks.hexSize),
     hexSpacing: zNumberField(fallbacks.hexSpacing),
+    boxFanHoleSize: zNumberField(fallbacks.boxFanHoleSize),
+    boxRingOneScrewHoles: zIntegerField(fallbacks.boxRingOneScrewHoles),
+    boxRingOneScrewDiameter: zNumberField(fallbacks.boxRingOneScrewDiameter),
+    boxRingOneRadius: zNumberField(fallbacks.boxRingOneRadius),
+    boxRingTwoScrewHoles: zIntegerField(fallbacks.boxRingTwoScrewHoles),
+    boxRingTwoScrewDiameter: zNumberField(fallbacks.boxRingTwoScrewDiameter),
+    boxRingTwoRadius: zNumberField(fallbacks.boxRingTwoRadius),
     rim: zNumberField(fallbacks.rim),
     filters: zFilterCountField(fallbacks.filters),
     splitFrames: zBooleanField(fallbacks.splitFrames),

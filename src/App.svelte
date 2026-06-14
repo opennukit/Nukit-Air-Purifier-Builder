@@ -39,6 +39,7 @@
     generatedGeometryControls,
     nukitPanelFitControls,
     tempestArrangementOptions,
+    tempestBoxExhaustControls,
     tempestFitControls,
     tempestHexGrillControls,
     type BooleanSettingName,
@@ -49,7 +50,7 @@
     type NumericSettingName,
   } from "@/app/controls/controlMetadata";
   import {
-    fanSizeChoiceForDiameter,
+    fanSizeChoiceForSettings,
     recommendedFanDiameterOptions,
     type FanSizeChoice,
   } from "@/app/controls/fanSelection";
@@ -202,10 +203,8 @@
   let activeDesignContext: WorkbenchDesignContext = workbenchView.design;
   let activeFabricationPreview: WorkbenchFabricationPreview = workbenchView.fabricationPreview;
   let activeControlPanels: WorkbenchControlPanels = workbenchView.controlPanels;
-  // UI-only: keeps the "Custom" size segment active while the typed diameter
-  // still matches a recommended size; the settings store only the diameter.
-  let customFanSizePinned = false;
-  let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
+  let isFourFilterTower = false;
+  let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForSettings(settings.fanDiameter, settings.topExhaust);
   let isStaticReferenceControlsActive = false;
   let showCutSheetPreviewMode = false;
   let showPrintSheetsPreviewMode = true;
@@ -267,13 +266,22 @@
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
-  $: selectedFanSizeChoice = fanSizeChoiceForDiameter(settings.fanDiameter, customFanSizePinned);
+  $: isFourFilterTower = isTempestControlsActive && settings.tempestArrangement === "four-side-filter-tower";
+  $: selectedFanSizeChoice = fanSizeChoiceForSettings(
+    settings.fanDiameter,
+    isFourFilterTower ? settings.topExhaust : "fan-grid",
+  );
   $: isStaticReferenceControlsActive = activeDesignContext.type === "static-reference";
   $: showCutSheetPreviewMode = activeFabricationPreview.type === "cut-sheet";
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
-  $: showHexGrillControls = isTempestControlsActive;
+  $: showHexGrillControls = isTempestControlsActive && selectedFanSizeChoice !== "box-exhaust";
+  // Box/exhaust uses its own ring screws, so the PC-fan screw-hole input is hidden.
+  $: visibleGeometryControls =
+    selectedFanSizeChoice === "box-exhaust"
+      ? generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter")
+      : generatedGeometryControls;
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
   $: showPrintSetupControls = fabricationMethod === "print-3mf" && activeControlPanels.setup.type === "available";
   $: showAdvancedControls = activeControlPanels.advanced.type === "available";
@@ -350,7 +358,6 @@
     settings = serializePurifierDraft(nextDraft);
     printDesignSettingsMemory = nextMemory;
     workbenchState = normalizeWorkbenchStateForSettings(nextState, nextDraft);
-    customFanSizePinned = false;
     syncDerivedWorkbenchState();
     syncUrl();
   }
@@ -360,14 +367,14 @@
   // ##############################
 
   function updateFanSizeChoice(choice: FanSizeChoice): void {
-    if (choice === "custom") {
-      customFanSizePinned = true;
+    if (choice === "box-exhaust") {
+      commitSettings({ ...settings, topExhaust: "box-exhaust" });
       return;
     }
-    customFanSizePinned = false;
     commitSettings({
       ...settings,
       fanDiameter: choice,
+      topExhaust: "fan-grid",
     });
   }
 
@@ -1264,7 +1271,7 @@
                 {/if}
 
                 <div class="fan-selection">
-                  <fieldset class="segmented-field segmented-field-three">
+                  <fieldset class="segmented-field" class:segmented-field-three={isFourFilterTower}>
                     <legend>Fan size</legend>
                     <div>
                       {#each recommendedFanDiameterOptions as diameter}
@@ -1279,37 +1286,41 @@
                           <span>{diameter} mm</span>
                         </label>
                       {/each}
-                      <label>
-                        <input
-                          type="radio"
-                          name="fanSizeChoice"
-                          value="custom"
-                          checked={selectedFanSizeChoice === "custom"}
-                          onchange={() => updateFanSizeChoice("custom")}
-                        />
-                        <span>Custom</span>
-                      </label>
+                      {#if isFourFilterTower}
+                        <label>
+                          <input
+                            type="radio"
+                            name="fanSizeChoice"
+                            value="box-exhaust"
+                            checked={selectedFanSizeChoice === "box-exhaust"}
+                            onchange={() => updateFanSizeChoice("box-exhaust")}
+                          />
+                          <span>Box/Exhaust</span>
+                        </label>
+                      {/if}
                     </div>
                   </fieldset>
 
-                  {#if selectedFanSizeChoice === "custom"}
-                    <label class="field">
-                      <span>Fan diameter</span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name="fanDiameter"
-                          min="40"
-                          max="140"
-                          step="1"
-                          inputmode="decimal"
-                          title="Snaps to the nearest supported size: 40/60/80/92/120/140"
-                          value={settings.fanDiameter}
-                          onchange={(event) => updateNumberSetting("fanDiameter", event)}
-                        />
-                        <small>mm</small>
-                      </span>
-                    </label>
+                  {#if selectedFanSizeChoice === "box-exhaust"}
+                    <div data-box-exhaust-controls>
+                      {#each tempestBoxExhaustControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    </div>
                   {/if}
 
                   <div class="field fan-color-field">
@@ -1340,7 +1351,7 @@
                 <p class="eyebrow">Geometry</p>
                 <h2>Material and fit</h2>
               </div>
-              {#each generatedGeometryControls as control}
+              {#each visibleGeometryControls as control}
                 <label class="field">
                   <span>{control.label}</span>
                   <span class="input-shell">

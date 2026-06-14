@@ -1,5 +1,6 @@
 import { defaultTempestSettings } from "@/domain/designs/tempest/model";
 import {
+  type TempestBoxExhaust,
   type TempestFanCountRequest,
   type TempestSettings,
 } from "@/domain/designs/tempest/shared";
@@ -33,6 +34,8 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
               left: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.left),
               right: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.right),
             },
+      topExhaust: design.topExhaust,
+      boxExhaust: resolveBoxExhaust(design),
     },
     frame: {
       ...defaultTempestSettings.frame,
@@ -58,6 +61,31 @@ function requireTempestDesign(configuration: PurifierSettings): Extract<Purifier
     throw new Error("requireTempestDesign: Expected Tempest print design");
   }
   return configuration.design;
+}
+
+// Expand the box/exhaust auto defaults: a 0 fan-hole size means ⅚ of the filter
+// face width, and a 0 ring radius means 120% / 140% of the fan-hole radius —
+// matching tempest-builder.html's derived defaults.
+function resolveBoxExhaust(
+  design: Extract<PurifierSettings["design"], { readonly type: "tempest" }>,
+): TempestBoxExhaust {
+  const faceWidth = Math.min(design.filter.width, design.filter.depth);
+  const fanHoleSize = design.boxFanHoleSize > 0 ? design.boxFanHoleSize : (5 / 6) * faceWidth;
+  const fanHoleRadius = fanHoleSize / 2;
+  const ringRadius = (raw: number, factor: number) => (raw > 0 ? raw : factor * fanHoleRadius);
+  return {
+    fanHoleSize,
+    ringOne: {
+      screwHoles: design.boxRingOneScrewHoles,
+      screwDiameter: design.boxRingOneScrewDiameter,
+      radius: ringRadius(design.boxRingOneRadius, 1.2),
+    },
+    ringTwo: {
+      screwHoles: design.boxRingTwoScrewHoles,
+      screwDiameter: design.boxRingTwoScrewDiameter,
+      radius: ringRadius(design.boxRingTwoRadius, 1.4),
+    },
+  };
 }
 
 function tempestArrangementFromConfiguration(configuration: PurifierSettings): TempestSettings["arrangement"] {

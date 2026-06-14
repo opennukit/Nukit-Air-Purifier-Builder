@@ -142,6 +142,7 @@ export function normalizeRawSettings(
     hexGrill: input.hexGrill,
     hexSize: normalizeHexSize(input.hexSize),
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
+    ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
     donutFilterHoleDiameter: donutFilter.holeDiameter,
@@ -276,6 +277,7 @@ export function serializePurifierDraft(
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
+      ...copyTempestExhaustFields(draft.design),
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -339,6 +341,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     hexGrill: defaultSettings.hexGrill,
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
+    ...copyTempestExhaustFields(defaultSettings),
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
     donutFilterHoleDiameter: defaultSettings.donutFilterHoleDiameter,
@@ -421,6 +424,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       hexGrill: input.design.hexGrill,
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
+      ...copyTempestExhaustFields(input.design),
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
       splitFrames: true,
@@ -497,6 +501,7 @@ function createConfiguredPrintDesign(input: {
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
+      ...normalizeTempestExhaustFields(input.raw),
     };
   }
 
@@ -599,6 +604,7 @@ function createPurifierDesignDraft(
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
+      ...copyTempestExhaustFields(configuration.design),
     };
   }
 
@@ -693,6 +699,44 @@ function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
 
 function normalizeCordHoleCornerOffset(value: Millimeters): Millimeters {
   return clamp(value, 0, 200);
+}
+
+type TempestExhaustFields = Pick<
+  RawPurifierSettings,
+  | "topExhaust"
+  | "boxFanHoleSize"
+  | "boxRingOneScrewHoles"
+  | "boxRingOneScrewDiameter"
+  | "boxRingOneRadius"
+  | "boxRingTwoScrewHoles"
+  | "boxRingTwoScrewDiameter"
+  | "boxRingTwoRadius"
+>;
+
+function copyTempestExhaustFields(source: TempestExhaustFields): TempestExhaustFields {
+  return {
+    topExhaust: source.topExhaust,
+    boxFanHoleSize: source.boxFanHoleSize,
+    boxRingOneScrewHoles: source.boxRingOneScrewHoles,
+    boxRingOneScrewDiameter: source.boxRingOneScrewDiameter,
+    boxRingOneRadius: source.boxRingOneRadius,
+    boxRingTwoScrewHoles: source.boxRingTwoScrewHoles,
+    boxRingTwoScrewDiameter: source.boxRingTwoScrewDiameter,
+    boxRingTwoRadius: source.boxRingTwoRadius,
+  };
+}
+
+function normalizeTempestExhaustFields(source: TempestExhaustFields): TempestExhaustFields {
+  return {
+    topExhaust: source.topExhaust,
+    boxFanHoleSize: clamp(source.boxFanHoleSize, 0, 500),
+    boxRingOneScrewHoles: Math.max(0, Math.round(source.boxRingOneScrewHoles)),
+    boxRingOneScrewDiameter: clamp(source.boxRingOneScrewDiameter, 0, 50),
+    boxRingOneRadius: clamp(source.boxRingOneRadius, 0, 500),
+    boxRingTwoScrewHoles: Math.max(0, Math.round(source.boxRingTwoScrewHoles)),
+    boxRingTwoScrewDiameter: clamp(source.boxRingTwoScrewDiameter, 0, 50),
+    boxRingTwoRadius: clamp(source.boxRingTwoRadius, 0, 500),
+  };
 }
 
 function normalizeHexSize(value: Millimeters): Millimeters {

@@ -81,6 +81,17 @@ export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>
   { name: "hexSize", label: "Hex size", suffix: "mm", step: "0.5" },
   { name: "hexSpacing", label: "Hex spacing", suffix: "mm", step: "0.1" },
 ];
+// Tempest 4-filter tower box/exhaust geometry (shown only when Box-Exhaust is the
+// fan choice). A 0 size/radius means "auto" — see tempest-builder.html.
+export const tempestBoxExhaustControls: readonly NumberControl<NumericSettingName>[] = [
+  { name: "boxFanHoleSize", label: "Fan hole size", suffix: "mm", step: "1" },
+  { name: "boxRingOneScrewHoles", label: "Ring 1 screws", suffix: "x", step: "1" },
+  { name: "boxRingOneScrewDiameter", label: "Ring 1 screw ø", suffix: "mm", step: "0.5" },
+  { name: "boxRingOneRadius", label: "Ring 1 radius", suffix: "mm", step: "1" },
+  { name: "boxRingTwoScrewHoles", label: "Ring 2 screws", suffix: "x", step: "1" },
+  { name: "boxRingTwoScrewDiameter", label: "Ring 2 screw ø", suffix: "mm", step: "0.5" },
+  { name: "boxRingTwoRadius", label: "Ring 2 radius", suffix: "mm", step: "1" },
+];
 export const advancedJointControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "fingerWidthMultiplier", label: "Finger width", suffix: "x", step: "0.1" },
   { name: "fingerSpaceMultiplier", label: "Finger space", suffix: "x", step: "0.1" },

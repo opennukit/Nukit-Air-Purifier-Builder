@@ -313,6 +313,11 @@ export const defaultTempestSettings: TempestSettings = {
       hexFlatToFlat: defaultTempestHoneycombHexFlatToFlat,
       ribThickness: defaultTempestHoneycombRibThickness,
     },
+    boxExhaust: {
+      fanHoleSize: 0,
+      ringOne: { screwHoles: 4, screwDiameter: 6, radius: 0 },
+      ringTwo: { screwHoles: 4, screwDiameter: 6, radius: 0 },
+    },
   },
   frame: {
     wallThickness: 5,

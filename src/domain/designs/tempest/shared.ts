@@ -82,8 +82,26 @@ export type TempestFanOpening =
     };
 
 // The 4-filter tower's top exhaust style: the default N×N grid of PC-fan cutouts,
-// or a single large opening for a box/exhaust fan zip-tied through corner holes.
-export type TempestTowerTopExhaust = "fan-grid" | "single-box-fan";
+// or a single central hole for a box/exhaust fan with up to two rings of screw
+// holes (matches tempest-builder.html's "box/exhaust").
+export type TempestTowerTopExhaust = "fan-grid" | "box-exhaust";
+
+// One ring of evenly-spaced screw holes around the box/exhaust hole. radius is
+// from the hole centre; screwHoles<=0 or screwDiameter<=0 or radius<=0 skips it.
+export type TempestBoxExhaustRing = {
+  readonly screwHoles: number;
+  readonly screwDiameter: Millimeters;
+  readonly radius: Millimeters;
+};
+
+// Resolved box/exhaust top: a central fan hole plus two screw-hole rings. Values
+// here are already resolved (auto defaults expanded), so the geometry uses them
+// directly.
+export type TempestBoxExhaust = {
+  readonly fanHoleSize: Millimeters;
+  readonly ringOne: TempestBoxExhaustRing;
+  readonly ringTwo: TempestBoxExhaustRing;
+};
 
 export type TempestFanSettings = {
   readonly diameter: Millimeters;
@@ -92,6 +110,8 @@ export type TempestFanSettings = {
   readonly opening: TempestFanOpening;
   // Tower-only; defaults to "fan-grid" when omitted, and ignored by horizontal layouts.
   readonly topExhaust?: TempestTowerTopExhaust;
+  // Tower box/exhaust geometry; only used when topExhaust === "box-exhaust".
+  readonly boxExhaust: TempestBoxExhaust;
 };
 
 // ##############################

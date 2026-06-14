@@ -108,8 +108,8 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
       ];
     },
     quad: ({ fanLayout, filterLayout }) => {
-      // A single box-exhaust opening needs no seam avoidance.
-      if (fanLayout.topExhaust === "single-box-fan") {
+      // The box-exhaust hole needs no fan-grill seam avoidance.
+      if (fanLayout.topExhaust === "box-exhaust") {
         return [];
       }
       const z = box.height - filterLayout.topPlateThickness / 2;

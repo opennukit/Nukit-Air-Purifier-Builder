@@ -159,6 +159,11 @@ export type CutSheetPreviewOptions = {
 // Settings Model
 // #######################################
 
+// Tempest 4-filter tower top exhaust: the PC-fan grid, or a box/exhaust fan with
+// a central hole and two screw rings (mirrors tempest-builder.html).
+export const topExhausts = ["fan-grid", "box-exhaust"] as const;
+export type TopExhaust = (typeof topExhausts)[number];
+
 // Tempest cord pass-through choices (mirrors tempest-builder.html).
 export const cordHoleWalls = ["none", "front", "back", "left", "right"] as const;
 export type CordHoleWall = (typeof cordHoleWalls)[number];
@@ -195,6 +200,16 @@ export type RawPurifierSettings = {
   hexGrill: boolean;
   hexSize: Millimeters;
   hexSpacing: Millimeters;
+  // Tempest 4-filter tower only: top exhaust style and box/exhaust geometry. A
+  // value of 0 for a size/radius means "auto" (derived from the filter width).
+  topExhaust: TopExhaust;
+  boxFanHoleSize: Millimeters;
+  boxRingOneScrewHoles: number;
+  boxRingOneScrewDiameter: Millimeters;
+  boxRingOneRadius: Millimeters;
+  boxRingTwoScrewHoles: number;
+  boxRingTwoScrewDiameter: Millimeters;
+  boxRingTwoRadius: Millimeters;
   donutFilterOuterDiameter: Millimeters;
   donutFilterLength: Millimeters;
   donutFilterHoleDiameter: Millimeters;
@@ -271,6 +286,14 @@ export type TempestPrintDesignDraft = {
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
+  readonly topExhaust: TopExhaust;
+  readonly boxFanHoleSize: Millimeters;
+  readonly boxRingOneScrewHoles: number;
+  readonly boxRingOneScrewDiameter: Millimeters;
+  readonly boxRingOneRadius: Millimeters;
+  readonly boxRingTwoScrewHoles: number;
+  readonly boxRingTwoScrewDiameter: Millimeters;
+  readonly boxRingTwoRadius: Millimeters;
 };
 
 export type StaticReferencePrintDesignDraft = {
@@ -325,6 +348,14 @@ export type ConfiguredPrintDesign =
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
+      readonly topExhaust: TopExhaust;
+      readonly boxFanHoleSize: Millimeters;
+      readonly boxRingOneScrewHoles: number;
+      readonly boxRingOneScrewDiameter: Millimeters;
+      readonly boxRingOneRadius: Millimeters;
+      readonly boxRingTwoScrewHoles: number;
+      readonly boxRingTwoScrewDiameter: Millimeters;
+      readonly boxRingTwoRadius: Millimeters;
     }
   | {
       readonly type: "static-reference";
@@ -403,6 +434,14 @@ export const defaultSettings: RawPurifierSettings = {
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
+  topExhaust: "fan-grid",
+  boxFanHoleSize: 0,
+  boxRingOneScrewHoles: 4,
+  boxRingOneScrewDiameter: 6,
+  boxRingOneRadius: 0,
+  boxRingTwoScrewHoles: 4,
+  boxRingTwoScrewDiameter: 6,
+  boxRingTwoRadius: 0,
   donutFilterOuterDiameter: 125,
   donutFilterLength: 150,
   donutFilterHoleDiameter: 92,

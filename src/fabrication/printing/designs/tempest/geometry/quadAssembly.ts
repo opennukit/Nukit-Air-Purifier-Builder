@@ -4,7 +4,13 @@ import type {
   TempestModel,
   TempestQuadWallRect,
 } from "@/domain/designs/tempest/model";
-import { tempestWalls, type TempestPlanarAxis, type TempestWall, type TempestWallMap } from "@/domain/designs/tempest/shared";
+import {
+  tempestWalls,
+  type TempestBoxExhaustRing,
+  type TempestPlanarAxis,
+  type TempestWall,
+  type TempestWallMap,
+} from "@/domain/designs/tempest/shared";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, CSG_SEGMENTS, EPSILON_LIP } from "./context";
 import {
@@ -14,10 +20,6 @@ import {
   unionAll,
 } from "./primitives";
 import { fanPatternCut, towerOpening2d } from "./patterns2d";
-
-// Box-fan top exhaust.
-const BOX_FAN_TIE_RADIUS_FLOOR_MM = 0.001; // never let a zero screw-hole diameter collapse the tie hole
-const BOX_FAN_TIE_PAIR_DIVISOR = 8; // tie holes sit ±(min open span / this) either side of each corner
 
 // Internal fillets are deliberate strength features: the air chamber's vertical
 // corners are rounded so the wall junctions meet in a fillet instead of a sharp
@@ -186,7 +188,7 @@ export function quadTopExhaust<Solid, Region>(
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): Solid[] {
-  if (fanLayout.topExhaust === "single-box-fan") {
+  if (fanLayout.topExhaust === "box-exhaust") {
     return towerBoxExhaustCuts(ctx, model, filterLayout);
   }
   return fanLayout.positionsX.flatMap((x) =>
@@ -202,44 +204,46 @@ export function quadTopExhaust<Solid, Region>(
   );
 }
 
-// A single large box/exhaust-fan opening over the air chamber, plus paired
-// corner holes for zip-tying a box fan in place (the traditional box-fan top).
+// A single central box/exhaust-fan hole over the air chamber, plus up to two
+// evenly-spaced rings of screw holes around it (matches tempest-builder.html's
+// tower_box_exhaust). All sizes come pre-resolved from settings.fan.boxExhaust.
 export function towerBoxExhaustCuts<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
-  const { transforms, extrusions } = ctx.modeling;
-  const chamber = filterLayout.airChamber;
+  const boxExhaust = model.settings.fan.boxExhaust;
   const cutHeight = filterLayout.topPlateThickness + 2 * EPSILON_LIP;
-  const seatRim = model.frame.outsideFlangeThickness;
-  const openWidth = Math.max(0.001, chamber.xMax - chamber.xMin - 2 * seatRim);
-  const openDepth = Math.max(0.001, chamber.yMax - chamber.yMin - 2 * seatRim);
-  const centerX = (chamber.xMin + chamber.xMax) / 2;
-  const centerY = (chamber.yMin + chamber.yMax) / 2;
+  const centerX = model.box.width / 2;
+  const centerY = model.box.depth / 2;
   const holeCenterZ = model.box.height - filterLayout.topPlateThickness / 2;
+  const cuts: Solid[] = [];
 
-  const opening = transforms.translate(
-    [centerX, centerY, model.box.height - filterLayout.topPlateThickness - EPSILON_LIP],
-    extrusions.extrudeLinear({ height: cutHeight }, towerOpening2d(ctx, openWidth, openDepth)),
-  );
+  const drill = (diameter: number, x: number, y: number): void => {
+    if (diameter <= 0) {
+      return;
+    }
+    cuts.push(cylinderAlong(ctx, "z", [x, y, holeCenterZ], cutHeight, diameter / 2, CORD_CYLINDER_SEGMENTS));
+  };
 
-  const tieRadius = Math.max(BOX_FAN_TIE_RADIUS_FLOOR_MM, model.settings.fan.screwHoleDiameter / 2);
-  const tieOutset = seatRim / 2;
-  const tiePairOffset = Math.min(openWidth, openDepth) / BOX_FAN_TIE_PAIR_DIVISOR;
-  const cornerX = openWidth / 2 + tieOutset;
-  const cornerY = openDepth / 2 + tieOutset;
-  const corners: ReadonlyArray<readonly [number, number]> = [
-    [centerX - cornerX, centerY - cornerY],
-    [centerX + cornerX, centerY - cornerY],
-    [centerX - cornerX, centerY + cornerY],
-    [centerX + cornerX, centerY + cornerY],
-  ];
-  const zipTieHoles = corners.flatMap(([cx, cy]) =>
-    [-tiePairOffset, tiePairOffset].map((dy) => cylinderAlong(ctx, "z", [cx, cy + dy, holeCenterZ], cutHeight, tieRadius, CORD_CYLINDER_SEGMENTS)),
-  );
+  drill(boxExhaust.fanHoleSize, centerX, centerY);
 
-  return [opening, ...zipTieHoles];
+  const drillRing = (ring: TempestBoxExhaustRing): void => {
+    if (ring.screwHoles <= 0 || ring.screwDiameter <= 0 || ring.radius <= 0) {
+      return;
+    }
+    // offset = PI/n puts a 4-hole ring at the corners (45°), matching the reference.
+    const angleOffset = Math.PI / ring.screwHoles;
+    for (let index = 0; index < ring.screwHoles; index += 1) {
+      const angle = angleOffset + (index * 2 * Math.PI) / ring.screwHoles;
+      drill(ring.screwDiameter, centerX + ring.radius * Math.cos(angle), centerY + ring.radius * Math.sin(angle));
+    }
+  };
+
+  drillRing(boxExhaust.ringOne);
+  drillRing(boxExhaust.ringTwo);
+
+  return cuts;
 }
 
 export function towerFilterSlots<Solid, Region>(
