@@ -1611,10 +1611,6 @@ Desktop Fixed View
     margin-bottom: 10px;
   }
 
-  .section-heading h2 {
-    font-size: 1.08rem;
-  }
-
   .field,
   .toggle-field {
     gap: 6px;
