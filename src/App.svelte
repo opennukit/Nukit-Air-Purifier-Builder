@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
+  import { autoUpdate, computePosition, flip, offset, shift, size } from "@floating-ui/dom";
   import {
     normalizePurifierDraft,
     printDesignIdForPurifierDraft,
@@ -527,78 +528,68 @@
     }
   }
 
-  // The tip is anchored to a tiny button that can sit near either panel edge (or
-  // a third of the way across a narrow phone), so a fixed-width popover spills
-  // out of its container. The controls column clips overflow-x (it scrolls
-  // vertically), so the viewport edge is not the real limit — clamp to the
-  // nearest clipping ancestor, capping the width to fit, then nudge it inside.
-  // Re-run on every reveal — hover, focus, and tap share one element.
-  function clampInfoTipToViewport(
+  // Position the open tip with Floating UI: the tooltip is `position: fixed`, so
+  // no scrolling/overflow ancestor (the controls column clips overflow-x) can
+  // cut it, and flip/shift/size keep it on-screen against every edge — the
+  // general fix for a popover anchored to a button that can sit anywhere. The
+  // `<p>` is the floating element; its sibling button is the reference.
+  function floatingInfoTip(
     node: HTMLElement,
     isOpen: boolean,
   ): { update(open: boolean): void; destroy(): void } {
-    const host = node.parentElement;
-    let frame = 0;
-    function clipBounds(): { left: number; right: number } {
-      const margin = 8;
-      let left = margin;
-      let right = window.innerWidth - margin;
-      for (let ancestor = node.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
-        const style = getComputedStyle(ancestor);
-        if (style.overflowX !== "visible" || style.overflowY !== "visible") {
-          const box = ancestor.getBoundingClientRect();
-          left = Math.max(left, box.left + margin);
-          right = Math.min(right, box.right - margin);
-          break;
-        }
-      }
-      return { left, right };
-    }
+    const reference = node.parentElement?.querySelector("button") ?? null;
+    let stopAutoUpdate: (() => void) | null = null;
+
     function reposition(): void {
-      node.style.transform = "";
-      node.style.maxWidth = "";
-      const { left, right } = clipBounds();
-      node.style.maxWidth = `${Math.max(0, right - left)}px`;
-      const rect = node.getBoundingClientRect();
-      if (rect.width === 0) {
+      if (reference === null) {
         return;
       }
-      let shift = 0;
-      const overshootRight = rect.right - right;
-      if (overshootRight > 0) {
-        shift = -overshootRight;
-      }
-      if (rect.left + shift < left) {
-        shift = left - rect.left;
-      }
-      if (shift !== 0) {
-        node.style.transform = `translateX(${shift}px)`;
-      }
+      void computePosition(reference, node, {
+        placement: "top",
+        middleware: [
+          offset(8),
+          flip({ padding: 8 }),
+          shift({ padding: 8 }),
+          size({
+            padding: 8,
+            apply({ availableWidth, elements }): void {
+              // Keep the 320px design width, but shrink to fit a narrow screen.
+              elements.floating.style.maxWidth = `${Math.min(320, Math.max(0, availableWidth))}px`;
+            },
+          }),
+        ],
+      }).then(({ x, y }) => {
+        node.style.left = `${x}px`;
+        node.style.top = `${y}px`;
+      });
     }
-    const onReveal = (): void => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(reposition);
-    };
-    host?.addEventListener("pointerenter", onReveal);
-    host?.addEventListener("focusin", onReveal);
-    window.addEventListener("resize", onReveal);
+
+    function start(): void {
+      if (stopAutoUpdate !== null || reference === null) {
+        return;
+      }
+      stopAutoUpdate = autoUpdate(reference, node, reposition);
+    }
+
+    function stop(): void {
+      stopAutoUpdate?.();
+      stopAutoUpdate = null;
+      node.style.maxWidth = "";
+    }
+
     if (isOpen) {
-      onReveal();
+      start();
     }
     return {
       update(open: boolean): void {
         if (open) {
-          onReveal();
+          start();
         } else {
-          node.style.transform = "";
-          node.style.maxWidth = "";
+          stop();
         }
       },
       destroy(): void {
-        cancelAnimationFrame(frame);
-        host?.removeEventListener("pointerenter", onReveal);
-        host?.removeEventListener("focusin", onReveal);
-        window.removeEventListener("resize", onReveal);
+        stop();
       },
     };
   }
@@ -1377,7 +1368,7 @@
                           onclick={() => toggleInfoTip("measureInfoNote")}
                           onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
                         >i</button>
-                        <p id="measureInfoNote" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "measureInfoNote"}>
+                        <p id="measureInfoNote" role="tooltip" use:floatingInfoTip={openInfoTipId === "measureInfoNote"}>
                           <strong>Don't copy the size printed on the filter.</strong> A "20x25x1" filter
                           actually measures about 24.5 x 19.5 x 0.75 in (622 x 495 x 19 mm), and brands
                           vary by a few millimeters. Measure your filter and enter the real numbers.
@@ -1576,7 +1567,7 @@
                               onclick={() => toggleInfoTip(`info-${control.name}`)}
                               onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
                             >i</button>
-                            <p id="info-{control.name}" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === `info-${control.name}`}>{control.info}</p>
+                            <p id="info-{control.name}" role="tooltip" use:floatingInfoTip={openInfoTipId === `info-${control.name}`}>{control.info}</p>
                           </span>
                         {/if}
                       </span>
@@ -1607,7 +1598,7 @@
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
                           onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
                         >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip" use:clampInfoTipToViewport={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
+                        <p id="info-cordHoleDiameter" role="tooltip" use:floatingInfoTip={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
                       </span>
                     </span>
                     <span class="input-shell">

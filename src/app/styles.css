@@ -1363,13 +1363,18 @@ WCAG-minimum 24px. */
   border-color: var(--accent-line-strong);
 }
 
+/* Fixed-positioned so no scrolling/overflow ancestor can clip it; the exact
+top/left come from Floating UI (use:floatingInfoTip), which also flips and
+shifts it to stay on-screen. Hidden until tapped/toggled open — iOS Safari
+never focuses the button on tap, so hover/focus alone can't reveal it. */
 .info-tip p {
-  position: absolute;
-  z-index: 4;
-  bottom: 22px;
-  left: -8px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 6;
   display: none;
-  width: min(320px, 72vw);
+  width: max-content;
+  max-width: min(320px, 92vw);
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--line-medium);
@@ -1383,10 +1388,6 @@ WCAG-minimum 24px. */
   letter-spacing: 0;
 }
 
-/* The is-open class covers taps: iOS Safari doesn't focus buttons on tap, so
-hover/focus-within alone never shows the tooltip there. */
-.info-tip:hover p,
-.info-tip:focus-within p,
 .info-tip.is-open p {
   display: block;
 }
