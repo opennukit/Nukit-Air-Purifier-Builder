@@ -1,3 +1,4 @@
+import { orientChunkVerticesForPrinting } from "@/fabrication/printing/partOrientation";
 import {
   createStoredZipPackage,
   createThreeMfPackage,
@@ -359,10 +360,17 @@ export function createPrintablePartThreeMf(
   bed: PrintBed,
   displayColor?: string,
 ): Uint8Array {
-  const bounds = meshBounds(part.mesh.vertices);
+  // Chunks are split full-depth along the assembly's Y axis, so they can be
+  // auto-oriented for the bed (see partOrientation.ts). Other parts (e.g. the
+  // donut adaptor) are already authored print-ready and exported as modeled.
+  const vertices =
+    part.kind === "tempest-print-chunk"
+      ? orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles)
+      : part.mesh.vertices;
+  const bounds = meshBounds(vertices);
   const object: MeshObject = {
     name: part.name,
-    vertices: part.mesh.vertices,
+    vertices,
     triangles: part.mesh.triangles,
     position: bedCenteredPosition(bounds, bed),
   };

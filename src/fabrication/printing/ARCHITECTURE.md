@@ -43,6 +43,16 @@ unprintable there; a lone single-object 3MF places cleanly in every slicer.
 `createPrintDesignThreeMfExport` (the single multi-plate `.3mf`) is retained —
 the in-app print-sheet preview still builds on its sheet plan.
 
+Each chunk is **auto-oriented for the bed** before export (`partOrientation.ts`):
+chunks are split full-depth along the assembly's Y axis, so the candidate
+orientations are the four quarter-turns about that depth axis. Each is scored by
+the steep downward (overhang) area it would strand above the bed, minus a reward
+for resting a large flat face on the plate, and the lowest-support one is kept.
+The 0° orientation is always a candidate and wins ties, so orientation can only
+reduce support versus the as-modelled pose, never add it — which is what lets the
+same rule apply to every configuration. Orientation is applied only on the export
+path, so the assembled/print-sheet previews still show chunks in assembly pose.
+
 The geometry layer never names a kernel. `buildTempestGeometry` is generic over
 `<Solid, Region>` and takes a `ModelingApi<Solid, Region>`; whichever backend you
 pass decides what `Solid` is. This is Parnas' rule in the type system: the
@@ -69,6 +79,7 @@ printing/
 │   ├── kitWorker.ts           Web Worker shell: own kernel init + FIFO builds
 │   └── kitWorkerClient.ts     latest-wins channels, dedupe, worker lifecycle
 │
+├── partOrientation.ts         auto-orient a chunk on the bed (min support; rotations about the depth axis)
 ├── printableKit.ts            generic PrintableKit type; 3MF export + per-chunk 3MF-in-ZIP export from a kit
 ├── printDesignKit.ts          dispatch by design id; kit cache key; enclosure colour; ZIP/3MF exporters
 └── threeMf.ts                 write the 3MF package (objects, plates, basematerials) + stored-ZIP writer
