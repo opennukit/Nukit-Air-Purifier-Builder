@@ -497,6 +497,21 @@
     }
   }
 
+  // Desktop affordance: hovering the button reveals the tip without a click.
+  // Mouse only — on touch, pointerenter fires on tap and would fight the click
+  // toggle, so touch keeps tap-to-open / tap-outside-to-close.
+  function openInfoTipOnHover(tipId: string, event: PointerEvent): void {
+    if (event.pointerType === "mouse") {
+      openInfoTipId = tipId;
+    }
+  }
+
+  function closeInfoTipOnHoverLeave(tipId: string, event: PointerEvent): void {
+    if (event.pointerType === "mouse") {
+      closeInfoTip(tipId);
+    }
+  }
+
   // A tap anywhere outside the open tip closes it. iOS Safari never focuses the
   // button on tap, so the button's own blur can't be relied on to dismiss it.
   function closeInfoTipOnOutsidePointer(event: Event): void {
@@ -1357,6 +1372,8 @@
                           aria-describedby="measureInfoNote"
                           aria-expanded={openInfoTipId === "measureInfoNote"}
                           onclick={() => toggleInfoTip("measureInfoNote")}
+                          onpointerenter={(event) => openInfoTipOnHover("measureInfoNote", event)}
+                          onpointerleave={(event) => closeInfoTipOnHoverLeave("measureInfoNote", event)}
                           onkeydown={(event) => handleInfoTipKeydown("measureInfoNote", event)}
                         >i</button>
                         <p id="measureInfoNote" role="tooltip" use:positionInfoTip={openInfoTipId === "measureInfoNote"}>
@@ -1556,6 +1573,8 @@
                               aria-describedby="info-{control.name}"
                               aria-expanded={openInfoTipId === `info-${control.name}`}
                               onclick={() => toggleInfoTip(`info-${control.name}`)}
+                              onpointerenter={(event) => openInfoTipOnHover(`info-${control.name}`, event)}
+                              onpointerleave={(event) => closeInfoTipOnHoverLeave(`info-${control.name}`, event)}
                               onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
                             >i</button>
                             <p id="info-{control.name}" role="tooltip" use:positionInfoTip={openInfoTipId === `info-${control.name}`}>{control.info}</p>
@@ -1587,6 +1606,8 @@
                           aria-describedby="info-cordHoleDiameter"
                           aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
                           onclick={() => toggleInfoTip("info-cordHoleDiameter")}
+                          onpointerenter={(event) => openInfoTipOnHover("info-cordHoleDiameter", event)}
+                          onpointerleave={(event) => closeInfoTipOnHoverLeave("info-cordHoleDiameter", event)}
                           onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
                         >i</button>
                         <p id="info-cordHoleDiameter" role="tooltip" use:positionInfoTip={openInfoTipId === "info-cordHoleDiameter"}>{cordHoleInfo}</p>
