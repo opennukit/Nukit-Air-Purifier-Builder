@@ -446,6 +446,19 @@
     bottom: "front",
   };
 
+  // Tooltip text for the Advanced controls.
+  const advancedControlInfo: Record<string, string> = {
+    fansLeft: "Fans on the left wall. Auto fits as many as the wall allows.",
+    fansRight: "Fans on the right wall. Auto fits as many as the wall allows.",
+    fansTop: "Fans on the top wall. Auto fits as many as the wall allows.",
+    fansBottom: "Fans on the bottom wall. Auto fits as many as the wall allows.",
+    screwHoleDiameter: "Diameter of each PC-fan mounting screw hole.",
+    hexSize: "Honeycomb cell size, measured flat to flat.",
+    hexSpacing: "Rib (wall) thickness between honeycomb cells.",
+    cordHoleSide: "Where along the wall the cord hole sits.",
+    cordHoleCornerOffset: "Distance from the corner to the cord hole.",
+  };
+
   $: filterSlotPlacementControls = isFourFilterTower
     ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
     : wallPlacementControls;
@@ -1221,6 +1234,20 @@
               </span>
             </label>
           {/snippet}
+          {#snippet infoTip(id: string, text: string)}
+            <span class="info-tip" class:is-open={openInfoTipId === id}>
+              <button
+                type="button"
+                aria-label="More information"
+                aria-describedby={id}
+                aria-expanded={openInfoTipId === id}
+                onclick={() => toggleInfoTip(id)}
+                onblur={() => closeInfoTip(id)}
+                onkeydown={(event) => handleInfoTipKeydown(id, event)}
+              >i</button>
+              <p {id} role="tooltip">{text}</p>
+            </span>
+          {/snippet}
           {#snippet fanSizeSegment()}
             <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
               <legend>Fan size</legend>
@@ -1526,114 +1553,6 @@
                     {/each}
                   </div>
 
-                  <button
-                    type="button"
-                    class="advanced-accordion-toggle"
-                    aria-expanded={showTempestAdvanced}
-                    onclick={() => (showTempestAdvanced = !showTempestAdvanced)}
-                  >
-                    <span class="eyebrow">Advanced</span>
-                    <svg class="advanced-accordion-chevron" class:is-open={showTempestAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
-                  </button>
-
-                  {#if showTempestAdvanced}
-                    <div data-tempest-advanced-controls>
-                      {#if showTempestWallFanControls}
-                        <div data-tempest-fan-placement>
-                          {#each fanPlacementControls as control}
-                            <label class="field compact-field">
-                              <span>{control.label} fans</span>
-                              <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
-                                <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
-                                {#each fixedFanCountOptions as count}
-                                  <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
-                                {/each}
-                              </select>
-                            </label>
-                          {/each}
-                        </div>
-                      {/if}
-                      <!--
-                        "Material thickness" and "Outside flange thickness" are
-                        intentionally hidden for now (they confused users); the
-                        settings still exist and may be surfaced again later.
-                      -->
-                      {#each tempestAdvancedGeometryControls as control}
-                        <label class="field">
-                          <span>{control.label}</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name={control.name}
-                              step={control.step}
-                              inputmode="decimal"
-                              value={settings[control.name]}
-                              onchange={(event) => updateNumberSetting(control.name, event)}
-                            />
-                            <small>{control.suffix}</small>
-                          </span>
-                        </label>
-                      {/each}
-                      {#if settings.cordHoleDiameter > 0}
-                        <label class="field">
-                          <span>Power cord wall</span>
-                          {#if isFourFilterTower}
-                            <select name="cordHoleWall">
-                              <option value={settings.cordHoleWall} selected>Top</option>
-                            </select>
-                          {:else}
-                            <select name="cordHoleWall" onchange={updateCordHoleWall}>
-                              {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
-                                <option value={wall} selected={settings.cordHoleWall === wall}>{titleCase(wall)}</option>
-                              {/each}
-                            </select>
-                          {/if}
-                        </label>
-                        <label class="field">
-                          <span>Cord position</span>
-                          <select name="cordHoleSide" onchange={updateCordHoleSide}>
-                            {#each cordHoleSides as side}
-                              <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
-                            {/each}
-                          </select>
-                        </label>
-                        <label class="field">
-                          <span>Cord corner offset</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name="cordHoleCornerOffset"
-                              min="0"
-                              step="1"
-                              inputmode="numeric"
-                              value={settings.cordHoleCornerOffset}
-                              onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
-                            />
-                            <small>mm</small>
-                          </span>
-                        </label>
-                      {/if}
-                      {#if showHexGrillControls && settings.hexGrill}
-                        {#each tempestHexGrillControls as control}
-                          <label class="field">
-                            <span>{control.label}</span>
-                            <span class="input-shell">
-                              <input
-                                type="number"
-                                name={control.name}
-                                min="0"
-                                step={control.step}
-                                inputmode="decimal"
-                                value={settings[control.name]}
-                                onchange={(event) => updateNumberSetting(control.name, event)}
-                              />
-                              <small>{control.suffix}</small>
-                            </span>
-                          </label>
-                        {/each}
-                      {/if}
-                    </div>
-                  {/if}
                 {/if}
               </div>
             </section>
@@ -1777,6 +1696,117 @@
                       <small>mm</small>
                     </span>
                   </label>
+                </div>
+              {/if}
+            </section>
+          {/if}
+
+          {#if isTempestControlsActive}
+            <section class="control-section tempest-advanced-section">
+              <button
+                type="button"
+                class="advanced-accordion-toggle"
+                aria-expanded={showTempestAdvanced}
+                onclick={() => (showTempestAdvanced = !showTempestAdvanced)}
+              >
+                <span class="eyebrow">Advanced</span>
+                <svg class="advanced-accordion-chevron" class:is-open={showTempestAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
+              </button>
+              {#if showTempestAdvanced}
+                <div class="advanced-columns" data-tempest-advanced-controls>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Fan tuning</p>
+                    {#if showTempestWallFanControls}
+                      {#each fanPlacementControls as control}
+                        <label class="field compact-field">
+                          <span>{control.label} fans {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name])}</span>
+                          <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
+                            <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
+                            {#each fixedFanCountOptions as count}
+                              <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
+                            {/each}
+                          </select>
+                        </label>
+                      {/each}
+                    {/if}
+                    {#each tempestAdvancedGeometryControls as control}
+                      <label class="field">
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name={control.name}
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
+                          />
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                  </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Cord &amp; grill</p>
+                    {#if settings.cordHoleDiameter > 0}
+                      <label class="field">
+                        <span>Power cord wall {@render infoTip("info-cordHoleWall", cordHoleInfo)}</span>
+                        {#if isFourFilterTower}
+                          <select name="cordHoleWall">
+                            <option value={settings.cordHoleWall} selected>Top</option>
+                          </select>
+                        {:else}
+                          <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                            {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
+                              <option value={wall} selected={settings.cordHoleWall === wall}>{titleCase(wall)}</option>
+                            {/each}
+                          </select>
+                        {/if}
+                      </label>
+                      <label class="field">
+                        <span>Cord position {@render infoTip("info-cordHoleSide", advancedControlInfo.cordHoleSide)}</span>
+                        <select name="cordHoleSide" onchange={updateCordHoleSide}>
+                          {#each cordHoleSides as side}
+                            <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Cord corner offset {@render infoTip("info-cordHoleCornerOffset", advancedControlInfo.cordHoleCornerOffset)}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="cordHoleCornerOffset"
+                            min="0"
+                            step="1"
+                            inputmode="numeric"
+                            value={settings.cordHoleCornerOffset}
+                            onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    {/if}
+                    {#if showHexGrillControls && settings.hexGrill}
+                      {#each tempestHexGrillControls as control}
+                        <label class="field">
+                          <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    {/if}
+                  </div>
                 </div>
               {/if}
             </section>
