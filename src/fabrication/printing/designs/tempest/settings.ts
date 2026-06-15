@@ -17,7 +17,12 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
   const design = requireTempestDesign(configuration);
   return {
     ...defaultTempestSettings,
-    chunkLabels: design.chunkLabels,
+    // PARKED: force the chunk-label deboss off in the app regardless of any saved
+    // value (it shipped default-on, so existing sessions have chunkLabels=true in
+    // their URL/draft and the control is now hidden). Restore `design.chunkLabels`
+    // when the feature is brought back. The deboss code itself still runs in tests
+    // that build TempestSettings with chunkLabels:true directly.
+    chunkLabels: false,
     arrangement: tempestArrangementFromConfiguration(configuration),
     fan: {
       ...defaultTempestSettings.fan,
