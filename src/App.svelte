@@ -1250,7 +1250,7 @@
           {/snippet}
           {#snippet fanSizeSegment()}
             <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
-              <legend>Fan size</legend>
+              <legend>Fan size {@render infoTip("info-fanSize", "The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them.")}</legend>
               <div>
                 {#each recommendedFanDiameterOptions as diameter}
                   <label>
@@ -1475,7 +1475,7 @@
                     </div>
                     {#if isTempestControlsActive}
                       <label class="field" data-tempest-filter-slot-placement>
-                        <span>Filter slot placement</span>
+                        <span>Filter slot placement {@render infoTip("info-filterSlotPlacement", "Which wall the filter slides in through. The chosen wall gets the open loading slot; the others stay closed.")}</span>
                         <select name="filterSlotPlacement" onchange={updateFilterSlot}>
                           {#each filterSlotPlacementControls as control}
                             <option value={control.key} selected={selectedFilterSlotKey === control.key}>{control.label}</option>
@@ -1610,7 +1610,7 @@
                     {@render fanSizeSegment()}
 
                     <fieldset class="fan-placement-field" data-tempest-fan-auto>
-                      <legend>Fan placement</legend>
+                      <legend>Fan placement {@render infoTip("info-fanPlacement", "Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.")}</legend>
                       <div class="fan-placement-checks">
                         {#each fanPlacementCheckboxControls as control}
                           <label class="toggle-field">
