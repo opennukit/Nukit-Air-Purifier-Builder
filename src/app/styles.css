@@ -1483,7 +1483,10 @@ hover/focus-within alone never shows the tooltip there. */
   font-weight: 800;
   line-height: 1.12;
   text-align: center;
-  overflow-wrap: break-word;
+  /* anywhere (not just break-word) so single long tokens without a normal break
+     opportunity — e.g. "Box/Exhaust" — still wrap instead of spilling past the
+     segment edge, and the cell can shrink to its column. */
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
