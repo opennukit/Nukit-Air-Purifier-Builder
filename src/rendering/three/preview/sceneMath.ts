@@ -23,7 +23,6 @@ import {
   generatedPreviewZoom,
   generatedPreviewZoomReferenceMillimeters,
   minimumLargeModelPreviewZoom,
-  oneMeterCubeSize,
   sceneScale,
   staticReferencePreviewZoom,
   staticReferenceSceneScale,
@@ -202,23 +201,22 @@ function tempestFramingDimensionMillimeters(layout: LayoutResult): number {
 }
 
 
+// The scale reference (banana) sits beside the model and is small relative to
+// it, so toggling it on must NOT change the camera framing — the view scale is
+// derived from the model alone.
 function modelViewScale(layout: LayoutResult): number {
   const settings = layout.configuration;
-  const scalePadding = settings.preview.enclosure.showBananaScale ? oneMeterCubeSize * 0.72 : 0;
   if (isStaticReferencePrintDesignId(settings.printDesign.id)) {
     const reference = staticPrintReferenceForPreset(settings.printDesign);
     if (reference !== undefined && staticPrintReferenceHasAssembledPreview(reference)) {
-      return (reference.previewMaxDimensionMm ?? 540) * sceneScale * 1.35 + scalePadding;
+      return (reference.previewMaxDimensionMm ?? 540) * sceneScale * 1.35;
     }
     const assetCount = reference?.previewAssets.length ?? 1;
     const columns = Math.max(1, Math.ceil(Math.sqrt(assetCount * 0.8)));
     const rows = Math.max(1, Math.ceil(assetCount / columns));
     const gridSpan = Math.max(columns, rows);
     return (
-      (reference?.previewMaxDimensionMm ?? 560) *
-        Math.max(1.35, gridSpan * 0.55) *
-        staticReferenceSceneScale +
-      scalePadding
+      (reference?.previewMaxDimensionMm ?? 560) * Math.max(1.35, gridSpan * 0.55) * staticReferenceSceneScale
     );
   }
   if (isDonutFilterPrintDesignId(settings.printDesign.id)) {
@@ -231,10 +229,10 @@ function modelViewScale(layout: LayoutResult): number {
       ) *
       sceneScale *
       1.25;
-    return baseScale + scalePadding;
+    return baseScale;
   }
   if (isTempestPrintDesignId(settings.printDesign.id)) {
-    return tempestFramingDimensionMillimeters(layout) * sceneScale + scalePadding;
+    return tempestFramingDimensionMillimeters(layout) * sceneScale;
   }
   return (
     Math.max(
@@ -242,7 +240,7 @@ function modelViewScale(layout: LayoutResult): number {
       layout.summary.workingDepth,
       layout.summary.chamberHeight,
     ) * sceneScale
-  ) + scalePadding;
+  );
 }
 
 export function clamp(value: number, min: number, max: number): number {
