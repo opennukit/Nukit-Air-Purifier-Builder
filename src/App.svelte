@@ -669,11 +669,12 @@
       return;
     }
     exportInProgress = true;
-    const cacheKey = printKitCacheKey(layout.rawSettings, printVolumePresetId);
-    const planReady = generatedPrintSheetPlanCache.get(cacheKey) !== undefined;
-    if (!planReady) {
-      showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
-    }
+    // Immediate feedback: building the plan (if cold) and serializing the 3MF
+    // both take a beat — the serialize step is synchronous and can freeze the
+    // thread for a second or two — so show the label and yield a frame so it
+    // paints before that work starts, rather than a silent click.
+    showTransientButtonLabel(buttonKey, "Preparing…", 60_000);
+    await nextFramePaint();
     try {
       const outcome = await ensurePlanForCurrentSettings();
       if (outcome.type === "failed") {
@@ -691,6 +692,14 @@
     } finally {
       exportInProgress = false;
     }
+  }
+
+  // Resolves after the browser has had a chance to paint, so a label set right
+  // before synchronous work (the 3MF serialize) is visible before it freezes.
+  function nextFramePaint(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
   }
 
   function downloadPrintKit(currentLayout: LayoutResult, plan: PrintableSheetPlan): void {
