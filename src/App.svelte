@@ -416,6 +416,38 @@
     commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
   }
 
+  const filterSizePresets = [
+    { id: "starkvind", label: "STARKVIND (370 x 290 x 40 mm)", width: 370, depth: 290, thickness: 40 },
+    { id: "fornuftig", label: "FORNUFTIG (390 x 250 x 20 mm)", width: 390, depth: 250, thickness: 20 },
+  ] as const;
+
+  // The selector reflects the current dimensions: it matches a preset only while
+  // all three measurements equal it, and falls back to "Custom" once any value
+  // is edited away from a preset.
+  $: selectedFilterSize =
+    filterSizePresets.find(
+      (preset) =>
+        Math.round(settings.filterWidth) === preset.width &&
+        Math.round(settings.filterDepth) === preset.depth &&
+        Math.round(settings.filterThickness) === preset.thickness,
+    )?.id ?? "custom";
+
+  function updateFilterSizePreset(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    const preset = filterSizePresets.find((entry) => entry.id === id);
+    if (preset === undefined) {
+      return; // "Custom" keeps the current measurements.
+    }
+    commitSettings({
+      ...settings,
+      filterWidth: preset.width,
+      filterDepth: preset.depth,
+      filterThickness: preset.thickness,
+      // The width drives the box/exhaust auto sizes, so refresh them too.
+      ...boxExhaustDiametersForWidth(preset.width),
+    });
+  }
+
   const filterDimensionNames = new Set<string>(filterDimensionControls.map((control) => control.name));
 
   function updateMeasuredDimension(
@@ -1292,6 +1324,15 @@
                 -->
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
+                    <label class="field" data-filter-size-preset>
+                      <span>Filter size</span>
+                      <select name="filterSizePreset" onchange={updateFilterSizePreset}>
+                        {#each filterSizePresets as preset}
+                          <option value={preset.id} selected={selectedFilterSize === preset.id}>{preset.label}</option>
+                        {/each}
+                        <option value="custom" selected={selectedFilterSize === "custom"}>Custom</option>
+                      </select>
+                    </label>
                     <div class="custom-dimensions" data-custom-filter-dimensions>
                       {#each filterDimensionControls as control}
                         <label class="field">
