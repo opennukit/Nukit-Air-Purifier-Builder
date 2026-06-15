@@ -708,7 +708,8 @@ function normalizeFilterFitClearance(value: Millimeters): Millimeters {
 }
 
 function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
-  return clamp(value, 3, 25);
+  // 0 (or less) means "no cord"; any real hole clamps to a printable 3–25 mm.
+  return value <= 0 ? 0 : clamp(value, 3, 25);
 }
 
 function normalizeCordHoleCornerOffset(value: Millimeters): Millimeters {

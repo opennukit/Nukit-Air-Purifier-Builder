@@ -1580,38 +1580,37 @@
                       </span>
                     </label>
                   {/each}
-                  {#if settings.cordHoleWall !== "none"}
-                    <label class="field">
-                      <span>
-                        Cord hole diameter
-                        <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
-                          <button
-                            type="button"
-                            aria-label="What does the power cord pass-through do?"
-                            aria-describedby="info-cordHoleDiameter"
-                            aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
-                            onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                            onblur={() => closeInfoTip("info-cordHoleDiameter")}
-                            onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
-                          >i</button>
-                          <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
-                        </span>
+                  <label class="field">
+                    <span>
+                      Cord hole diameter
+                      <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
+                        <button
+                          type="button"
+                          aria-label="What does the power cord pass-through do?"
+                          aria-describedby="info-cordHoleDiameter"
+                          aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
+                          onclick={() => toggleInfoTip("info-cordHoleDiameter")}
+                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
+                          onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
+                        >i</button>
+                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
                       </span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name="cordHoleDiameter"
-                          min="3"
-                          max="25"
-                          step="0.5"
-                          inputmode="decimal"
-                          value={settings.cordHoleDiameter}
-                          onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                        />
-                        <small>mm</small>
-                      </span>
-                    </label>
-                  {/if}
+                    </span>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name="cordHoleDiameter"
+                        min="0"
+                        max="25"
+                        step="0.5"
+                        inputmode="decimal"
+                        value={settings.cordHoleDiameter}
+                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                      />
+                      <small>mm</small>
+                    </span>
+                  </label>
+                  <p class="section-note cord-hole-note">Set the diameter to 0 for no cord hole.</p>
                   {#if showHexGrillControls}
                     <label class="toggle-field">
                       <input
@@ -1667,15 +1666,21 @@
                           </span>
                         </label>
                       {/each}
-                      <label class="field">
-                        <span>Power cord wall</span>
-                        <select name="cordHoleWall" onchange={updateCordHoleWall}>
-                          {#each cordHoleWalls as wall}
-                            <option value={wall} selected={settings.cordHoleWall === wall}>{wall === "none" ? "None" : titleCase(wall)}</option>
-                          {/each}
-                        </select>
-                      </label>
-                      {#if settings.cordHoleWall !== "none"}
+                      {#if settings.cordHoleDiameter > 0}
+                        <label class="field">
+                          <span>Power cord wall</span>
+                          {#if isFourFilterTower}
+                            <select name="cordHoleWall">
+                              <option value={settings.cordHoleWall} selected>Top</option>
+                            </select>
+                          {:else}
+                            <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                              {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
+                                <option value={wall} selected={settings.cordHoleWall === wall}>{titleCase(wall)}</option>
+                              {/each}
+                            </select>
+                          {/if}
+                        </label>
                         <label class="field">
                           <span>Cord position</span>
                           <select name="cordHoleSide" onchange={updateCordHoleSide}>

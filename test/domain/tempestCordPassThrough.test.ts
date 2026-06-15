@@ -15,6 +15,19 @@ describe("tempest cord pass-through settings", () => {
     expect(model("printDesign=nukit-tempest&cordHoleWall=none").cordPassThrough.type).toBe("none");
   });
 
+  test("a 0 cord-hole diameter disables the cord (means none)", () => {
+    const settings = createTempestSettingsFromLayout(
+      createLayout(decodeSettings("printDesign=nukit-tempest&cordHoleWall=left&cordHoleDiameter=0")),
+    );
+    expect(settings.cordPassThrough).toEqual({ type: "none" });
+    // a real diameter restores it
+    expect(
+      createTempestSettingsFromLayout(
+        createLayout(decodeSettings("printDesign=nukit-tempest&cordHoleWall=left&cordHoleDiameter=8")),
+      ).cordPassThrough.type,
+    ).toBe("wall");
+  });
+
   test("sandwich routes the cord through the chosen wall", () => {
     const cord = model(
       "printDesign=nukit-tempest&tempestArrangement=dual-horizontal-sandwich&cordHoleWall=left&cordHoleSide=center&cordHoleDiameter=10&cordHoleCornerOffset=20",

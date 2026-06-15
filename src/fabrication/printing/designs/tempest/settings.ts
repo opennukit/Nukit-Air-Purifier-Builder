@@ -56,7 +56,8 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       wall: design.filterSlotWall,
     },
     cordPassThrough:
-      design.cordHoleWall === "none"
+      // A 0 (or less) cord-hole diameter means "no cord".
+      design.cordHoleWall === "none" || design.cordHoleDiameter <= 0
         ? { type: "none" }
         : {
             type: "wall",
