@@ -437,12 +437,14 @@
     bottom: "front",
   };
 
-  $: selectedFilterSlotKey = (wallPlacementControls.find(
-    (control) => filterSlotWallByKey[control.key] === settings.filterSlotWall,
-  )?.key ?? "top") as WallKey;
   $: filterSlotPlacementControls = isFourFilterTower
     ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
     : wallPlacementControls;
+  // Resolve the selection from the options actually offered, so the tower (which
+  // only offers Top/Bottom) falls back to Top when the stored wall isn't shown.
+  $: selectedFilterSlotKey = (filterSlotPlacementControls.find(
+    (control) => filterSlotWallByKey[control.key] === settings.filterSlotWall,
+  )?.key ?? "top") as WallKey;
 
   function updateFilterSlot(event: Event): void {
     const key = (event.target as HTMLSelectElement).value as WallKey;
