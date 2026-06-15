@@ -1151,7 +1151,7 @@ export class PurifierThreePreview {
       showFilterMedia: settings.preview.enclosure.showFilterMedia,
       showFans: settings.preview.enclosure.showFans,
       showPreviewEdges: settings.preview.enclosure.showPreviewEdges,
-    }, settings.preview.enclosure.explodedView);
+    }, settings.preview.enclosure.explodedView, chunkGroups);
 
     const dimensionBounds = new Box3().setFromObject(this.modelGroup);
     // Exploded view separates the model into its printable chunks along the glue
@@ -1250,13 +1250,40 @@ export class PurifierThreePreview {
     fanAppearance: FanAppearance,
     visibility: { readonly showFilterMedia: boolean; readonly showFans: boolean; readonly showPreviewEdges: boolean },
     exploded: boolean,
+    chunkGroups: readonly Object3D[],
   ): void {
     if (visibility.showFilterMedia) {
       this.addTempestPreviewFilters(model, pose, visibility.showPreviewEdges);
     }
     if (visibility.showFans) {
-      this.addTempestPreviewFans(model, pose, fanAppearance, exploded);
+      this.addTempestPreviewFans(model, pose, fanAppearance, exploded, chunkGroups);
     }
+  }
+
+  // Parent a fan to the print chunk that holds its opening so it moves with that
+  // chunk when the shell explodes — staying lined up with its hole. Falls back to
+  // the nearest chunk (then the model group) when no chunk strictly contains it.
+  private parentPreviewFanToChunk(fan: Group, chunkBoxes: readonly { readonly group: Object3D; readonly box: Box3 }[]): void {
+    if (chunkBoxes.length === 0) {
+      this.modelGroup.add(fan);
+      return;
+    }
+    const center = fan.position;
+    let chosen = chunkBoxes[0].group;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const { group, box } of chunkBoxes) {
+      if (box.containsPoint(center)) {
+        chosen = group;
+        break;
+      }
+      const distance = box.getCenter(new Vector3()).distanceTo(center);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        chosen = group;
+      }
+    }
+    fan.position.sub(chosen.position);
+    chosen.add(fan);
   }
 
   private addTempestPreviewFilters(model: TempestModel, pose: TempestPrintablePose, showPreviewEdges: boolean): void {
@@ -1278,12 +1305,22 @@ export class PurifierThreePreview {
     }
   }
 
-  private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance, exploded: boolean): void {
+  private addTempestPreviewFans(
+    model: TempestModel,
+    pose: TempestPrintablePose,
+    fanAppearance: FanAppearance,
+    exploded: boolean,
+    chunkGroups: readonly Object3D[],
+  ): void {
+    // World matrices must be current before reading chunk bounds for the
+    // fan-to-chunk parenting test.
+    this.modelGroup.updateMatrixWorld(true);
+    const chunkBoxes = chunkGroups.map((group) => ({ group, box: new Box3().setFromObject(group) }));
     matchTopology(model, {
       sandwich: (m) => {
         const { fanLayout } = m;
         for (const wall of tempestPreviewWalls) {
-          this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance, exploded);
+          this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance, exploded, chunkBoxes);
         }
       },
       quad: (m) => {
@@ -1301,11 +1338,11 @@ export class PurifierThreePreview {
             });
             fan.userData["tempestPreviewFan"] = true;
             moveTempestFanInsideTop(fan, m, pose, topInteriorZ);
+            this.parentPreviewFanToChunk(fan, chunkBoxes);
             if (exploded) {
               explodeTempestTopFanOutward(fan, m, pose, topInteriorZ, generatedPreviewExplodeDistance);
             }
             collectFanRotors(fan, this.fanRotors);
-            this.modelGroup.add(fan);
           }
         }
       },
@@ -1319,6 +1356,7 @@ export class PurifierThreePreview {
     localVerticalCenter: number,
     fanAppearance: FanAppearance,
     exploded: boolean,
+    chunkBoxes: readonly { readonly group: Object3D; readonly box: Box3 }[],
   ): void {
     for (const position of layout.positionsAlongWall) {
       const fan = createFan({
@@ -1330,11 +1368,11 @@ export class PurifierThreePreview {
       });
       fan.userData["tempestPreviewFan"] = true;
       moveTempestFanInsideWall(fan, model, pose, layout.wall);
+      this.parentPreviewFanToChunk(fan, chunkBoxes);
       if (exploded) {
         explodeTempestWallFanOutward(fan, model, pose, layout.wall, generatedPreviewExplodeDistance);
       }
       collectFanRotors(fan, this.fanRotors);
-      this.modelGroup.add(fan);
     }
   }
 
