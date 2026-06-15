@@ -212,6 +212,9 @@ export type TempestSettings = {
   readonly filterSlot: TempestFilterSlotSettings;
   readonly cordPassThrough: TempestCordPassThrough;
   readonly alignmentPins: TempestAlignmentPinSettings;
+  // Deboss each seam with a two-letter code (both chunk letters) on the inner
+  // wall so glued pieces are easy to match. Only affects split (multi-chunk) prints.
+  readonly chunkLabels: boolean;
   readonly printBed: TempestPrintBedVolume;
   readonly renderTarget: TempestRenderTarget;
 };

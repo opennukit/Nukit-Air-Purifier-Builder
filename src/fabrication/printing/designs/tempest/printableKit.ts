@@ -31,6 +31,15 @@ import {
   type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import {
+  cellKey,
+  planChunkLabels,
+  type ChunkSeamLabel,
+} from "@/fabrication/printing/designs/tempest/geometry/chunkLabels";
+import {
+  debossChunkSeamLabels,
+  type SeamPinAnchor,
+} from "@/fabrication/printing/designs/tempest/geometry/chunkLabelDeboss";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 
@@ -70,6 +79,13 @@ export function createTempestPrintableKit(
   // the returned parts carry only extracted plain-data meshes. The posing and
   // chunk-clipping run through the same ModelingApi seam as the parametric shape
   // (geometry/chunking.ts); only mesh extraction below is Manifold-bound.
+  // Posed alignment-pin sites: solid, hole-clear anchors for the seam-code deboss.
+  const pinAnchors: SeamPinAnchor[] =
+    createTempestAssemblyPinDiagram(settings, presetId)?.placements.map((placement) => ({
+      position: placement.position,
+      axis: placement.axis,
+    })) ?? [];
+
   const parts = withGeometryArena(() => {
     const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
     const assembly = posePrintableAssembly(
@@ -77,7 +93,7 @@ export function createTempestPrintableKit(
       pose,
       createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, printableChunkGrid, assembly);
+    return createChunkParts(ctx, model, printableChunkGrid, assembly, pinAnchors);
   });
 
   return {
@@ -219,32 +235,87 @@ function settingsForPresetBed(settings: TempestSettings, presetId: PrintVolumePr
 // Chunk Parts
 // #######################################
 
+// Chunk/seam label deboss: 7 mm caps cut 1 mm into the inner wall (the reference
+// proportions). Only meaningful once the print is split into more than one chunk.
+const CHUNK_LABEL_CAP_HEIGHT_MM = 7;
+const CHUNK_LABEL_DEPTH_MM = 1;
+
+type ClippedChunk = {
+  readonly address: ChunkAddress;
+  readonly bounds: ChunkBounds;
+  readonly geom: Geom3;
+  readonly mesh: ReturnType<typeof extractWeldedMesh>;
+};
+
 function createChunkParts(
   ctx: GeometryContext<Geom3, Geom2>,
+  model: TempestModel,
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
+  pinAnchors: readonly SeamPinAnchor[],
 ): PrintablePart[] {
-  const parts: PrintablePart[] = [];
+  // Pass 1: clip every cell and record which ones actually hold material — the
+  // letter plan and seam codes can only reference occupied chunks.
+  const clipped = new Map<string, ClippedChunk>();
+  const occupied = new Set<string>();
   for (let z = 0; z < chunkGrid.countZ; z += 1) {
     for (let y = 0; y < chunkGrid.countY; y += 1) {
       for (let x = 0; x < chunkGrid.countX; x += 1) {
-        const part = createChunkPart(ctx, chunkGrid, assembly, { x, y, z });
-        if (part.mesh.vertices.length > 0) {
-          parts.push(part);
+        const address = { x, y, z };
+        const bounds = chunkBoundsAt(chunkGrid, address);
+        const geom = clipPrintChunk(ctx, assembly, bounds);
+        const mesh = extractWeldedMesh(geom);
+        if (mesh.vertices.length === 0) {
+          continue;
         }
+        const key = cellKey(address);
+        occupied.add(key);
+        clipped.set(key, { address, bounds, geom, mesh });
       }
     }
+  }
+
+  // Posed model centre — the deboss faces the code toward here so it reads from
+  // inside the chamber.
+  const last = (b: readonly number[]) => b[b.length - 1];
+  const modelCenter: [number, number, number] = [
+    (chunkGrid.boundariesX[0] + last(chunkGrid.boundariesX)) / 2,
+    (chunkGrid.boundariesY[0] + last(chunkGrid.boundariesY)) / 2,
+    (chunkGrid.boundariesZ[0] + last(chunkGrid.boundariesZ)) / 2,
+  ];
+
+  // Pass 2: deboss each chunk's seam codes (when enabled and the print is split),
+  // then emit parts in the stable z,y,x order the clipped map preserves.
+  const seamsByCell = new Map<string, ChunkSeamLabel[]>();
+  if (model.settings.chunkLabels && occupied.size > 1) {
+    for (const seam of planChunkLabels(chunkGrid, occupied).seams) {
+      const key = cellKey(seam.cell);
+      (seamsByCell.get(key) ?? seamsByCell.set(key, []).get(key)!).push(seam);
+    }
+  }
+
+  const parts: PrintablePart[] = [];
+  for (const chunk of clipped.values()) {
+    const seams = seamsByCell.get(cellKey(chunk.address));
+    const mesh =
+      seams === undefined || seams.length === 0
+        ? chunk.mesh
+        : extractWeldedMesh(
+            debossChunkSeamLabels(ctx, chunk.geom, seams, pinAnchors, modelCenter, chunk.bounds.origin, {
+              capHeight: CHUNK_LABEL_CAP_HEIGHT_MM,
+              depth: CHUNK_LABEL_DEPTH_MM,
+            }),
+          );
+    parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh));
   }
   return parts;
 }
 
-function createChunkPart(
-  ctx: GeometryContext<Geom3, Geom2>,
-  chunkGrid: TempestChunkGrid,
-  assembly: Geom3,
+function buildChunkPart(
   address: ChunkAddress,
+  bounds: ChunkBounds,
+  mesh: ReturnType<typeof extractWeldedMesh>,
 ): PrintablePart {
-  const bounds = chunkBoundsAt(chunkGrid, address);
   const [width, depth, height] = bounds.size;
   const [originX, originY, originZ] = bounds.origin;
   return {
@@ -259,7 +330,7 @@ function createChunkPart(
     width: roundMillimeters(width),
     depth: roundMillimeters(depth),
     height: roundMillimeters(height),
-    mesh: extractWeldedMesh(clipPrintChunk(ctx, assembly, bounds)),
+    mesh,
   };
 }
 

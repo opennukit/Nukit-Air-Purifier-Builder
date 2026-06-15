@@ -17,6 +17,7 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
   const design = requireTempestDesign(configuration);
   return {
     ...defaultTempestSettings,
+    chunkLabels: design.chunkLabels,
     arrangement: tempestArrangementFromConfiguration(configuration),
     fan: {
       ...defaultTempestSettings.fan,

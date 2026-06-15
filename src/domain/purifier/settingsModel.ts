@@ -218,6 +218,9 @@ export type RawPurifierSettings = {
   // Tempest-only: top/bottom outer frame thickness, independent of the wall
   // thickness so the frame can be beefier for filter retention.
   outsideFlangeThickness: Millimeters;
+  // Tempest-only: deboss a two-letter seam code on the inner wall by each seam of
+  // a split (multi-chunk) print so glued pieces are easy to match.
+  chunkLabels: boolean;
   // Tempest-only: honeycomb fan grill. hexGrill off = a plain circular opening;
   // hexSize is the hex flat-to-flat, hexSpacing the rib between cells.
   hexGrill: boolean;
@@ -312,6 +315,7 @@ export type TempestPrintDesignDraft = {
   readonly cordHoleSide: CordHoleSide;
   readonly cordHoleCornerOffset: Millimeters;
   readonly outsideFlangeThickness: Millimeters;
+  readonly chunkLabels: boolean;
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
@@ -377,6 +381,7 @@ export type ConfiguredPrintDesign =
       readonly cordHoleSide: CordHoleSide;
       readonly cordHoleCornerOffset: Millimeters;
       readonly outsideFlangeThickness: Millimeters;
+      readonly chunkLabels: boolean;
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
@@ -466,6 +471,7 @@ export const defaultSettings: RawPurifierSettings = {
   cordHoleSide: defaultTempestCordPassThrough.side,
   cordHoleCornerOffset: defaultTempestCordPassThrough.cornerOffset,
   outsideFlangeThickness: 10,
+  chunkLabels: true,
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,

@@ -21,7 +21,7 @@ describe("Tempest meshes are 2-manifold", () => {
     for (const part of kit.parts) {
       expect(manifoldReport(part.mesh)).toEqual(cleanManifold);
     }
-  });
+  }, 30000);
 
   test("honeycomb fan grills stay manifold", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");

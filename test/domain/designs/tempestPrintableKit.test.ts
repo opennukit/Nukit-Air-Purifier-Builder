@@ -163,6 +163,35 @@ describe("Tempest CSG printable kit", () => {
     expect(chamferFaceSpans.every((span) => span.triangleCount >= 2)).toBe(true);
   }, 15000);
 
+  test("debosses seam codes into every split chunk, and not when disabled or unsplit", () => {
+    const meshVolume = (part: PrintablePart): number => {
+      let sum = 0;
+      for (const t of part.mesh.triangles) {
+        const a = part.mesh.vertices[t.v1];
+        const b = part.mesh.vertices[t.v2];
+        const c = part.mesh.vertices[t.v3];
+        sum += a.x * (b.y * c.z - c.y * b.z) - a.y * (b.x * c.z - c.x * b.z) + a.z * (b.x * c.y - c.x * b.y);
+      }
+      return Math.abs(sum / 6);
+    };
+    const tower = (chunkLabels: boolean, preset: "bed-256" | "unsplit") =>
+      createTempestPrintableKit({ ...defaultTempestSettings, chunkLabels }, preset);
+
+    const labelled = tower(true, "bed-256");
+    const plain = tower(false, "bed-256");
+    expect(labelled.parts.length).toBe(plain.parts.length);
+    // Every split chunk loses a little material to its debossed codes.
+    for (const part of labelled.parts) {
+      const twin = plain.parts.find((p) => p.id === part.id)!;
+      const removed = meshVolume(twin) - meshVolume(part);
+      expect(removed).toBeGreaterThan(1); // mm^3 of 1 mm-deep engraving
+      expect(removed).toBeLessThan(5000); // but never a gouge
+    }
+
+    // An unsplit print has no seams, so labelling changes nothing.
+    expect(meshVolume(tower(true, "unsplit").parts[0])).toBeCloseTo(meshVolume(tower(false, "unsplit").parts[0]), 3);
+  }, 30000);
+
   test("places the unsplit posed assembly at the origin", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");
     const chunks = tempestChunkParts(kit);

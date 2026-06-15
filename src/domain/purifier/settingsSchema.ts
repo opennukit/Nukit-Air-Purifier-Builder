@@ -82,6 +82,7 @@ export type PurifierSettingsFieldFallbacks = {
   readonly cordHoleDiameter: number;
   readonly cordHoleCornerOffset: number;
   readonly outsideFlangeThickness: number;
+  readonly chunkLabels: boolean;
   readonly hexGrill: boolean;
   readonly hexSize: number;
   readonly hexSpacing: number;
@@ -143,6 +144,7 @@ export const createPurifierSettingsFieldsSchema = (
     cordHoleDiameter: zNumberField(fallbacks.cordHoleDiameter),
     cordHoleCornerOffset: zNumberField(fallbacks.cordHoleCornerOffset),
     outsideFlangeThickness: zNumberField(fallbacks.outsideFlangeThickness),
+    chunkLabels: zBooleanField(fallbacks.chunkLabels),
     hexGrill: zBooleanField(fallbacks.hexGrill),
     hexSize: zNumberField(fallbacks.hexSize),
     hexSpacing: zNumberField(fallbacks.hexSpacing),
