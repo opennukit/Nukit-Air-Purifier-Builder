@@ -7,7 +7,7 @@
   } from "@/domain/purifier/airPurifier";
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
-    applyTempestArrangementDefaults,
+    applyTempestArrangement,
     boxExhaustDiametersForWidth,
     cordHoleSides,
     cordHoleWalls,
@@ -410,7 +410,10 @@
   }
 
   function updateTempestArrangement(arrangement: TempestArrangementPreset): void {
-    commitSettings(applyTempestArrangementDefaults(settings, arrangement));
+    // Switch layout (and reset the per-wall fan banks for the new arrangement)
+    // but keep the chosen filter size — applyTempestArrangement leaves the
+    // measured dimensions alone, unlike applyTempestArrangementDefaults.
+    commitSettings(applyTempestArrangement(settings, arrangement));
   }
 
   function updateTempestDesign(event: Event): void {
