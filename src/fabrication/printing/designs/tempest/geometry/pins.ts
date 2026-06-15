@@ -83,7 +83,15 @@ export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: 
   return matchTopology(model, {
     sandwich: (m) => {
       const bores = sandwichFanBores(m, m.fanLayout);
-      return placements.filter((placement) => !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness)));
+      // The filter loading slot cuts an opening through one wall, so a seam pin
+      // landing on that wall within the slot footprint has no material to grip
+      // and the CSG cuts no hole there — it would float in the exploded preview.
+      const slots = sandwichLoadingSlots(m, m.filterLayout);
+      return placements.filter(
+        (placement) =>
+          !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness)) &&
+          !slots.some((slot) => loadingSlotSwallowsPin(slot, placement)),
+      );
     },
     quad: (m) => {
       // Drop any pin centered in an open region — it would have no material to
@@ -502,6 +510,71 @@ function boreSwallowsPin(bore: SandwichFanBore, placement: TempestAlignmentPinPl
   }
   const planarDistance = bore.normalAxis === "x" ? Math.hypot(pinY - boreY, pinZ - boreZ) : Math.hypot(pinX - boreX, pinZ - boreZ);
   return planarDistance < bore.radius;
+}
+
+// #######################################
+// Sandwich Filter Loading Slots
+// #######################################
+
+// One wall's filter loading slot as data: the open band along the wall's length
+// axis and Z, sitting at the wall midline along the wall normal. A seam pin whose
+// center lands in this band has no wall material to grip. The cut math mirrors
+// horizontalFilterSlotHole (endMargin..wallLength-endMargin along the wall) and
+// the slot's wall-local z is lifted into model space by the outside flange.
+type SandwichLoadingSlot = {
+  readonly lengthAxis: "x" | "y";
+  readonly lengthMin: number;
+  readonly lengthMax: number;
+  readonly normalAxis: "x" | "y";
+  readonly normalPosition: number;
+  readonly zMin: number;
+  readonly zMax: number;
+};
+
+function sandwichLoadingSlots(
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+): SandwichLoadingSlot[] {
+  const wallMid = model.frame.wallThickness / 2;
+  const endMargin = Math.max(model.settings.filterSlot.endMargin, model.frame.chamferSize);
+  const { width, depth } = model.box;
+  const frontBack = model.settings.filterSlot.wall === "front" || model.settings.filterSlot.wall === "back";
+  const wallLength = frontBack ? width : depth;
+  const lengthMin = endMargin;
+  const lengthMax = wallLength - endMargin;
+  if (lengthMax <= lengthMin) {
+    return [];
+  }
+  const lengthAxis: "x" | "y" = frontBack ? "x" : "y";
+  const normalAxis: "x" | "y" = frontBack ? "y" : "x";
+  const normalPosition =
+    model.settings.filterSlot.wall === "front"
+      ? wallMid
+      : model.settings.filterSlot.wall === "back"
+        ? depth - wallMid
+        : model.settings.filterSlot.wall === "left"
+          ? wallMid
+          : width - wallMid;
+  return filterLayout.loading.slots.flatMap((slot) => {
+    const zMin = model.frame.outsideFlangeThickness + slot.localZBottom;
+    const zMax = model.frame.outsideFlangeThickness + slot.localZTop;
+    return zMax <= zMin ? [] : [{ lengthAxis, lengthMin, lengthMax, normalAxis, normalPosition, zMin, zMax }];
+  });
+}
+
+function loadingSlotSwallowsPin(slot: SandwichLoadingSlot, placement: TempestAlignmentPinPlacement): boolean {
+  const [x, y, z] = placement.position;
+  if (z <= slot.zMin || z >= slot.zMax) {
+    return false;
+  }
+  const lengthCoordinate = slot.lengthAxis === "x" ? x : y;
+  if (lengthCoordinate <= slot.lengthMin || lengthCoordinate >= slot.lengthMax) {
+    return false;
+  }
+  const normalCoordinate = slot.normalAxis === "x" ? x : y;
+  // Seam wall pins sit exactly on the wall midline; a 1 mm tolerance keeps the
+  // test robust to rounding without reaching pins on the opposite wall.
+  return Math.abs(normalCoordinate - slot.normalPosition) <= 1;
 }
 
 // #######################################

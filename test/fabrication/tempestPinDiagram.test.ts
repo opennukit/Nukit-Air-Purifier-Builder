@@ -178,6 +178,50 @@ describe("tempest assembly pin diagram", () => {
     }
   });
 
+  test("clears sandwich pins out of the filter loading slot opening", () => {
+    const plan = createTempestChunkPlan(tempestSettings, "bed-180");
+    const candidates = tempestAlignmentPinPlacements(plan.model, plan.sourceChunkGrid);
+    const cleared = tempestPinPlacementsClearOfFans(plan.model, plan.sourceChunkGrid);
+    expect(cleared.length).toBeGreaterThan(0);
+
+    const fl = plan.model.filterLayout;
+    if (fl.topology !== "sandwich") {
+      throw new Error("expected a sandwich layout");
+    }
+    const { width, depth } = plan.model.box;
+    const wallMid = plan.model.frame.wallThickness / 2;
+    const slotWall = plan.model.settings.filterSlot.wall;
+    const frontBack = slotWall === "front" || slotWall === "back";
+    const endMargin = Math.max(plan.model.settings.filterSlot.endMargin, plan.model.frame.chamferSize);
+    const wallLength = frontBack ? width : depth;
+    const lengthMin = endMargin;
+    const lengthMax = wallLength - endMargin;
+    const normalPosition =
+      slotWall === "front" ? wallMid : slotWall === "back" ? depth - wallMid : slotWall === "left" ? wallMid : width - wallMid;
+
+    // At least one candidate fell in the slot opening (otherwise this guards nothing).
+    const inSlot = (placement: (typeof candidates)[number]): boolean => {
+      const [x, y, z] = placement.position;
+      const lengthCoordinate = frontBack ? x : y;
+      const normalCoordinate = frontBack ? y : x;
+      return fl.loading.slots.some((slot) => {
+        const zMin = plan.model.frame.outsideFlangeThickness + slot.localZBottom;
+        const zMax = plan.model.frame.outsideFlangeThickness + slot.localZTop;
+        return (
+          z > zMin &&
+          z < zMax &&
+          lengthCoordinate > lengthMin &&
+          lengthCoordinate < lengthMax &&
+          Math.abs(normalCoordinate - normalPosition) <= 1
+        );
+      });
+    };
+    expect(candidates.some(inSlot)).toBe(true);
+    for (const placement of cleared) {
+      expect(inSlot(placement)).toBe(false);
+    }
+  });
+
   test("returns no diagram when the print volume keeps the model whole", () => {
     expect(createTempestAssemblyPinDiagram(tempestSettings, "unsplit")).toBeNull();
   });
