@@ -1448,7 +1448,7 @@
                             checked={selectedFanSizeChoice === "box-exhaust"}
                             onchange={() => updateFanSizeChoice("box-exhaust")}
                           />
-                          <span>Box/Exhaust</span>
+                          <span>Box/<wbr>Exhaust</span>
                         </label>
                       {/if}
                     </div>

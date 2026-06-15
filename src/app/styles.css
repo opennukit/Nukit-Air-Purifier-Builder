@@ -1458,6 +1458,10 @@ hover/focus-within alone never shows the tooltip there. */
 
 .segmented-field label {
   position: relative;
+  /* Grid so the option span stretches to the row height: when one option wraps
+     to two lines (e.g. "Box/ Exhaust") every segment in the row matches its
+     height instead of leaving the others short. */
+  display: grid;
 }
 
 .segmented-field input {
@@ -1483,10 +1487,10 @@ hover/focus-within alone never shows the tooltip there. */
   font-weight: 800;
   line-height: 1.12;
   text-align: center;
-  /* anywhere (not just break-word) so single long tokens without a normal break
-     opportunity — e.g. "Box/Exhaust" — still wrap instead of spilling past the
-     segment edge, and the cell can shrink to its column. */
-  overflow-wrap: anywhere;
+  /* break-word keeps multi-word options tidy; "Box/Exhaust" carries an explicit
+     <wbr> after the slash so it wraps as "Box/" / "Exhaust" rather than mid-word
+     when the column gets tight. */
+  overflow-wrap: break-word;
   cursor: pointer;
 }
 
