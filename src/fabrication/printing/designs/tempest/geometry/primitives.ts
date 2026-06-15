@@ -85,6 +85,35 @@ export function outerChamferedWallPrism<Solid, Region>(
   return extrusions.extrudeLinear({ height: Math.max(0.001, height) }, footprint);
 }
 
+// A full width x depth prism whose TOP and BOTTOM faces are beveled inward by
+// `chamfer` at 45° — a horizontal-edge chamfer around the whole perimeter. Built
+// like chamferedOpeningCutAlongZ: two end hulls (inset -> full) bracket a
+// straight middle. Intersect it with a box to add a small chamfer around that
+// box's top and bottom outside edges without disturbing its vertical corners.
+export function topBottomEdgeChamferSolid<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  width: number,
+  depth: number,
+  height: number,
+  chamfer: number,
+): Solid {
+  const { transforms, extrusions, hulls } = ctx.modeling;
+  const safeWidth = Math.max(0.001, width);
+  const safeDepth = Math.max(0.001, depth);
+  const safeHeight = Math.max(0.001, height);
+  const full = rectangle2d(ctx, 0, 0, safeWidth, safeDepth);
+  const safeChamfer = Math.max(0, Math.min(chamfer, safeWidth / 2 - 0.01, safeDepth / 2 - 0.01, safeHeight / 2 - 0.01));
+  if (safeChamfer <= 0) {
+    return extrusions.extrudeLinear({ height: safeHeight }, full);
+  }
+  const inset = rectangle2d(ctx, safeChamfer, safeChamfer, safeWidth - 2 * safeChamfer, safeDepth - 2 * safeChamfer);
+  return unionAll(ctx, [
+    hulls.hull(thinExtrude(ctx, inset, 0), thinExtrude(ctx, full, safeChamfer)),
+    transforms.translate([0, 0, safeChamfer], extrusions.extrudeLinear({ height: safeHeight - 2 * safeChamfer }, full)),
+    hulls.hull(thinExtrude(ctx, full, safeHeight - safeChamfer), thinExtrude(ctx, inset, safeHeight)),
+  ]);
+}
+
 export function rectangle2d<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   x: number,

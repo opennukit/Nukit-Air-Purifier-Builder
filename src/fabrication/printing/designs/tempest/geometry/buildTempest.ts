@@ -4,7 +4,7 @@ import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
-import { chamferedPrism, subtractAll, unionAll } from "./primitives";
+import { chamferedPrism, subtractAll, topBottomEdgeChamferSolid, unionAll } from "./primitives";
 import {
   towerAirChamber,
   towerCornerChamfer,
@@ -88,17 +88,23 @@ function assembleQuad<Solid, Region>(
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): Solid {
-  // 1. The outer box; towerCornerChamfer keeps the bevel a full wall clear of the
-  //    nearest filter pocket.
-  const outerBox = chamferedPrism(
-    ctx,
-    0,
-    0,
-    0,
-    model.box.width,
-    model.box.depth,
-    model.box.height,
-    towerCornerChamfer(model.frame.towerCornerPostChamfer, filterLayout.structuralOffset, model.frame.outsideFlangeThickness),
+  // 1. The outer box; towerCornerChamfer keeps the vertical-corner bevel a full
+  //    wall clear of the nearest filter pocket. Intersecting with a top/bottom
+  //    edge-chamfer solid adds the same small horizontal-edge chamfer the
+  //    sandwich carries (model.frame.chamferSize) around the top and bottom
+  //    outside perimeter, leaving the corner bevel untouched.
+  const outerBox = ctx.modeling.booleans.intersect(
+    chamferedPrism(
+      ctx,
+      0,
+      0,
+      0,
+      model.box.width,
+      model.box.depth,
+      model.box.height,
+      towerCornerChamfer(model.frame.towerCornerPostChamfer, filterLayout.structuralOffset, model.frame.outsideFlangeThickness),
+    ),
+    topBottomEdgeChamferSolid(ctx, model.box.width, model.box.depth, model.box.height, model.frame.chamferSize),
   );
 
   // 2-6. Subtract every void from the box.
