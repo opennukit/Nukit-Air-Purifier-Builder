@@ -1378,7 +1378,7 @@
                 <h2 id="partsSectionTitle">{isTempestControlsActive ? "Filter" : partsSectionTitleText}</h2>
               </div>
               <p class="section-note">
-                Get your filters first, measure them, then enter the numbers here.
+                Get your filters first, measure them, then enter the numbers here. The nominal size is not the actual size.
               </p>
               <div data-generated-part-controls>
                 <!--
@@ -1609,7 +1609,9 @@
           {#if !isStaticReferenceControlsActive}
             <section class="control-section geometry-section" data-generated-geometry-controls>
               <div class="section-heading">
-                <p class="eyebrow">{isTempestControlsActive ? "Parts" : "Geometry"}</p>
+                {#if !isTempestControlsActive}
+                  <p class="eyebrow">Geometry</p>
+                {/if}
                 <h2>{isTempestControlsActive ? "Fan" : "Material and fit"}</h2>
               </div>
               {#if !isTempestControlsActive}
@@ -1651,92 +1653,98 @@
                 </div>
               {/if}
               {#if isTempestControlsActive}
-                <div class="fan-selection">
-                  {@render fanSizeSegment()}
+                <div class="fan-column">
+                  <div class="fan-selection">
+                    {@render fanSizeSegment()}
 
-                  {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
-                    <div data-box-exhaust-controls>
-                      {#each tempestBoxExhaustControls as control}
-                        <label class="field">
-                          <span>{control.label}</span>
-                          <span class="input-shell">
+                    {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
+                      <div data-box-exhaust-controls>
+                        {#each tempestBoxExhaustControls as control}
+                          <label class="field">
+                            <span>{control.label}</span>
+                            <span class="input-shell">
+                              <input
+                                type="number"
+                                name={control.name}
+                                min="0"
+                                step={control.step}
+                                inputmode="decimal"
+                                value={settings[control.name]}
+                                onchange={(event) => updateNumberSetting(control.name, event)}
+                              />
+                              <small>{control.suffix}</small>
+                            </span>
+                          </label>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    <fieldset class="fan-placement-field" data-tempest-fan-auto>
+                      <legend>Fan placement</legend>
+                      <div class="fan-placement-checks">
+                        {#each fanPlacementCheckboxControls as control}
+                          <label class="toggle-field">
                             <input
-                              type="number"
-                              name={control.name}
-                              min="0"
-                              step={control.step}
-                              inputmode="decimal"
-                              value={settings[control.name]}
-                              onchange={(event) => updateNumberSetting(control.name, event)}
+                              type="checkbox"
+                              name={`auto-${control.name}`}
+                              checked={settings[control.name] === automaticFanCount}
+                              onchange={(event) => updateFanAuto(control.name, event)}
                             />
-                            <small>{control.suffix}</small>
-                          </span>
-                        </label>
-                      {/each}
-                    </div>
-                  {/if}
+                            <span>{control.label}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                  </div>
 
-                  <fieldset class="fan-placement-field" data-tempest-fan-auto>
-                    <legend>Fan placement</legend>
-                    <div class="fan-placement-checks">
-                      {#each fanPlacementCheckboxControls as control}
+                  {#if showHexGrillControls}
+                    <fieldset class="fan-placement-field" data-tempest-hex-grill>
+                      <legend>Honeycomb grill</legend>
+                      <div class="fan-placement-checks">
                         <label class="toggle-field">
                           <input
                             type="checkbox"
-                            name={`auto-${control.name}`}
-                            checked={settings[control.name] === automaticFanCount}
-                            onchange={(event) => updateFanAuto(control.name, event)}
+                            name="hexGrill"
+                            checked={settings.hexGrill}
+                            onchange={(event) => updateBooleanSetting("hexGrill", event)}
                           />
-                          <span>{control.label}</span>
+                          <span>On</span>
                         </label>
-                      {/each}
-                    </div>
-                  </fieldset>
-                </div>
+                      </div>
+                    </fieldset>
+                  {/if}
 
-                {#if showHexGrillControls}
-                  <label class="toggle-field">
-                    <input
-                      type="checkbox"
-                      name="hexGrill"
-                      checked={settings.hexGrill}
-                      onchange={(event) => updateBooleanSetting("hexGrill", event)}
-                    />
-                    <span>Honeycomb grill</span>
-                  </label>
-                {/if}
-
-                <label class="field">
-                  <span>
-                    Cord hole diameter
-                    <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
-                      <button
-                        type="button"
-                        aria-label="What does the power cord pass-through do?"
-                        aria-describedby="info-cordHoleDiameter"
-                        aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
-                        onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                        onblur={() => closeInfoTip("info-cordHoleDiameter")}
-                        onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
-                      >i</button>
-                      <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
+                  <label class="field">
+                    <span>
+                      Cord hole diameter
+                      <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
+                        <button
+                          type="button"
+                          aria-label="What does the power cord pass-through do?"
+                          aria-describedby="info-cordHoleDiameter"
+                          aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
+                          onclick={() => toggleInfoTip("info-cordHoleDiameter")}
+                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
+                          onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
+                        >i</button>
+                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo} Set the diameter to 0 for no cord hole.</p>
+                      </span>
                     </span>
-                  </span>
-                  <span class="input-shell">
-                    <input
-                      type="number"
-                      name="cordHoleDiameter"
-                      min="0"
-                      max="25"
-                      step="0.5"
-                      inputmode="decimal"
-                      value={settings.cordHoleDiameter}
-                      onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                    />
-                    <small>mm</small>
-                  </span>
-                </label>
-                <p class="section-note cord-hole-note">Set the diameter to 0 for no cord hole.</p>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name="cordHoleDiameter"
+                        min="0"
+                        max="25"
+                        step="0.5"
+                        inputmode="decimal"
+                        value={settings.cordHoleDiameter}
+                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                      />
+                      <small>mm</small>
+                    </span>
+                  </label>
+                </div>
               {/if}
             </section>
           {/if}

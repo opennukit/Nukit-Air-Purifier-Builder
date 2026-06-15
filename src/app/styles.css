@@ -1509,10 +1509,23 @@ Layout Grids
   gap: 10px;
 }
 
+/* The tempest fan column spans the full width of the geometry section's 2-up
+   grid so its controls stack vertically (fan size, fan placement, honeycomb,
+   cord) instead of flowing into the second grid track. */
+.fan-column {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+}
+
 .fan-selection {
   display: grid;
   gap: 8px;
   margin: 9px 0 12px;
+}
+
+.fan-column .fan-selection {
+  margin: 0;
 }
 
 .fan-selection .segmented-field,
