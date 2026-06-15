@@ -440,17 +440,12 @@
   $: selectedFilterSlotKey = (wallPlacementControls.find(
     (control) => filterSlotWallByKey[control.key] === settings.filterSlotWall,
   )?.key ?? "top") as WallKey;
-  $: filterSlotChecked = {
-    left: selectedFilterSlotKey === "left",
-    right: selectedFilterSlotKey === "right",
-    top: selectedFilterSlotKey === "top",
-    bottom: selectedFilterSlotKey === "bottom",
-  } as Record<WallKey, boolean>;
   $: filterSlotPlacementControls = isFourFilterTower
     ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
     : wallPlacementControls;
 
-  function toggleFilterSlot(key: WallKey): void {
+  function updateFilterSlot(event: Event): void {
+    const key = (event.target as HTMLSelectElement).value as WallKey;
     commitSettings({ ...settings, filterSlotWall: filterSlotWallByKey[key] });
   }
 
@@ -1391,22 +1386,14 @@
                       {/each}
                     </div>
                     {#if isTempestControlsActive}
-                      <fieldset class="fan-placement-field" data-tempest-filter-slot-placement>
-                        <legend>Filter slot placement</legend>
-                        <div class="fan-placement-checks">
+                      <label class="field" data-tempest-filter-slot-placement>
+                        <span>Filter slot placement</span>
+                        <select name="filterSlotPlacement" onchange={updateFilterSlot}>
                           {#each filterSlotPlacementControls as control}
-                            <label class="toggle-field">
-                              <input
-                                type="checkbox"
-                                name={`filter-slot-${control.key}`}
-                                checked={filterSlotChecked[control.key]}
-                                onchange={() => toggleFilterSlot(control.key)}
-                              />
-                              <span>{control.label}</span>
-                            </label>
+                            <option value={control.key} selected={selectedFilterSlotKey === control.key}>{control.label}</option>
                           {/each}
-                        </div>
-                      </fieldset>
+                        </select>
+                      </label>
                     {/if}
                   </div>
                 {/if}
