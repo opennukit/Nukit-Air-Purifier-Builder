@@ -78,8 +78,8 @@ export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = 
 // Tempest honeycomb fan grill (hidden in box/exhaust mode). hexSize is the hex
 // flat-to-flat, hexSpacing the rib between cells — matches tempest-builder.html.
 export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "hexSize", label: "Hex size", suffix: "mm", step: "0.5" },
-  { name: "hexSpacing", label: "Hex spacing", suffix: "mm", step: "0.1" },
+  { name: "hexSize", label: "Grill hex size", suffix: "mm", step: "0.5" },
+  { name: "hexSpacing", label: "Grill hex spacing", suffix: "mm", step: "0.1" },
 ];
 // Tempest 4-filter tower box/exhaust geometry (shown only when Box-Exhaust is the
 // fan choice). A 0 size/radius means "auto" — see tempest-builder.html.
