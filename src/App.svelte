@@ -1192,6 +1192,37 @@
         </section>
 
         <div class="controls-sections">
+          {#snippet fanSizeSegment()}
+            <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
+              <legend>Fan size</legend>
+              <div>
+                {#each recommendedFanDiameterOptions as diameter}
+                  <label>
+                    <input
+                      type="radio"
+                      name="fanSizeChoice"
+                      value={diameter}
+                      checked={selectedFanSizeChoice === diameter}
+                      onchange={() => updateFanSizeChoice(diameter)}
+                    />
+                    <span>{diameter} mm</span>
+                  </label>
+                {/each}
+                {#if showBoxExhaustOption}
+                  <label>
+                    <input
+                      type="radio"
+                      name="fanSizeChoice"
+                      value="box-exhaust"
+                      checked={selectedFanSizeChoice === "box-exhaust"}
+                      onchange={() => updateFanSizeChoice("box-exhaust")}
+                    />
+                    <span>Box/<wbr>Exhaust</span>
+                  </label>
+                {/if}
+              </div>
+            </fieldset>
+          {/snippet}
           {#if !isStaticReferenceControlsActive}
             <section class="control-section layout-section" data-generated-layout-controls>
               <div class="section-heading">
@@ -1344,7 +1375,7 @@
             <section class="control-section parts-section">
               <div class="section-heading">
                 <p class="eyebrow">Parts</p>
-                <h2 id="partsSectionTitle">{partsSectionTitleText}</h2>
+                <h2 id="partsSectionTitle">{isTempestControlsActive ? "Filter" : partsSectionTitleText}</h2>
               </div>
               <p class="section-note">
                 Get your filters first, measure them, then enter the numbers here.
@@ -1423,205 +1454,49 @@
                   </div>
                 {/if}
 
-                <div class="fan-selection">
-                  <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
-                    <legend>Fan size</legend>
-                    <div>
-                      {#each recommendedFanDiameterOptions as diameter}
-                        <label>
+                {#if !isTempestControlsActive}
+                  <div class="fan-selection">
+                    {@render fanSizeSegment()}
+                  </div>
+                {/if}
+
+                {#if isTempestControlsActive}
+                  <div data-tempest-fit-controls>
+                    {#each tempestFitControls as control}
+                      <label class="field">
+                        <span>
+                          {control.label}
+                          {#if control.info !== undefined}
+                            <span class="info-tip" class:is-open={openInfoTipId === `info-${control.name}`}>
+                              <button
+                                type="button"
+                                aria-label="What does {control.label} do?"
+                                aria-describedby="info-{control.name}"
+                                aria-expanded={openInfoTipId === `info-${control.name}`}
+                                onclick={() => toggleInfoTip(`info-${control.name}`)}
+                                onblur={() => closeInfoTip(`info-${control.name}`)}
+                                onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
+                              >i</button>
+                              <p id="info-{control.name}" role="tooltip">{control.info}</p>
+                            </span>
+                          {/if}
+                        </span>
+                        <span class="input-shell">
                           <input
-                            type="radio"
-                            name="fanSizeChoice"
-                            value={diameter}
-                            checked={selectedFanSizeChoice === diameter}
-                            onchange={() => updateFanSizeChoice(diameter)}
+                            type="number"
+                            name={control.name}
+                            min="0"
+                            max="5"
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
                           />
-                          <span>{diameter} mm</span>
-                        </label>
-                      {/each}
-                      {#if showBoxExhaustOption}
-                        <label>
-                          <input
-                            type="radio"
-                            name="fanSizeChoice"
-                            value="box-exhaust"
-                            checked={selectedFanSizeChoice === "box-exhaust"}
-                            onchange={() => updateFanSizeChoice("box-exhaust")}
-                          />
-                          <span>Box/<wbr>Exhaust</span>
-                        </label>
-                      {/if}
-                    </div>
-                  </fieldset>
-
-                  {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
-                    <div data-box-exhaust-controls>
-                      {#each tempestBoxExhaustControls as control}
-                        <label class="field">
-                          <span>{control.label}</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name={control.name}
-                              min="0"
-                              step={control.step}
-                              inputmode="decimal"
-                              value={settings[control.name]}
-                              onchange={(event) => updateNumberSetting(control.name, event)}
-                            />
-                            <small>{control.suffix}</small>
-                          </span>
-                        </label>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if isTempestControlsActive}
-                    <fieldset class="fan-placement-field" data-tempest-fan-auto>
-                      <legend>Fan placement</legend>
-                      <div class="fan-placement-checks">
-                        {#each fanPlacementCheckboxControls as control}
-                          <label class="toggle-field">
-                            <input
-                              type="checkbox"
-                              name={`auto-${control.name}`}
-                              checked={settings[control.name] === automaticFanCount}
-                              onchange={(event) => updateFanAuto(control.name, event)}
-                            />
-                            <span>{control.label}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-                  {/if}
-
-                </div>
-              </div>
-            </section>
-          {/if}
-
-          {#if !isStaticReferenceControlsActive}
-            <section class="control-section geometry-section" data-generated-geometry-controls>
-              <div class="section-heading">
-                <p class="eyebrow">Geometry</p>
-                <h2>Material and fit</h2>
-              </div>
-              {#if !isTempestControlsActive}
-                {#each visibleGeometryControls as control}
-                  <label class="field">
-                    <span>{control.label}</span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name={control.name}
-                        step={control.step}
-                        inputmode="decimal"
-                        value={settings[control.name]}
-                        onchange={(event) => updateNumberSetting(control.name, event)}
-                      />
-                      <small>{control.suffix}</small>
-                    </span>
-                  </label>
-                {/each}
-              {/if}
-              {#if isNukitControlsActive}
-                <div data-nukit-panel-fit-controls>
-                  {#each nukitPanelFitControls as control}
-                    <label class="field">
-                      <span>{control.label}</span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name={control.name}
-                          step={control.step}
-                          inputmode="decimal"
-                          value={settings[control.name]}
-                          onchange={(event) => updateNumberSetting(control.name, event)}
-                        />
-                        <small>{control.suffix}</small>
-                      </span>
-                    </label>
-                  {/each}
-                </div>
-              {/if}
-              {#if isTempestControlsActive}
-                <div data-tempest-fit-controls>
-                  {#each tempestFitControls as control}
-                    <label class="field">
-                      <span>
-                        {control.label}
-                        {#if control.info !== undefined}
-                          <span class="info-tip" class:is-open={openInfoTipId === `info-${control.name}`}>
-                            <button
-                              type="button"
-                              aria-label="What does {control.label} do?"
-                              aria-describedby="info-{control.name}"
-                              aria-expanded={openInfoTipId === `info-${control.name}`}
-                              onclick={() => toggleInfoTip(`info-${control.name}`)}
-                              onblur={() => closeInfoTip(`info-${control.name}`)}
-                              onkeydown={(event) => handleInfoTipKeydown(`info-${control.name}`, event)}
-                            >i</button>
-                            <p id="info-{control.name}" role="tooltip">{control.info}</p>
-                          </span>
-                        {/if}
-                      </span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name={control.name}
-                          min="0"
-                          max="5"
-                          step={control.step}
-                          inputmode="decimal"
-                          value={settings[control.name]}
-                          onchange={(event) => updateNumberSetting(control.name, event)}
-                        />
-                        <small>{control.suffix}</small>
-                      </span>
-                    </label>
-                  {/each}
-                  <label class="field">
-                    <span>
-                      Cord hole diameter
-                      <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
-                        <button
-                          type="button"
-                          aria-label="What does the power cord pass-through do?"
-                          aria-describedby="info-cordHoleDiameter"
-                          aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
-                          onclick={() => toggleInfoTip("info-cordHoleDiameter")}
-                          onblur={() => closeInfoTip("info-cordHoleDiameter")}
-                          onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
-                        >i</button>
-                        <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
-                      </span>
-                    </span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name="cordHoleDiameter"
-                        min="0"
-                        max="25"
-                        step="0.5"
-                        inputmode="decimal"
-                        value={settings.cordHoleDiameter}
-                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                      />
-                      <small>mm</small>
-                    </span>
-                  </label>
-                  <p class="section-note cord-hole-note">Set the diameter to 0 for no cord hole.</p>
-                  {#if showHexGrillControls}
-                    <label class="toggle-field">
-                      <input
-                        type="checkbox"
-                        name="hexGrill"
-                        checked={settings.hexGrill}
-                        onchange={(event) => updateBooleanSetting("hexGrill", event)}
-                      />
-                      <span>Honeycomb grill</span>
-                    </label>
-                  {/if}
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                  </div>
 
                   <button
                     type="button"
@@ -1726,7 +1601,142 @@
                       {/if}
                     </div>
                   {/if}
+                {/if}
+              </div>
+            </section>
+          {/if}
+
+          {#if !isStaticReferenceControlsActive}
+            <section class="control-section geometry-section" data-generated-geometry-controls>
+              <div class="section-heading">
+                <p class="eyebrow">{isTempestControlsActive ? "Parts" : "Geometry"}</p>
+                <h2>{isTempestControlsActive ? "Fan" : "Material and fit"}</h2>
+              </div>
+              {#if !isTempestControlsActive}
+                {#each visibleGeometryControls as control}
+                  <label class="field">
+                    <span>{control.label}</span>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name={control.name}
+                        step={control.step}
+                        inputmode="decimal"
+                        value={settings[control.name]}
+                        onchange={(event) => updateNumberSetting(control.name, event)}
+                      />
+                      <small>{control.suffix}</small>
+                    </span>
+                  </label>
+                {/each}
+              {/if}
+              {#if isNukitControlsActive}
+                <div data-nukit-panel-fit-controls>
+                  {#each nukitPanelFitControls as control}
+                    <label class="field">
+                      <span>{control.label}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name={control.name}
+                          step={control.step}
+                          inputmode="decimal"
+                          value={settings[control.name]}
+                          onchange={(event) => updateNumberSetting(control.name, event)}
+                        />
+                        <small>{control.suffix}</small>
+                      </span>
+                    </label>
+                  {/each}
                 </div>
+              {/if}
+              {#if isTempestControlsActive}
+                <div class="fan-selection">
+                  {@render fanSizeSegment()}
+
+                  {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
+                    <div data-box-exhaust-controls>
+                      {#each tempestBoxExhaustControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  <fieldset class="fan-placement-field" data-tempest-fan-auto>
+                    <legend>Fan placement</legend>
+                    <div class="fan-placement-checks">
+                      {#each fanPlacementCheckboxControls as control}
+                        <label class="toggle-field">
+                          <input
+                            type="checkbox"
+                            name={`auto-${control.name}`}
+                            checked={settings[control.name] === automaticFanCount}
+                            onchange={(event) => updateFanAuto(control.name, event)}
+                          />
+                          <span>{control.label}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  </fieldset>
+                </div>
+
+                {#if showHexGrillControls}
+                  <label class="toggle-field">
+                    <input
+                      type="checkbox"
+                      name="hexGrill"
+                      checked={settings.hexGrill}
+                      onchange={(event) => updateBooleanSetting("hexGrill", event)}
+                    />
+                    <span>Honeycomb grill</span>
+                  </label>
+                {/if}
+
+                <label class="field">
+                  <span>
+                    Cord hole diameter
+                    <span class="info-tip" class:is-open={openInfoTipId === "info-cordHoleDiameter"}>
+                      <button
+                        type="button"
+                        aria-label="What does the power cord pass-through do?"
+                        aria-describedby="info-cordHoleDiameter"
+                        aria-expanded={openInfoTipId === "info-cordHoleDiameter"}
+                        onclick={() => toggleInfoTip("info-cordHoleDiameter")}
+                        onblur={() => closeInfoTip("info-cordHoleDiameter")}
+                        onkeydown={(event) => handleInfoTipKeydown("info-cordHoleDiameter", event)}
+                      >i</button>
+                      <p id="info-cordHoleDiameter" role="tooltip">{cordHoleInfo}</p>
+                    </span>
+                  </span>
+                  <span class="input-shell">
+                    <input
+                      type="number"
+                      name="cordHoleDiameter"
+                      min="0"
+                      max="25"
+                      step="0.5"
+                      inputmode="decimal"
+                      value={settings.cordHoleDiameter}
+                      onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                    />
+                    <small>mm</small>
+                  </span>
+                </label>
+                <p class="section-note cord-hole-note">Set the diameter to 0 for no cord hole.</p>
               {/if}
             </section>
           {/if}
