@@ -25,6 +25,7 @@ import {
   applyPrintDesignPreset,
   applyTempestArrangementDefaults,
   cameraPresets,
+  canonicalFilterSlotWall,
   canonicalTempestArrangement,
   canonicalTempestDesign,
   cordHoleSides,
@@ -35,6 +36,7 @@ import {
   type CameraPreset,
   type CordHoleSide,
   type CordHoleWall,
+  type FilterSlotWall,
   type PreviewMaterialColorId,
   type PurifierDraft,
   type RawPurifierSettings,
@@ -75,6 +77,7 @@ export function encodeSettings(
   params.set("fansBottom", String(settings.fansBottom));
   params.set("tempestArrangement", settings.tempestArrangement);
   params.set("tempestDesign", settings.tempestDesign);
+  params.set("filterSlotWall", settings.filterSlotWall);
   params.set("filterFitClearance", formatNumber(settings.filterFitClearance));
   params.set("cordHoleDiameter", formatNumber(settings.cordHoleDiameter));
   params.set("cordHoleWall", settings.cordHoleWall);
@@ -172,6 +175,7 @@ export function decodeSettings(search: string): RawPurifierSettings {
     fanDiameter,
     tempestArrangement: readTempestArrangement(params),
     tempestDesign: readTempestDesign(params),
+    filterSlotWall: readFilterSlotWall(params),
     cordHoleWall: readCordHoleWall(params),
     cordHoleSide: readCordHoleSide(params),
     topExhaust: readTopExhaust(params),
@@ -267,6 +271,10 @@ function readTempestArrangement(
 
 function readTempestDesign(params: URLSearchParams): TempestDesign {
   return canonicalTempestDesign(params.get("tempestDesign"));
+}
+
+function readFilterSlotWall(params: URLSearchParams): FilterSlotWall {
+  return canonicalFilterSlotWall(params.get("filterSlotWall"));
 }
 
 // ##############################

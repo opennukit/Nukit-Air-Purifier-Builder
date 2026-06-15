@@ -49,6 +49,12 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       rim: configuration.cutting.rim,
       filterFitClearance: design.filterFitClearance,
     },
+    filterSlot: {
+      ...defaultTempestSettings.filterSlot,
+      // Which wall the horizontal-layout filter slots open on (the tower loads
+      // from the top plate regardless).
+      wall: design.filterSlotWall,
+    },
     cordPassThrough:
       design.cordHoleWall === "none"
         ? { type: "none" }

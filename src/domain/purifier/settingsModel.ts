@@ -179,6 +179,13 @@ export type CordHoleWall = (typeof cordHoleWalls)[number];
 export const cordHoleSides = ["left", "center", "right"] as const;
 export type CordHoleSide = (typeof cordHoleSides)[number];
 
+// Which wall the filter insertion slots are cut into for the horizontal layouts
+// (1-top / sandwich). "back" renders at the visual top, "front" at the bottom —
+// matching the fan-placement orientation. The tower always loads from the top
+// plate, so this is ignored there.
+export const filterSlotWalls = ["front", "back", "left", "right"] as const;
+export type FilterSlotWall = (typeof filterSlotWalls)[number];
+
 export type RawPurifierSettings = {
   printDesign: PrintDesignId;
   filterWidth: Millimeters;
@@ -196,6 +203,8 @@ export type RawPurifierSettings = {
   tempestArrangement: TempestArrangementPreset;
   // Tempest-only: which preset design is selected ("custom" = user-driven).
   tempestDesign: TempestDesign;
+  // Tempest horizontal layouts: which wall the filter insertion slots open on.
+  filterSlotWall: FilterSlotWall;
   // Tempest-only: clearance added per side around the MEASURED filter so it
   // slides into its cavity; separate from the measurement on purpose.
   filterFitClearance: Millimeters;
@@ -289,6 +298,7 @@ export type TempestPrintDesignDraft = {
   readonly preset: TempestPrintDesignPreset;
   readonly arrangement: TempestArrangementPreset;
   readonly design: TempestDesign;
+  readonly filterSlotWall: FilterSlotWall;
   readonly filter: FilterDimensions;
   // Per-wall fan banks for the horizontal (1-top / 2-sandwich) layouts; ignored by
   // the four-side tower (which exhausts through the top).
@@ -355,6 +365,7 @@ export type ConfiguredPrintDesign =
       readonly preset: TempestPrintDesignPreset;
       readonly arrangement: TempestArrangementPreset;
       readonly design: TempestDesign;
+      readonly filterSlotWall: FilterSlotWall;
       readonly filter: FilterDimensions;
       readonly filterFitClearance: Millimeters;
       readonly cordHoleDiameter: Millimeters;
@@ -443,6 +454,7 @@ export const defaultSettings: RawPurifierSettings = {
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
   tempestDesign: "custom",
+  filterSlotWall: "back",
   filterFitClearance: 1,
   cordHoleDiameter: defaultTempestCordPassThrough.diameter,
   cordHoleWall: defaultTempestCordPassThrough.wall,
@@ -697,6 +709,12 @@ export function canonicalTempestDesign(
   value: TempestDesign | string | null | undefined,
 ): TempestDesign {
   return tempestDesigns.find((design) => design === value) ?? defaultSettings.tempestDesign;
+}
+
+export function canonicalFilterSlotWall(
+  value: FilterSlotWall | string | null | undefined,
+): FilterSlotWall {
+  return filterSlotWalls.find((wall) => wall === value) ?? defaultSettings.filterSlotWall;
 }
 
 // Box/exhaust sizes auto-populate from the filter width: the central fan hole is

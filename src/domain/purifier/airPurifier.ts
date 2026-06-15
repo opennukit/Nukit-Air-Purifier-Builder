@@ -13,6 +13,7 @@ import {
 } from "@/domain/purifier/designPresets";
 import {
   cameraPresets,
+  canonicalFilterSlotWall,
   canonicalTempestArrangement,
   canonicalTempestDesign,
   clamp,
@@ -132,6 +133,7 @@ export function normalizeRawSettings(
     ...normalized,
     tempestArrangement,
     tempestDesign: canonicalTempestDesign(input.tempestDesign),
+    filterSlotWall: canonicalFilterSlotWall(input.filterSlotWall),
     // Preserved like tempestArrangement: the value survives even while a
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
@@ -269,6 +271,7 @@ export function serializePurifierDraft(
       ...serializedFilterFields(draft.design.filter),
       tempestArrangement: draft.design.arrangement,
       tempestDesign: draft.design.design,
+      filterSlotWall: draft.design.filterSlotWall,
       filterFitClearance: draft.design.filterFitClearance,
       cordHoleDiameter: draft.design.cordHoleDiameter,
       cordHoleWall: draft.design.cordHoleWall,
@@ -336,6 +339,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fansBottom: fanCountRequestToRawSetting(input.fan.banks.bottom),
     tempestArrangement: defaultSettings.tempestArrangement,
     tempestDesign: defaultSettings.tempestDesign,
+    filterSlotWall: defaultSettings.filterSlotWall,
     filterFitClearance: defaultSettings.filterFitClearance,
     cordHoleDiameter: defaultSettings.cordHoleDiameter,
     cordHoleWall: defaultSettings.cordHoleWall,
@@ -419,6 +423,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...serializedFilterFields(input.design.filter),
       tempestArrangement: input.design.arrangement,
       tempestDesign: input.design.design,
+      filterSlotWall: input.design.filterSlotWall,
       filterFitClearance: input.design.filterFitClearance,
       cordHoleDiameter: input.design.cordHoleDiameter,
       cordHoleWall: input.design.cordHoleWall,
@@ -497,6 +502,7 @@ function createConfiguredPrintDesign(input: {
       preset: printDesign,
       arrangement: canonicalTempestArrangement(input.raw.tempestArrangement),
       design: canonicalTempestDesign(input.raw.tempestDesign),
+      filterSlotWall: canonicalFilterSlotWall(input.raw.filterSlotWall),
       filter: input.filter,
       filterFitClearance: normalizeFilterFitClearance(input.raw.filterFitClearance),
       cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
@@ -601,6 +607,7 @@ function createPurifierDesignDraft(
       preset: configuration.design.preset,
       arrangement: configuration.design.arrangement,
       design: configuration.design.design,
+      filterSlotWall: configuration.design.filterSlotWall,
       filter: configuration.design.filter,
       fanBanks: configuration.fan.banks,
       filterFitClearance: configuration.design.filterFitClearance,

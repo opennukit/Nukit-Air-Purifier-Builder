@@ -16,6 +16,7 @@
     tempestDesignLabels,
     type CordHoleSide,
     type CordHoleWall,
+    type FilterSlotWall,
     type PreviewMaterialColorId,
     type PurifierDraft,
     type RawPurifierSettings,
@@ -416,10 +417,12 @@
     commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
   }
 
-  // "Filter slot placement" drives the filter arrangement: Top/Bottom choose a
-  // single top filter vs a top+bottom sandwich, and Left/Right switch to the
-  // four-side tower (which then shows only Top/Bottom). It stays in sync with the
-  // "Filter layout" buttons since both set the arrangement.
+  // "Filter slot placement" picks which wall the filter insertion slots open on
+  // (the layout/count stays with the "Filter layout" buttons). It's a single
+  // wall, so the checkboxes act as a single-select. The preview renders the back
+  // wall at the visual top and the front wall at the bottom, so Top -> back and
+  // Bottom -> front. The four-side tower always loads from the top plate, so only
+  // Top/Bottom are offered there.
   type WallKey = "left" | "right" | "top" | "bottom";
   const wallPlacementControls: readonly { readonly key: WallKey; readonly label: string }[] = [
     { key: "left", label: "Left" },
@@ -427,34 +430,28 @@
     { key: "top", label: "Top" },
     { key: "bottom", label: "Bottom" },
   ];
+  const filterSlotWallByKey: Record<WallKey, FilterSlotWall> = {
+    left: "left",
+    right: "right",
+    top: "back",
+    bottom: "front",
+  };
 
-  function filterSlotsForArrangement(arrangement: TempestArrangementPreset): Record<WallKey, boolean> {
-    if (arrangement === "single-horizontal-top-filter") {
-      return { left: false, right: false, top: true, bottom: false };
-    }
-    // dual-horizontal-sandwich and four-side-filter-tower both fill top + bottom;
-    // the tower additionally renders no left/right (those select the tower).
-    return { left: false, right: false, top: true, bottom: true };
-  }
-
-  function arrangementForFilterSlots(slots: Record<WallKey, boolean>): TempestArrangementPreset {
-    if (slots.left || slots.right) {
-      return "four-side-filter-tower";
-    }
-    if (slots.top && slots.bottom) {
-      return "dual-horizontal-sandwich";
-    }
-    return "single-horizontal-top-filter";
-  }
-
-  $: filterSlotChecked = filterSlotsForArrangement(settings.tempestArrangement);
+  $: selectedFilterSlotKey = (wallPlacementControls.find(
+    (control) => filterSlotWallByKey[control.key] === settings.filterSlotWall,
+  )?.key ?? "top") as WallKey;
+  $: filterSlotChecked = {
+    left: selectedFilterSlotKey === "left",
+    right: selectedFilterSlotKey === "right",
+    top: selectedFilterSlotKey === "top",
+    bottom: selectedFilterSlotKey === "bottom",
+  } as Record<WallKey, boolean>;
   $: filterSlotPlacementControls = isFourFilterTower
     ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
     : wallPlacementControls;
 
   function toggleFilterSlot(key: WallKey): void {
-    const next = { ...filterSlotChecked, [key]: !filterSlotChecked[key] };
-    updateTempestArrangement(arrangementForFilterSlots(next));
+    commitSettings({ ...settings, filterSlotWall: filterSlotWallByKey[key] });
   }
 
   const filterSizePresets = [
