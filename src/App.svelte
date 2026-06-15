@@ -307,6 +307,11 @@
     selectedFanSizeChoice === "box-exhaust"
       ? generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter")
       : generatedGeometryControls;
+  // The tempest Advanced section hides "Material thickness" for now (and the
+  // outside-flange field is omitted entirely), leaving just the fan screw holes.
+  $: tempestAdvancedGeometryControls = visibleGeometryControls.filter(
+    (control) => control.name !== "materialThickness",
+  );
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
   $: showPrintSetupControls = fabricationMethod === "print-3mf" && activeControlPanels.setup.type === "available";
   $: showAdvancedControls = activeControlPanels.advanced.type === "available";
@@ -1548,7 +1553,12 @@
                           {/each}
                         </div>
                       {/if}
-                      {#each visibleGeometryControls as control}
+                      <!--
+                        "Material thickness" and "Outside flange thickness" are
+                        intentionally hidden for now (they confused users); the
+                        settings still exist and may be surfaced again later.
+                      -->
+                      {#each tempestAdvancedGeometryControls as control}
                         <label class="field">
                           <span>{control.label}</span>
                           <span class="input-shell">
@@ -1564,22 +1574,6 @@
                           </span>
                         </label>
                       {/each}
-                      <label class="field">
-                        <span>Outside flange thickness</span>
-                        <span class="input-shell">
-                          <input
-                            type="number"
-                            name="outsideFlangeThickness"
-                            min="1"
-                            max="50"
-                            step="0.5"
-                            inputmode="decimal"
-                            value={settings.outsideFlangeThickness}
-                            onchange={(event) => updateNumberSetting("outsideFlangeThickness", event)}
-                          />
-                          <small>mm</small>
-                        </span>
-                      </label>
                       {#if settings.cordHoleDiameter > 0}
                         <label class="field">
                           <span>Power cord wall</span>
