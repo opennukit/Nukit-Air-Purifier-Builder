@@ -6,8 +6,12 @@
 
 import {
   isStaticReferencePrintDesignId,
+  isTempestPrintDesignId,
   staticPrintReferenceForPreset,
 } from "@/domain/purifier/designPresets";
+import { createTempestModel } from "@/domain/designs/tempest/model";
+import { tempestCordFanCollision } from "@/domain/designs/tempest/cordFanCollision";
+import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import { evaluateBuildDiagnostics, summarizeDiagnostics, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import type { ExportFormat, PrintableSheetPlan } from "@/fabrication/printing/printableKit";
@@ -21,7 +25,7 @@ export function evaluateActiveExportDiagnostics(
     return [];
   }
 
-  const baseDiagnostics = evaluateBuildDiagnostics(currentLayout);
+  const baseDiagnostics = [...evaluateBuildDiagnostics(currentLayout), ...tempestGeometryDiagnostics(currentLayout)];
 
   if (currentFabricationMethod !== "print-3mf") {
     return baseDiagnostics;
@@ -41,6 +45,26 @@ export function evaluateActiveExportDiagnostics(
     });
   }
   return [...baseDiagnostics, ...printDiagnostics];
+}
+
+// Geometry advisories specific to the Tempest model (built from the layout).
+function tempestGeometryDiagnostics(currentLayout: LayoutResult): BuildDiagnostic[] {
+  if (!isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
+    return [];
+  }
+  const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
+  if (!tempestCordFanCollision(model)) {
+    return [];
+  }
+  return [
+    {
+      id: "cord-fan-collision",
+      severity: "warning",
+      title: "Cord hole hits a fan",
+      detail:
+        "The power-cord hole overlaps a fan. Move it with the cord wall, position, or corner offset (under Advanced) to a clear spot.",
+    },
+  ];
 }
 
 export function summarizeActiveBuildReadiness(
