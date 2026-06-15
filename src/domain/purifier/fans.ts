@@ -54,7 +54,7 @@ export type FanSpec = {
   cutClearance: Millimeters;
 };
 
-export const fanColors = ["black", "beige"] as const;
+export const fanColors = ["black", "beige", "grey"] as const;
 
 export type FanColor = (typeof fanColors)[number];
 
@@ -67,6 +67,9 @@ export type FanAppearance = {
   readonly hubColor: number;
   readonly accentColor: number;
   readonly previewCadModel?: FanPreviewCadModel;
+  // When true, the CAD preview model is re-coloured with this appearance's
+  // frame/blade colors instead of the asset's baked-in (beige) colors.
+  readonly recolorCadModel?: boolean;
 };
 
 export type FanPreviewCadModel = {
@@ -84,28 +87,43 @@ export type FanPreviewCadModel = {
 // (frame/blade/hub colors, CAD silhouette); the preview scales the fan
 // visual to whatever diameter is configured. Neither color is a product
 // recommendation.
+const noctuaCadPreviewModel: FanPreviewCadModel = {
+  type: "noctua-nf-a14-public-cad",
+  sourceUrl: "https://www.noctua.at/en/3d-cad-models",
+  assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
+  usage: "preview-only",
+};
+
 const fanAppearanceByColor: Record<FanColor, FanAppearance> = {
+  // Uses the NF-A14 CAD silhouette re-coloured black (dark frame, grey blades).
   black: {
-    frameColor: 0x111817,
+    frameColor: 0x1b1f22,
     ringColor: 0x050807,
-    bladeColor: 0x49525a,
-    hubColor: 0x919a96,
+    bladeColor: 0x3f454b,
+    hubColor: 0x7d858b,
     accentColor: 0x253a38,
+    previewCadModel: noctuaCadPreviewModel,
+    recolorCadModel: true,
   },
   // Preview colors and silhouette come from the bundled NF-A14 public CAD
-  // model; sourceUrl below is asset attribution, not a recommendation.
+  // model; sourceUrl is asset attribution, not a recommendation.
   beige: {
     frameColor: 0xd6bd8d,
     ringColor: 0xb79a67,
     bladeColor: 0x6b3b25,
     hubColor: 0xe2cda4,
     accentColor: 0x8f5b35,
-    previewCadModel: {
-      type: "noctua-nf-a14-public-cad",
-      sourceUrl: "https://www.noctua.at/en/3d-cad-models",
-      assetUrl: "/vendor/fan-preview/noctua/nf-a14-public-cad-preview.json",
-      usage: "preview-only",
-    },
+    previewCadModel: noctuaCadPreviewModel,
+  },
+  // The same CAD silhouette re-coloured a neutral mid-grey.
+  grey: {
+    frameColor: 0x9aa0a4,
+    ringColor: 0x6f7479,
+    bladeColor: 0xc3c8cc,
+    hubColor: 0xdfe2e5,
+    accentColor: 0x70777c,
+    previewCadModel: noctuaCadPreviewModel,
+    recolorCadModel: true,
   },
 };
 

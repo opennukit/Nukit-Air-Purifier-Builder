@@ -16,6 +16,7 @@ export function previewMaterialColorLabel(color: PreviewMaterialColorPreset): st
 export const fanColorLabels: Record<FanColor, string> = {
   black: "Black",
   beige: "Beige/brown",
+  grey: "Grey",
 };
 
 export function swatchColor(color: number): string {

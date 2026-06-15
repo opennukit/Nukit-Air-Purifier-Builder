@@ -138,7 +138,7 @@ function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Grou
     return core;
   }
 
-  void loadFanCadModel(cadModel.assetUrl, appearance)
+  void loadFanCadModel(cadModel.assetUrl)
     .then((model) => {
       if (core.userData["disposedPreviewObject"] === true) {
         return;
@@ -151,7 +151,7 @@ function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Grou
         const mesh = new Mesh(
           part.geometry,
           new MeshStandardMaterial({
-            color: part.color,
+            color: resolveCadMeshColor(part, appearance),
             roughness: part.isRotor ? 0.5 : 0.62,
             metalness: part.isRotor ? 0.05 : 0.08,
           }),
@@ -179,12 +179,15 @@ function createNoctuaCadFanCore(radius: number, appearance: FanAppearance): Grou
   return core;
 }
 
-async function loadFanCadModel(assetUrl: string, appearance: FanAppearance): Promise<LoadedFanCadModel> {
+async function loadFanCadModel(assetUrl: string): Promise<LoadedFanCadModel> {
   const cached = fanCadModelCache.get(assetUrl);
   if (cached !== undefined) {
     return cached;
   }
 
+  // The cached model is appearance-independent (geometry + baked colors); the
+  // final color is chosen per fan colour at build time, so one cache entry
+  // serves the beige, black, and grey fans alike.
   const promise = fetch(assetUrl)
     .then(async (response) => {
       if (!response.ok) {
@@ -192,7 +195,7 @@ async function loadFanCadModel(assetUrl: string, appearance: FanAppearance): Pro
       }
       return parseFanCadPreviewAsset(await response.json());
     })
-    .then((asset) => createLoadedFanCadModel(asset, appearance))
+    .then((asset) => createLoadedFanCadModel(asset))
     .catch((error) => {
       fanCadModelCache.delete(assetUrl);
       throw error;
@@ -201,14 +204,14 @@ async function loadFanCadModel(assetUrl: string, appearance: FanAppearance): Pro
   return promise;
 }
 
-function createLoadedFanCadModel(asset: FanCadPreviewAsset, appearance: FanAppearance): LoadedFanCadModel {
+function createLoadedFanCadModel(asset: FanCadPreviewAsset): LoadedFanCadModel {
   if (asset.schema !== "filterboxbuilder-fan-cad-preview-v1" || asset.usage !== "preview-only-purchased-part-visual") {
     throw new Error("createLoadedFanCadModel: Unsupported fan CAD preview asset");
   }
 
   return {
     nominalDiameter: asset.nominalDiameter,
-    meshes: asset.meshes.map((mesh) => createLoadedFanCadMesh(mesh, asset.bounds.center, appearance)),
+    meshes: asset.meshes.map((mesh) => createLoadedFanCadMesh(mesh, asset.bounds.center)),
   };
 }
 
@@ -324,7 +327,6 @@ function expectUnitColor(input: unknown, label: string): readonly [number, numbe
 function createLoadedFanCadMesh(
   mesh: FanCadPreviewMesh,
   center: readonly [number, number, number],
-  appearance: FanAppearance,
 ): LoadedFanCadMesh {
   const positions: number[] = [];
   for (let index = 0; index < mesh.position.length; index += 3) {
@@ -349,9 +351,27 @@ function createLoadedFanCadMesh(
   return {
     name: mesh.name,
     geometry,
-    color: meshColor(mesh, isRotor, appearance),
+    bakedColor: bakedMeshColor(mesh),
     isRotor,
   };
+}
+
+function bakedMeshColor(mesh: FanCadPreviewMesh): number | undefined {
+  if (mesh.color === undefined) {
+    return undefined;
+  }
+  const [red, green, blue] = mesh.color;
+  return ((Math.round(red * 255) << 16) | (Math.round(green * 255) << 8) | Math.round(blue * 255)) >>> 0;
+}
+
+// The material color for a loaded CAD mesh: re-coloured appearances (black/grey)
+// paint blades with the blade color and everything else with the frame color;
+// otherwise the asset's baked-in (beige) color is kept.
+function resolveCadMeshColor(mesh: LoadedFanCadMesh, appearance: FanAppearance): number {
+  if (!appearance.recolorCadModel && mesh.bakedColor !== undefined) {
+    return mesh.bakedColor;
+  }
+  return mesh.isRotor ? appearance.bladeColor : appearance.frameColor;
 }
 
 function fanCadVertexAt(mesh: FanCadPreviewMesh, index: number): { readonly x: number; readonly y: number; readonly z: number } {
@@ -364,13 +384,6 @@ function fanCadVertexAt(mesh: FanCadPreviewMesh, index: number): { readonly x: n
   return { x, y, z };
 }
 
-function meshColor(mesh: FanCadPreviewMesh, isRotor: boolean, appearance: FanAppearance): number {
-  if (mesh.color !== undefined) {
-    const [red, green, blue] = mesh.color;
-    return ((Math.round(red * 255) << 16) | (Math.round(green * 255) << 8) | Math.round(blue * 255)) >>> 0;
-  }
-  return isRotor ? appearance.bladeColor : appearance.hubColor;
-}
 
 // ##############################
 // Procedural Fan Geometry

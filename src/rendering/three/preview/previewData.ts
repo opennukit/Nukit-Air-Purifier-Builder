@@ -71,7 +71,9 @@ export type LoadedFanCadModel = {
 export type LoadedFanCadMesh = {
   readonly name: string;
   readonly geometry: BufferGeometry;
-  readonly color: number;
+  // The asset's baked-in color, if any. The final material color is resolved
+  // per-appearance at build time so one cached model serves every fan color.
+  readonly bakedColor?: number;
   readonly isRotor: boolean;
 };
 
