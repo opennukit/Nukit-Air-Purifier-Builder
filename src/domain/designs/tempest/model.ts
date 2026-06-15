@@ -381,22 +381,24 @@ export function createTempestModel(settings: TempestSettings = defaultTempestSet
   // no cast — the generic TempestModelPlan<T> keeps every step's tag in lockstep.
   if (plan.topology === "sandwich") {
     const filterLayout = plan.filterLayout(safeSettings, box, frame);
+    const fanLayout = plan.fanLayout(safeSettings, box, filterLayout);
     return {
       ...common,
       topology: "sandwich",
       filterLayout,
-      fanLayout: plan.fanLayout(safeSettings, box, filterLayout),
-      cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout),
+      fanLayout,
+      cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout, fanLayout),
       printablePose: plan.pose(box, filterLayout),
     };
   }
   const filterLayout = plan.filterLayout(safeSettings, box, frame);
+  const fanLayout = plan.fanLayout(safeSettings, box, filterLayout);
   return {
     ...common,
     topology: "quad",
     filterLayout,
-    fanLayout: plan.fanLayout(safeSettings, box, filterLayout),
-    cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout),
+    fanLayout,
+    cordPassThrough: plan.cordPlacement(safeSettings, box, filterLayout, fanLayout),
     printablePose: plan.pose(box, filterLayout),
   };
 }
@@ -421,6 +423,7 @@ export type TempestModelPlan<T extends TempestTopology> = {
     settings: TempestSettings,
     box: TempestBoxEnvelope,
     filterLayout: Extract<TempestFilterLayout, { readonly topology: T }>,
+    fanLayout: Extract<TempestFanLayout, { readonly topology: T }>,
   ) => Extract<TempestCordPassThroughPlacement, { readonly topology: T }> | TempestNoCord;
   readonly pose: (
     box: TempestBoxEnvelope,

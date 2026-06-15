@@ -30,6 +30,8 @@ import type {
 
 // Minimum gap from the air-chamber edge to the tower cord hole.
 const CORD_TOWER_MIN_EDGE_MM = 2;
+// Clearance kept between the cord hole and a fan body when auto-shifting.
+const CORD_FAN_CLEARANCE_MM = 1;
 
 type QuadArrangement = Extract<TempestFilterArrangement, { readonly type: "four-side-filter-tower" }>;
 
@@ -223,22 +225,73 @@ function towerFanPositions(fanCount: number, length: Millimeters, fanDiameter: M
 export function createQuadCordPlacement(
   settings: TempestSettings,
   quadFilter: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): TempestQuadCord | TempestNoCord {
   if (settings.cordPassThrough.type === "none") {
     return { type: "none" };
   }
   const cord = settings.cordPassThrough;
+  const chamber = quadFilter.airChamber;
   const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
   const corner = quadCordCorner(cord);
+  const desiredX = corner.x === "max" ? chamber.xMax - offset : chamber.xMin + offset;
+  const desiredY = corner.y === "max" ? chamber.yMax - offset : chamber.yMin + offset;
+  // The tower routes the cord up through the top plate where the fan grid lives,
+  // so auto-shift it to the nearest fan-free spot over the air chamber.
+  const placement = avoidTowerFans(desiredX, desiredY, cord.diameter, settings.fan.diameter, chamber, fanLayout);
   return {
     topology: "quad",
     type: "top-cylinder",
     diameter: cord.diameter,
-    x: corner.x === "max" ? quadFilter.airChamber.xMax - offset : quadFilter.airChamber.xMin + offset,
-    y: corner.y === "max" ? quadFilter.airChamber.yMax - offset : quadFilter.airChamber.yMin + offset,
-    zStart: quadFilter.airChamber.zMax,
+    x: placement.x,
+    y: placement.y,
+    zStart: chamber.zMax,
     depth: quadFilter.topPlateThickness,
   };
+}
+
+// Nudge the cord centre to the nearest point that keeps its hole clear of every
+// fan's square footprint while staying inset over the air chamber. PC fans are
+// square frames, so the cord clears a fan when it is far enough on EITHER axis.
+function avoidTowerFans(
+  desiredX: Millimeters,
+  desiredY: Millimeters,
+  cordDiameter: Millimeters,
+  fanDiameter: Millimeters,
+  chamber: { readonly xMin: Millimeters; readonly xMax: Millimeters; readonly yMin: Millimeters; readonly yMax: Millimeters },
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
+): { readonly x: Millimeters; readonly y: Millimeters } {
+  const reach = cordDiameter / 2 + fanDiameter / 2 + CORD_FAN_CLEARANCE_MM;
+  const inset = cordDiameter / 2 + CORD_TOWER_MIN_EDGE_MM;
+  const xMin = chamber.xMin + inset;
+  const xMax = chamber.xMax - inset;
+  const yMin = chamber.yMin + inset;
+  const yMax = chamber.yMax - inset;
+  const { positionsX, positionsY } = fanLayout;
+  const clear = (x: number, y: number): boolean =>
+    positionsX.every((fx) => positionsY.every((fy) => Math.abs(x - fx) >= reach || Math.abs(y - fy) >= reach));
+  if (positionsX.length === 0 || positionsY.length === 0 || clear(desiredX, desiredY)) {
+    return { x: desiredX, y: desiredY };
+  }
+  const clampX = (value: number): number => Math.min(xMax, Math.max(xMin, value));
+  const clampY = (value: number): number => Math.min(yMax, Math.max(yMin, value));
+  // Candidate coordinates: the desired value, the bounds, and the points just
+  // clear of each fan row/column. The nearest valid (x, y) pair wins.
+  const xs = [desiredX, xMin, xMax, ...positionsX.flatMap((fx) => [fx - reach, fx + reach])].map(clampX);
+  const ys = [desiredY, yMin, yMax, ...positionsY.flatMap((fy) => [fy - reach, fy + reach])].map(clampY);
+  let best: { x: number; y: number; distance: number } | null = null;
+  for (const x of xs) {
+    for (const y of ys) {
+      if (!clear(x, y)) {
+        continue;
+      }
+      const distance = Math.hypot(x - desiredX, y - desiredY);
+      if (best === null || distance < best.distance) {
+        best = { x, y, distance };
+      }
+    }
+  }
+  return best === null ? { x: desiredX, y: desiredY } : { x: best.x, y: best.y };
 }
 
 // Which corner of the air chamber the tower cord exits through, as min/max on
@@ -266,6 +319,6 @@ export const quadPlan: TempestModelPlan<"quad"> = {
   box: createQuadBox,
   filterLayout: createQuadFilterLayout,
   fanLayout: createQuadFanLayout,
-  cordPlacement: (settings, _box, filterLayout) => createQuadCordPlacement(settings, filterLayout),
+  cordPlacement: (settings, _box, filterLayout, fanLayout) => createQuadCordPlacement(settings, filterLayout, fanLayout),
   pose: (box) => createQuadPose(box),
 };
