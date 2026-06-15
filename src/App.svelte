@@ -416,9 +416,10 @@
     commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
   }
 
-  // "Filter slot placement" is a styled placeholder for now: it tracks which
-  // walls would hold a filter slot but does not change the geometry yet. The
-  // four-side tower only offers Top/Bottom.
+  // "Filter slot placement" drives the filter arrangement: Top/Bottom choose a
+  // single top filter vs a top+bottom sandwich, and Left/Right switch to the
+  // four-side tower (which then shows only Top/Bottom). It stays in sync with the
+  // "Filter layout" buttons since both set the arrangement.
   type WallKey = "left" | "right" | "top" | "bottom";
   const wallPlacementControls: readonly { readonly key: WallKey; readonly label: string }[] = [
     { key: "left", label: "Left" },
@@ -426,13 +427,34 @@
     { key: "top", label: "Top" },
     { key: "bottom", label: "Bottom" },
   ];
-  let filterSlotPlacement: Record<WallKey, boolean> = { left: true, right: true, top: true, bottom: true };
+
+  function filterSlotsForArrangement(arrangement: TempestArrangementPreset): Record<WallKey, boolean> {
+    if (arrangement === "single-horizontal-top-filter") {
+      return { left: false, right: false, top: true, bottom: false };
+    }
+    // dual-horizontal-sandwich and four-side-filter-tower both fill top + bottom;
+    // the tower additionally renders no left/right (those select the tower).
+    return { left: false, right: false, top: true, bottom: true };
+  }
+
+  function arrangementForFilterSlots(slots: Record<WallKey, boolean>): TempestArrangementPreset {
+    if (slots.left || slots.right) {
+      return "four-side-filter-tower";
+    }
+    if (slots.top && slots.bottom) {
+      return "dual-horizontal-sandwich";
+    }
+    return "single-horizontal-top-filter";
+  }
+
+  $: filterSlotChecked = filterSlotsForArrangement(settings.tempestArrangement);
   $: filterSlotPlacementControls = isFourFilterTower
     ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
     : wallPlacementControls;
 
   function toggleFilterSlot(key: WallKey): void {
-    filterSlotPlacement = { ...filterSlotPlacement, [key]: !filterSlotPlacement[key] };
+    const next = { ...filterSlotChecked, [key]: !filterSlotChecked[key] };
+    updateTempestArrangement(arrangementForFilterSlots(next));
   }
 
   const filterSizePresets = [
@@ -1380,7 +1402,7 @@
                               <input
                                 type="checkbox"
                                 name={`filter-slot-${control.key}`}
-                                checked={filterSlotPlacement[control.key]}
+                                checked={filterSlotChecked[control.key]}
                                 onchange={() => toggleFilterSlot(control.key)}
                               />
                               <span>{control.label}</span>
