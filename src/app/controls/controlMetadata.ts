@@ -57,7 +57,7 @@ export const donutFilterDimensionControls: readonly DimensionControl<DonutFilter
 ];
 export const generatedGeometryControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "materialThickness", label: "Material thickness", suffix: "mm", step: "0.1" },
-  { name: "screwHoleDiameter", label: "Fan screw holes", suffix: "mm", step: "0.1" },
+  { name: "screwHoleDiameter", label: "Fan screw size", suffix: "mm", step: "0.1" },
 ];
 export const nukitPanelFitControls: readonly NumberControl<NumericSettingName>[] = [
   { name: "rim", label: "Filter rim", suffix: "mm", step: "1" },
