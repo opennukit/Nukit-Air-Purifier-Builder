@@ -456,16 +456,20 @@
     { id: "fornuftig", label: "FORNUFTIG (390 x 250 x 20 mm)", width: 390, depth: 250, thickness: 20 },
   ] as const;
 
-  // The selector reflects the current dimensions: it matches a preset only while
-  // all three measurements equal it, and falls back to "Custom" once any value
-  // is edited away from a preset.
+  // The selector reflects the current dimensions: it matches a preset in either
+  // orientation (so swapping width/length keeps the preset selected), and falls
+  // back to "Custom" once a measurement is edited away from a preset.
   $: selectedFilterSize =
-    filterSizePresets.find(
-      (preset) =>
-        Math.round(settings.filterWidth) === preset.width &&
-        Math.round(settings.filterDepth) === preset.depth &&
-        Math.round(settings.filterThickness) === preset.thickness,
-    )?.id ?? "custom";
+    filterSizePresets.find((preset) => {
+      const width = Math.round(settings.filterWidth);
+      const depth = Math.round(settings.filterDepth);
+      const thickness = Math.round(settings.filterThickness);
+      return (
+        thickness === preset.thickness &&
+        ((width === preset.width && depth === preset.depth) ||
+          (width === preset.depth && depth === preset.width))
+      );
+    })?.id ?? "custom";
 
   function updateFilterSizePreset(event: Event): void {
     const id = (event.target as HTMLSelectElement).value;
@@ -480,6 +484,19 @@
       filterThickness: preset.thickness,
       // The width drives the box/exhaust auto sizes, so refresh them too.
       ...boxExhaustDiametersForWidth(preset.width),
+    });
+  }
+
+  // Swap filter width and length to flip the box between wide and tall. The
+  // preset stays selected because selectedFilterSize matches either orientation.
+  function swapFilterDimensions(): void {
+    const width = Math.round(settings.filterDepth);
+    const depth = Math.round(settings.filterWidth);
+    commitSettings({
+      ...settings,
+      filterWidth: width,
+      filterDepth: depth,
+      ...boxExhaustDiametersForWidth(width),
     });
   }
 
@@ -1192,6 +1209,23 @@
         </section>
 
         <div class="controls-sections">
+          {#snippet dimensionField(control: (typeof filterDimensionControls)[number])}
+            <label class="field">
+              <span>{control.label}</span>
+              <span class="input-shell">
+                <input
+                  type="number"
+                  name={control.name}
+                  step={control.step}
+                  max="999"
+                  inputmode="numeric"
+                  value={Math.round(settings[control.name])}
+                  onchange={(event) => updateMeasuredDimension(control.name, event)}
+                />
+                <small>mm</small>
+              </span>
+            </label>
+          {/snippet}
           {#snippet fanSizeSegment()}
             <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
               <legend>Fan size</legend>
@@ -1400,23 +1434,22 @@
                       </select>
                     </label>
                     <div class="custom-dimensions" data-custom-filter-dimensions>
-                      {#each filterDimensionControls as control}
-                        <label class="field">
-                          <span>{control.label}</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name={control.name}
-                              step={control.step}
-                              max="999"
-                              inputmode="numeric"
-                              value={Math.round(settings[control.name])}
-                              onchange={(event) => updateMeasuredDimension(control.name, event)}
-                            />
-                            <small>mm</small>
-                          </span>
-                        </label>
-                      {/each}
+                      <div class="dimension-swap-row">
+                        {@render dimensionField(filterDimensionControls[0])}
+                        <button
+                          type="button"
+                          class="filter-swap"
+                          title="Swap width and length"
+                          aria-label="Swap filter width and length"
+                          onclick={swapFilterDimensions}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M5 8h12l-3-3M19 16H7l3 3" />
+                          </svg>
+                        </button>
+                        {@render dimensionField(filterDimensionControls[1])}
+                      </div>
+                      {@render dimensionField(filterDimensionControls[2])}
                     </div>
                     {#if isTempestControlsActive}
                       <label class="field" data-tempest-filter-slot-placement>

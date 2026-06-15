@@ -1210,12 +1210,60 @@ Dimension Grids
 ############################## */
 
 .custom-dimensions {
-  display: grid;
-  /* Reflow to fewer columns when the panel is narrow instead of squeezing all
-     three until the value + unit suffix crop. */
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 6px;
   margin: 0 0 10px;
+}
+
+/* Width + swap button + length share a row so the swap control sits between the
+   two boxes; the row and the thickness field flex and wrap when space is tight. */
+.dimension-swap-row {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  flex: 2 1 200px;
+  min-width: 0;
+}
+
+.dimension-swap-row .field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.custom-dimensions > .field {
+  flex: 1 1 92px;
+  min-width: 0;
+}
+
+.filter-swap {
+  flex: 0 0 auto;
+  align-self: end;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.filter-swap:hover {
+  border-color: var(--accent);
+}
+
+.filter-swap svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .donut-filter-controls {
