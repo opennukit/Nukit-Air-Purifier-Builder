@@ -92,16 +92,18 @@ function orientToSeamAxis<Solid, Region>(ctx: GeometryContext<Solid, Region>, ax
   return transforms.rotateZ(Math.PI / 2, transforms.rotateX(-Math.PI / 2, solid));
 }
 
-// Build one seam's deboss tool. The code is engraved on a chamber-facing inner
-// wall near the seam: we anchor on a low alignment pin (guaranteed solid, clear
-// of holes), face the model interior (so it reads from inside), and peel a 1 mm
-// shell off that inward-facing surface (hole-safe — it can only cut real wall).
+// Build one seam's deboss tool, in the assembly (world) frame. The code goes on
+// the wall that faces the central air chamber — NOT the outer wall (whose inner
+// face looks into a filter slot). All inputs are world-frame; the chunk solid is
+// translated from its local origin into world for the shell, then the finished
+// cut is translated back by `origin` so it lines up with the local chunk.
 function seamDebossCut<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   chunk: Solid,
   seam: ChunkSeamLabel,
   pins: readonly SeamPinAnchor[],
   modelCenter: readonly [number, number, number],
+  origin: readonly [number, number, number],
   options: ChunkLabelDebossOptions,
 ): Solid | null {
   const seamPins = pinsOnSeam(seam, pins);
@@ -115,15 +117,26 @@ function seamDebossCut<Solid, Region>(
   const { transforms, extrusions, booleans } = ctx.modeling;
 
   // Engrave on a vertical wall perpendicular to `e`. Pins sit on walls, so each
-  // pin's e-coordinate IS a wall plane; we anchor on the low pin nearest an outer
-  // face, which lands the code on the solid bottom rail of an outer/structural
-  // wall — the seam-adjacent outer wall is otherwise mostly open filter window.
+  // pin's e-coordinate IS a wall plane. Two side walls cross the seam: the OUTER
+  // wall (near the box face → its inner side faces a filter slot) and the inner
+  // STRUCTURAL wall that bounds the air chamber. We want the latter, so among the
+  // side-region pins we take the one farthest from the outer face (innermost side
+  // wall), then the lowest of those (codes read best near the floor).
   const e: SeamAxis = seam.axis === "y" ? "x" : "y";
   const extentE = 2 * modelCenter[AXIS_INDEX[e]];
   const distToOuter = (p: { x: number; y: number; z: number }) => Math.min(coord(p, e), extentE - coord(p, e));
-  const anchor = [...seamPins].sort(
-    (a, b) => distToOuter(a.position) + 0.5 * a.position.z - (distToOuter(b.position) + 0.5 * b.position.z),
-  )[0].position;
+  // Side region only (exclude pins out in the chamber interior, e.g. top-plate pins).
+  const sideBand = 0.3 * extentE;
+  const sidePins = seamPins.filter((p) => distToOuter(p.position) <= sideBand);
+  const candidates = sidePins.length > 0 ? sidePins : seamPins;
+  const anchor = [...candidates].sort((a, b) => {
+    const da = distToOuter(a.position);
+    const db = distToOuter(b.position);
+    if (Math.abs(da - db) > 0.5) {
+      return db - da; // innermost side wall (the chamber wall) first
+    }
+    return a.position.z - b.position.z; // then lowest
+  })[0].position;
   const chamberSign = modelCenter[AXIS_INDEX[e]] - coord(anchor, e) >= 0 ? 1 : -1;
 
   const band = BAND_FAR_MM - BAND_NEAR_MM;
@@ -140,16 +153,19 @@ function seamDebossCut<Solid, Region>(
   place[AXIS_INDEX[hAxis]] = coord(anchor, "z") + options.capHeight / 2;
   const prism = transforms.translate(place, prismOriented);
 
+  // Shell off the chamber-facing surface of the chunk (moved into world first).
+  const worldChunk = transforms.translate([origin[0], origin[1], origin[2]], chunk);
   const shellShift: [number, number, number] = [0, 0, 0];
   shellShift[AXIS_INDEX[e]] = -chamberSign * options.depth;
-  const shell = booleans.subtract(chunk, transforms.translate(shellShift, chunk));
+  const shell = booleans.subtract(worldChunk, transforms.translate(shellShift, worldChunk));
 
   // Nudge the cut a hair into the chamber (outward) so its outer face does not
-  // sit exactly on the wall surface; a coincident face there can leave a single
-  // over-shared edge (non-manifold) after the subtraction.
+  // sit exactly on the wall surface (a coincident face there can leave a single
+  // over-shared, non-manifold edge), then bring it back into the chunk's frame.
   const outset: [number, number, number] = [0, 0, 0];
   outset[AXIS_INDEX[e]] = chamberSign * SURFACE_OUTSET_MM;
-  return transforms.translate(outset, booleans.intersect(prism, shell));
+  const worldCut = transforms.translate(outset, booleans.intersect(prism, shell));
+  return transforms.translate([-origin[0], -origin[1], -origin[2]], worldCut);
 }
 
 function faceAxes(axis: SeamAxis): readonly [SeamAxis, SeamAxis] {
@@ -176,24 +192,9 @@ export function debossChunkSeamLabels<Solid, Region>(
   origin: readonly [number, number, number],
   options: ChunkLabelDebossOptions,
 ): Solid {
-  const localPins: SeamPinAnchor[] = pins.map((pin) => ({
-    axis: pin.axis,
-    position: { x: pin.position.x - origin[0], y: pin.position.y - origin[1], z: pin.position.z - origin[2] },
-  }));
-  const localCenter: [number, number, number] = [
-    modelCenter[0] - origin[0],
-    modelCenter[1] - origin[1],
-    modelCenter[2] - origin[2],
-  ];
   const cuts: Solid[] = [];
   for (const seam of seams) {
-    const localSeam: ChunkSeamLabel = {
-      ...seam,
-      boundary: seam.boundary - origin[AXIS_INDEX[seam.axis]],
-      faceMin: [seam.faceMin[0] - origin[AXIS_INDEX[faceAxes(seam.axis)[0]]], seam.faceMin[1] - origin[AXIS_INDEX[faceAxes(seam.axis)[1]]]],
-      faceMax: [seam.faceMax[0] - origin[AXIS_INDEX[faceAxes(seam.axis)[0]]], seam.faceMax[1] - origin[AXIS_INDEX[faceAxes(seam.axis)[1]]]],
-    };
-    const cut = seamDebossCut(ctx, chunk, localSeam, localPins, localCenter, options);
+    const cut = seamDebossCut(ctx, chunk, seam, pins, modelCenter, origin, options);
     if (cut !== null) {
       cuts.push(cut);
     }
