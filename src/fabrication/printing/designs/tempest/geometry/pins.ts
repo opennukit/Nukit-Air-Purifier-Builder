@@ -282,8 +282,21 @@ function pinPlacementsQuad(
           placements.push({ position: [seamX, wallY, gridZ], axis: "x" });
         }
       }
-      for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-        placements.push({ position: [seamX, gridY, filterLayout.bottomPlateThickness / 2], axis: "x" });
+      // Bottom plate: mirror the top plate's placement (structural-ring edge
+      // bands + central positions kept where the top keeps them) so the bottom
+      // pins sit directly under the top ones instead of as a dense full-width row.
+      const bottomZx = filterLayout.bottomPlateThickness / 2;
+      for (const gridY of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
+        placements.push({ position: [seamX, gridY, bottomZx], axis: "x" });
+      }
+      for (const gridY of rimPositions(model.box.depth - filterLayout.structuralOffset, model.box.depth - model.frame.outsideFlangeThickness, pin.spacing)) {
+        placements.push({ position: [seamX, gridY, bottomZx], axis: "x" });
+      }
+      for (const gridY of rimPositions(filterLayout.structuralOffset, model.box.depth - filterLayout.structuralOffset, pin.spacing)) {
+        if (nearSeam(gridY, interiorSeamsY) || clampedTopPinDepth(topHoles, seamX, gridY, "x", pin.holeDepth) === null) {
+          continue;
+        }
+        placements.push({ position: [seamX, gridY, bottomZx], axis: "x" });
       }
       for (const gridY of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
         placements.push({ position: [seamX, gridY, model.box.height - filterLayout.topPlateThickness / 2], axis: "x" });
@@ -318,8 +331,19 @@ function pinPlacementsQuad(
           placements.push({ position: [wallX, seamY, gridZ], axis: "y" });
         }
       }
-      for (const gridX of rimPositions(model.frame.wallThickness, model.box.width - model.frame.wallThickness, pin.spacing)) {
-        placements.push({ position: [gridX, seamY, filterLayout.bottomPlateThickness / 2], axis: "y" });
+      // Bottom plate: mirror the top plate's placement (see the x-seam comment).
+      const bottomZy = filterLayout.bottomPlateThickness / 2;
+      for (const gridX of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
+        placements.push({ position: [gridX, seamY, bottomZy], axis: "y" });
+      }
+      for (const gridX of rimPositions(model.box.width - filterLayout.structuralOffset, model.box.width - model.frame.outsideFlangeThickness, pin.spacing)) {
+        placements.push({ position: [gridX, seamY, bottomZy], axis: "y" });
+      }
+      for (const gridX of rimPositions(filterLayout.structuralOffset, model.box.width - filterLayout.structuralOffset, pin.spacing)) {
+        if (nearSeam(gridX, interiorSeamsX) || clampedTopPinDepth(topHoles, gridX, seamY, "y", pin.holeDepth) === null) {
+          continue;
+        }
+        placements.push({ position: [gridX, seamY, bottomZy], axis: "y" });
       }
       for (const gridX of rimPositions(model.frame.outsideFlangeThickness, filterLayout.structuralOffset, pin.spacing)) {
         placements.push({ position: [gridX, seamY, model.box.height - filterLayout.topPlateThickness / 2], axis: "y" });
@@ -362,7 +386,19 @@ function pinPlacementsQuad(
           placements.push({ position: [wallX, gridY, seamZ], axis: "z" });
         }
       }
-      const pinXY = filterLayout.structuralOffset - model.frame.wallThickness;
+      // Corner-post z-pins: sit them in the MIDDLE of the solid corner block —
+      // between the 45° outer bevel and the air-chamber edge — so they bite into
+      // material. The old `structuralOffset - wallThickness` hugged the chamber
+      // edge and could float just outside the solid.
+      const cornerChamfer = towerCornerChamfer(
+        model.frame.towerCornerPostChamfer,
+        filterLayout.structuralOffset,
+        model.frame.outsideFlangeThickness,
+      );
+      const pinXY = Math.min(
+        filterLayout.structuralOffset - model.frame.wallThickness,
+        Math.max(cornerChamfer / 2 + model.frame.wallThickness, (cornerChamfer / 2 + filterLayout.structuralOffset) / 2),
+      );
       for (const centerX of [pinXY, model.box.width - pinXY]) {
         for (const centerY of [pinXY, model.box.depth - pinXY]) {
           placements.push({ position: [centerX, centerY, seamZ], axis: "z" });
