@@ -124,6 +124,8 @@ import {
 import {
   createTempestPreviewBox,
   expectSandwichArrangementFilter,
+  explodeTempestTopFanOutward,
+  explodeTempestWallFanOutward,
   moveTempestFanInsideTop,
   moveTempestFanInsideWall,
   tempestCsgAxisToSceneAxis,
@@ -153,6 +155,7 @@ import {
   edgeColor,
   fanPreviewRearDepthMillimeters,
   fanRotorAngularVelocity,
+  generatedPreviewExplodeDistance,
   groundY,
   homePreviewRotationX,
   previewControlClearanceTargetOffset,
@@ -1148,16 +1151,19 @@ export class PurifierThreePreview {
       showFilterMedia: settings.preview.enclosure.showFilterMedia,
       showFans: settings.preview.enclosure.showFans,
       showPreviewEdges: settings.preview.enclosure.showPreviewEdges,
-    });
+    }, settings.preview.enclosure.explodedView);
 
     const dimensionBounds = new Box3().setFromObject(this.modelGroup);
-    // Exploded view separates the model into its printable chunks along the
-    // glue seams; the purchased parts (filters, fans) keep the generic
-    // from-center explode so they clear the opened shell the same as before.
+    // Exploded view separates the model into its printable chunks along the glue
+    // seams; the filters keep the generic from-center explode. Fans are excluded
+    // here — they explode straight out along their wall normal (in
+    // addTempestPreviewFans) so they stay aligned with their openings.
     explodeGeneratedPreviewChildrenFromCenter(
       this.modelGroup,
       settings.preview.enclosure.explodedView,
-      this.modelGroup.children.filter((child) => !chunkGroups.includes(child)),
+      this.modelGroup.children.filter(
+        (child) => !chunkGroups.includes(child) && child.userData["tempestPreviewFan"] !== true,
+      ),
     );
     if (settings.preview.enclosure.explodedView) {
       const offsets = chunkSeamExplodeOffsetsMillimeters(
@@ -1243,12 +1249,13 @@ export class PurifierThreePreview {
     pose: TempestPrintablePose,
     fanAppearance: FanAppearance,
     visibility: { readonly showFilterMedia: boolean; readonly showFans: boolean; readonly showPreviewEdges: boolean },
+    exploded: boolean,
   ): void {
     if (visibility.showFilterMedia) {
       this.addTempestPreviewFilters(model, pose, visibility.showPreviewEdges);
     }
     if (visibility.showFans) {
-      this.addTempestPreviewFans(model, pose, fanAppearance);
+      this.addTempestPreviewFans(model, pose, fanAppearance, exploded);
     }
   }
 
@@ -1271,12 +1278,12 @@ export class PurifierThreePreview {
     }
   }
 
-  private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance): void {
+  private addTempestPreviewFans(model: TempestModel, pose: TempestPrintablePose, fanAppearance: FanAppearance, exploded: boolean): void {
     matchTopology(model, {
       sandwich: (m) => {
         const { fanLayout } = m;
         for (const wall of tempestPreviewWalls) {
-          this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance);
+          this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance, exploded);
         }
       },
       quad: (m) => {
@@ -1292,7 +1299,11 @@ export class PurifierThreePreview {
               facing: "axis-positive",
               appearance: fanAppearance,
             });
+            fan.userData["tempestPreviewFan"] = true;
             moveTempestFanInsideTop(fan, m, pose, topInteriorZ);
+            if (exploded) {
+              explodeTempestTopFanOutward(fan, m, pose, topInteriorZ, generatedPreviewExplodeDistance);
+            }
             collectFanRotors(fan, this.fanRotors);
             this.modelGroup.add(fan);
           }
@@ -1307,6 +1318,7 @@ export class PurifierThreePreview {
     layout: TempestWallFanLayout,
     localVerticalCenter: number,
     fanAppearance: FanAppearance,
+    exploded: boolean,
   ): void {
     for (const position of layout.positionsAlongWall) {
       const fan = createFan({
@@ -1316,7 +1328,11 @@ export class PurifierThreePreview {
         facing: tempestWallFanFacing(model, pose, layout.wall),
         appearance: fanAppearance,
       });
+      fan.userData["tempestPreviewFan"] = true;
       moveTempestFanInsideWall(fan, model, pose, layout.wall);
+      if (exploded) {
+        explodeTempestWallFanOutward(fan, model, pose, layout.wall, generatedPreviewExplodeDistance);
+      }
       collectFanRotors(fan, this.fanRotors);
       this.modelGroup.add(fan);
     }

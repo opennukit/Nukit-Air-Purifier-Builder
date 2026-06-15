@@ -224,6 +224,31 @@ export function moveTempestFanInsideTop(
   fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
 }
 
+// Exploded view: slide a fan straight out along its wall's outward normal so it
+// stays lined up with its opening (a from-center explode drifts off-centre fans
+// sideways off their holes).
+export function explodeTempestWallFanOutward(
+  fan: Group,
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  wall: TempestWall,
+  distance: number,
+): void {
+  const plane = tempestWallInteriorPlane(model, pose, wall);
+  fan.position[plane.axis] -= plane.insideSign * distance;
+}
+
+export function explodeTempestTopFanOutward(
+  fan: Group,
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  topInteriorZ: number,
+  distance: number,
+): void {
+  const plane = tempestTopInteriorPlane(model, pose, topInteriorZ);
+  fan.position[plane.axis] -= plane.insideSign * distance;
+}
+
 // The underside of the top plate, expressed as a scene-space interior plane —
 // same shape as the wall planes, but with a real gap so the fan drops clear of
 // the top fan-grid (the walls stop below the grid) rather than poking up level
