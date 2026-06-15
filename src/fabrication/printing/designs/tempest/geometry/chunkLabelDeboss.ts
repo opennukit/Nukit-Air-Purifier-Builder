@@ -65,6 +65,7 @@ function centredLabelRegion<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   code: string,
   capHeight: number,
+  mirror: boolean,
 ): { region: Region; width: number; height: number } | null {
   const rendered = renderLabel(code, capHeight);
   if (rendered.loops.length === 0) {
@@ -72,8 +73,12 @@ function centredLabelRegion<Solid, Region>(
   }
   const halfW = rendered.width / 2;
   const halfH = rendered.height / 2;
+  // `mirror` flips the glyphs left-right so the code reads correctly when viewed
+  // from inside the chamber (the engraved face points at the viewer, so without
+  // this the text comes out backwards for half the wall orientations).
+  const sx = mirror ? -1 : 1;
   const polys = rendered.loops.map((loop) =>
-    ctx.modeling.primitives.polygon({ points: loop.map(([x, y]) => [x - halfW, y - halfH]) }),
+    ctx.modeling.primitives.polygon({ points: loop.map(([x, y]) => [sx * (x - halfW), y - halfH]) }),
   );
   return { region: unionAll2d(ctx, polys), width: rendered.width, height: rendered.height };
 }
@@ -110,10 +115,6 @@ function seamDebossCut<Solid, Region>(
   if (seamPins.length === 0) {
     return null;
   }
-  const built = centredLabelRegion(ctx, seam.code, options.capHeight);
-  if (built === null) {
-    return null;
-  }
   const { transforms, extrusions, booleans } = ctx.modeling;
 
   // Engrave on a vertical wall perpendicular to `e`. Pins sit on walls, so each
@@ -121,11 +122,11 @@ function seamDebossCut<Solid, Region>(
   // wall (near the box face → its inner side faces a filter slot) and the inner
   // STRUCTURAL wall that bounds the air chamber. We want the latter, so among the
   // side-region pins we take the one farthest from the outer face (innermost side
-  // wall), then the lowest of those (codes read best near the floor).
+  // wall), then the one nearest the wall's mid-height so the code sits on the flat
+  // wall, not the bottom filter flange.
   const e: SeamAxis = seam.axis === "y" ? "x" : "y";
   const extentE = 2 * modelCenter[AXIS_INDEX[e]];
   const distToOuter = (p: { x: number; y: number; z: number }) => Math.min(coord(p, e), extentE - coord(p, e));
-  // Side region only (exclude pins out in the chamber interior, e.g. top-plate pins).
   const sideBand = 0.3 * extentE;
   const sidePins = seamPins.filter((p) => distToOuter(p.position) <= sideBand);
   const candidates = sidePins.length > 0 ? sidePins : seamPins;
@@ -135,15 +136,32 @@ function seamDebossCut<Solid, Region>(
     if (Math.abs(da - db) > 0.5) {
       return db - da; // innermost side wall (the chamber wall) first
     }
-    return a.position.z - b.position.z; // then lowest
+    return a.position.z - b.position.z; // then lowest (near the floor, watertight)
   })[0].position;
   const chamberSign = modelCenter[AXIS_INDEX[e]] - coord(anchor, e) >= 0 ? 1 : -1;
+
+  // Mirror so the code reads correctly to a viewer inside the chamber: the
+  // engraved face points at the viewer (look dir = -chamberNormal, up = +z), so
+  // the glyph width must run along the viewer's right = cross(look, up).
+  const [wAxis, hAxis] = faceAxes(e);
+  const look: [number, number, number] = [0, 0, 0];
+  look[AXIS_INDEX[e]] = -chamberSign;
+  const right: [number, number, number] = [
+    look[1] * 1 - look[2] * 0,
+    look[2] * 0 - look[0] * 1,
+    look[0] * 0 - look[1] * 0,
+  ]; // cross(look, up=+z)
+  const mirror = right[AXIS_INDEX[wAxis]] < 0;
+
+  const built = centredLabelRegion(ctx, seam.code, options.capHeight, mirror);
+  if (built === null) {
+    return null;
+  }
 
   const band = BAND_FAR_MM - BAND_NEAR_MM;
   const prismLocal = transforms.translate([0, 0, -band / 2], extrusions.extrudeLinear({ height: band }, built.region));
   const prismOriented = orientToSeamAxis(ctx, e, prismLocal); // width->faceAxes(e)[0], height->z, depth->e
 
-  const [wAxis, hAxis] = faceAxes(e);
   const place: [number, number, number] = [0, 0, 0];
   place[AXIS_INDEX[e]] = coord(anchor, e); // band straddles the wall at the pin
   // Width: hug the seam when the width axis is the seam normal, else sit on the pin.
