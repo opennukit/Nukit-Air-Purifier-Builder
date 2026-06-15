@@ -31,15 +31,8 @@ import {
   type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
 import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
-import {
-  cellKey,
-  planChunkLabels,
-  type ChunkSeamLabel,
-} from "@/fabrication/printing/designs/tempest/geometry/chunkLabels";
-import {
-  debossChunkSeamLabels,
-  type SeamPinAnchor,
-} from "@/fabrication/printing/designs/tempest/geometry/chunkLabelDeboss";
+import { cellKey, planChunkLabels } from "@/fabrication/printing/designs/tempest/geometry/chunkLabels";
+import { debossChunkSeamLabels, type DebossFace } from "@/fabrication/printing/designs/tempest/geometry/chunkLabelDeboss";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 
@@ -79,13 +72,6 @@ export function createTempestPrintableKit(
   // the returned parts carry only extracted plain-data meshes. The posing and
   // chunk-clipping run through the same ModelingApi seam as the parametric shape
   // (geometry/chunking.ts); only mesh extraction below is Manifold-bound.
-  // Posed alignment-pin sites: solid, hole-clear anchors for the seam-code deboss.
-  const pinAnchors: SeamPinAnchor[] =
-    createTempestAssemblyPinDiagram(settings, presetId)?.placements.map((placement) => ({
-      position: placement.position,
-      axis: placement.axis,
-    })) ?? [];
-
   const parts = withGeometryArena(() => {
     const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
     const assembly = posePrintableAssembly(
@@ -93,7 +79,7 @@ export function createTempestPrintableKit(
       pose,
       createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, model, printableChunkGrid, assembly, pinAnchors);
+    return createChunkParts(ctx, model, printableChunkGrid, assembly);
   });
 
   return {
@@ -235,10 +221,11 @@ function settingsForPresetBed(settings: TempestSettings, presetId: PrintVolumePr
 // Chunk Parts
 // #######################################
 
-// Chunk/seam label deboss: 7 mm caps cut 1 mm into the inner wall (the reference
-// proportions). Only meaningful once the print is split into more than one chunk.
-const CHUNK_LABEL_CAP_HEIGHT_MM = 7;
-const CHUNK_LABEL_DEPTH_MM = 1;
+// Chunk/seam label deboss on the flat bottom face. Cap height and depth are
+// deliberately bold (deeper than a normal mark) while we dial the feature in.
+// Only meaningful once the print is split into more than one chunk.
+const CHUNK_LABEL_CAP_HEIGHT_MM = 10;
+const CHUNK_LABEL_DEPTH_MM = 2.5;
 
 type ClippedChunk = {
   readonly address: ChunkAddress;
@@ -252,7 +239,6 @@ function createChunkParts(
   model: TempestModel,
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
-  pinAnchors: readonly SeamPinAnchor[],
 ): PrintablePart[] {
   // Pass 1: clip every cell and record which ones actually hold material — the
   // letter plan and seam codes can only reference occupied chunks.
@@ -275,33 +261,26 @@ function createChunkParts(
     }
   }
 
-  // Posed model centre — the deboss faces the code toward here so it reads from
-  // inside the chamber.
-  const last = (b: readonly number[]) => b[b.length - 1];
-  const modelCenter: [number, number, number] = [
-    (chunkGrid.boundariesX[0] + last(chunkGrid.boundariesX)) / 2,
-    (chunkGrid.boundariesY[0] + last(chunkGrid.boundariesY)) / 2,
-    (chunkGrid.boundariesZ[0] + last(chunkGrid.boundariesZ)) / 2,
-  ];
-
-  // Pass 2: deboss each chunk's seam codes (when enabled and the print is split),
-  // then emit parts in the stable z,y,x order the clipped map preserves.
-  const seamsByCell = new Map<string, ChunkSeamLabel[]>();
+  // Pass 2: collect each occupied chunk's seam codes (when labelling is on and the
+  // print is split), deboss them into the bottom face, then emit parts in the
+  // stable z,y,x order the clipped map preserves.
+  const codesByCell = new Map<string, string[]>();
   if (model.settings.chunkLabels && occupied.size > 1) {
     for (const seam of planChunkLabels(chunkGrid, occupied).seams) {
       const key = cellKey(seam.cell);
-      (seamsByCell.get(key) ?? seamsByCell.set(key, []).get(key)!).push(seam);
+      (codesByCell.get(key) ?? codesByCell.set(key, []).get(key)!).push(seam.code);
     }
   }
 
   const parts: PrintablePart[] = [];
   for (const chunk of clipped.values()) {
-    const seams = seamsByCell.get(cellKey(chunk.address));
+    const codes = codesByCell.get(cellKey(chunk.address));
+    const face = codes && codes.length > 0 ? dominantFlatFace(chunk.mesh) : null;
     const mesh =
-      seams === undefined || seams.length === 0
+      codes === undefined || codes.length === 0 || face === null
         ? chunk.mesh
         : extractWeldedMesh(
-            debossChunkSeamLabels(ctx, chunk.geom, seams, pinAnchors, modelCenter, chunk.bounds.origin, {
+            debossChunkSeamLabels(ctx, chunk.geom, codes, face, {
               capHeight: CHUNK_LABEL_CAP_HEIGHT_MM,
               depth: CHUNK_LABEL_DEPTH_MM,
             }),
@@ -309,6 +288,69 @@ function createChunkParts(
     parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh));
   }
   return parts;
+}
+
+// The biggest flat axis-aligned face of a chunk to engrave the codes on. Prefers
+// the printing base (downward-facing -z face) when it carries a decent share of
+// the area, otherwise the single largest face — so every chunk gets a solid,
+// readable surface whatever its shape. Returns null if no flat face is found.
+function dominantFlatFace(mesh: ReturnType<typeof extractWeldedMesh>): DebossFace | null {
+  const otherAxes: Record<0 | 1 | 2, readonly [0 | 1 | 2, 0 | 1 | 2]> = { 0: [1, 2], 1: [0, 2], 2: [0, 1] };
+  type Bin = { axis: 0 | 1 | 2; sign: 1 | -1; offset: number; area: number; su: number; sv: number };
+  const bins = new Map<string, Bin>();
+  const v = mesh.vertices;
+  for (const t of mesh.triangles) {
+    const a = v[t.v1];
+    const b = v[t.v2];
+    const c = v[t.v3];
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const uz = b.z - a.z;
+    const wx = c.x - a.x;
+    const wy = c.y - a.y;
+    const wz = c.z - a.z;
+    const nx = uy * wz - uz * wy;
+    const ny = uz * wx - ux * wz;
+    const nz = ux * wy - uy * wx;
+    const len = Math.hypot(nx, ny, nz);
+    if (len < 1e-9) {
+      continue;
+    }
+    const n = [nx / len, ny / len, nz / len] as const;
+    const cen = [(a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3] as const;
+    for (const axis of [0, 1, 2] as const) {
+      if (Math.abs(n[axis]) < 0.97) {
+        continue;
+      }
+      const sign: 1 | -1 = n[axis] > 0 ? 1 : -1;
+      const offset = Math.round(cen[axis] * 2) / 2;
+      const key = `${axis}:${sign}:${offset}`;
+      const [ui, vi] = otherAxes[axis];
+      const area = len / 2;
+      const bin = bins.get(key) ?? { axis, sign, offset, area: 0, su: 0, sv: 0 };
+      bin.area += area;
+      bin.su += area * cen[ui];
+      bin.sv += area * cen[vi];
+      bins.set(key, bin);
+    }
+  }
+  const all = [...bins.values()];
+  if (all.length === 0) {
+    return null;
+  }
+  const largest = all.reduce((m, e) => (e.area > m.area ? e : m));
+  const base = all.filter((e) => e.axis === 2 && e.sign === -1).sort((p, q) => q.area - p.area)[0];
+  const chosen = base !== undefined && base.area >= 0.4 * largest.area ? base : largest;
+  const [uIdx, vIdx] = otherAxes[chosen.axis];
+  return {
+    axis: chosen.axis,
+    sign: chosen.sign,
+    offset: chosen.offset,
+    uIdx,
+    vIdx,
+    uCenter: chosen.su / chosen.area,
+    vCenter: chosen.sv / chosen.area,
+  };
 }
 
 function buildChunkPart(
