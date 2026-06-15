@@ -138,7 +138,6 @@ import {
 } from "@/rendering/three/preview/tempestParts";
 import {
   createBananaScaleReference,
-  createOneMeterScaleCube,
   disposeMaterial,
 } from "@/rendering/three/preview/scaleReferences";
 import {
@@ -156,7 +155,6 @@ import {
   fanRotorAngularVelocity,
   groundY,
   homePreviewRotationX,
-  oneMeterCubeSize,
   previewControlClearanceTargetOffset,
   previewFanWallInset,
   sceneScale,
@@ -995,15 +993,6 @@ export class PurifierThreePreview {
       modelBounds.max.z + gap - bananaBounds.min.z,
     );
     this.scaleReferenceGroup.add(banana);
-
-    const cube = createOneMeterScaleCube();
-    const cubeBounds = new Box3().setFromObject(cube);
-    cube.position.set(
-      banana.position.x + bananaReferenceLength * 0.62 + oneMeterCubeSize * 0.62,
-      groundY - cubeBounds.min.y + 0.009,
-      modelBounds.max.z + gap - cubeBounds.min.z,
-    );
-    this.scaleReferenceGroup.add(cube);
   }
 
   private updateModelFocus(modelBounds: Box3): void {
