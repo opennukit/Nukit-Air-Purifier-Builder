@@ -166,11 +166,12 @@ export type TopExhaust = (typeof topExhausts)[number];
 
 // Tempest preset designs. "custom" is the fully user-driven build; named designs
 // (e.g. Nukit Tempest Euro) apply a complete tempest configuration when chosen.
-export const tempestDesigns = ["custom", "nukit-tempest-euro"] as const;
+export const tempestDesigns = ["nukit-tempest-euro", "nukit-tempest-euro-cube", "custom"] as const;
 export type TempestDesign = (typeof tempestDesigns)[number];
 export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
-  custom: "Custom",
   "nukit-tempest-euro": "Nukit Tempest Euro",
+  "nukit-tempest-euro-cube": "Nukit Tempest Euro Cube",
+  custom: "Custom",
 };
 
 // Tempest cord pass-through choices (mirrors tempest-builder.html).
@@ -595,11 +596,25 @@ export const nukitTempestEuroDesignOverrides = {
   ...boxExhaustDiametersForWidth(370),
 } satisfies Partial<RawPurifierSettings>;
 
+// The "Nukit Tempest Euro Cube": the Euro preset rebuilt as a 4-side-filter
+// tower around a 290x370x40 filter (the Euro filter on its side), so the box
+// exhaust resizes to the 290 mm width.
+export const nukitTempestEuroCubeDesignOverrides = {
+  ...nukitTempestEuroDesignOverrides,
+  filterWidth: 290,
+  filterDepth: 370,
+  tempestArrangement: "four-side-filter-tower",
+  ...boxExhaustDiametersForWidth(290),
+} satisfies Partial<RawPurifierSettings>;
+
 // Apply a named tempest design. "custom" just records the choice; a named design
 // applies its full configuration so the build matches the preset.
 export function applyTempestDesign(settings: RawPurifierSettings, design: TempestDesign): RawPurifierSettings {
   if (design === "nukit-tempest-euro") {
     return { ...settings, ...nukitTempestEuroDesignOverrides, tempestDesign: "nukit-tempest-euro" };
+  }
+  if (design === "nukit-tempest-euro-cube") {
+    return { ...settings, ...nukitTempestEuroCubeDesignOverrides, tempestDesign: "nukit-tempest-euro-cube" };
   }
   return { ...settings, tempestDesign: canonicalTempestDesign(design) };
 }
