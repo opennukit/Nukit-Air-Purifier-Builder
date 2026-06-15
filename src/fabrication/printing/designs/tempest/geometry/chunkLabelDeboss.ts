@@ -56,6 +56,10 @@ const BAND_FAR_MM = 16;
 // The cut pokes this far past the wall surface into the chamber so its outer face
 // is never coincident with the wall (which would be non-manifold).
 const SURFACE_OUTSET_MM = 0.1;
+// Where up the wall the code sits, as a fraction of the wall's pin span. Low
+// enough to stay in the solid band above the filter flange and below the fan
+// holes (which cluster around the wall's vertical centre).
+const CODE_BAND_FRACTION = 0.3;
 
 const AXIS_INDEX: Readonly<Record<SeamAxis, 0 | 1 | 2>> = { x: 0, y: 1, z: 2 };
 
@@ -97,93 +101,56 @@ function orientToSeamAxis<Solid, Region>(ctx: GeometryContext<Solid, Region>, ax
   return transforms.rotateZ(Math.PI / 2, transforms.rotateX(-Math.PI / 2, solid));
 }
 
-// Build one seam's deboss tool, in the assembly (world) frame. The code goes on
-// the wall that faces the central air chamber — NOT the outer wall (whose inner
-// face looks into a filter slot). All inputs are world-frame; the chunk solid is
-// translated from its local origin into world for the shell, then the finished
-// cut is translated back by `origin` so it lines up with the local chunk.
-function seamDebossCut<Solid, Region>(
-  ctx: GeometryContext<Solid, Region>,
-  chunk: Solid,
+// The chamber-facing wall a seam's code is engraved on, plus the pins lying on it
+// (which mark its solid, hole-free regions).
+type WallTarget = {
+  readonly e: SeamAxis; // wall normal axis
+  readonly wallPlane: number; // wall position along e (assembly frame)
+  readonly chamberSign: 1 | -1; // direction from wall toward the chamber
+  readonly wAxis: SeamAxis; // in-wall horizontal axis
+  readonly hAxis: SeamAxis; // in-wall vertical axis (z)
+  readonly wallPins: readonly SeamPinAnchor[];
+};
+
+// Pick the chamber-facing wall for a seam: a vertical wall perpendicular to `e`.
+// Pins sit on walls, so each pin's e-coordinate IS a wall plane; two side walls
+// cross the seam — the OUTER wall (inner face looks into a filter slot) and the
+// inner STRUCTURAL wall bounding the air chamber. We want the latter, i.e. the
+// side-region pin farthest from the outer face.
+function wallTargetForSeam(
   seam: ChunkSeamLabel,
   pins: readonly SeamPinAnchor[],
   modelCenter: readonly [number, number, number],
-  origin: readonly [number, number, number],
-  options: ChunkLabelDebossOptions,
-): Solid | null {
+): WallTarget | null {
   const seamPins = pinsOnSeam(seam, pins);
   if (seamPins.length === 0) {
     return null;
   }
-  const { transforms, extrusions, booleans } = ctx.modeling;
-
-  // Engrave on a vertical wall perpendicular to `e`. Pins sit on walls, so each
-  // pin's e-coordinate IS a wall plane. Two side walls cross the seam: the OUTER
-  // wall (near the box face → its inner side faces a filter slot) and the inner
-  // STRUCTURAL wall that bounds the air chamber. We want the latter, so among the
-  // side-region pins we take the one farthest from the outer face (innermost side
-  // wall), then the one nearest the wall's mid-height so the code sits on the flat
-  // wall, not the bottom filter flange.
   const e: SeamAxis = seam.axis === "y" ? "x" : "y";
   const extentE = 2 * modelCenter[AXIS_INDEX[e]];
   const distToOuter = (p: { x: number; y: number; z: number }) => Math.min(coord(p, e), extentE - coord(p, e));
   const sideBand = 0.3 * extentE;
   const sidePins = seamPins.filter((p) => distToOuter(p.position) <= sideBand);
   const candidates = sidePins.length > 0 ? sidePins : seamPins;
-  const anchor = [...candidates].sort((a, b) => {
-    const da = distToOuter(a.position);
-    const db = distToOuter(b.position);
-    if (Math.abs(da - db) > 0.5) {
-      return db - da; // innermost side wall (the chamber wall) first
-    }
-    return a.position.z - b.position.z; // then lowest (near the floor, watertight)
-  })[0].position;
-  const chamberSign = modelCenter[AXIS_INDEX[e]] - coord(anchor, e) >= 0 ? 1 : -1;
-
-  // Mirror so the code reads correctly to a viewer inside the chamber: the
-  // engraved face points at the viewer (look dir = -chamberNormal, up = +z), so
-  // the glyph width must run along the viewer's right = cross(look, up).
+  const wallPlane = [...candidates].sort((a, b) => distToOuter(b.position) - distToOuter(a.position))[0].position;
+  const plane = coord(wallPlane, e);
+  const chamberSign: 1 | -1 = modelCenter[AXIS_INDEX[e]] - plane >= 0 ? 1 : -1;
   const [wAxis, hAxis] = faceAxes(e);
+  const wallPins = candidates.filter((p) => Math.abs(coord(p.position, e) - plane) < 3);
+  return { e, wallPlane: plane, chamberSign, wAxis, hAxis, wallPins };
+}
+
+function wallKey(t: WallTarget): string {
+  return `${t.e}:${Math.round(t.wallPlane)}:${t.chamberSign}`;
+}
+
+// Mirror the glyphs when the wall's width axis runs opposite the viewer's right
+// (viewer inside the chamber, look = -chamberNormal, up = +z, right = look × up).
+function wallNeedsMirror(t: WallTarget): boolean {
   const look: [number, number, number] = [0, 0, 0];
-  look[AXIS_INDEX[e]] = -chamberSign;
-  const right: [number, number, number] = [
-    look[1] * 1 - look[2] * 0,
-    look[2] * 0 - look[0] * 1,
-    look[0] * 0 - look[1] * 0,
-  ]; // cross(look, up=+z)
-  const mirror = right[AXIS_INDEX[wAxis]] < 0;
-
-  const built = centredLabelRegion(ctx, seam.code, options.capHeight, mirror);
-  if (built === null) {
-    return null;
-  }
-
-  const band = BAND_FAR_MM - BAND_NEAR_MM;
-  const prismLocal = transforms.translate([0, 0, -band / 2], extrusions.extrudeLinear({ height: band }, built.region));
-  const prismOriented = orientToSeamAxis(ctx, e, prismLocal); // width->faceAxes(e)[0], height->z, depth->e
-
-  const place: [number, number, number] = [0, 0, 0];
-  place[AXIS_INDEX[e]] = coord(anchor, e); // band straddles the wall at the pin
-  // Width: hug the seam when the width axis is the seam normal, else sit on the pin.
-  place[AXIS_INDEX[wAxis]] =
-    wAxis === seam.axis ? seam.boundary - seam.towardNeighbour * (built.width / 2 + 2) : coord(anchor, wAxis);
-  // Height: baseline just above the anchor (near the floor / bottom rail).
-  place[AXIS_INDEX[hAxis]] = coord(anchor, "z") + options.capHeight / 2;
-  const prism = transforms.translate(place, prismOriented);
-
-  // Shell off the chamber-facing surface of the chunk (moved into world first).
-  const worldChunk = transforms.translate([origin[0], origin[1], origin[2]], chunk);
-  const shellShift: [number, number, number] = [0, 0, 0];
-  shellShift[AXIS_INDEX[e]] = -chamberSign * options.depth;
-  const shell = booleans.subtract(worldChunk, transforms.translate(shellShift, worldChunk));
-
-  // Nudge the cut a hair into the chamber (outward) so its outer face does not
-  // sit exactly on the wall surface (a coincident face there can leave a single
-  // over-shared, non-manifold edge), then bring it back into the chunk's frame.
-  const outset: [number, number, number] = [0, 0, 0];
-  outset[AXIS_INDEX[e]] = chamberSign * SURFACE_OUTSET_MM;
-  const worldCut = transforms.translate(outset, booleans.intersect(prism, shell));
-  return transforms.translate([-origin[0], -origin[1], -origin[2]], worldCut);
+  look[AXIS_INDEX[t.e]] = -t.chamberSign;
+  const right: [number, number, number] = [look[1], -look[0], 0]; // cross(look, +z)
+  return right[AXIS_INDEX[t.wAxis]] < 0;
 }
 
 function faceAxes(axis: SeamAxis): readonly [SeamAxis, SeamAxis] {
@@ -210,15 +177,87 @@ export function debossChunkSeamLabels<Solid, Region>(
   origin: readonly [number, number, number],
   options: ChunkLabelDebossOptions,
 ): Solid {
-  const cuts: Solid[] = [];
+  // Group the chunk's seams by the chamber wall they target so several codes on
+  // one wall can be laid out side by side instead of stacking on top of each other.
+  const groups = new Map<string, { target: WallTarget; seams: ChunkSeamLabel[] }>();
   for (const seam of seams) {
-    const cut = seamDebossCut(ctx, chunk, seam, pins, modelCenter, origin, options);
-    if (cut !== null) {
-      cuts.push(cut);
+    const target = wallTargetForSeam(seam, pins, modelCenter);
+    if (target === null) {
+      continue;
     }
+    const key = wallKey(target);
+    const group = groups.get(key) ?? { target, seams: [] };
+    group.seams.push(seam);
+    groups.set(key, group);
+  }
+
+  const cuts: Solid[] = [];
+  for (const { target, seams: wallSeams } of groups.values()) {
+    cuts.push(...wallDebossCuts(ctx, chunk, target, wallSeams, origin, options));
   }
   if (cuts.length === 0) {
     return chunk;
   }
   return ctx.modeling.booleans.subtract(chunk, unionAll(ctx, cuts));
+}
+
+// Lay one wall's codes out centred horizontally on the wall and spread apart so
+// they never overlap, sitting in the solid band above the filter flange / below
+// the fan holes (the pins on the wall mark that band).
+function wallDebossCuts<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  chunk: Solid,
+  target: WallTarget,
+  wallSeams: readonly ChunkSeamLabel[],
+  origin: readonly [number, number, number],
+  options: ChunkLabelDebossOptions,
+): Solid[] {
+  const { transforms, extrusions, booleans } = ctx.modeling;
+  const mirror = wallNeedsMirror(target);
+  const built = wallSeams
+    .map((seam) => centredLabelRegion(ctx, seam.code, options.capHeight, mirror))
+    .filter((b): b is NonNullable<typeof b> => b !== null);
+  if (built.length === 0) {
+    return [];
+  }
+
+  // Wall span from its pins: horizontal centre, and the solid band height (low on
+  // the wall, clear of the fan holes that sit around the wall's vertical centre).
+  const ws = target.wallPins.map((p) => coord(p.position, target.wAxis));
+  const zs = target.wallPins.map((p) => p.position.z);
+  const wMid = (Math.min(...ws) + Math.max(...ws)) / 2;
+  const zMin = Math.min(...zs);
+  const zMax = Math.max(...zs);
+  const vCenter = zMin + (zMax - zMin) * CODE_BAND_FRACTION;
+
+  const gap = options.capHeight * 0.6;
+  const totalWidth = built.reduce((sum, b) => sum + b.width, 0) + gap * (built.length - 1);
+
+  // One shell per wall (shared by every code on it).
+  const worldChunk = transforms.translate([origin[0], origin[1], origin[2]], chunk);
+  const shellShift: [number, number, number] = [0, 0, 0];
+  shellShift[AXIS_INDEX[target.e]] = -target.chamberSign * options.depth;
+  const shell = booleans.subtract(worldChunk, transforms.translate(shellShift, worldChunk));
+
+  const band = BAND_FAR_MM - BAND_NEAR_MM;
+  const cuts: Solid[] = [];
+  let cursor = wMid - totalWidth / 2;
+  for (const b of built) {
+    const wPos = cursor + b.width / 2;
+    cursor += b.width + gap;
+
+    const prismLocal = transforms.translate([0, 0, -band / 2], extrusions.extrudeLinear({ height: band }, b.region));
+    const prismOriented = orientToSeamAxis(ctx, target.e, prismLocal);
+    const place: [number, number, number] = [0, 0, 0];
+    place[AXIS_INDEX[target.e]] = target.wallPlane;
+    place[AXIS_INDEX[target.wAxis]] = wPos;
+    place[AXIS_INDEX[target.hAxis]] = vCenter;
+    const prism = transforms.translate(place, prismOriented);
+
+    const outset: [number, number, number] = [0, 0, 0];
+    outset[AXIS_INDEX[target.e]] = target.chamberSign * SURFACE_OUTSET_MM;
+    const worldCut = transforms.translate(outset, booleans.intersect(prism, shell));
+    cuts.push(transforms.translate([-origin[0], -origin[1], -origin[2]], worldCut));
+  }
+  return cuts;
 }
