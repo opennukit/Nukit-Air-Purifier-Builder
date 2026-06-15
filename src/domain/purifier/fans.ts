@@ -54,7 +54,7 @@ export type FanSpec = {
   cutClearance: Millimeters;
 };
 
-export const fanColors = ["black", "beige", "grey"] as const;
+export const fanColors = ["black", "beige"] as const;
 
 export type FanColor = (typeof fanColors)[number];
 
@@ -114,16 +114,6 @@ const fanAppearanceByColor: Record<FanColor, FanAppearance> = {
     hubColor: 0xe2cda4,
     accentColor: 0x8f5b35,
     previewCadModel: noctuaCadPreviewModel,
-  },
-  // The same CAD silhouette re-coloured a neutral mid-grey.
-  grey: {
-    frameColor: 0x9aa0a4,
-    ringColor: 0x6f7479,
-    bladeColor: 0xc3c8cc,
-    hubColor: 0xdfe2e5,
-    accentColor: 0x70777c,
-    previewCadModel: noctuaCadPreviewModel,
-    recolorCadModel: true,
   },
 };
 
