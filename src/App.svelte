@@ -215,6 +215,8 @@
   // box/exhaust option and its variables, hex size/spacing, fan screw holes,
   // material thickness, and the cord wall/position/offset controls.
   let showTempestAdvanced = false;
+  // Chunk-label deboss is parked: hide its control until the placement is reworked.
+  const SHOW_CHUNK_LABELS_CONTROL = false;
   let showBoxExhaustOption = false;
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForSettings(settings.fanDiameter, settings.topExhaust);
   let isStaticReferenceControlsActive = false;
@@ -1803,20 +1805,25 @@
                         </label>
                       {/each}
                     {/if}
-                    <fieldset class="fan-placement-field" data-tempest-chunk-labels>
-                      <legend>Chunk labels {@render infoTip("info-chunkLabels", "Debosses a two-letter code on the inner wall by each seam (both pieces share the code) so you can match the printed chunks when gluing. Only affects prints split into multiple pieces.")}</legend>
-                      <div class="fan-placement-checks">
-                        <label class="toggle-field">
-                          <input
-                            type="checkbox"
-                            name="chunkLabels"
-                            checked={settings.chunkLabels}
-                            onchange={(event) => updateBooleanSetting("chunkLabels", event)}
-                          />
-                          <span>On</span>
-                        </label>
-                      </div>
-                    </fieldset>
+                    <!-- Chunk-label deboss is parked for now: control hidden and the
+                         setting defaults off. Flip SHOW_CHUNK_LABELS_CONTROL to bring it
+                         back; the geometry code in printableKit/chunkLabelDeboss stays. -->
+                    {#if SHOW_CHUNK_LABELS_CONTROL}
+                      <fieldset class="fan-placement-field" data-tempest-chunk-labels>
+                        <legend>Chunk labels {@render infoTip("info-chunkLabels", "Debosses a two-letter code on each piece so you can match the printed chunks when gluing. Only affects prints split into multiple pieces.")}</legend>
+                        <div class="fan-placement-checks">
+                          <label class="toggle-field">
+                            <input
+                              type="checkbox"
+                              name="chunkLabels"
+                              checked={settings.chunkLabels}
+                              onchange={(event) => updateBooleanSetting("chunkLabels", event)}
+                            />
+                            <span>On</span>
+                          </label>
+                        </div>
+                      </fieldset>
+                    {/if}
                   </div>
                 </div>
               {/if}

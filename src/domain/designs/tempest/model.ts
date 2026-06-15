@@ -339,7 +339,9 @@ export const defaultTempestSettings: TempestSettings = {
     holeDepth: 10,
     spacing: 30,
   },
-  chunkLabels: true,
+  // Off for now — the deboss feature is parked (UI hidden); the geometry code
+  // stays and still runs whenever chunkLabels is explicitly enabled.
+  chunkLabels: false,
   printBed: {
     width: 256,
     depth: 256,
@@ -463,7 +465,7 @@ function normalizeTempestSettings(settings: TempestSettings): TempestSettings {
     },
     cordPassThrough: normalizeTempestCordPassThrough(settings.cordPassThrough),
     alignmentPins: normalizeTempestAlignmentPins(settings.alignmentPins),
-    chunkLabels: settings.chunkLabels !== false,
+    chunkLabels: settings.chunkLabels === true,
     printBed: {
       width: finitePositive(settings.printBed.width, defaultTempestSettings.printBed.width),
       depth: finitePositive(settings.printBed.depth, defaultTempestSettings.printBed.depth),

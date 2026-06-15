@@ -471,7 +471,7 @@ export const defaultSettings: RawPurifierSettings = {
   cordHoleSide: defaultTempestCordPassThrough.side,
   cordHoleCornerOffset: defaultTempestCordPassThrough.cornerOffset,
   outsideFlangeThickness: 10,
-  chunkLabels: true,
+  chunkLabels: false,
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,

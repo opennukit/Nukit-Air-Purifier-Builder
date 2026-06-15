@@ -221,11 +221,10 @@ function settingsForPresetBed(settings: TempestSettings, presetId: PrintVolumePr
 // Chunk Parts
 // #######################################
 
-// Chunk/seam label deboss on the flat bottom face. Cap height and depth are
-// deliberately bold (deeper than a normal mark) while we dial the feature in.
-// Only meaningful once the print is split into more than one chunk.
-const CHUNK_LABEL_CAP_HEIGHT_MM = 10;
-const CHUNK_LABEL_DEPTH_MM = 2.5;
+// Chunk/seam label deboss. Parked for now (off by default, control hidden); the
+// placement still needs work — it can land on the fan grill — before re-enabling.
+const CHUNK_LABEL_CAP_HEIGHT_MM = 7;
+const CHUNK_LABEL_DEPTH_MM = 1;
 
 type ClippedChunk = {
   readonly address: ChunkAddress;
