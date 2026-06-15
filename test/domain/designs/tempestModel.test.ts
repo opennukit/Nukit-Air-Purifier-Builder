@@ -101,8 +101,10 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
       throw new Error("Expected a sandwich wall cord");
     }
-    // side "right" along the 507 wall with the 17 corner offset.
-    expect(model.cordPassThrough.positionAlongWall).toBe(490);
+    // Upright like the sandwich: the side-wall cord exits near the standing floor.
+    const floorClearance = model.frame.wallThickness + model.cordPassThrough.diameter / 2;
+    expect(model.cordPassThrough.positionAlongWall).toBeGreaterThanOrEqual(floorClearance);
+    expect(model.cordPassThrough.positionAlongWall).toBeLessThanOrEqual(floorClearance + 10);
     expect(model.cordPassThrough.verticalCenter).toBe(model.box.height / 2);
   });
 

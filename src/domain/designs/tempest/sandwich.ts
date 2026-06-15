@@ -246,21 +246,18 @@ export function createSandwichCordPlacement(
     return { type: "none" };
   }
   const cord = settings.cordPassThrough;
-  const arrangement = expectSandwichArrangement(settings.arrangement);
   const wallLength = cord.wall === "front" || cord.wall === "back" ? box.width : box.depth;
   const offset = horizontalCordOffset(settings);
-  // The dual sandwich stands upright for printing and display (createSandwichPose:
-  // build +y becomes the standing UP axis, so the front wall y=0 becomes the
-  // floor). A power cord should exit near the standing floor, so on the left and
-  // right walls — which stay vertical in that pose — the hole sits one corner-safe
-  // cord offset above the wall's floor end instead of following the side setting
-  // (offset = cord radius + wall + margin, so the bore clears the floor wall it
-  // stands next to). A hole through the front wall already exits at the floor; the
-  // back wall is the user's explicit choice of the standing top. The single-filter
-  // sandwich keeps its as-modelled orientation, so its cord keeps side placement.
-  const standsUpright = horizontalFilterCount(arrangement) === 2;
+  // Both horizontal layouts stand upright for printing and display
+  // (createSandwichPose: build +y becomes the standing UP axis, so the front wall
+  // y=0 becomes the floor). A power cord should exit near the standing floor, so
+  // on the left and right walls — which stay vertical in that pose — the hole sits
+  // one corner-safe cord offset above the wall's floor end instead of following
+  // the side setting (offset = cord radius + wall + margin, so the bore clears the
+  // floor wall it stands next to). A hole through the front wall already exits at
+  // the floor; the back wall is the user's explicit choice of the standing top.
   const positionAlongWall =
-    standsUpright && (cord.wall === "left" || cord.wall === "right")
+    cord.wall === "left" || cord.wall === "right"
       ? offset
       : cordPositionAlongWall(wallLength, cord.side, offset);
   return {
