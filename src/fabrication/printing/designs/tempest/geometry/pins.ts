@@ -106,11 +106,15 @@ export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: 
         m.filterLayout.structuralOffset,
         m.frame.outsideFlangeThickness,
       );
+      // Widen the bevel exclusion by the pin's reach so a hole near the corner
+      // never grazes (breaks out of) the 45° chamfer face, only its centre.
+      const pinReach = m.settings.alignmentPins.type === "enabled" ? m.settings.alignmentPins.diameter / 2 : 0;
+      const bevelClearance = chamfer + pinReach * Math.SQRT2 + 0.5;
       return placements.filter(
         (placement) =>
           !windows.some((window) => windowSwallowsPin(window, placement)) &&
           !pockets.some((pocket) => boxSwallowsPin(pocket, placement)) &&
-          !cornerBevelSwallowsPin(placement, m.box.width, m.box.depth, chamfer),
+          !cornerBevelSwallowsPin(placement, m.box.width, m.box.depth, bevelClearance),
       );
     },
   });
@@ -129,7 +133,11 @@ export function pinHoles<Solid, Region>(
     return [];
   }
   const pin = model.settings.alignmentPins;
-  const placements = tempestAlignmentPinPlacements(model, chunkGrid);
+  // Drill ONLY the placements that survive the same filter the exploded preview
+  // uses (clear of fan bores, side windows, filter pockets, and corner bevels).
+  // Drilling the raw candidates instead cut holes through those open/bevelled
+  // regions, which is what made pins appear to break through the walls.
+  const placements = tempestPinPlacementsClearOfFans(model, chunkGrid);
   if (placements.length === 0) {
     return [];
   }
