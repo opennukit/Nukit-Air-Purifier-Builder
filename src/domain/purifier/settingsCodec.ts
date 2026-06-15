@@ -83,6 +83,7 @@ export function encodeSettings(
   params.set("cordHoleWall", settings.cordHoleWall);
   params.set("cordHoleSide", settings.cordHoleSide);
   params.set("cordHoleCornerOffset", formatNumber(settings.cordHoleCornerOffset));
+  params.set("outsideFlangeThickness", formatNumber(settings.outsideFlangeThickness));
   params.set("hexGrill", String(settings.hexGrill));
   params.set("hexSize", formatNumber(settings.hexSize));
   params.set("hexSpacing", formatNumber(settings.hexSpacing));
@@ -418,6 +419,7 @@ const purifierSettingsFieldKeys: Record<
   filterFitClearance: "filterFitClearance",
   cordHoleDiameter: "cordHoleDiameter",
   cordHoleCornerOffset: "cordHoleCornerOffset",
+  outsideFlangeThickness: "outsideFlangeThickness",
   hexGrill: "hexGrill",
   hexSize: "hexSize",
   hexSpacing: "hexSpacing",

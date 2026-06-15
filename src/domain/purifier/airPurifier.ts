@@ -141,6 +141,7 @@ export function normalizeRawSettings(
     cordHoleWall: input.cordHoleWall,
     cordHoleSide: input.cordHoleSide,
     cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.cordHoleCornerOffset),
+    outsideFlangeThickness: normalizeOutsideFlangeThickness(input.outsideFlangeThickness),
     hexGrill: input.hexGrill,
     hexSize: normalizeHexSize(input.hexSize),
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
@@ -277,6 +278,7 @@ export function serializePurifierDraft(
       cordHoleWall: draft.design.cordHoleWall,
       cordHoleSide: draft.design.cordHoleSide,
       cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
+      outsideFlangeThickness: draft.design.outsideFlangeThickness,
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
@@ -345,6 +347,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     cordHoleWall: defaultSettings.cordHoleWall,
     cordHoleSide: defaultSettings.cordHoleSide,
     cordHoleCornerOffset: defaultSettings.cordHoleCornerOffset,
+    outsideFlangeThickness: defaultSettings.outsideFlangeThickness,
     hexGrill: defaultSettings.hexGrill,
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
@@ -429,6 +432,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       cordHoleWall: input.design.cordHoleWall,
       cordHoleSide: input.design.cordHoleSide,
       cordHoleCornerOffset: input.design.cordHoleCornerOffset,
+      outsideFlangeThickness: input.design.outsideFlangeThickness,
       hexGrill: input.design.hexGrill,
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
@@ -509,6 +513,7 @@ function createConfiguredPrintDesign(input: {
       cordHoleWall: input.raw.cordHoleWall,
       cordHoleSide: input.raw.cordHoleSide,
       cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
+      outsideFlangeThickness: normalizeOutsideFlangeThickness(input.raw.outsideFlangeThickness),
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
@@ -615,6 +620,7 @@ function createPurifierDesignDraft(
       cordHoleWall: configuration.design.cordHoleWall,
       cordHoleSide: configuration.design.cordHoleSide,
       cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
+      outsideFlangeThickness: configuration.design.outsideFlangeThickness,
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
@@ -714,6 +720,10 @@ function normalizeCordHoleDiameter(value: Millimeters): Millimeters {
 
 function normalizeCordHoleCornerOffset(value: Millimeters): Millimeters {
   return clamp(value, 0, 200);
+}
+
+function normalizeOutsideFlangeThickness(value: Millimeters): Millimeters {
+  return clamp(value, 1, 50);
 }
 
 type TempestExhaustFields = Pick<

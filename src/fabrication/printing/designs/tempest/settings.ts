@@ -48,6 +48,7 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       wallThickness: configuration.cutting.materialThickness,
       rim: configuration.cutting.rim,
       filterFitClearance: design.filterFitClearance,
+      outsideFlangeThickness: design.outsideFlangeThickness,
     },
     filterSlot: {
       ...defaultTempestSettings.filterSlot,

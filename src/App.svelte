@@ -1564,6 +1564,22 @@
                           </span>
                         </label>
                       {/each}
+                      <label class="field">
+                        <span>Outside flange thickness</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="outsideFlangeThickness"
+                            min="1"
+                            max="50"
+                            step="0.5"
+                            inputmode="decimal"
+                            value={settings.outsideFlangeThickness}
+                            onchange={(event) => updateNumberSetting("outsideFlangeThickness", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
                       {#if settings.cordHoleDiameter > 0}
                         <label class="field">
                           <span>Power cord wall</span>
