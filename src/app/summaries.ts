@@ -19,6 +19,7 @@ import type {
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import { tempestDesignLabels } from "@/domain/purifier/settingsModel";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
+import { matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -340,8 +341,17 @@ function laserSheetPartsItems(
 }
 
 function rectangularFilterSize(currentSettings: RawPurifierSettings): string {
-  // Filters are entered as whole measured millimetres, so the summary shows them
-  // rounded — no stray decimal from a value pasted in via a shared URL.
+  // Show the stock filter's name when the dimensions match a preset (in either
+  // orientation); otherwise the measured size. Filters are entered as whole
+  // measured millimetres, so the summary rounds them.
+  const preset = matchedFilterSizePreset(
+    currentSettings.filterWidth,
+    currentSettings.filterDepth,
+    currentSettings.filterThickness,
+  );
+  if (preset !== undefined) {
+    return preset.label;
+  }
   const whole = (value: number) => formatMillimeters(Math.round(value));
   return `${whole(currentSettings.filterWidth)} x ${whole(currentSettings.filterDepth)} x ${whole(currentSettings.filterThickness)}`;
 }

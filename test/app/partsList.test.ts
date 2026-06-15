@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createPartsListItems } from "@/app/summaries";
 import { createLayout } from "@/fabrication/purifierLayout";
+import { decodeSettings } from "@/domain/purifier/settingsCodec";
 import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/settingsModel";
 
 // #######################################
@@ -34,6 +35,31 @@ describe("parts list", () => {
     // 2 x 10 mm hole depth minus the 2 mm glue room.
     expect(items.find((item) => item.label === "Filament alignment pins")?.detail).toContain("18 mm");
     expect(categories).not.toContain("Sheet");
+  });
+
+  test("the Filter row shows the stock filter name when a preset matches, else the measured size", () => {
+    const starkvind = createLayout(
+      decodeSettings("printDesign=nukit-tempest&filterWidth=370&filterDepth=290&filterThickness=40"),
+    );
+    expect(
+      createPartsListItems(starkvind, "print-3mf", starkvind.rawSettings, "bed-256").find((item) => item.category === "Filter")?.label,
+    ).toBe("STARKVIND (370 x 290 x 40 mm)");
+
+    // swapped orientation still reads as STARKVIND
+    const swapped = createLayout(
+      decodeSettings("printDesign=nukit-tempest&filterWidth=290&filterDepth=370&filterThickness=40"),
+    );
+    expect(
+      createPartsListItems(swapped, "print-3mf", swapped.rawSettings, "bed-256").find((item) => item.category === "Filter")?.label,
+    ).toBe("STARKVIND (370 x 290 x 40 mm)");
+
+    // a custom size falls back to the measured dimensions
+    const custom = createLayout(
+      decodeSettings("printDesign=nukit-tempest&filterWidth=300&filterDepth=300&filterThickness=25"),
+    );
+    expect(
+      createPartsListItems(custom, "print-3mf", custom.rawSettings, "bed-256").find((item) => item.category === "Filter")?.label,
+    ).toBe("300 mm x 300 mm x 25 mm");
   });
 
   test("lists curated source files, filters, fans, and license for a static reference", () => {

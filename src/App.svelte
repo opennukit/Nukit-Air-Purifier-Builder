@@ -35,6 +35,7 @@
     fixedFanCountOptions,
     type FanColor,
   } from "@/domain/purifier/fans";
+  import { filterSizePresets, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
   import {
     advancedJointControls,
     cordHoleInfo,
@@ -454,25 +455,11 @@
     commitSettings({ ...settings, filterSlotWall: filterSlotWallByKey[key] });
   }
 
-  const filterSizePresets = [
-    { id: "starkvind", label: "STARKVIND (370 x 290 x 40 mm)", width: 370, depth: 290, thickness: 40 },
-    { id: "fornuftig", label: "FORNUFTIG (390 x 250 x 20 mm)", width: 390, depth: 250, thickness: 20 },
-  ] as const;
-
   // The selector reflects the current dimensions: it matches a preset in either
   // orientation (so swapping width/length keeps the preset selected), and falls
   // back to "Custom" once a measurement is edited away from a preset.
   $: selectedFilterSize =
-    filterSizePresets.find((preset) => {
-      const width = Math.round(settings.filterWidth);
-      const depth = Math.round(settings.filterDepth);
-      const thickness = Math.round(settings.filterThickness);
-      return (
-        thickness === preset.thickness &&
-        ((width === preset.width && depth === preset.depth) ||
-          (width === preset.depth && depth === preset.width))
-      );
-    })?.id ?? "custom";
+    matchedFilterSizePreset(settings.filterWidth, settings.filterDepth, settings.filterThickness)?.id ?? "custom";
 
   function updateFilterSizePreset(event: Event): void {
     const id = (event.target as HTMLSelectElement).value;
