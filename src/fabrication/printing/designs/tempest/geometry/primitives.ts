@@ -85,32 +85,34 @@ export function outerChamferedWallPrism<Solid, Region>(
   return extrusions.extrudeLinear({ height: Math.max(0.001, height) }, footprint);
 }
 
-// A full width x depth prism whose TOP and BOTTOM faces are beveled inward by
-// `chamfer` at 45° — a horizontal-edge chamfer around the whole perimeter. Built
-// like chamferedOpeningCutAlongZ: two end hulls (inset -> full) bracket a
-// straight middle. Intersect it with a box to add a small chamfer around that
-// box's top and bottom outside edges without disturbing its vertical corners.
+// Extrudes `footprint` to `height` but bevels its TOP and BOTTOM faces inward by
+// `chamfer` at 45° — a horizontal-edge chamfer that follows EVERY edge of the
+// footprint outline. Passing a corner-chamfered (octagonal) footprint therefore
+// chamfers the top and bottom of the corner posts' diagonal faces too, not just
+// the four main faces. Built like chamferedOpeningCutAlongZ: two end hulls
+// (inset -> full) bracket a straight middle. The inset is a uniform inward
+// offset of the footprint, so it stays concentric whatever the outline.
 export function topBottomEdgeChamferSolid<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
-  width: number,
-  depth: number,
+  footprint: Region,
   height: number,
   chamfer: number,
 ): Solid {
-  const { transforms, extrusions, hulls } = ctx.modeling;
-  const safeWidth = Math.max(0.001, width);
-  const safeDepth = Math.max(0.001, depth);
+  const { transforms, extrusions, hulls, expansions } = ctx.modeling;
   const safeHeight = Math.max(0.001, height);
-  const full = rectangle2d(ctx, 0, 0, safeWidth, safeDepth);
-  const safeChamfer = Math.max(0, Math.min(chamfer, safeWidth / 2 - 0.01, safeDepth / 2 - 0.01, safeHeight / 2 - 0.01));
+  const safeChamfer = Math.max(0, Math.min(chamfer, safeHeight / 2 - 0.01));
   if (safeChamfer <= 0) {
-    return extrusions.extrudeLinear({ height: safeHeight }, full);
+    return extrusions.extrudeLinear({ height: safeHeight }, footprint);
   }
-  const inset = rectangle2d(ctx, safeChamfer, safeChamfer, safeWidth - 2 * safeChamfer, safeDepth - 2 * safeChamfer);
+  const inset = expansions.offset({ delta: -safeChamfer, corners: "edge", segments: CSG_SEGMENTS }, footprint);
+  // thinExtrude lays a 0.01 mm slab UP from its z, so the top hull's slabs start
+  // 0.01 below their target planes — that keeps the box top exactly at safeHeight
+  // and the upper bevel's straight-face edge exactly at safeHeight - safeChamfer
+  // (no 0.01 overshoot past the plates).
   return unionAll(ctx, [
-    hulls.hull(thinExtrude(ctx, inset, 0), thinExtrude(ctx, full, safeChamfer)),
-    transforms.translate([0, 0, safeChamfer], extrusions.extrudeLinear({ height: safeHeight - 2 * safeChamfer }, full)),
-    hulls.hull(thinExtrude(ctx, full, safeHeight - safeChamfer), thinExtrude(ctx, inset, safeHeight)),
+    hulls.hull(thinExtrude(ctx, inset, 0), thinExtrude(ctx, footprint, safeChamfer)),
+    transforms.translate([0, 0, safeChamfer], extrusions.extrudeLinear({ height: safeHeight - 2 * safeChamfer }, footprint)),
+    hulls.hull(thinExtrude(ctx, footprint, safeHeight - safeChamfer - 0.01), thinExtrude(ctx, inset, safeHeight - 0.01)),
   ]);
 }
 

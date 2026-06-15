@@ -126,16 +126,14 @@ describe("Tempest CSG printable kit", () => {
   }, 30000);
 
   test("keeps the four-filter tower as one large-chamfered solid body", () => {
-    const kit = createTempestPrintableKit(
-      {
-        ...defaultTempestSettings,
-        arrangement: {
-          type: "four-side-filter-tower",
-          filter: defaultTempestTowerFilter,
-        },
+    const towerSettings = {
+      ...defaultTempestSettings,
+      arrangement: {
+        type: "four-side-filter-tower" as const,
+        filter: defaultTempestTowerFilter,
       },
-      "unsplit",
-    );
+    };
+    const kit = createTempestPrintableKit(towerSettings, "unsplit");
     const part = kit.parts[0];
 
     expect(kit.parts).toHaveLength(1);
@@ -152,11 +150,15 @@ describe("Tempest CSG printable kit", () => {
     );
     const chamferFaceSpans = towerCornerChamferFaceSpans(part.mesh, part.width, part.depth);
     expect(rectangularCornerVertexNames(part.mesh, part.width, part.depth)).toEqual([]);
+    // The corner posts now carry the same small top/bottom edge chamfer the rest
+    // of the perimeter does (model.frame.chamferSize = 2 mm), so each corner's
+    // diagonal face stops 2 mm short of the top and bottom plates.
+    const edgeChamfer = createTempestModel(towerSettings).frame.chamferSize;
     expect(chamferFaceSpans).toEqual([
-      { corner: "front-left", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
-      { corner: "front-right", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
-      { corner: "back-left", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
-      { corner: "back-right", triangleCount: expect.any(Number), minZ: 0, maxZ: part.height },
+      { corner: "front-left", triangleCount: expect.any(Number), minZ: edgeChamfer, maxZ: part.height - edgeChamfer },
+      { corner: "front-right", triangleCount: expect.any(Number), minZ: edgeChamfer, maxZ: part.height - edgeChamfer },
+      { corner: "back-left", triangleCount: expect.any(Number), minZ: edgeChamfer, maxZ: part.height - edgeChamfer },
+      { corner: "back-right", triangleCount: expect.any(Number), minZ: edgeChamfer, maxZ: part.height - edgeChamfer },
     ]);
     expect(chamferFaceSpans.every((span) => span.triangleCount >= 2)).toBe(true);
   }, 15000);
