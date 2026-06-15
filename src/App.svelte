@@ -969,20 +969,22 @@
                   </span>
                   <span class="preview-control-label">Fans</span>
                 </label>
-                <div class="preview-color-field" role="group" aria-label="Fan color">
-                  {#each fanColors as color}
-                    <button
-                      class:active-color={settings.fanColor === color}
-                      type="button"
-                      aria-label={fanColorLabels[color]}
-                      aria-pressed={settings.fanColor === color}
-                      title={fanColorLabels[color]}
-                      onclick={() => updateFanColor(color)}
-                    >
-                      <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>
-                    </button>
-                  {/each}
-                </div>
+                {#if settings.showFans}
+                  <div class="preview-color-field" role="group" aria-label="Fan color">
+                    {#each fanColors as color}
+                      <button
+                        class:active-color={settings.fanColor === color}
+                        type="button"
+                        aria-label={fanColorLabels[color]}
+                        aria-pressed={settings.fanColor === color}
+                        title={fanColorLabels[color]}
+                        onclick={() => updateFanColor(color)}
+                      >
+                        <span style:--swatch-color={swatchColor(fanAppearanceForColor(color).frameColor)}></span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
                 <span class="preview-toolbar-primary-break" aria-hidden="true"></span>
                 <label class="toggle-field preview-toggle-field preview-control-spatial" title="Exploded view">
                   <input
