@@ -164,13 +164,13 @@ export type CutSheetPreviewOptions = {
 export const topExhausts = ["fan-grid", "box-exhaust"] as const;
 export type TopExhaust = (typeof topExhausts)[number];
 
-// Tempest preset designs. "custom" is the fully user-driven build; pre-made
-// designs will be added here later. The selection is shown in the preview's
-// "Design" readout but does not (yet) change geometry on its own.
-export const tempestDesigns = ["custom"] as const;
+// Tempest preset designs. "custom" is the fully user-driven build; named designs
+// (e.g. Nukit Tempest Euro) apply a complete tempest configuration when chosen.
+export const tempestDesigns = ["custom", "nukit-tempest-euro"] as const;
 export type TempestDesign = (typeof tempestDesigns)[number];
 export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
   custom: "Custom",
+  "nukit-tempest-euro": "Nukit Tempest Euro",
 };
 
 // Tempest cord pass-through choices (mirrors tempest-builder.html).
@@ -560,6 +560,48 @@ export function applyTempestArrangement(
     fansTop: fanBanks.top,
     fansBottom: fanBanks.bottom,
   };
+}
+
+// The "Nukit Tempest Euro" preset: a 2-filter sandwich tower around a 370x290x40
+// filter, fans on the top (back) wall, honeycomb grill, right-wall cord. These
+// are the tempest-defining fields the design sets; preview/fabrication choices
+// are left to the user (and seeded by the default load).
+export const nukitTempestEuroDesignOverrides = {
+  filterWidth: 370,
+  filterDepth: 290,
+  filterThickness: 40,
+  rim: 30,
+  fanColor: "black",
+  fanDiameter: 140,
+  filters: 2,
+  fansLeft: 0,
+  fansRight: 0,
+  fansTop: automaticFanCount,
+  fansBottom: 0,
+  tempestArrangement: "dual-horizontal-sandwich",
+  filterSlotWall: "back",
+  filterFitClearance: 1,
+  cordHoleDiameter: 8,
+  cordHoleWall: "right",
+  cordHoleSide: "right",
+  cordHoleCornerOffset: 17,
+  outsideFlangeThickness: 10,
+  hexGrill: true,
+  hexSize: 10,
+  hexSpacing: 1.6,
+  topExhaust: "fan-grid",
+  screwHoleDiameter: 5,
+  materialThickness: 5,
+  ...boxExhaustDiametersForWidth(370),
+} satisfies Partial<RawPurifierSettings>;
+
+// Apply a named tempest design. "custom" just records the choice; a named design
+// applies its full configuration so the build matches the preset.
+export function applyTempestDesign(settings: RawPurifierSettings, design: TempestDesign): RawPurifierSettings {
+  if (design === "nukit-tempest-euro") {
+    return { ...settings, ...nukitTempestEuroDesignOverrides, tempestDesign: "nukit-tempest-euro" };
+  }
+  return { ...settings, tempestDesign: canonicalTempestDesign(design) };
 }
 
 export function applyTempestArrangementDefaults(

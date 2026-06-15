@@ -8,6 +8,7 @@
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
   import {
     applyTempestArrangement,
+    applyTempestDesign,
     boxExhaustDiametersForWidth,
     cordHoleSides,
     cordHoleWalls,
@@ -145,7 +146,21 @@
   // Initial Session
   // ##############################
 
-  const initialUrlParams = new URLSearchParams(window.location.search);
+  // The site loads with the Nukit Tempest Euro build by default (a print-3mf
+  // tempest sandwich around a 370x290x40 filter). A shared link with its own
+  // params always wins; only a bare URL falls back to this.
+  const DEFAULT_SESSION_QUERY =
+    "printDesign=nukit-tempest&filterWidth=370&filterDepth=290&filterThickness=40&rim=30&fanColor=black&fanDiameter=140" +
+    "&fansLeft=0&fansRight=0&fansTop=-1&fansBottom=0&tempestArrangement=dual-horizontal-sandwich" +
+    "&tempestDesign=nukit-tempest-euro&filterSlotWall=back&filterFitClearance=1&cordHoleDiameter=8&cordHoleWall=right" +
+    "&cordHoleSide=right&cordHoleCornerOffset=17&outsideFlangeThickness=10&chunkLabels=false&hexGrill=true&hexSize=10" +
+    "&hexSpacing=1.6&topExhaust=fan-grid&boxFanHoleSize=278&boxRingOneScrewHoles=4&boxRingOneScrewDiameter=6" +
+    "&boxRingOneDiameter=370&boxRingTwoScrewHoles=4&boxRingTwoScrewDiameter=6&boxRingTwoDiameter=444&screwHoleDiameter=5" +
+    "&materialThickness=5&showFilterMedia=false&showFans=true&showFilterFrame=true&previewMaterialColor=matte-gray" +
+    "&autoRotate=true&cameraPreset=official&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256";
+  const initialSearch =
+    window.location.search.replace(/^\?/, "").length > 0 ? window.location.search : `?${DEFAULT_SESSION_QUERY}`;
+  const initialUrlParams = new URLSearchParams(initialSearch.startsWith("?") ? initialSearch.slice(1) : initialSearch);
 
   // Reduced-motion users get a still model by default; an explicit autoRotate
   // URL param is a deliberate choice in a shared link, so it still wins.
@@ -165,7 +180,7 @@
   }
 
   const initialSession = normalizeWorkbenchSession(
-    applyReducedMotionAutoRotateDefault(decodePurifierDraftSettings(window.location.search)),
+    applyReducedMotionAutoRotateDefault(decodePurifierDraftSettings(initialSearch)),
     decodeWorkbenchState(initialUrlParams),
   );
   let draft: PurifierDraft = initialSession.settings;
@@ -425,7 +440,7 @@
   }
 
   function updateTempestDesign(event: Event): void {
-    commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
+    commitSettings(applyTempestDesign(settings, (event.target as HTMLSelectElement).value as TempestDesign));
   }
 
   // "Filter slot placement" picks which wall the filter insertion slots open on
