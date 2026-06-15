@@ -1609,28 +1609,6 @@
                   <div class="fan-selection">
                     {@render fanSizeSegment()}
 
-                    {#if showTempestAdvanced && selectedFanSizeChoice === "box-exhaust"}
-                      <div data-box-exhaust-controls>
-                        {#each tempestBoxExhaustControls as control}
-                          <label class="field">
-                            <span>{control.label}</span>
-                            <span class="input-shell">
-                              <input
-                                type="number"
-                                name={control.name}
-                                min="0"
-                                step={control.step}
-                                inputmode="decimal"
-                                value={settings[control.name]}
-                                onchange={(event) => updateNumberSetting(control.name, event)}
-                              />
-                              <small>{control.suffix}</small>
-                            </span>
-                          </label>
-                        {/each}
-                      </div>
-                    {/if}
-
                     <fieldset class="fan-placement-field" data-tempest-fan-auto>
                       <legend>Fan placement</legend>
                       <div class="fan-placement-checks">
@@ -1745,6 +1723,25 @@
                         </span>
                       </label>
                     {/each}
+                    {#if selectedFanSizeChoice === "box-exhaust"}
+                      {#each tempestBoxExhaustControls as control}
+                        <label class="field">
+                          <span>{control.label}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    {/if}
                   </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Cord &amp; grill</p>
