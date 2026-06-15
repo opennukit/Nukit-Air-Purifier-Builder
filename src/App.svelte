@@ -416,6 +416,25 @@
     commitSettings({ ...settings, tempestDesign: (event.target as HTMLSelectElement).value as TempestDesign });
   }
 
+  // "Filter slot placement" is a styled placeholder for now: it tracks which
+  // walls would hold a filter slot but does not change the geometry yet. The
+  // four-side tower only offers Top/Bottom.
+  type WallKey = "left" | "right" | "top" | "bottom";
+  const wallPlacementControls: readonly { readonly key: WallKey; readonly label: string }[] = [
+    { key: "left", label: "Left" },
+    { key: "right", label: "Right" },
+    { key: "top", label: "Top" },
+    { key: "bottom", label: "Bottom" },
+  ];
+  let filterSlotPlacement: Record<WallKey, boolean> = { left: true, right: true, top: true, bottom: true };
+  $: filterSlotPlacementControls = isFourFilterTower
+    ? wallPlacementControls.filter((control) => control.key === "top" || control.key === "bottom")
+    : wallPlacementControls;
+
+  function toggleFilterSlot(key: WallKey): void {
+    filterSlotPlacement = { ...filterSlotPlacement, [key]: !filterSlotPlacement[key] };
+  }
+
   const filterSizePresets = [
     { id: "starkvind", label: "STARKVIND (370 x 290 x 40 mm)", width: 370, depth: 290, thickness: 40 },
     { id: "fornuftig", label: "FORNUFTIG (390 x 250 x 20 mm)", width: 390, depth: 250, thickness: 20 },
@@ -1352,6 +1371,24 @@
                         </label>
                       {/each}
                     </div>
+                    {#if isTempestControlsActive}
+                      <fieldset class="fan-placement-field" data-tempest-filter-slot-placement>
+                        <legend>Filter slot placement</legend>
+                        <div class="fan-placement-checks">
+                          {#each filterSlotPlacementControls as control}
+                            <label class="toggle-field">
+                              <input
+                                type="checkbox"
+                                name={`filter-slot-${control.key}`}
+                                checked={filterSlotPlacement[control.key]}
+                                onchange={() => toggleFilterSlot(control.key)}
+                              />
+                              <span>{control.label}</span>
+                            </label>
+                          {/each}
+                        </div>
+                      </fieldset>
+                    {/if}
                   </div>
                 {/if}
 
