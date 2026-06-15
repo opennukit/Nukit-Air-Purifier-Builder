@@ -106,7 +106,7 @@ export const tempestArrangementOptions: readonly {
   readonly id: TempestArrangementPreset;
   readonly label: string;
 }[] = [
-  { id: "single-horizontal-top-filter", label: "1 top filter" },
+  { id: "single-horizontal-top-filter", label: "1-filter wall mount" },
   { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
   { id: "four-side-filter-tower", label: "4 side filters" },
 ];

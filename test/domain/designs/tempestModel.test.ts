@@ -92,12 +92,12 @@ describe("Tempest OpenSCAD model port", () => {
     expect(standingHeight).toBeLessThanOrEqual(floorClearance + 10);
   });
 
-  test("single-filter sandwich keeps its as-modelled pose and side-positioned cord", () => {
+  test("single-filter wall mount stands upright with a side-positioned cord", () => {
     const model = createTempestModel({
       ...defaultTempestSettings,
       arrangement: { type: "single-horizontal-top-filter", filter: defaultTempestHorizontalFilter },
     });
-    expect(model.printablePose.type).toBe("source");
+    expect(model.printablePose.type).toBe("upright-dual-filter");
     if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
       throw new Error("Expected a sandwich wall cord");
     }

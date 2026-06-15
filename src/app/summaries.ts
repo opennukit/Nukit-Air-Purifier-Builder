@@ -401,7 +401,7 @@ function staticPrintSpoolBudgetUsd(estimate: StaticPrintEstimate): number {
 
 function tempestArrangementLabel(arrangement: string): string {
   if (arrangement === "single-horizontal-top-filter") {
-    return "Single horizontal filter";
+    return "1-filter wall mount";
   }
   if (arrangement === "four-side-filter-tower") {
     return "Four-filter tower";

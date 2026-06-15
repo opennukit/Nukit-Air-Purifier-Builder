@@ -278,21 +278,15 @@ export function createSandwichCordPlacement(
   };
 }
 
-// A two-filter sandwich prints best stood upright; a single-filter sandwich
-// stays as-modelled. Count-based, not tag-based — both are sandwich topology.
+// Both horizontal layouts — the single-filter wall mount and the 2-filter
+// sandwich — stand upright for printing and display.
 export function createSandwichPose(
   box: TempestBoxEnvelope,
-  filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+  _filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
 ): TempestPrintablePose {
-  if (filterLayout.filterCount === 2) {
-    return {
-      type: "upright-dual-filter",
-      envelope: { width: box.width, depth: box.height, height: box.depth },
-    };
-  }
   return {
-    type: "source",
-    envelope: { width: box.width, depth: box.depth, height: box.height },
+    type: "upright-dual-filter",
+    envelope: { width: box.width, depth: box.height, height: box.depth },
   };
 }
 
