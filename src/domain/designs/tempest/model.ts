@@ -120,7 +120,7 @@ export type TempestFilterLayout =
       readonly wallRects: TempestWallMap<TempestQuadWallRect>;
       readonly filterPockets: TempestWallMap<TempestTowerFilterPocket>;
       readonly loading: {
-        readonly type: "top-plate-slots";
+        readonly type: "top-plate-slots" | "bottom-plate-slots";
         readonly slotCount: 4;
       };
     };

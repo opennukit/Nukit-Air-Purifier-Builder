@@ -251,10 +251,15 @@ export function towerFilterSlots<Solid, Region>(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): Solid[] {
-  // The slots you push the filters down through share each pocket's footprint;
-  // they are the wall rects cut through the top plate.
-  const z = model.box.height - filterLayout.topPlateThickness - EPSILON_LIP;
-  const height = filterLayout.topPlateThickness + 2 * EPSILON_LIP;
+  // The slots you push the filters through share each pocket's footprint; they
+  // are the wall rects cut through one cap plate — the bottom plate when loading
+  // from the bottom, otherwise the top plate.
+  const bottomLoading = filterLayout.loading.type === "bottom-plate-slots";
+  const z = bottomLoading
+    ? -EPSILON_LIP
+    : model.box.height - filterLayout.topPlateThickness - EPSILON_LIP;
+  const height =
+    (bottomLoading ? filterLayout.bottomPlateThickness : filterLayout.topPlateThickness) + 2 * EPSILON_LIP;
   return tempestWalls.map((wall) => {
     const rect = filterLayout.wallRects[wall];
     return cuboidFromMinSize(ctx, rect.xMin, rect.yMin, z, rect.xMax - rect.xMin, rect.yMax - rect.yMin, height);

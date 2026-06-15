@@ -3,8 +3,11 @@ import { decodeSettings, encodeSettings } from "@/domain/purifier/settingsCodec"
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 import { createTempestModel } from "@/domain/designs/tempest/model";
+import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
+import { cleanManifold, manifoldReport } from "../helpers/manifoldChecks";
 
 const sandwich = "printDesign=nukit-tempest&tempestArrangement=dual-horizontal-sandwich";
+const tower = "printDesign=nukit-tempest&tempestArrangement=four-side-filter-tower&filterWidth=290&filterDepth=290&filterThickness=25";
 
 describe("tempest filter slot wall (entry face)", () => {
   test("defaults to the back wall (renders at the visual top)", () => {
@@ -29,5 +32,23 @@ describe("tempest filter slot wall (entry face)", () => {
     ).toBe("right");
     const settings = createTempestSettingsFromLayout(createLayout(decodeSettings(`${sandwich}&filterSlotWall=bogus`)));
     expect(settings.filterSlot.wall).toBe("back");
+  });
+
+  test("the tower loads from the top plate by default and the bottom plate when set", () => {
+    const top = createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(tower))));
+    if (top.filterLayout.topology !== "quad") throw new Error("expected a quad tower");
+    expect(top.filterLayout.loading.type).toBe("top-plate-slots");
+
+    const bottom = createTempestModel(
+      createTempestSettingsFromLayout(createLayout(decodeSettings(`${tower}&filterSlotWall=front`))),
+    );
+    if (bottom.filterLayout.topology !== "quad") throw new Error("expected a quad tower");
+    expect(bottom.filterLayout.loading.type).toBe("bottom-plate-slots");
+  });
+
+  test("a bottom-loading tower still exports a watertight body", () => {
+    const settings = createTempestSettingsFromLayout(createLayout(decodeSettings(`${tower}&filterSlotWall=front`)));
+    const kit = createTempestPrintableKit(settings, "unsplit");
+    expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
   });
 });

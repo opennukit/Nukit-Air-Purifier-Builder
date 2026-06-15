@@ -576,8 +576,12 @@ function quadFilterPocketColumns(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
 ): QuadPocketColumn[] {
-  const zMin = filterLayout.bottomPlateThickness;
-  const zMax = model.box.height;
+  // The open column reaches through whichever cap plate carries the loading
+  // slots: up through the top plate for top loading, down through the bottom
+  // plate for bottom loading. Pins in that footprint would otherwise float.
+  const bottomLoading = filterLayout.loading.type === "bottom-plate-slots";
+  const zMin = bottomLoading ? 0 : filterLayout.bottomPlateThickness;
+  const zMax = bottomLoading ? model.box.height - filterLayout.topPlateThickness : model.box.height;
   return Object.values(filterLayout.wallRects).map((rect) => ({
     xMin: rect.xMin,
     xMax: rect.xMax,

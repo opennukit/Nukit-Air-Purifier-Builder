@@ -109,7 +109,9 @@ export function createQuadFilterLayout(
     ),
     filterPockets: mapTempestWalls(() => pocket),
     loading: {
-      type: "top-plate-slots",
+      // The tower loads the filters through one cap plate. "front" (the visual
+      // bottom) loads from the bottom plate; everything else from the top plate.
+      type: settings.filterSlot.wall === "front" ? "bottom-plate-slots" : "top-plate-slots",
       slotCount: 4,
     },
   };
