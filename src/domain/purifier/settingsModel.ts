@@ -491,7 +491,7 @@ export const defaultSettings: RawPurifierSettings = {
   donutCapRim: 10,
   donutCapEnabled: true,
   screwHoleDiameter: 5,
-  materialThickness: 6,
+  materialThickness: 3,
   kerfFit: 0.1,
   fingerWidthMultiplier: defaultCutJointSettings.finger.widthMultiplier,
   fingerSpaceMultiplier: defaultCutJointSettings.finger.spaceMultiplier,

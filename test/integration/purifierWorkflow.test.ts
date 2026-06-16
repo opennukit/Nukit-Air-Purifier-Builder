@@ -565,7 +565,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(externalStaticReferencePreset?.releaseVisibility).toBe("internal");
     expect(staticPrintReferenceHasPlatePreview(externalStaticReference)).toBe(false);
     expect(staticPrintReferenceHasAssembledPreview(externalStaticReference)).toBe(false);
-    expect(defaultSettings.materialThickness).toBe(6);
+    expect(defaultSettings.materialThickness).toBe(3);
   });
 
   test("applies Tempest printable design defaults and exports generated chunks", () => {
