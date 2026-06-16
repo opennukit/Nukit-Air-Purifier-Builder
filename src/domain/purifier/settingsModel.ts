@@ -510,7 +510,7 @@ export const defaultSettings: RawPurifierSettings = {
   showBananaScale: false,
   showPreviewEdges: false,
   previewMaterialColor: defaultPreviewMaterialColorId,
-  autoRotate: true,
+  autoRotate: false,
   cameraPreset: "official",
   labels: true,
   referenceScale: 100,
