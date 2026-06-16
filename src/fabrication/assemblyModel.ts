@@ -144,7 +144,8 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   // edge (where the right-short rail used to sit) and vice versa.
   "front-long": ({ layer, depth, rim }) => ({
     position: [0, layer.outerFrameY, depth / 2 - rim / 2],
-    rotation: [Math.PI / 2, 0, 0],
+    // Flipped 180deg about its long (X) axis so it is no longer upside down.
+    rotation: [-Math.PI / 2, 0, 0],
   }),
   "rear-long": ({ layer, width, rim }) => ({
     position: [-width / 2 + rim / 2, layer.outerFrameY, 0],
@@ -158,7 +159,8 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   }),
   "right-short": ({ layer, depth, rim }) => ({
     position: [0, layer.outerFrameY, -depth / 2 + rim / 2],
-    rotation: [Math.PI / 2, 0, 0],
+    // Flipped 180deg about its long (X) axis so it is no longer upside down.
+    rotation: [-Math.PI / 2, 0, 0],
   }),
   "inner-long": ({ layer, depth, rim }) => ({
     position: [0, layer.innerFrameY, -depth / 2 + rim / 2],
