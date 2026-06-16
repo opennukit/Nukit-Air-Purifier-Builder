@@ -240,8 +240,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} outer short rail`,
           width,
           rim,
-          // Rear (loading-side) inner-flange flange: outer edge is open, so plain.
-          [longEdge, edgeSections("f"), edgeSections("e"), edgeSections("f")],
+          // Inner flange rear rail keeps its fingers (only the OUTER-frame rear
+          // flange is plain on the loading side).
+          [longEdge, edgeSections("f"), edgeSections("f"), edgeSections("f")],
           settings,
           filterRailAssembly(filterIndex, "outer-short"),
         ),
