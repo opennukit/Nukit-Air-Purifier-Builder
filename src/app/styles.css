@@ -1032,6 +1032,20 @@ Unit Inputs
 
 .input-shell input {
   border: 0;
+  min-width: 0;
+}
+
+/* Drop the native number spinners so the value never loses width to them (which
+   was clipping e.g. "370" to "37"). */
+.input-shell input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.input-shell input[type="number"]::-webkit-outer-spin-button,
+.input-shell input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .input-shell small {
@@ -1247,17 +1261,19 @@ Dimension Grids
   align-items: end;
   gap: 6px;
   flex: 2 1 200px;
-  min-width: 0;
+  /* Don't shrink below the two boxes + swap button, so the row wraps to the next
+     line instead of squeezing the value boxes until they crop. */
+  min-width: min-content;
 }
 
 .dimension-swap-row .field {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 64px;
 }
 
 .custom-dimensions > .field {
   flex: 1 1 92px;
-  min-width: 0;
+  min-width: 78px;
 }
 
 .filter-swap {
