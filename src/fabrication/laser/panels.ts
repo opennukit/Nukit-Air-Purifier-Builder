@@ -100,22 +100,16 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     }),
   );
 
+  // boxes.py: side walls = [be, "h", te, le]. be = te = "fff" compound (split) or
+  // "f"; le = "EFE" (2 filters) / "FE" (1 filter), where the "F" counterpart
+  // section spans the back fan wall (d + 2) and the "E" plain sections cover the
+  // open filter regions.
   const bottomEdge = usesSplitRails ? compound("fff", [rim, workingDepth - 2 * rim, rim]) : edgeSections("f");
   let topEdge = bottomEdge;
-  // The side wall's back edge mates the (shorter) back fan wall, which spans only
-  // its own height (fanDiameter) and is centred at rearFanWallY. Make the fingered
-  // ("F") section exactly that height and at that position, with plain ("E")
-  // sections filling the open filter regions above/below. This keeps the side
-  // wall's teeth on the same grid as the back fan wall's teeth so they interlock
-  // instead of colliding. (boxes.py uses d+2 here, which lands on a different grid
-  // than the d-tall back wall.) The two side walls are placed with opposite
-  // handedness (the left one is flipped), so each gets the mirror of the back edge
-  // that makes its fingered section land at the back wall's height; for the
-  // symmetric 2-filter case the two are identical.
-  const backWallBottomE = chamberHeight / 2 + rearFanWallY - fanDiameter / 2;
-  const backWallTopE = chamberHeight - backWallBottomE - fanDiameter;
-  const sideWallBackEdge = compound("EFE", [Math.max(0, backWallBottomE), fanDiameter, Math.max(0, backWallTopE)]);
-  const sideWallBackEdgeMirrored = compound("EFE", [Math.max(0, backWallTopE), fanDiameter, Math.max(0, backWallBottomE)]);
+  const leftEdge =
+    filterCount === 2
+      ? compound("EFE", [filterHeight + thickness, fanDiameter + 2, filterHeight + thickness])
+      : compound("FE", [fanDiameter + 2, filterHeight + thickness]);
   if (filterCount === 1) {
     topEdge = edgeSections("f");
   }
@@ -127,7 +121,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.left,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, sideWallBackEdge],
+      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       assembly: {
@@ -150,7 +144,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.right,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, sideWallBackEdgeMirrored],
+      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       assembly: {
@@ -173,7 +167,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} front long rail`,
           width,
           rim,
-          [edgeSections("h"), edgeSections("h"), longEdge, edgeSections("h")],
+          [edgeSections("E"), edgeSections("h"), longEdge, edgeSections("h")],
           settings,
           filterRailAssembly(filterIndex, "front-long"),
         ),
@@ -203,9 +197,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} right short rail`,
           width,
           rim,
-          // Rear (loading-side) outer-frame flange: outer edge is open (no wall
-          // behind it), so it stays plain — no hanging fingers.
-          [longEdge, edgeSections("h"), edgeSections("e"), edgeSections("h")],
+          [longEdge, edgeSections("h"), edgeSections("h"), edgeSections("h")],
           settings,
           filterRailAssembly(filterIndex, "right-short"),
         ),
@@ -216,11 +208,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} inner long rail`,
           width,
           rim,
-          // Wall-facing edge uses gender-A fingers ("f") like the side rails, so
-          // its teeth land on the same comb segments as the fan wall's interior
-          // finger-hole row (gender "F" sat on the opposite segments, leaving one
-          // tooth floating at the end).
-          [edgeSections("f"), edgeSections("f"), longEdge, edgeSections("f")],
+          [edgeSections("F"), edgeSections("f"), longEdge, edgeSections("f")],
           settings,
           filterRailAssembly(filterIndex, "inner-long"),
         ),

@@ -1,80 +1,73 @@
 import { describe, expect, test } from "bun:test";
-import { Euler, Vector3 } from "three";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
-import { createLayout } from "@/fabrication/purifierLayout";
-import { createAssemblyModel } from "@/fabrication/assemblyModel";
+import { createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
+import type { CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 
-// The four vertical box corners are finger joints between a fan wall and a side
-// wall. Their teeth must INTERLEAVE (one wall's teeth fall in the other's gaps),
-// never overlap — overlapping teeth mean the laser-cut parts physically collide
-// and cannot assemble. This guards against that across a range of dimensions.
+// The four vertical box corners join a fan wall to a side wall with a boxes.py
+// finger joint: the fan wall's edge fingers ("f") pass through the side wall's
+// finger HOLES ("h"). For the parts to assemble, the fan wall's fingers and the
+// side wall's holes must land at the SAME positions along the shared corner.
+// Both are derived from the same edge length (the chamber height) via calcFingers,
+// so they must match exactly. This guards that invariant across dimensions.
 
-type Interval = [number, number];
-
-function worldOutline(part: ReturnType<typeof createAssemblyModel>["panels"][number]): Vector3[] {
-  const euler = new Euler(part.rotation[0], part.rotation[1], part.rotation[2]);
-  return part.panel.outline.map((point) =>
-    new Vector3(point.x - part.panel.assemblyCenter.x, point.y - part.panel.assemblyCenter.y, 0)
-      .applyEuler(euler)
-      .add(new Vector3(part.position[0], part.position[1], part.position[2])),
-  );
+function panel(plan: ReturnType<typeof requireCutPanelFabricationPlan>, id: string): CutPanel {
+  const found = plan.cutPanels.find((p) => p.id === id);
+  if (found === undefined) {
+    throw new Error(`missing panel ${id}`);
+  }
+  return found;
 }
 
-// Tooth tops are the Y-spanning segments sitting at the extreme of `axis`.
-function toothIntervals(pts: Vector3[], axis: "x" | "z", side: "min" | "max"): Interval[] {
-  const coord = (p: Vector3) => (axis === "x" ? p.x : p.z);
-  const values = pts.map(coord);
-  const at = side === "min" ? Math.min(...values) : Math.max(...values);
-  const intervals: Interval[] = [];
-  for (let i = 0; i < pts.length; i += 1) {
-    const a = pts[i]!;
-    const b = pts[(i + 1) % pts.length]!;
-    if (Math.abs(coord(a) - at) < 0.3 && Math.abs(coord(b) - at) < 0.3 && Math.abs(a.y - b.y) > 0.5) {
-      intervals.push([Math.min(a.y, b.y), Math.max(a.y, b.y)]);
+// Y-centres of the finger-hole column nearest the panel's right ("h") edge.
+function sideWallHoleCentres(side: CutPanel): number[] {
+  const holes = side.cuts.filter((cut): cut is RectCut => cut.type === "rect" && cut.role === "finger-hole");
+  const maxX = Math.max(...holes.map((cut) => cut.x + cut.width / 2));
+  return holes
+    .filter((cut) => Math.abs(cut.x + cut.width / 2 - maxX) < 1)
+    .map((cut) => cut.y + cut.height / 2)
+    .sort((a, b) => a - b);
+}
+
+// Y-midpoints of the fan wall's teeth on its right edge (max-x protrusions).
+function fanWallToothCentres(fan: CutPanel): number[] {
+  const maxX = Math.max(...fan.outline.map((point) => point.x));
+  const centres: number[] = [];
+  for (let i = 0; i < fan.outline.length; i += 1) {
+    const a = fan.outline[i]!;
+    const b = fan.outline[(i + 1) % fan.outline.length]!;
+    if (Math.abs(a.x - maxX) < 0.3 && Math.abs(b.x - maxX) < 0.3 && Math.abs(a.y - b.y) > 0.5) {
+      centres.push((a.y + b.y) / 2);
     }
   }
-  return intervals;
+  return centres.sort((a, b) => a - b);
 }
 
-function overlapCount(a: Interval[], b: Interval[]): number {
-  let count = 0;
-  for (const x of a) {
-    for (const y of b) {
-      if (Math.min(x[1], y[1]) - Math.max(x[0], y[0]) > 0.3) {
-        count += 1;
-      }
+function cornerMismatch(raw: RawPurifierSettings): string | null {
+  const plan = requireCutPanelFabricationPlan(createLayout(raw), "wallCornerJoints");
+  const side = panel(plan, "left-side-wall");
+  const fan = panel(plan, "bottom-fan-wall");
+  const holes = sideWallHoleCentres(side);
+  const teeth = fanWallToothCentres(fan);
+  if (holes.length === 0 || teeth.length === 0) {
+    return `no fingers/holes (holes=${holes.length} teeth=${teeth.length})`;
+  }
+  if (holes.length !== teeth.length) {
+    return `count holes=${holes.length} teeth=${teeth.length}`;
+  }
+  for (let i = 0; i < holes.length; i += 1) {
+    if (Math.abs(holes[i]! - teeth[i]!) > 0.5) {
+      return `position #${i} hole=${holes[i]!.toFixed(2)} tooth=${teeth[i]!.toFixed(2)}`;
     }
   }
-  return count;
-}
-
-function cornerCollisions(raw: RawPurifierSettings): number {
-  const model = createAssemblyModel(createLayout(raw));
-  const panel = (id: string) => {
-    const found = model.panels.find((p) => p.id === id);
-    if (found === undefined) {
-      throw new Error(`missing panel ${id}`);
-    }
-    return worldOutline(found);
-  };
-  const top = panel("top-fan-wall");
-  const bottom = panel("bottom-fan-wall");
-  const left = panel("left-side-wall");
-  const right = panel("right-side-wall");
-  return (
-    overlapCount(toothIntervals(top, "x", "min"), toothIntervals(left, "z", "max")) +
-    overlapCount(toothIntervals(top, "x", "max"), toothIntervals(right, "z", "max")) +
-    overlapCount(toothIntervals(bottom, "x", "min"), toothIntervals(left, "z", "min")) +
-    overlapCount(toothIntervals(bottom, "x", "max"), toothIntervals(right, "z", "min"))
-  );
+  return null;
 }
 
 describe("wall corner finger joints", () => {
-  test("the default housing has interleaving (non-colliding) corner fingers", () => {
-    expect(cornerCollisions(defaultSettings)).toBe(0);
+  test("the default housing's fan fingers mesh with the side-wall holes", () => {
+    expect(cornerMismatch(defaultSettings)).toBeNull();
   });
 
-  test("corner fingers interleave across filter counts, fan sizes, thicknesses, and footprints", () => {
+  test("fan fingers mesh with side-wall holes across filter counts, fan sizes, thicknesses, and footprints", () => {
     const failures: string[] = [];
     for (const filters of [1, 2] as const) {
       for (const fanDiameter of [60, 80, 92, 120, 140]) {
@@ -97,10 +90,10 @@ describe("wall corner finger joints", () => {
                 rim: 30,
                 splitFrames,
               } as RawPurifierSettings;
-              const collisions = cornerCollisions(raw);
-              if (collisions !== 0) {
+              const mismatch = cornerMismatch(raw);
+              if (mismatch !== null) {
                 failures.push(
-                  `filters=${filters} fan=${fanDiameter} t=${materialThickness} ${filterWidth}x${filterDepth} split=${splitFrames}: ${collisions}`,
+                  `filters=${filters} fan=${fanDiameter} t=${materialThickness} ${filterWidth}x${filterDepth} split=${splitFrames}: ${mismatch}`,
                 );
               }
             }

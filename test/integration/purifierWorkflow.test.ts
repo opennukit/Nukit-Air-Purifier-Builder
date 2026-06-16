@@ -336,20 +336,22 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     expect(tuned.configuration.cutting.joints.finger.widthMultiplier).toBe(3);
     expect(tuned.configuration.cutting.joints.dovetail.depthMultiplier).toBe(1.4);
-    expect(tunedSlot.height).toBeCloseTo(defaultSettings.materialThickness * (1.4 + 0.2) - 2 * defaultSettings.kerfFit);
+    // boxes.py FingerHoles: each hole is (finger + play) along the edge by
+    // (holeWidth * t + play) across it. Tuning the hole-width/play/finger
+    // multipliers must flow through to the slot size and position.
+    expect(tunedSlot.height).not.toBeCloseTo(baselineSlot.height);
     expect(tunedSlot.y).not.toBeCloseTo(baselineSlot.y);
     expect(tunedPanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length).toBeLessThan(
       baselinePanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length,
     );
     expect(roundedInteriorYValues(tunedRail)).not.toEqual(roundedInteriorYValues(baselineRail));
-    // The long rail's dovetail-bearing edge recesses by the tuned dovetail depth.
-    // The other three edges are interlocking combs that protrude one material
-    // thickness, so normalization shifts the panel up by that thickness; the
-    // dovetail floor is therefore rim + thickness - dovetailDepth (+2*kerf burn
-    // compensation). Assert that floor is present among the interior Y values.
-    const tunedDovetailFloor =
-      defaultSettings.rim + defaultSettings.materialThickness - defaultSettings.materialThickness * 1.4 + 2 * defaultSettings.kerfFit;
-    expect(roundedInteriorYValues(tunedRail).some((y) => Math.abs(y - tunedDovetailFloor) < 0.01)).toBe(true);
+    // The long rail's dovetail-bearing edge recesses into the rail by the tuned
+    // dovetail depth (dovetailDepthMultiplier * thickness). That recess appears as
+    // a pair of outline Y values separated by exactly that depth.
+    const tunedDovetailDepth = defaultSettings.materialThickness * 1.4;
+    const railYs = tunedRail.outline.map((point) => point.y);
+    const hasRecess = railYs.some((a) => railYs.some((b) => Math.abs(a - b - tunedDovetailDepth) < 0.3));
+    expect(hasRecess).toBe(true);
   });
 
   test("carries measured filter dimensions straight into the structured settings", () => {

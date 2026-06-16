@@ -142,10 +142,14 @@ export function edgeSections(pattern: string, lengths?: readonly number[]): Edge
 export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   const kerfFit = input.kerfFit ?? 0;
   const outline = offsetOutlineOutward(buildRectangularOutline(input), kerfFit);
-  // Finger ("f"), counterpart ("F") and finger-hole ("h") edges are all drawn as
-  // interlocking combs on the outline itself, so no separate edge slot rows are
-  // needed. Interior finger-hole rows (filter joints) are passed in via `cuts`.
-  const cuts = [...(input.cuts ?? [])];
+  const jointSettings = input.jointSettings ?? defaultCutJointSettings;
+  // "finger-holes" ("h") edges are drawn as a plain straight edge; the holes the
+  // mating fingers pass through are rectangular cuts added here (boxes.py
+  // FingerHoleEdge), set in from the edge by edge_width + thickness/2.
+  const cuts = [
+    ...(input.cuts ?? []),
+    ...createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings),
+  ];
   return normalizePanel({
     id: input.id,
     name: input.name,
@@ -254,10 +258,11 @@ export function cutPanelsToDocument(
 // Finger Hole Cuts
 // #######################################
 
-// Interior finger-hole slots that a mating wall's fingers pass through. They
-// must line up with the mating comb's TEETH. A finger ("f") edge is gender A,
-// which carries teeth on the odd segments of the equal-width comb, so the slots
-// sit on those same odd segments and share the comb's segment width.
+// Faithful port of boxes.py FingerHoles.__call__: rectangular holes a mating
+// "f" edge's fingers pass through. One hole per finger, at the same leftover-
+// centred positions (leftover/2 + i*(space+finger)), sized finger x thickness
+// (plus play). (x, y) is the start of the hole row; angle 90 runs the row along
+// +y, angle 0 along +x.
 export function fingerHoleCutsAt(
   x: number,
   y: number,
@@ -267,41 +272,70 @@ export function fingerHoleCutsAt(
   kerfFit = 0,
   jointSettings: CutJointSettings = defaultCutJointSettings,
 ): RectCut[] {
-  const { segments, segmentWidth } = fingerCombSegments(length, thickness, jointSettings.finger);
+  const settings = jointSettings.finger;
+  const { fingers, leftover } = calcFingers(length, thickness, settings);
+  const space = settings.spaceMultiplier * thickness;
+  const finger = settings.widthMultiplier * thickness;
+  const play = settings.playMultiplier * thickness;
+  const alongHole = finger + play; // hole size along the edge
+  const acrossHole = settings.holeWidthMultiplier * thickness + play; // perpendicular depth
   const cuts: RectCut[] = [];
-  const holeThickness = thickness * (jointSettings.finger.holeWidthMultiplier + jointSettings.finger.playMultiplier);
-  for (let index = 1; index < segments; index += 2) {
-    const position = index * segmentWidth;
+  for (let index = 0; index < fingers; index += 1) {
+    const center = leftover / 2 + index * (space + finger) + finger / 2;
     if (angle === 90) {
       cuts.push(
         shrinkRectCut(
-          {
-            type: "rect",
-            x: x - holeThickness / 2,
-            y: y + position,
-            width: holeThickness,
-            height: segmentWidth,
-            radius: 0,
-            role: "finger-hole",
-          },
+          { type: "rect", x: x - acrossHole / 2, y: y + center - alongHole / 2, width: acrossHole, height: alongHole, radius: 0, role: "finger-hole" },
           kerfFit,
         ),
       );
     } else {
       cuts.push(
         shrinkRectCut(
-          {
-            type: "rect",
-            x: x + position,
-            y: y - holeThickness / 2,
-            width: segmentWidth,
-            height: holeThickness,
-            radius: 0,
-            role: "finger-hole",
-          },
+          { type: "rect", x: x + center - alongHole / 2, y: y - acrossHole / 2, width: alongHole, height: acrossHole, radius: 0, role: "finger-hole" },
           kerfFit,
         ),
       );
+    }
+  }
+  return cuts;
+}
+
+// boxes.py FingerHoleEdge: for every "finger-holes" ("h") section on an edge,
+// cut the rectangular holes the mating "f" fingers pass through, set in from the
+// edge by edge_width + thickness/2. Holes run along that edge section so they
+// line up with the perpendicular wall's fingers over the same length.
+function createFingerHoleCutsForEdges(
+  width: number,
+  height: number,
+  edges: RectangularPanelInput["edges"],
+  thickness: number,
+  kerfFit: number,
+  jointSettings: CutJointSettings,
+): CutFeature[] {
+  const cuts: CutFeature[] = [];
+  const offset = (jointSettings.finger.holeOffsetMultiplier + 0.5) * thickness;
+  const edgeLengths = [width, height, width, height];
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
+    const sections = edges[edgeIndex];
+    const totalSpecified = sections.reduce((sum, section) => sum + section.length, 0);
+    const normalized =
+      totalSpecified > 0 ? sections : sections.map((section) => ({ ...section, length: edgeLengths[edgeIndex] }));
+    let cursor = 0;
+    for (const section of normalized) {
+      const length = section.length;
+      if (section.kind === "finger-holes") {
+        if (edgeIndex === 0) {
+          cuts.push(...fingerHoleCutsAt(cursor, offset, length, 0, thickness, kerfFit, jointSettings));
+        } else if (edgeIndex === 1) {
+          cuts.push(...fingerHoleCutsAt(width - offset, cursor, length, 90, thickness, kerfFit, jointSettings));
+        } else if (edgeIndex === 2) {
+          cuts.push(...fingerHoleCutsAt(width - cursor - length, height - offset, length, 0, thickness, kerfFit, jointSettings));
+        } else {
+          cuts.push(...fingerHoleCutsAt(offset, height - cursor - length, length, 90, thickness, kerfFit, jointSettings));
+        }
+      }
+      cursor += length;
     }
   }
   return cuts;
@@ -348,14 +382,21 @@ function appendEdgeSection(
   jointSettings: CutJointSettings,
 ): void {
   if (kind === "finger") {
-    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, "A");
+    // boxes.py FingerJointEdge "f": fingers protrude outward.
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, true);
     return;
   }
-  if (kind === "finger-counter" || kind === "finger-holes") {
-    // The counterpart ("F") and the finger-hole edge ("h") are both the mating
-    // gender (B) of a finger ("f", gender A): they interlock as a comb rather
-    // than receiving a separate row of slots.
-    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, "B");
+  if (kind === "finger-counter") {
+    // boxes.py FingerJointEdgeCounterPart "F": the same fingers cut INWARD, with
+    // play added, so an "f" finger seats into this "F" notch.
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, false);
+    return;
+  }
+  if (kind === "finger-holes") {
+    // boxes.py FingerHoleEdge "h": a plain straight edge; the mating "f" fingers
+    // pass through rectangular holes cut into the panel face (added in
+    // createFingerHoleCutsForEdges), which is what removes material at the joint.
+    appendLine(points, moveBy(lastPoint(points), direction.axis, length));
     return;
   }
   if (kind === "dovetail") {
@@ -369,34 +410,48 @@ function appendEdgeSection(
   appendLine(points, moveBy(lastPoint(points), direction.axis, length));
 }
 
-type FingerGender = "A" | "B";
-
-// Emit a finger comb along the edge. The comb is an odd number of equal-width
-// segments; gender A carries a tooth on the odd segments, gender B on the even
-// segments, so an "f" (A) edge and an "F"/"h" (B) edge are exact complements
-// that interlock. Teeth always protrude OUTWARD (the gender only chooses which
-// segments carry one) — matching florianfesti/boxes and tempest-builder.html.
+// Faithful port of boxes.py FingerJointEdge.__call__ (florianfesti/boxes).
+// `positive` true = the "f" edge (fingers protrude outward); false = the "F"
+// counterpart (the same fingers cut inward, with play). The edge runs:
+//   leftover/2, [finger, space, finger, space, ..., finger], leftover/2
+// with fingers protruding (or recessed) by one material thickness.
 function appendFingerProfile(
   points: CutPoint[],
   length: number,
   direction: EdgeDirection,
   thickness: number,
   settings: FingerJointSettings,
-  gender: FingerGender,
+  positive: boolean,
 ): void {
-  const { segments, segmentWidth } = fingerCombSegments(length, thickness, settings);
-  const depth = thickness;
-  const toothOnOdd = gender === "A";
-  for (let index = 0; index < segments; index += 1) {
-    const hasTooth = (index % 2 === 1) === toothOnOdd;
-    if (hasTooth) {
-      appendStep(points, direction.outward, depth);
-      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
-      appendStep(points, direction.outward, -depth);
-    } else {
-      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
-    }
+  let { fingers, leftover } = calcFingers(length, thickness, settings);
+  let space = settings.spaceMultiplier * thickness;
+  let finger = settings.widthMultiplier * thickness;
+  const play = settings.playMultiplier * thickness;
+  const depth = thickness; // finger length at a 90deg corner (extra_length = 0)
+
+  // boxes.py: too small for normal fingers -> one centred rectangular finger.
+  if (fingers === 0 && finger > 0 && leftover > 0.75 * thickness && leftover > 4 * play) {
+    fingers = 1;
+    finger = leftover = leftover / 2;
   }
+  // boxes.py: the counterpart grows the finger / shrinks the space by the play.
+  if (!positive) {
+    finger += play;
+    space -= play;
+    leftover -= play;
+  }
+  const step = positive ? depth : -depth;
+
+  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
+  for (let index = 0; index < fingers; index += 1) {
+    if (index !== 0) {
+      appendLine(points, moveBy(lastPoint(points), direction.axis, space));
+    }
+    appendStep(points, direction.outward, step);
+    appendLine(points, moveBy(lastPoint(points), direction.axis, finger));
+    appendStep(points, direction.outward, -step);
+  }
+  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
 }
 
 function appendDovetailProfile(
@@ -514,25 +569,29 @@ function normalizePanel(panel: CutPanelDraft): CutPanelDraft {
 // Joint Geometry Helpers
 // #######################################
 
-// Split an edge into an ODD number of equal-width comb segments. An odd count
-// guarantees both ends are the same kind of segment, which is what makes the two
-// genders exact complements (see appendFingerProfile). The target segment width
-// is the average of the finger and space multipliers so both controls still
-// affect tooth density (defaults: (2 + 2) / 2 = 2 -> ~2 x thickness, as upstream).
-function fingerCombSegments(
+// Faithful port of boxes.py FingerJointBase.calcFingers: how many fingers fit on
+// an edge of the given length, and the leftover space split evenly at both ends.
+// Uses fixed finger/space widths (multiples of thickness) with surroundingspaces
+// = 2, so an edge of length L1 and a matching hole row of the same length always
+// land on the same positions — which is what makes the joints actually mesh.
+function calcFingers(
   length: number,
   thickness: number,
   settings: FingerJointSettings,
-): { segments: number; segmentWidth: number } {
-  const pitch = ((settings.widthMultiplier + settings.spaceMultiplier) / 2) * thickness;
-  let segments = pitch > 0 ? Math.round(length / pitch) : 3;
-  if (segments < 3) {
-    segments = 3;
+): { fingers: number; leftover: number } {
+  const space = settings.spaceMultiplier * thickness;
+  const finger = settings.widthMultiplier * thickness;
+  const surroundingSpaces = 2;
+  let fingers = finger > 0 ? Math.floor((length - (surroundingSpaces - 1) * space) / (space + finger)) : 0;
+  if (fingers === 0 && finger > 0 && length > finger + thickness) {
+    fingers = 1;
   }
-  if (segments % 2 === 0) {
-    segments += 1;
+  let leftover = length - fingers * (space + finger) + space;
+  if (fingers <= 0) {
+    fingers = 0;
+    leftover = length;
   }
-  return { segments, segmentWidth: length / segments };
+  return { fingers, leftover };
 }
 
 function shrinkRectCut(cut: RectCut, kerfFit: number): RectCut {
