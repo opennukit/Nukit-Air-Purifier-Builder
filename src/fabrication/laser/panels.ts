@@ -124,8 +124,10 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "left-side-wall",
         placement: {
+          // Flipped top-to-bottom (180 deg about its own normal axis) while still
+          // facing outward, so the left wall is no longer upside down.
           position: [-width / 2, 0, 0],
-          rotation: [0, -Math.PI / 2, 0],
+          rotation: [Math.PI, -Math.PI / 2, 0],
         },
       },
     }),
