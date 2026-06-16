@@ -123,7 +123,7 @@ export function createPanelGroup(
 ): Group {
   const panel = part.panel;
   const group = new Group();
-  const geometry = createPanelGeometry(panel, materialThickness);
+  const geometry = createPanelGeometry(panel, materialThickness, exploded);
   const mesh = new Mesh(geometry, material);
   mesh.name = panel.id;
   mesh.castShadow = true;
@@ -163,26 +163,38 @@ export function createPanelGroup(
   return group;
 }
 
-function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
+function createPanelGeometry(panel: CutPanel, materialThickness: number, exploded: boolean): ExtrudeGeometry {
   const shape = new Shape();
-  // The assembled enclosure preview shows solid rectangular walls so the laser
-  // model reads like the 3D-print and assembled-box views (and the reference's
-  // assembled model). The interlocking finger teeth are part of the 2D cut sheet
-  // only, so the 3D walls use the panel's nominal rectangle rather than the
-  // toothed outline.
-  const halfWidth = (panel.nominalWidth / 2) * sceneScale;
-  const halfHeight = (panel.nominalHeight / 2) * sceneScale;
-  shape.moveTo(-halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, halfHeight);
-  shape.lineTo(-halfWidth, halfHeight);
-  shape.closePath();
+  if (exploded) {
+    // Exploded view shows how the parts join: extrude the real toothed cut
+    // outline (finger combs + dovetails) so the joinery is visible.
+    panel.outline.forEach((point, index) => {
+      const x = (point.x - panel.assemblyCenter.x) * sceneScale;
+      const y = (point.y - panel.assemblyCenter.y) * sceneScale;
+      if (index === 0) {
+        shape.moveTo(x, y);
+      } else {
+        shape.lineTo(x, y);
+      }
+    });
+    shape.closePath();
+  } else {
+    // Assembled view shows solid rectangular walls so the laser model reads like
+    // the 3D-print and assembled-box views (and the reference's assembled model).
+    // The interlocking finger teeth live only in the 2D cut sheet here.
+    const halfWidth = (panel.nominalWidth / 2) * sceneScale;
+    const halfHeight = (panel.nominalHeight / 2) * sceneScale;
+    shape.moveTo(-halfWidth, -halfHeight);
+    shape.lineTo(halfWidth, -halfHeight);
+    shape.lineTo(halfWidth, halfHeight);
+    shape.lineTo(-halfWidth, halfHeight);
+    shape.closePath();
+  }
 
   for (const cut of panel.cuts) {
-    // Finger-hole and slot rectangles are joinery for the flat parts; they would
-    // clutter the assembled walls, so only fan/screw openings and filter windows
-    // are punched into the 3D preview.
-    if (cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
+    // Finger-hole and slot joinery only belongs on the exploded view (and the
+    // cut sheet); the assembled walls keep just the fan/window/screw openings.
+    if (!exploded && cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
       continue;
     }
     const hole = createHolePath(cut, panel);

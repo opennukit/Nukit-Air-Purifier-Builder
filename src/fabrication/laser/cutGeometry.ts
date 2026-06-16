@@ -407,28 +407,36 @@ function appendDovetailProfile(
   settings: DovetailJointSettings,
   polarity: 1 | -1,
 ): void {
-  const size = settings.sizeMultiplier * thickness;
-  const gap = size;
-  const depth = settings.depthMultiplier * thickness;
-  const sections = Math.floor(length / (size + gap));
-  if (sections === 0) {
-    appendLine(points, moveBy(lastPoint(points), direction.axis, length));
-    return;
-  }
-
-  const shoulder = size * dovetailShoulderFraction(settings.taper);
-  const middle = Math.max(size * 0.1, size - 2 * shoulder);
-  const leftover = length - sections * (size + gap) + gap;
-  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
-  for (let index = 0; index < sections; index += 1) {
-    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, shoulder), direction.outward, depth * polarity));
-    appendLine(points, moveBy(lastPoint(points), direction.axis, middle));
-    appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, shoulder), direction.outward, -depth * polarity));
-    if (index < sections - 1) {
-      appendLine(points, moveBy(lastPoint(points), direction.axis, gap));
+  // Reference-faithful dovetail comb (florianfesti/boxes, tempest-builder): an
+  // odd number of equal segments with a trapezoidal tooth on every odd segment.
+  // The male tail (polarity +1) protrudes and flares WIDER at the tip; the
+  // female socket (polarity -1) recesses and flares wider at its floor, so a
+  // tail locks into a socket. Odd segment count keeps both ends flat.
+  const segments = dovetailSegments(length, thickness, settings);
+  const segmentWidth = length / segments;
+  const depth = settings.depthMultiplier * thickness * polarity;
+  const flare = Math.min(segmentWidth * 0.3 * (settings.taper / 50), Math.abs(depth) * 0.6);
+  for (let index = 0; index < segments; index += 1) {
+    if (index % 2 === 1) {
+      appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, -flare), direction.outward, depth));
+      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth + 2 * flare));
+      appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, -flare), direction.outward, -depth));
+    } else {
+      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
     }
   }
-  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
+}
+
+function dovetailSegments(length: number, thickness: number, settings: DovetailJointSettings): number {
+  const toothPitch = settings.sizeMultiplier * thickness;
+  let segments = toothPitch > 0 ? Math.round(length / toothPitch) : 3;
+  if (segments < 3) {
+    segments = 3;
+  }
+  if (segments % 2 === 0) {
+    segments += 1;
+  }
+  return segments;
 }
 
 // #######################################
@@ -525,17 +533,6 @@ function fingerCombSegments(
     segments += 1;
   }
   return { segments, segmentWidth: length / segments };
-}
-
-function dovetailShoulderFraction(taper: number): number {
-  return 0.05 + (clampNumber(taper, 0, 80) / 80) * 0.208;
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, value));
 }
 
 function shrinkRectCut(cut: RectCut, kerfFit: number): RectCut {
