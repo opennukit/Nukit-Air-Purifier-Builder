@@ -424,7 +424,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(assembly.dimensions.every((dimension) => dimension.labelOffset.length === 3)).toBe(true);
     expect(frontRailPanel.assembly).toEqual({ type: "filter-rail", filterIndex: 0, railKey: "front-long" });
     expect(frontRail?.position[1]).toBeCloseTo(lowerOuterFrameY);
-    expect(frontRail?.position[2]).toBeCloseTo(-layout.summary.workingDepth / 2 + defaultSettings.rim / 2);
+    // front-long and right-short rails are seated on swapped faces, so the
+    // front-long rail sits on the rear edge (+workingDepth/2).
+    expect(frontRail?.position[2]).toBeCloseTo(layout.summary.workingDepth / 2 - defaultSettings.rim / 2);
     expect(frontRail?.rotation).toEqual([Math.PI / 2, 0, 0]);
     expect(innerRail?.position[1]).toBeCloseTo(lowerInnerFrameY);
     expect(innerRail?.position[2]).toBeCloseTo(-layout.summary.workingDepth / 2 + defaultSettings.rim / 2);

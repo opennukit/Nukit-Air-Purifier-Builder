@@ -140,8 +140,10 @@ type FilterRailPlacementInput = {
 };
 
 const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInput) => AssemblyPlacement> = {
+  // front-long and right-short swap faces: the front-long rail seats on the rear
+  // edge (where the right-short rail used to sit) and vice versa.
   "front-long": ({ layer, depth, rim }) => ({
-    position: [0, layer.outerFrameY, -depth / 2 + rim / 2],
+    position: [0, layer.outerFrameY, depth / 2 - rim / 2],
     rotation: [Math.PI / 2, 0, 0],
   }),
   "rear-long": ({ layer, width, rim }) => ({
@@ -155,7 +157,7 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
     rotation: [Math.PI / 2, 0, Math.PI / 2],
   }),
   "right-short": ({ layer, depth, rim }) => ({
-    position: [0, layer.outerFrameY, depth / 2 - rim / 2],
+    position: [0, layer.outerFrameY, -depth / 2 + rim / 2],
     rotation: [Math.PI / 2, 0, 0],
   }),
   "inner-long": ({ layer, depth, rim }) => ({
