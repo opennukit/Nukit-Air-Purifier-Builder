@@ -193,7 +193,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} right short rail`,
           width,
           rim,
-          [longEdge, edgeSections("h"), edgeSections("h"), edgeSections("h")],
+          // Rear (loading-side) outer-frame flange: outer edge is open (no wall
+          // behind it), so it stays plain — no hanging fingers.
+          [longEdge, edgeSections("h"), edgeSections("e"), edgeSections("h")],
           settings,
           filterRailAssembly(filterIndex, "right-short"),
         ),
@@ -238,7 +240,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} outer short rail`,
           width,
           rim,
-          [longEdge, edgeSections("f"), edgeSections("f"), edgeSections("f")],
+          // Rear (loading-side) inner-flange flange: outer edge is open, so plain.
+          [longEdge, edgeSections("f"), edgeSections("e"), edgeSections("f")],
           settings,
           filterRailAssembly(filterIndex, "outer-short"),
         ),
