@@ -206,7 +206,11 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           `${labelPrefix} inner long rail`,
           width,
           rim,
-          [edgeSections("F"), edgeSections("f"), longEdge, edgeSections("f")],
+          // Wall-facing edge uses gender-A fingers ("f") like the side rails, so
+          // its teeth land on the same comb segments as the fan wall's interior
+          // finger-hole row (gender "F" sat on the opposite segments, leaving one
+          // tooth floating at the end).
+          [edgeSections("f"), edgeSections("f"), longEdge, edgeSections("f")],
           settings,
           filterRailAssembly(filterIndex, "inner-long"),
         ),
