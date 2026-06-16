@@ -58,7 +58,16 @@ describe("Air purifier cut-sheet equivalence", () => {
       "right-side-wall",
       "top-fan-wall",
     ]);
-    expect(cutPanels(layout).every((panel) => panel.outline.length > 4)).toBe(true);
+    // Every panel carries real joinery: either interlocking teeth on its outline
+    // (>4 vertices) or finger holes / dovetail sockets as inner cuts. A short rail
+    // edge whose dovetail does not fit (boxes.py sections == 0) becomes a plain
+    // edge and joins via its finger holes instead.
+    expect(
+      cutPanels(layout).every(
+        (panel) =>
+          panel.outline.length > 4 || panel.cuts.some((cut) => cut.type === "rect" && cut.role === "finger-hole"),
+      ),
+    ).toBe(true);
   });
 
   test("matches upstream AirPurifier layout direction and burn-corrected inner cuts", () => {

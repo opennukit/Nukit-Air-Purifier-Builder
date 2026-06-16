@@ -399,7 +399,16 @@ describe("FilterBoxBuilder purifier workflow", () => {
       "right-side-wall",
     ]);
     expect(assembly.filterRails).toHaveLength(16);
-    expect(assembly.filterRails.every((part) => part.role === "filter-rail" && part.panel.outline.length > 4)).toBe(true);
+    // Each rail carries joinery as outline teeth or as finger holes; a 30 mm rail
+    // edge can't fit a boxes.py dovetail (size*2 > length), so it falls back to a
+    // plain edge that joins via its finger holes.
+    expect(
+      assembly.filterRails.every(
+        (part) =>
+          part.role === "filter-rail" &&
+          (part.panel.outline.length > 4 || part.panel.cuts.some((cut) => cut.type === "rect" && cut.role === "finger-hole")),
+      ),
+    ).toBe(true);
     expect(assembly.filterFrames).toHaveLength(8);
     expect(assembly.filterMedia).toHaveLength(2);
     expect(assembly.seams).toHaveLength(12);

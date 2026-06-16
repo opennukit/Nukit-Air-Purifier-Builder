@@ -454,6 +454,14 @@ function appendFingerProfile(
   appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
 }
 
+// Faithful port of boxes.py DoveTailJoint.__call__ (florianfesti/boxes). The
+// path is turtle graphics: edge(d) goes forward d; corner(deg, r) rounds the
+// turn with radius r. We run it in a local (u = along axis, v = outward) frame
+// using boxes.py's exact math, then map each vertex through the edge basis so
+// the handedness of our outline is absorbed automatically. polarity +1 = "d"
+// (tails stick out), -1 = "D" counterpart (sockets cut in). radius is boxes.py's
+// DoveTailSettings default (0.2 * thickness); kerf is applied to the whole
+// outline separately, mirroring boxes.py's burn offset.
 function appendDovetailProfile(
   points: CutPoint[],
   length: number,
@@ -462,36 +470,75 @@ function appendDovetailProfile(
   settings: DovetailJointSettings,
   polarity: 1 | -1,
 ): void {
-  // Reference-faithful dovetail comb (florianfesti/boxes, tempest-builder): an
-  // odd number of equal segments with a trapezoidal tooth on every odd segment.
-  // The male tail (polarity +1) protrudes and flares WIDER at the tip; the
-  // female socket (polarity -1) recesses and flares wider at its floor, so a
-  // tail locks into a socket. Odd segment count keeps both ends flat.
-  const segments = dovetailSegments(length, thickness, settings);
-  const segmentWidth = length / segments;
-  const depth = settings.depthMultiplier * thickness * polarity;
-  const flare = Math.min(segmentWidth * 0.3 * (settings.taper / 50), Math.abs(depth) * 0.6);
-  for (let index = 0; index < segments; index += 1) {
-    if (index % 2 === 1) {
-      appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, -flare), direction.outward, depth));
-      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth + 2 * flare));
-      appendLine(points, moveBy(moveBy(lastPoint(points), direction.axis, -flare), direction.outward, -depth));
-    } else {
-      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
+  const size = settings.sizeMultiplier * thickness;
+  const depth = settings.depthMultiplier * thickness;
+  const radius = Math.max(0.2 * thickness, 1e-4);
+  const angle = settings.taper;
+  const a = angle + 90;
+  const alpha = Math.PI / 2 - (Math.PI * angle) / 180;
+  const l1 = radius / Math.tan(alpha / 2);
+  const diffx = (0.5 * depth) / Math.tan(alpha);
+  const l2 = (0.5 * depth) / Math.sin(alpha);
+  const sections = Math.floor(length / (size * 2));
+  const leftover = length - sections * size * 2;
+
+  const start = lastPoint(points);
+  if (sections === 0) {
+    appendLine(points, moveBy(start, direction.axis, length));
+    return;
+  }
+
+  const p = polarity === 1 ? 1 : -1;
+  let u = 0;
+  let v = 0;
+  let phi = 0; // heading in the local frame; 0 = along the edge axis
+  const emit = (): void => {
+    // Our (axis, outward) basis is left-handed (outward is 90deg CW of axis),
+    // while boxes.py's turtle math is right-handed (outward 90deg CCW). Map the
+    // local outward coordinate through -outward so a positive "d" tail protrudes
+    // OUT of the part and the "D" counterpart recesses IN, as boxes.py intends.
+    points.push({
+      x: start.x + u * direction.axis.x - v * direction.outward.x,
+      y: start.y + u * direction.axis.y - v * direction.outward.y,
+    });
+  };
+  const edge = (distance: number): void => {
+    u += distance * Math.cos(phi);
+    v += distance * Math.sin(phi);
+    emit();
+  };
+  const corner = (degrees: number, r: number): void => {
+    const rad = (degrees * Math.PI) / 180;
+    if (r > 1e-9 && Math.abs(rad) > 1e-9) {
+      const side = Math.sign(rad);
+      const cx = u + r * Math.cos(phi + (side * Math.PI) / 2);
+      const cy = v + r * Math.sin(phi + (side * Math.PI) / 2);
+      const a0 = Math.atan2(v - cy, u - cx);
+      const steps = Math.max(2, Math.ceil(Math.abs(rad) / (Math.PI / 16)));
+      for (let k = 1; k <= steps; k += 1) {
+        const ang = a0 + rad * (k / steps);
+        u = cx + r * Math.cos(ang);
+        v = cy + r * Math.sin(ang);
+        emit();
+      }
+    }
+    phi += rad;
+  };
+
+  edge((size + leftover) / 2 + diffx - l1);
+  for (let i = 0; i < sections; i += 1) {
+    corner(-p * a, radius);
+    edge(2 * (l2 - l1));
+    corner(p * a, radius);
+    edge(2 * (diffx - l1) + size);
+    corner(p * a, radius);
+    edge(2 * (l2 - l1));
+    corner(-p * a, radius);
+    if (i < sections - 1) {
+      edge(2 * (diffx - l1) + size);
     }
   }
-}
-
-function dovetailSegments(length: number, thickness: number, settings: DovetailJointSettings): number {
-  const toothPitch = settings.sizeMultiplier * thickness;
-  let segments = toothPitch > 0 ? Math.round(length / toothPitch) : 3;
-  if (segments < 3) {
-    segments = 3;
-  }
-  if (segments % 2 === 0) {
-    segments += 1;
-  }
-  return segments;
+  edge((size + leftover) / 2 + diffx - l1);
 }
 
 // #######################################

@@ -43,8 +43,9 @@ export const defaultCutJointSettings: CutJointSettings = {
     holeOffsetMultiplier: 1.5,
   },
   dovetail: {
-    sizeMultiplier: 2,
-    depthMultiplier: 1,
+    // boxes.py DoveTailSettings defaults (multiples of thickness; taper = angle).
+    sizeMultiplier: 3,
+    depthMultiplier: 1.5,
     taper: 50,
   },
 };
