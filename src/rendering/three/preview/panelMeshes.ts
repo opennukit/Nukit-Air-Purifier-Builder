@@ -165,31 +165,24 @@ export function createPanelGroup(
 
 function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
   const shape = new Shape();
-  // The assembled enclosure renders each wall as its clean nominal footprint, not
-  // the toothed cut outline. boxes.py's corner joints are lap/finger-into-hole
-  // joints: a wall's fingers protrude into the mating wall's holes, so the parts
-  // interlock with no body overlap. A flat-panel preview placed at nominal corner
-  // positions can't fold those laps, so extruding the real teeth makes
-  // perpendicular walls appear to collide. The true joinery lives on the flat cut
-  // sheet (which matches boxes.py); here we draw clean butted walls. Fan walls are
-  // inset one thickness in width so they seat between the side walls' inner faces.
-  const role = panel.assembly?.type === "placed" ? panel.assembly.role : undefined;
-  const widthInset = role === "front-fan-wall" || role === "rear-fan-wall" || role === "closed-back" ? materialThickness : 0;
-  const halfWidth = ((panel.nominalWidth - widthInset) / 2) * sceneScale;
-  const halfHeight = (panel.nominalHeight / 2) * sceneScale;
-  shape.moveTo(-halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, halfHeight);
-  shape.lineTo(-halfWidth, halfHeight);
+  // Extrude the real toothed cut outline (finger combs + dovetail tails/sockets)
+  // so the joinery is visible in both the assembled and exploded 3D views. The
+  // cut geometry matches boxes.py, so the fingers interlock with their mating
+  // holes/notches. At nominal corner positions perpendicular walls' teeth still
+  // overlap visually (a flat-panel preview can't fold the lap), but the flat cut
+  // parts themselves mesh.
+  panel.outline.forEach((point, index) => {
+    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
+    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
+    if (index === 0) {
+      shape.moveTo(x, y);
+    } else {
+      shape.lineTo(x, y);
+    }
+  });
   shape.closePath();
 
   for (const cut of panel.cuts) {
-    // Joinery cuts (finger holes / slots) belong to the lap joints that the clean
-    // preview doesn't model, so they'd just punch spurious slots through the
-    // walls. Keep only functional openings (fans, windows, vents, cord pass).
-    if (cut.role === "finger-hole") {
-      continue;
-    }
     const hole = createHolePath(cut, panel);
     if (hole !== null) {
       shape.holes.push(hole);
