@@ -11,7 +11,6 @@ import {
   Mesh,
   Path,
   Shape,
-  ShapeGeometry,
   Vector3,
 } from "three";
 import type { FanAppearance } from "@/domain/purifier/fans";
@@ -120,7 +119,6 @@ export function createPanelGroup(
   exploded: boolean,
   material: Material,
   edgeMaterial: Material,
-  cutMarkMaterial: Material,
   screwMarkMaterial: Material,
 ): Group {
   const panel = part.panel;
@@ -135,7 +133,7 @@ export function createPanelGroup(
   const edges = createPreviewEdges(geometry, edgeMaterial);
   group.add(edges);
 
-  group.add(createPanelCutMarkGroup(panel, materialThickness, cutMarkMaterial, screwMarkMaterial));
+  group.add(createPanelCutMarkGroup(panel, materialThickness, screwMarkMaterial));
 
   if (showFans) {
     const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
@@ -167,18 +165,26 @@ export function createPanelGroup(
 
 function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
   const shape = new Shape();
-  panel.outline.forEach((point, index) => {
-    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
-    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
-    if (index === 0) {
-      shape.moveTo(x, y);
-    } else {
-      shape.lineTo(x, y);
-    }
-  });
+  // The assembled enclosure preview shows solid rectangular walls so the laser
+  // model reads like the 3D-print and assembled-box views (and the reference's
+  // assembled model). The interlocking finger teeth are part of the 2D cut sheet
+  // only, so the 3D walls use the panel's nominal rectangle rather than the
+  // toothed outline.
+  const halfWidth = (panel.nominalWidth / 2) * sceneScale;
+  const halfHeight = (panel.nominalHeight / 2) * sceneScale;
+  shape.moveTo(-halfWidth, -halfHeight);
+  shape.lineTo(halfWidth, -halfHeight);
+  shape.lineTo(halfWidth, halfHeight);
+  shape.lineTo(-halfWidth, halfHeight);
   shape.closePath();
 
   for (const cut of panel.cuts) {
+    // Finger-hole and slot rectangles are joinery for the flat parts; they would
+    // clutter the assembled walls, so only fan/screw openings and filter windows
+    // are punched into the 3D preview.
+    if (cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
+      continue;
+    }
     const hole = createHolePath(cut, panel);
     if (hole !== null) {
       shape.holes.push(hole);
@@ -199,18 +205,15 @@ function createPanelGeometry(panel: CutPanel, materialThickness: number): Extrud
 function createPanelCutMarkGroup(
   panel: CutPanel,
   materialThickness: number,
-  cutMarkMaterial: Material,
   screwMarkMaterial: Material,
 ): Group {
   const group = new Group();
   const z = Math.max(materialThickness * sceneScale, 0.012) / 2 + panelCutOverlayLift;
 
+  // Clean assembled walls only carry the screw-hole marks; finger-hole and slot
+  // joinery is shown on the flat cut sheet, not on the 3D enclosure.
   for (const cut of panel.cuts) {
-    if (cut.type === "rect" && (cut.role === "finger-hole" || cut.role === "slot")) {
-      const mark = new Mesh(createRectFaceGeometry(cut, panel), cutMarkMaterial);
-      mark.position.z = z;
-      group.add(mark);
-    } else if (cut.type === "circle" && cut.role === "screw") {
+    if (cut.type === "circle" && cut.role === "screw") {
       const mark = new Mesh(new CircleGeometry(cut.radius * sceneScale, 20), screwMarkMaterial);
       mark.position.set((cut.cx - panel.assemblyCenter.x) * sceneScale, (cut.cy - panel.assemblyCenter.y) * sceneScale, z);
       group.add(mark);
@@ -218,20 +221,6 @@ function createPanelCutMarkGroup(
   }
 
   return group;
-}
-
-function createRectFaceGeometry(cut: RectCut, panel: CutPanel): ShapeGeometry {
-  const left = (cut.x - panel.assemblyCenter.x) * sceneScale;
-  const right = (cut.x + cut.width - panel.assemblyCenter.x) * sceneScale;
-  const top = (cut.y - panel.assemblyCenter.y) * sceneScale;
-  const bottom = (cut.y + cut.height - panel.assemblyCenter.y) * sceneScale;
-  const shape = new Shape();
-  shape.moveTo(left, top);
-  shape.lineTo(left, bottom);
-  shape.lineTo(right, bottom);
-  shape.lineTo(right, top);
-  shape.closePath();
-  return new ShapeGeometry(shape);
 }
 
 function createHolePath(cut: CutFeature, panel: CutPanel): Path | null {

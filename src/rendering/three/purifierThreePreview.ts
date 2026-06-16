@@ -461,7 +461,6 @@ export class PurifierThreePreview {
     const railWood = createWoodMaterial();
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
-    const cutMark = createCutMarkMaterial(0.54);
     const screwMark = createCutMarkMaterial(0.68);
     const filter = createFilterMediaMaterial(settings.filterCount === 2 ? 0.55 : 0.73);
     const fanAppearance = fanAppearanceForColor(settings.fan.color);
@@ -475,7 +474,6 @@ export class PurifierThreePreview {
         settings.preview.enclosure.explodedView,
         wood,
         darkEdge,
-        cutMark,
         screwMark,
       );
       collectFanRotors(panelGroup, this.fanRotors);
@@ -494,7 +492,6 @@ export class PurifierThreePreview {
               settings.preview.enclosure.explodedView,
               railWood,
               darkEdge,
-              cutMark,
               screwMark,
             ),
           );
