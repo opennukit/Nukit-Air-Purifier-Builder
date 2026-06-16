@@ -146,10 +146,31 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   // "finger-holes" ("h") edges are drawn as a plain straight edge; the holes the
   // mating fingers pass through are rectangular cuts added here (boxes.py
   // FingerHoleEdge), set in from the edge by edge_width + thickness/2.
-  const cuts = [
-    ...(input.cuts ?? []),
-    ...createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings),
-  ];
+  const edgeHoles = createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings);
+  // Near a corner, finger-hole rows/columns from different joints can run into
+  // each other (an interior filter-rail row into an edge wall-joint column, or
+  // two edge columns where they meet). For most dimensions they fall in each
+  // other's gaps (as in boxes.py), but at some proportions they touch or overlap,
+  // leaving an unbuildable sliver. We drop the minimum number of holes so every
+  // remaining pair keeps at least `minBridge` of material, preferring to keep the
+  // structural edge-column holes over interior rows. Configs that already clear
+  // this (including boxes.py's) are left untouched.
+  const minBridge = 0.75;
+  const allCuts: CutFeature[] = [...(input.cuts ?? []), ...edgeHoles];
+  const edgeHoleSet = new Set<CutFeature>(edgeHoles);
+  const fingerHoles = allCuts
+    .filter((cut): cut is RectCut => cut.type === "rect" && cut.role === "finger-hole")
+    .sort((a, b) => (edgeHoleSet.has(b) ? 1 : 0) - (edgeHoleSet.has(a) ? 1 : 0));
+  const dropped = new Set<CutFeature>();
+  const keptHoles: RectCut[] = [];
+  for (const hole of fingerHoles) {
+    if (keptHoles.some((kept) => rectGap(hole, kept) < minBridge)) {
+      dropped.add(hole);
+    } else {
+      keptHoles.push(hole);
+    }
+  }
+  const cuts = allCuts.filter((cut) => !dropped.has(cut));
   return normalizePanel({
     id: input.id,
     name: input.name,
@@ -299,6 +320,16 @@ export function fingerHoleCutsAt(
     }
   }
   return cuts;
+}
+
+// Minimum distance between two axis-aligned rectangles; negative when they
+// overlap. Used to detect (and remove) finger-hole rows that would collide with
+// an edge's finger-hole column.
+function rectGap(a: RectCut, b: RectCut): number {
+  const dx = Math.max(0, a.x - (b.x + b.width), b.x - (a.x + a.width));
+  const dy = Math.max(0, a.y - (b.y + b.height), b.y - (a.y + a.height));
+  const overlap = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  return overlap ? -1 : Math.hypot(dx, dy);
 }
 
 // boxes.py FingerHoleEdge: for every "finger-holes" ("h") section on an edge,

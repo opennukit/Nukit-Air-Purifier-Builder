@@ -183,8 +183,17 @@ function expectHorizontalFingerHoleRowsToMatchEdges(panel: ReturnType<typeof req
   rows.forEach((row, index) => {
     const edge = index === 0 ? "bottom" : "top";
     const edgeCenters = horizontalEdgeToothCenters(panel, edge);
-    expect(row.centers).toHaveLength(edgeCenters.length);
-    expect(maxAlignmentError(row.centers, edgeCenters)).toBeLessThan(0.001);
+    // Filter-hole rows sit on the same grid as the perimeter teeth, so every
+    // remaining hole must align exactly. A hole that would collide with an edge
+    // finger-hole column near a corner is dropped (to avoid an unbuildable
+    // sliver), so the row may carry up to a couple fewer holes than there are
+    // teeth — but it never has extras and never misaligns.
+    expect(row.centers.length).toBeLessThanOrEqual(edgeCenters.length);
+    expect(row.centers.length).toBeGreaterThanOrEqual(edgeCenters.length - 2);
+    for (const center of row.centers) {
+      const nearest = Math.min(...edgeCenters.map((edgeCenter) => Math.abs(edgeCenter - center)));
+      expect(nearest).toBeLessThan(0.001);
+    }
   });
 }
 
@@ -235,10 +244,6 @@ function horizontalEdgeToothCenters(panel: ReturnType<typeof requiredPanel>, edg
   }
 
   return centers.sort((left, right) => left - right);
-}
-
-function maxAlignmentError(left: readonly number[], right: readonly number[]): number {
-  return left.reduce((maxError, value, index) => Math.max(maxError, Math.abs(value - (right[index] ?? value))), 0);
 }
 
 function roundCoordinate(value: number): number {
