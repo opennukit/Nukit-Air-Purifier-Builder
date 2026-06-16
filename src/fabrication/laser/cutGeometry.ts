@@ -149,13 +149,12 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   const edgeHoles = createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings);
   // Near a corner, finger-hole rows/columns from different joints can run into
   // each other (an interior filter-rail row into an edge wall-joint column, or
-  // two edge columns where they meet). For most dimensions they fall in each
-  // other's gaps (as in boxes.py), but at some proportions they touch or overlap,
-  // leaving an unbuildable sliver. We drop the minimum number of holes so every
-  // remaining pair keeps at least `minBridge` of material, preferring to keep the
-  // structural edge-column holes over interior rows. Configs that already clear
-  // this (including boxes.py's) are left untouched.
-  const minBridge = 0.75;
+  // two edge columns where they meet). boxes.py keeps a clear gap there; we do
+  // the same by dropping the minimum number of holes so every remaining pair
+  // keeps at least one material thickness of bridge between them, preferring to
+  // keep the structural edge-column holes over interior rows. This drops only the
+  // one or two filter-row holes that crowd the wall-joint column at a corner.
+  const minBridge = Math.max(0.75, input.thickness);
   const allCuts: CutFeature[] = [...(input.cuts ?? []), ...edgeHoles];
   const edgeHoleSet = new Set<CutFeature>(edgeHoles);
   const fingerHoles = allCuts
