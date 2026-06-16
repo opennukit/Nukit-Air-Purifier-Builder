@@ -45,7 +45,10 @@ describe("Air purifier cut-sheet equivalence", () => {
     );
 
     expect(outerPathShapes).toHaveLength(cutPanels(layout).length);
-    expect(innerPathShapes.length).toBeGreaterThan(280);
+    // Inner cut paths are fan/screw circles, filter windows and the interior
+    // filter finger-hole rows. Wall-to-wall joints are interlocking combs drawn
+    // on the panel OUTLINES (not inner slots), so they are not counted here.
+    expect(innerPathShapes.length).toBeGreaterThan(120);
     expect(cutSheet(layout).shapes.some((shape) => shape.type === "circle" || shape.type === "rect")).toBe(false);
     expect(svg).toContain("<path");
     expect(fanPanels).toHaveLength(2);

@@ -342,12 +342,15 @@ describe("FilterBoxBuilder purifier workflow", () => {
       baselinePanel.cuts.filter((cut) => cut.type === "rect" && cut.role === "finger-hole").length,
     );
     expect(roundedInteriorYValues(tunedRail)).not.toEqual(roundedInteriorYValues(baselineRail));
-    // Outlines are burn-compensated tool paths: the recess floor sits one kerf
-    // outward and the whole panel is shifted one kerf by normalization, so the
-    // nominal depth reappears only after the laser removes the kerf.
-    expect(Math.min(...roundedInteriorYValues(tunedRail))).toBeCloseTo(
-      defaultSettings.rim - defaultSettings.materialThickness * 1.4 + 2 * defaultSettings.kerfFit,
-    );
+    // The long rail's dovetail-bearing top edge recesses by the tuned dovetail
+    // depth. Outlines are burn-compensated tool paths: the recess floor sits one
+    // kerf outward and the whole panel is shifted one kerf by normalization, so
+    // the nominal depth reappears only after the laser removes the kerf. The
+    // rail's short ("h") edges are interlocking combs, so they contribute their
+    // own interior Y values too — assert the dovetail floor is present rather
+    // than that it is the single minimum.
+    const tunedDovetailFloor = defaultSettings.rim - defaultSettings.materialThickness * 1.4 + 2 * defaultSettings.kerfFit;
+    expect(roundedInteriorYValues(tunedRail).some((y) => Math.abs(y - tunedDovetailFloor) < 0.01)).toBe(true);
   });
 
   test("carries measured filter dimensions straight into the structured settings", () => {

@@ -142,11 +142,10 @@ export function edgeSections(pattern: string, lengths?: readonly number[]): Edge
 export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   const kerfFit = input.kerfFit ?? 0;
   const outline = offsetOutlineOutward(buildRectangularOutline(input), kerfFit);
-  const jointSettings = input.jointSettings ?? defaultCutJointSettings;
-  const cuts = [
-    ...(input.cuts ?? []),
-    ...createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings),
-  ];
+  // Finger ("f"), counterpart ("F") and finger-hole ("h") edges are all drawn as
+  // interlocking combs on the outline itself, so no separate edge slot rows are
+  // needed. Interior finger-hole rows (filter joints) are passed in via `cuts`.
+  const cuts = [...(input.cuts ?? [])];
   return normalizePanel({
     id: input.id,
     name: input.name,
@@ -244,8 +243,10 @@ export function cutPanelsToDocument(
     });
   }
 
-  const width = shapes.reduce((maxX, shape) => Math.max(maxX, shapeMaxX(shape)), 0) + sheetMargin;
-  const height = shapes.reduce((maxY, shape) => Math.max(maxY, shapeMaxY(shape)), 0) + sheetMargin;
+  // Round the sheet extents so equal-segment comb widths (length / oddCount)
+  // don't leak floating-point noise into the canvas size and summaries.
+  const width = roundToMicron(shapes.reduce((maxX, shape) => Math.max(maxX, shapeMaxX(shape)), 0) + sheetMargin);
+  const height = roundToMicron(shapes.reduce((maxY, shape) => Math.max(maxY, shapeMaxY(shape)), 0) + sheetMargin);
   return { width, height, shapes };
 }
 
@@ -253,6 +254,10 @@ export function cutPanelsToDocument(
 // Finger Hole Cuts
 // #######################################
 
+// Interior finger-hole slots that a mating wall's fingers pass through. They
+// must line up with the mating comb's TEETH. A finger ("f") edge is gender A,
+// which carries teeth on the odd segments of the equal-width comb, so the slots
+// sit on those same odd segments and share the comb's segment width.
 export function fingerHoleCutsAt(
   x: number,
   y: number,
@@ -262,24 +267,20 @@ export function fingerHoleCutsAt(
   kerfFit = 0,
   jointSettings: CutJointSettings = defaultCutJointSettings,
 ): RectCut[] {
-  const { fingers, leftover, finger, space } = calculateFingerPattern(length, thickness, jointSettings.finger);
-  if (fingers === 0) {
-    return [];
-  }
-
+  const { segments, segmentWidth } = fingerCombSegments(length, thickness, jointSettings.finger);
   const cuts: RectCut[] = [];
-  const holeWidth = thickness * (jointSettings.finger.holeWidthMultiplier + jointSettings.finger.playMultiplier);
-  for (let index = 0; index < fingers; index += 1) {
-    const position = leftover / 2 + index * (finger + space);
+  const holeThickness = thickness * (jointSettings.finger.holeWidthMultiplier + jointSettings.finger.playMultiplier);
+  for (let index = 1; index < segments; index += 2) {
+    const position = index * segmentWidth;
     if (angle === 90) {
       cuts.push(
         shrinkRectCut(
           {
             type: "rect",
-            x: x - holeWidth / 2,
+            x: x - holeThickness / 2,
             y: y + position,
-            width: holeWidth,
-            height: finger,
+            width: holeThickness,
+            height: segmentWidth,
             radius: 0,
             role: "finger-hole",
           },
@@ -292,9 +293,9 @@ export function fingerHoleCutsAt(
           {
             type: "rect",
             x: x + position,
-            y: y - holeWidth / 2,
-            width: finger,
-            height: holeWidth,
+            y: y - holeThickness / 2,
+            width: segmentWidth,
+            height: holeThickness,
             radius: 0,
             role: "finger-hole",
           },
@@ -347,11 +348,14 @@ function appendEdgeSection(
   jointSettings: CutJointSettings,
 ): void {
   if (kind === "finger") {
-    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, 1);
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, "A");
     return;
   }
-  if (kind === "finger-counter") {
-    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, -1);
+  if (kind === "finger-counter" || kind === "finger-holes") {
+    // The counterpart ("F") and the finger-hole edge ("h") are both the mating
+    // gender (B) of a finger ("f", gender A): they interlock as a comb rather
+    // than receiving a separate row of slots.
+    appendFingerProfile(points, length, direction, thickness, jointSettings.finger, "B");
     return;
   }
   if (kind === "dovetail") {
@@ -365,26 +369,34 @@ function appendEdgeSection(
   appendLine(points, moveBy(lastPoint(points), direction.axis, length));
 }
 
+type FingerGender = "A" | "B";
+
+// Emit a finger comb along the edge. The comb is an odd number of equal-width
+// segments; gender A carries a tooth on the odd segments, gender B on the even
+// segments, so an "f" (A) edge and an "F"/"h" (B) edge are exact complements
+// that interlock. Teeth always protrude OUTWARD (the gender only chooses which
+// segments carry one) — matching florianfesti/boxes and tempest-builder.html.
 function appendFingerProfile(
   points: CutPoint[],
   length: number,
   direction: EdgeDirection,
   thickness: number,
   settings: FingerJointSettings,
-  polarity: 1 | -1,
+  gender: FingerGender,
 ): void {
-  const { fingers, leftover, finger, space } = calculateFingerPattern(length, thickness, settings);
+  const { segments, segmentWidth } = fingerCombSegments(length, thickness, settings);
   const depth = thickness;
-  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
-  for (let index = 0; index < fingers; index += 1) {
-    appendStep(points, direction.outward, depth * polarity);
-    appendLine(points, moveBy(lastPoint(points), direction.axis, finger));
-    appendStep(points, direction.outward, -depth * polarity);
-    if (index < fingers - 1) {
-      appendLine(points, moveBy(lastPoint(points), direction.axis, space));
+  const toothOnOdd = gender === "A";
+  for (let index = 0; index < segments; index += 1) {
+    const hasTooth = (index % 2 === 1) === toothOnOdd;
+    if (hasTooth) {
+      appendStep(points, direction.outward, depth);
+      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
+      appendStep(points, direction.outward, -depth);
+    } else {
+      appendLine(points, moveBy(lastPoint(points), direction.axis, segmentWidth));
     }
   }
-  appendLine(points, moveBy(lastPoint(points), direction.axis, leftover / 2));
 }
 
 function appendDovetailProfile(
@@ -461,36 +473,6 @@ function cyclicPoint(points: readonly CutPoint[], index: number): CutPoint {
   return point;
 }
 
-function createFingerHoleCutsForEdges(
-  width: number,
-  height: number,
-  edges: RectangularPanelInput["edges"],
-  thickness: number,
-  kerfFit: number,
-  jointSettings: CutJointSettings,
-): CutFeature[] {
-  const cuts: RectCut[] = [];
-  const edgeHoleOffset = thickness * jointSettings.finger.holeOffsetMultiplier;
-  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
-    const sections = edges[edgeIndex];
-    const hasFingerHoleEdge = sections.some((section) => section.kind === "finger-holes");
-    if (!hasFingerHoleEdge) {
-      continue;
-    }
-
-    if (edgeIndex === 0) {
-      cuts.push(...fingerHoleCutsAt(0, edgeHoleOffset, width, 0, thickness, kerfFit, jointSettings));
-    } else if (edgeIndex === 1) {
-      cuts.push(...fingerHoleCutsAt(width - edgeHoleOffset, 0, height, 90, thickness, kerfFit, jointSettings));
-    } else if (edgeIndex === 2) {
-      cuts.push(...fingerHoleCutsAt(0, height - edgeHoleOffset, width, 0, thickness, kerfFit, jointSettings));
-    } else {
-      cuts.push(...fingerHoleCutsAt(edgeHoleOffset, 0, height, 90, thickness, kerfFit, jointSettings));
-    }
-  }
-  return cuts;
-}
-
 // #######################################
 // Panel Normalization
 // #######################################
@@ -524,27 +506,25 @@ function normalizePanel(panel: CutPanelDraft): CutPanelDraft {
 // Joint Geometry Helpers
 // #######################################
 
-function calculateFingerPattern(
+// Split an edge into an ODD number of equal-width comb segments. An odd count
+// guarantees both ends are the same kind of segment, which is what makes the two
+// genders exact complements (see appendFingerProfile). The target segment width
+// is the average of the finger and space multipliers so both controls still
+// affect tooth density (defaults: (2 + 2) / 2 = 2 -> ~2 x thickness, as upstream).
+function fingerCombSegments(
   length: number,
   thickness: number,
   settings: FingerJointSettings,
-): { fingers: number; leftover: number; finger: number; space: number } {
-  const space = settings.spaceMultiplier * thickness;
-  let finger = settings.widthMultiplier * thickness;
-  let fingers = Math.floor((length - space) / (space + finger));
-  if (fingers <= 0) {
-    if (finger > 0 && length > 0.75 * thickness) {
-      finger = length / 2;
-      return { fingers: 1, leftover: finger, finger, space };
-    }
-    return { fingers: 0, leftover: length, finger, space };
+): { segments: number; segmentWidth: number } {
+  const pitch = ((settings.widthMultiplier + settings.spaceMultiplier) / 2) * thickness;
+  let segments = pitch > 0 ? Math.round(length / pitch) : 3;
+  if (segments < 3) {
+    segments = 3;
   }
-  return {
-    fingers,
-    leftover: length - fingers * (space + finger) + space,
-    finger,
-    space,
-  };
+  if (segments % 2 === 0) {
+    segments += 1;
+  }
+  return { segments, segmentWidth: length / segments };
 }
 
 function dovetailShoulderFraction(taper: number): number {
@@ -693,6 +673,10 @@ function shapeMaxY(shape: Shape): number {
 // #######################################
 // Point Helpers
 // #######################################
+
+function roundToMicron(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 function translatePoints(points: readonly CutPoint[], offsetX: number, offsetY: number): CutPoint[] {
   return points.map((point) => ({ x: point.x + offsetX, y: point.y + offsetY }));
