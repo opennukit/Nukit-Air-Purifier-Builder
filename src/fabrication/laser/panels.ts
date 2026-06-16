@@ -102,10 +102,20 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 
   const bottomEdge = usesSplitRails ? compound("fff", [rim, workingDepth - 2 * rim, rim]) : edgeSections("f");
   let topEdge = bottomEdge;
-  const leftEdge =
-    filterCount === 2
-      ? compound("EFE", [filterHeight + thickness, fanDiameter + 2, filterHeight + thickness])
-      : compound("FE", [fanDiameter + 2, filterHeight + thickness]);
+  // The side wall's back edge mates the (shorter) back fan wall, which spans only
+  // its own height (fanDiameter) and is centred at rearFanWallY. Make the fingered
+  // ("F") section exactly that height and at that position, with plain ("E")
+  // sections filling the open filter regions above/below. This keeps the side
+  // wall's teeth on the same grid as the back fan wall's teeth so they interlock
+  // instead of colliding. (boxes.py uses d+2 here, which lands on a different grid
+  // than the d-tall back wall.) The two side walls are placed with opposite
+  // handedness (the left one is flipped), so each gets the mirror of the back edge
+  // that makes its fingered section land at the back wall's height; for the
+  // symmetric 2-filter case the two are identical.
+  const backWallBottomE = chamberHeight / 2 + rearFanWallY - fanDiameter / 2;
+  const backWallTopE = chamberHeight - backWallBottomE - fanDiameter;
+  const sideWallBackEdge = compound("EFE", [Math.max(0, backWallBottomE), fanDiameter, Math.max(0, backWallTopE)]);
+  const sideWallBackEdgeMirrored = compound("EFE", [Math.max(0, backWallTopE), fanDiameter, Math.max(0, backWallBottomE)]);
   if (filterCount === 1) {
     topEdge = edgeSections("f");
   }
@@ -117,7 +127,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.left,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
+      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, sideWallBackEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       assembly: {
@@ -140,7 +150,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.right,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
+      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, sideWallBackEdgeMirrored],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       assembly: {
