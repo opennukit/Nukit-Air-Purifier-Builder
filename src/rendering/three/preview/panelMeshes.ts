@@ -166,11 +166,27 @@ export function createPanelGroup(
 function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
   const shape = new Shape();
   // Both the assembled and exploded views extrude the real toothed cut outline
-  // (finger combs + dovetails) so the joinery is visible and any non-meshing
-  // joint is obvious.
+  // (finger combs + dovetails) so the joinery is visible. The cut fingers stick
+  // out a full material thickness; against a perpendicular panel that overshoots
+  // its outer face by half a thickness, making corners look messy. For the
+  // preview only, clamp how far any tooth protrudes past the panel's nominal
+  // rectangle to half a thickness, so corner fingers sit flush and the box reads
+  // as clean right angles. (The exported cut geometry is unchanged.)
+  const halfWidth = (panel.nominalWidth / 2) * sceneScale;
+  const halfHeight = (panel.nominalHeight / 2) * sceneScale;
+  const maxProtrusion = (materialThickness / 2) * sceneScale;
+  const clampAxis = (value: number, halfExtent: number): number => {
+    if (value > halfExtent) {
+      return halfExtent + Math.min(value - halfExtent, maxProtrusion);
+    }
+    if (value < -halfExtent) {
+      return -halfExtent - Math.min(-halfExtent - value, maxProtrusion);
+    }
+    return value;
+  };
   panel.outline.forEach((point, index) => {
-    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
-    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
+    const x = clampAxis((point.x - panel.assemblyCenter.x) * sceneScale, halfWidth);
+    const y = clampAxis((point.y - panel.assemblyCenter.y) * sceneScale, halfHeight);
     if (index === 0) {
       shape.moveTo(x, y);
     } else {
