@@ -146,7 +146,9 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   }),
   "rear-long": ({ layer, width, rim }) => ({
     position: [-width / 2 + rim / 2, layer.outerFrameY, 0],
-    rotation: [Math.PI / 2, 0, Math.PI / 2],
+    // Left-side rail: flipped about its normal so the finger edge faces the left
+    // wall (outward, -X) and the smooth air-opening edge faces inward (+X).
+    rotation: [Math.PI / 2, 0, -Math.PI / 2],
   }),
   "left-short": ({ layer, width, rim }) => ({
     position: [width / 2 - rim / 2, layer.outerFrameY, 0],
@@ -162,7 +164,8 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   }),
   "outer-long": ({ layer, width, rim }) => ({
     position: [-width / 2 + rim / 2, layer.innerFrameY, 0],
-    rotation: [Math.PI / 2, 0, Math.PI / 2],
+    // Left-side rail: flipped so its finger edge faces the left wall (outward).
+    rotation: [Math.PI / 2, 0, -Math.PI / 2],
   }),
   "inner-short": ({ layer, width, rim }) => ({
     position: [width / 2 - rim / 2, layer.innerFrameY, 0],
