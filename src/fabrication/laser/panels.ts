@@ -57,6 +57,12 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const usesSplitRails = settings.frameConstruction.type === "split-rails";
   const panels: CutPanelDraft[] = [];
   const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
+  // The side walls carry the front fan wall's joint as FingerHoleEdge ("h")
+  // slots set in from their edge by edge_width + thickness/2. So the front fan
+  // wall seats that far inside the side walls' front edges, its teeth passing
+  // through those slots. This is a placement (lap-joint) offset, not a geometry
+  // change. (The rear fan wall mates the "EFE" edge notch and stays flush.)
+  const fingerHoleInset = (settings.cutting.joints.finger.holeOffsetMultiplier + 0.5) * thickness;
   const rearFanWallY = rearFanWallCenterY(filterCount, chamberHeight, fanDiameter);
 
   panels.push(
@@ -93,7 +99,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "front-fan-wall",
         placement: {
-          position: [0, 0, -workingDepth / 2],
+          position: [0, 0, -workingDepth / 2 + fingerHoleInset],
           rotation: [0, 0, 0],
         },
       },
