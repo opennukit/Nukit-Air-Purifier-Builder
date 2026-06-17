@@ -1400,7 +1400,7 @@
               {#if isNukitControlsActive}
                 <div data-nukit-filter-count>
                   <fieldset class="segmented-field">
-                    <legend>Filters</legend>
+                    <legend>Filter layout</legend>
                     <div>
                       <label>
                         <input
@@ -1583,7 +1583,6 @@
             <section class="control-section fan-section" data-nukit-fan-controls>
               <div class="section-heading">
                 <p class="eyebrow">Fan</p>
-                <h2>Fan</h2>
               </div>
               <div class="fan-column">
                 <div class="fan-selection">

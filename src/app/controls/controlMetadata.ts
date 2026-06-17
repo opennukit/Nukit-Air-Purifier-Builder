@@ -106,9 +106,9 @@ export const tempestArrangementOptions: readonly {
   readonly id: TempestArrangementPreset;
   readonly label: string;
 }[] = [
-  { id: "single-horizontal-top-filter", label: "1-filter wall mount" },
-  { id: "dual-horizontal-sandwich", label: "2-filter sandwich" },
-  { id: "four-side-filter-tower", label: "4 side filters" },
+  { id: "single-horizontal-top-filter", label: "One side" },
+  { id: "dual-horizontal-sandwich", label: "Both sides" },
+  { id: "four-side-filter-tower", label: "Four sides" },
 ];
 export const cordHoleInfo =
   "Diameter of the hole the fan power cables exit through, near the bottom of the right wall. The 4-side tower routes it through the matching top-plate corner instead.";
