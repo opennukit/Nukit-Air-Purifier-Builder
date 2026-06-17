@@ -150,6 +150,9 @@ export type TempestPlateFanPosition = {
 export type TempestPlateFanLayout = {
   readonly positions: readonly TempestPlateFanPosition[];
   readonly fanCount: number;
+  // The most fans that fit clear of the walls (what "automatic" places); the UI
+  // offers 0..maximumCount so a user can pick fewer.
+  readonly maximumCount: number;
 };
 
 export type TempestFanLayout =

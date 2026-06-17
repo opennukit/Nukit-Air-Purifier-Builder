@@ -217,12 +217,8 @@ function createBottomPlateFanLayout(
   localVerticalCenter: number,
 ): TempestPlateFanLayout {
   const requested = settings.fan.bottomPlateFans;
-  const off =
-    filterCount !== 1 ||
-    requested === undefined ||
-    (requested.type === "fixed" && requested.count === 0);
-  if (off) {
-    return { positions: [], fanCount: 0 };
+  if (filterCount !== 1 || requested === undefined) {
+    return { positions: [], fanCount: 0, maximumCount: 0 };
   }
   const diameter = settings.fan.diameter;
   const minimumCenterFromEdge = settings.frame.wallThickness + diameter / 2;
@@ -238,16 +234,20 @@ function createBottomPlateFanLayout(
   const backZ1 = flange + bodyDepth;
   const wallBoxes = wallFanFootprints(walls, box, settings, localVerticalCenter);
 
-  const positions: TempestPlateFanPosition[] = [];
+  // Every grid cell that clears the wall fans, in row-major order. "automatic"
+  // takes them all; a fixed count keeps the first N.
+  const clear: TempestPlateFanPosition[] = [];
   for (const x of xs) {
     for (const y of ys) {
       const back: Aabb = { x0: x - radius, x1: x + radius, y0: y - radius, y1: y + radius, z0: backZ0, z1: backZ1 };
       if (!wallBoxes.some((wallBox) => aabbOverlap(back, wallBox, BACK_FAN_WALL_CLEARANCE_MM))) {
-        positions.push({ x, y });
+        clear.push({ x, y });
       }
     }
   }
-  return { positions, fanCount: positions.length };
+  const maximumCount = clear.length;
+  const count = requested.type === "automatic" ? maximumCount : Math.max(0, Math.min(requested.count, maximumCount));
+  return { positions: clear.slice(0, count), fanCount: count, maximumCount };
 }
 
 // The chamber-side body footprints of every wall fan, in model coordinates, so a

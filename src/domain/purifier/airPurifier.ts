@@ -148,7 +148,7 @@ export function normalizeRawSettings(
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
     // Preserved like hexGrill: toRawSettings re-emits the default, so restore the
     // user's "Back" fan toggle from the raw input here.
-    backPlateFans: input.backPlateFans,
+    backPlateFans: normalizeBackFanCount(input.backPlateFans),
     boxDepth: normalizeBoxDepth(input.boxDepth),
     ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
@@ -530,7 +530,7 @@ function createConfiguredPrintDesign(input: {
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
-      backPlateFans: input.raw.backPlateFans,
+      backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
       ...normalizeTempestExhaustFields(input.raw),
     };
@@ -792,6 +792,16 @@ function normalizeHexSpacing(value: Millimeters): Millimeters {
 
 function normalizeBoxDepth(value: Millimeters): Millimeters {
   return Number.isFinite(value) && value > 0 ? clamp(value, 1, 1000) : defaultSettings.boxDepth;
+}
+
+// The "Back" fan count: -1 = automatic, 0 = none, N = that many. Any other value
+// snaps to the nearest valid integer (negatives collapse to automatic).
+function normalizeBackFanCount(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const truncated = Math.trunc(value);
+  return truncated < 0 ? -1 : truncated;
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {

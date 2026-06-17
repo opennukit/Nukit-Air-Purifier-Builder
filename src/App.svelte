@@ -106,6 +106,8 @@
   } from "@/app/workbench/workbenchViewModel";
   import { exportBlockingDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
   import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
+  import { createTempestModel } from "@/domain/designs/tempest/model";
+  import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
   import {
     createPrintableSheetPlanFromKit,
     exportFormats as fabricationMethods,
@@ -317,6 +319,26 @@
   // none of the four side-wall fans are selected.
   $: noWallFansSelected =
     settings.fansLeft === 0 && settings.fansRight === 0 && settings.fansTop === 0 && settings.fansBottom === 0;
+  $: backFansSelected = isOneSideFilter && settings.backPlateFans !== 0;
+  // The Tempest model drives the per-wall fan maxima the Advanced "Fan tuning"
+  // selects offer (Auto + 0..max), so a user can request fewer than Auto fills.
+  $: tempestFanModel =
+    isTempestControlsActive ? createTempestModel(createTempestSettingsFromLayout(layout)) : null;
+  $: fanMaxByControl =
+    tempestFanModel !== null && tempestFanModel.topology === "sandwich"
+      ? {
+          // UI mapping: Top -> back wall, Bottom -> front wall.
+          fansLeft: tempestFanModel.fanLayout.walls.left.maximumCount,
+          fansRight: tempestFanModel.fanLayout.walls.right.maximumCount,
+          fansTop: tempestFanModel.fanLayout.walls.back.maximumCount,
+          fansBottom: tempestFanModel.fanLayout.walls.front.maximumCount,
+        }
+      : { fansLeft: 0, fansRight: 0, fansTop: 0, fansBottom: 0 };
+  $: backFanMax =
+    tempestFanModel !== null && tempestFanModel.topology === "sandwich"
+      ? tempestFanModel.fanLayout.bottomPlate.maximumCount
+      : 0;
+  const countOptionsUpTo = (max: number): number[] => Array.from({ length: Math.max(0, max) + 1 }, (_, index) => index);
   // The horizontal layouts (1 top / 2 sandwich) take per-wall fans; the tower
   // exhausts through the top instead.
   $: showTempestWallFanControls = isTempestControlsActive && !isFourFilterTower;
@@ -645,6 +667,18 @@
   function updateFanAuto(name: FanCountSettingName, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
     commitSettings({ ...settings, [name]: checked ? automaticFanCount : 0 });
+  }
+
+  // The "Back" placement checkbox toggles the bottom-plate fan grid: checked =
+  // automatic (fill), unchecked = none. The Advanced "Back" select writes an
+  // exact count to the same backPlateFans setting.
+  function updateBackFanAuto(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    commitSettings({ ...settings, backPlateFans: checked ? automaticFanCount : 0 });
+  }
+
+  function updateBackFanCount(event: Event): void {
+    commitSettings({ ...settings, backPlateFans: readFanCountControlValue(event) });
   }
 
   function toggleAutoRotate(): void {
@@ -1696,8 +1730,8 @@
                             <input
                               type="checkbox"
                               name="backPlateFans"
-                              checked={settings.backPlateFans}
-                              onchange={(event) => updateBooleanSetting("backPlateFans", event)}
+                              checked={settings.backPlateFans !== 0}
+                              onchange={(event) => updateBackFanAuto(event)}
                             />
                             <span>Back</span>
                           </label>
@@ -1705,7 +1739,7 @@
                       </div>
                     </fieldset>
 
-                    {#if isOneSideFilter && settings.backPlateFans && noWallFansSelected}
+                    {#if backFansSelected && noWallFansSelected}
                       <label class="field">
                         <span>Box depth</span>
                         <span class="input-shell">
@@ -1797,12 +1831,23 @@
                           <span>{control.label} fans {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name])}</span>
                           <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
                             <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
-                            {#each fixedFanCountOptions as count}
+                            {#each countOptionsUpTo(fanMaxByControl[control.name]) as count}
                               <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
                             {/each}
                           </select>
                         </label>
                       {/each}
+                      {#if backFansSelected}
+                        <label class="field compact-field">
+                          <span>Back fans {@render infoTip("info-backPlateFansCount", "Number of fans on the back plate. 'Auto' fills it with as many as fit; choose fewer if you prefer.")}</span>
+                          <select name="backPlateFansCount" onchange={(event) => updateBackFanCount(event)}>
+                            <option value={automaticFanCount} selected={settings.backPlateFans === automaticFanCount}>Auto</option>
+                            {#each countOptionsUpTo(backFanMax) as count}
+                              <option value={count} selected={settings.backPlateFans === count}>{count === 0 ? "None" : String(count)}</option>
+                            {/each}
+                          </select>
+                        </label>
+                      {/if}
                     {/if}
                     {#each tempestAdvancedGeometryControls as control}
                       <label class="field">

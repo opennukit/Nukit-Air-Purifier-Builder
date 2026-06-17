@@ -49,6 +49,21 @@ const zIntegerField = (fallback: number) =>
     return parsed === undefined ? undefined : Math.trunc(parsed);
   }, z.number().default(fallback));
 
+// The "Back" fan count: an integer (-1 automatic / 0 none / N fixed). Legacy
+// shared URLs encoded it as a boolean, so "true" -> automatic (-1) and
+// "false" -> none (0) are still accepted.
+const zBackFanCountField = (fallback: number) =>
+  z.preprocess((value) => {
+    if (value === "true") {
+      return -1;
+    }
+    if (value === "false") {
+      return 0;
+    }
+    const parsed = rawNumberInput(value);
+    return parsed === undefined ? undefined : Math.trunc(parsed);
+  }, z.number().default(fallback));
+
 // Mirrors readBoolean: "true"/"1" -> true, "false"/"0" -> false, else fallback.
 const zBooleanField = (fallback: boolean) =>
   z.preprocess((value) => {
@@ -86,7 +101,7 @@ export type PurifierSettingsFieldFallbacks = {
   readonly hexGrill: boolean;
   readonly hexSize: number;
   readonly hexSpacing: number;
-  readonly backPlateFans: boolean;
+  readonly backPlateFans: number;
   readonly boxDepth: number;
   readonly boxFanHoleSize: number;
   readonly boxRingOneScrewHoles: number;
@@ -150,7 +165,7 @@ export const createPurifierSettingsFieldsSchema = (
     hexGrill: zBooleanField(fallbacks.hexGrill),
     hexSize: zNumberField(fallbacks.hexSize),
     hexSpacing: zNumberField(fallbacks.hexSpacing),
-    backPlateFans: zBooleanField(fallbacks.backPlateFans),
+    backPlateFans: zBackFanCountField(fallbacks.backPlateFans),
     boxDepth: zNumberField(fallbacks.boxDepth),
     boxFanHoleSize: zNumberField(fallbacks.boxFanHoleSize),
     boxRingOneScrewHoles: zIntegerField(fallbacks.boxRingOneScrewHoles),

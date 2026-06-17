@@ -68,22 +68,25 @@ describe("tempest per-wall fan placement (1-top / 2-sandwich)", () => {
 });
 
 describe('tempest "Back" fan grid (single-filter bottom plate)', () => {
-  test("the backPlateFans toggle survives the URL round-trip", () => {
-    const round = new URLSearchParams(
-      encodeSettings(decodeSettings(`${oneSide}&backPlateFans=true`)),
-    );
-    expect(round.get("backPlateFans")).toBe("true");
+  test("the backPlateFans count survives the URL round-trip", () => {
+    const round = new URLSearchParams(encodeSettings(decodeSettings(`${oneSide}&backPlateFans=3`)));
+    expect(round.get("backPlateFans")).toBe("3");
   });
 
-  test("the toggle survives normalization (not dropped to the default)", () => {
+  test("the legacy boolean form decodes to automatic / none", () => {
+    expect(new URLSearchParams(encodeSettings(decodeSettings(`${oneSide}&backPlateFans=true`))).get("backPlateFans")).toBe("-1");
+    expect(new URLSearchParams(encodeSettings(decodeSettings(`${oneSide}&backPlateFans=false`))).get("backPlateFans")).toBe("0");
+  });
+
+  test("the count survives normalization (not dropped to the default)", () => {
     expect(
       normalizeRawSettings({
         ...defaultSettings,
         printDesign: "nukit-tempest",
         tempestArrangement: "single-horizontal-top-filter",
-        backPlateFans: true,
+        backPlateFans: -1,
       } as const).backPlateFans,
-    ).toBe(true);
+    ).toBe(-1);
   });
 
   test("a checked Back toggle fills a fan grid on the one-side bottom plate", () => {
@@ -96,6 +99,21 @@ describe('tempest "Back" fan grid (single-filter bottom plate)', () => {
       sandwich: (fans) => fans.bottomPlate,
     });
     expect(grid.fanCount).toBeGreaterThan(0);
+  });
+
+  test("a fixed back count keeps that many fans, up to the grid maximum", () => {
+    const at = (count: number) => {
+      const m = createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(`${oneSide}&backPlateFans=${count}`))));
+      if (m.topology !== "sandwich") throw new Error("expected sandwich");
+      return m.fanLayout.bottomPlate;
+    };
+    const auto = at(-1);
+    expect(auto.fanCount).toBe(auto.maximumCount);
+    expect(auto.maximumCount).toBeGreaterThan(1);
+    expect(at(2).fanCount).toBe(2);
+    expect(at(1).fanCount).toBe(1);
+    // Asking for more than fit is capped at the maximum.
+    expect(at(auto.maximumCount + 5).fanCount).toBe(auto.maximumCount);
   });
 
   test("the bottom plate stays solid when Back is off", () => {

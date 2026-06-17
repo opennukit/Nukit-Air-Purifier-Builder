@@ -237,9 +237,11 @@ export type RawPurifierSettings = {
   hexGrill: boolean;
   hexSize: Millimeters;
   hexSpacing: Millimeters;
-  // Tempest one-side (single-horizontal-top-filter) only: a fan grid on the solid
-  // plate opposite the filter ("Back" fan placement).
-  backPlateFans: boolean;
+  // Tempest one-side (single-horizontal-top-filter) only: the "Back" fan grid on
+  // the solid plate opposite the filter, as a fan count: -1 = automatic (fill the
+  // grid), 0 = none, N = that many fans. (Legacy URLs used true/false; the codec
+  // maps those to -1/0.)
+  backPlateFans: number;
   // Tempest one-side "panel" (Back on) only: the chamber depth between the inside
   // filter flange and the inside back wall, in mm.
   boxDepth: Millimeters;
@@ -336,7 +338,7 @@ export type TempestPrintDesignDraft = {
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
-  readonly backPlateFans: boolean;
+  readonly backPlateFans: number;
   readonly boxDepth: Millimeters;
   readonly topExhaust: TopExhaust;
   readonly boxFanHoleSize: Millimeters;
@@ -404,7 +406,7 @@ export type ConfiguredPrintDesign =
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
-      readonly backPlateFans: boolean;
+      readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
       readonly topExhaust: TopExhaust;
       readonly boxFanHoleSize: Millimeters;
@@ -496,7 +498,7 @@ export const defaultSettings: RawPurifierSettings = {
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
-  backPlateFans: false,
+  backPlateFans: 0,
   boxDepth: 70,
   topExhaust: "fan-grid",
   // Box/exhaust sizes are concrete diameters, auto-populated from the filter
