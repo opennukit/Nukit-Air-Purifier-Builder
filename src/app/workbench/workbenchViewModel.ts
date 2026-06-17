@@ -49,7 +49,7 @@ export type WorkbenchDesignContext =
   | {
       readonly type: "nukit";
       readonly preset: LaserCutDesignPreset;
-      readonly layoutSectionTitle: "Layout";
+      readonly layoutSectionTitle: "";
       readonly partsSectionTitle: "Filter";
     }
   | {
@@ -201,7 +201,7 @@ function createWorkbenchDesignContext(
     return {
       type: "nukit",
       preset: isLaserCutDesignPreset(preset) ? preset : findLaserCutDesignPreset(),
-      layoutSectionTitle: "Layout",
+      layoutSectionTitle: "",
       partsSectionTitle: "Filter",
     };
   }

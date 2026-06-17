@@ -1242,7 +1242,7 @@
           {/if}
         </section>
 
-        <div class="controls-sections">
+        <div class="controls-sections" class:laser-columns={isNukitControlsActive}>
           {#snippet dimensionField(control: (typeof filterDimensionControls)[number])}
             <label class="field">
               <span>{control.label}</span>

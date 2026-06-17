@@ -835,6 +835,25 @@ Panel Grids
   align-items: start;
 }
 
+/* Laser Cut: flow the sections as balanced columns instead of a fixed 2-col grid
+   so cards of differing height don't leave empty space at the top of one column
+   and the bottom of the other. Full-width sections span both columns. */
+.controls-sections.laser-columns {
+  display: block;
+  column-count: 2;
+  column-gap: 18px;
+}
+
+.controls-sections.laser-columns > .control-section {
+  break-inside: avoid;
+  margin: 0 0 18px;
+}
+
+.controls-sections.laser-columns > .joint-tuning-section,
+.controls-sections.laser-columns > .parts-list-section {
+  column-span: all;
+}
+
 .parts-section {
   grid-column: 1;
 }
