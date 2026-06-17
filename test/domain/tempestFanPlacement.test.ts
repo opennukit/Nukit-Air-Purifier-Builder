@@ -116,6 +116,30 @@ describe('tempest "Back" fan grid (single-filter bottom plate)', () => {
     expect(at(auto.maximumCount + 5).fanCount).toBe(auto.maximumCount);
   });
 
+  test("a fixed back count is laid out symmetrically and centred", () => {
+    // A 501x501 filter gives a 3x3 max grid, so 3 can be a centred row and 4 a square.
+    const wide = "printDesign=nukit-tempest&tempestArrangement=single-horizontal-top-filter&fanDiameter=140&filterWidth=501&filterDepth=501&filterThickness=19&outsideFlangeThickness=10&materialThickness=5&fansLeft=0&fansRight=0&fansTop=0&fansBottom=0";
+    const layoutFor = (count: number) => {
+      const m = createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(`${wide}&backPlateFans=${count}`))));
+      if (m.topology !== "sandwich") throw new Error("expected sandwich");
+      return { box: m.box, positions: m.fanLayout.bottomPlate.positions };
+    };
+    const mirroredAbout = (values: number[], centre: number) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted.every((v, i) => Math.abs(v + sorted[sorted.length - 1 - i] - 2 * centre) < 0.01);
+    };
+    // 3 -> a single centred row (one y, x's mirror about the width centre).
+    const three = layoutFor(3);
+    expect(new Set(three.positions.map((p) => Math.round(p.y))).size).toBe(1);
+    expect(mirroredAbout(three.positions.map((p) => p.x), three.box.width / 2)).toBe(true);
+    // 4 -> a 2x2 block: x's and y's each mirror about their centre.
+    const four = layoutFor(4);
+    expect(mirroredAbout(four.positions.map((p) => p.x), four.box.width / 2)).toBe(true);
+    expect(mirroredAbout(four.positions.map((p) => p.y), four.box.depth / 2)).toBe(true);
+    expect(new Set(four.positions.map((p) => Math.round(p.x))).size).toBe(2);
+    expect(new Set(four.positions.map((p) => Math.round(p.y))).size).toBe(2);
+  });
+
   test("the bottom plate stays solid when Back is off", () => {
     const grid = matchTopology(
       createTempestModel(

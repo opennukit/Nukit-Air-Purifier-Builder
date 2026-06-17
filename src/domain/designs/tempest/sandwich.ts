@@ -205,10 +205,13 @@ type Aabb = {
 
 // The "Back" fan grid lives on the solid bottom plate that the single-filter
 // layout puts opposite its one (top) filter. The dual sandwich has no solid plate
-// there, so it never gets a grid. The grid mirrors the tower top plate: a centred
-// row/column array spaced by fanSpacing, kept a fan-radius-plus-wall in from each
-// edge so the bodies clear the corner posts. Any cell whose fan body would hit a
-// wall fan (left/right/top/bottom) is then dropped, so the two never intersect.
+// there, so it never gets a grid. The grid mirrors the tower top plate: fans
+// spaced by fanSpacing, kept a fan-radius-plus-wall in from each edge so the
+// bodies clear the corner posts. A fan body that would hit a wall fan is dropped.
+//
+// "automatic" fills the whole grid; a fixed count places that many SYMMETRICALLY:
+// a near-square block (e.g. 4 -> 2x2), and odd counts centred (e.g. 3 -> a centred
+// row), never bunched into one corner or an L.
 function createBottomPlateFanLayout(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
@@ -222,32 +225,107 @@ function createBottomPlateFanLayout(
   }
   const diameter = settings.fan.diameter;
   const minimumCenterFromEdge = settings.frame.wallThickness + diameter / 2;
-  const xs = plateFanPositions(plateFansPerSide(box.width, minimumCenterFromEdge, diameter), box.width, diameter);
-  const ys = plateFanPositions(plateFansPerSide(box.depth, minimumCenterFromEdge, diameter), box.depth, diameter);
+  const maxCols = plateFansPerSide(box.width, minimumCenterFromEdge, diameter);
+  const maxRows = plateFansPerSide(box.depth, minimumCenterFromEdge, diameter);
 
   const radius = diameter / 2;
-  const bodyDepth = tempestFanBodyDepth(diameter);
   const flange = settings.frame.outsideFlangeThickness;
-  // The back fan sits on the inside back wall (z = flange) and its body reaches up
-  // into the chamber by one body depth.
   const backZ0 = flange;
-  const backZ1 = flange + bodyDepth;
+  const backZ1 = flange + tempestFanBodyDepth(diameter);
   const wallBoxes = wallFanFootprints(walls, box, settings, localVerticalCenter);
+  const clearsWalls = ({ x, y }: TempestPlateFanPosition): boolean =>
+    !wallBoxes.some((wallBox) =>
+      aabbOverlap({ x0: x - radius, x1: x + radius, y0: y - radius, y1: y + radius, z0: backZ0, z1: backZ1 }, wallBox, BACK_FAN_WALL_CLEARANCE_MM),
+    );
 
-  // Every grid cell that clears the wall fans, in row-major order. "automatic"
-  // takes them all; a fixed count keeps the first N.
-  const clear: TempestPlateFanPosition[] = [];
-  for (const x of xs) {
-    for (const y of ys) {
-      const back: Aabb = { x0: x - radius, x1: x + radius, y0: y - radius, y1: y + radius, z0: backZ0, z1: backZ1 };
-      if (!wallBoxes.some((wallBox) => aabbOverlap(back, wallBox, BACK_FAN_WALL_CLEARANCE_MM))) {
-        clear.push({ x, y });
+  // The full grid, used both as the maximum and as the exact placement once the
+  // requested count reaches it.
+  const fullXs = plateFanPositions(maxCols, box.width, diameter);
+  const fullYs = plateFanPositions(maxRows, box.depth, diameter);
+  const fullGrid: TempestPlateFanPosition[] = [];
+  for (const x of fullXs) {
+    for (const y of fullYs) {
+      if (clearsWalls({ x, y })) {
+        fullGrid.push({ x, y });
       }
     }
   }
-  const maximumCount = clear.length;
-  const count = requested.type === "automatic" ? maximumCount : Math.max(0, Math.min(requested.count, maximumCount));
-  return { positions: clear.slice(0, count), fanCount: count, maximumCount };
+  const maximumCount = fullGrid.length;
+  const target = requested.type === "automatic" ? maximumCount : Math.max(0, Math.min(requested.count, maximumCount));
+  if (target <= 0) {
+    return { positions: [], fanCount: 0, maximumCount };
+  }
+  if (target >= maximumCount) {
+    return { positions: fullGrid, fanCount: maximumCount, maximumCount };
+  }
+
+  // Fewer than the full grid: lay the count out as a centred, near-square block.
+  const { rows } = chooseBackGrid(target, maxCols, maxRows);
+  const rowCounts = distributeBackRows(target, rows);
+  const ys = plateFanPositions(rows, box.depth, diameter);
+  const positions = rowCounts
+    .flatMap((rowCount, rowIndex) => plateFanPositions(rowCount, box.width, diameter).map((x) => ({ x, y: ys[rowIndex] })))
+    .filter(clearsWalls);
+  return { positions, fanCount: positions.length, maximumCount };
+}
+
+// Pick the rows x cols block for `count` fans: the squarest rectangle that holds
+// it with the least waste (so 4 -> 2x2, 6 -> 3x2, 3 -> 3x1), preferring more
+// columns than rows on a tie.
+function chooseBackGrid(count: number, maxCols: number, maxRows: number): { readonly cols: number; readonly rows: number } {
+  let best: { cols: number; rows: number; score: readonly number[] } | null = null;
+  for (let cols = 1; cols <= maxCols; cols += 1) {
+    for (let rows = 1; rows <= maxRows; rows += 1) {
+      if (cols * rows < count) {
+        continue;
+      }
+      const score = [cols * rows - count, Math.abs(cols - rows), -cols, -rows];
+      if (best === null || lexicographicLess(score, best.score)) {
+        best = { cols, rows, score };
+      }
+    }
+  }
+  return best === null ? { cols: Math.max(1, Math.min(count, maxCols)), rows: 1 } : { cols: best.cols, rows: best.rows };
+}
+
+// Split `count` fans across `rows` rows as evenly as possible, with the heavier
+// rows placed symmetrically about the centre so the stack reads as a palindrome
+// (e.g. 7 over 3 rows -> 2,3,2; 8 -> 3,2,3).
+function distributeBackRows(count: number, rows: number): number[] {
+  const base = Math.floor(count / rows);
+  const counts = new Array<number>(rows).fill(base);
+  let remaining = count - base * rows;
+  if (remaining % 2 === 1 && rows % 2 === 1) {
+    counts[(rows - 1) / 2] += 1;
+    remaining -= 1;
+  }
+  let low = 0;
+  let high = rows - 1;
+  while (remaining >= 2 && low < high) {
+    counts[low] += 1;
+    counts[high] += 1;
+    low += 1;
+    high -= 1;
+    remaining -= 2;
+  }
+  // Any leftover (even rows with an odd remainder) fills from the centre outward.
+  const centreOut = [...counts.keys()].sort((a, b) => Math.abs(a - (rows - 1) / 2) - Math.abs(b - (rows - 1) / 2));
+  let index = 0;
+  while (remaining > 0) {
+    counts[centreOut[index % rows]] += 1;
+    remaining -= 1;
+    index += 1;
+  }
+  return counts;
+}
+
+function lexicographicLess(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) {
+      return a[i] < b[i];
+    }
+  }
+  return false;
 }
 
 // The chamber-side body footprints of every wall fan, in model coordinates, so a
