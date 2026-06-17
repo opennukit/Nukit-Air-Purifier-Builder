@@ -1314,22 +1314,6 @@
                 {/if}
               </div>
               <div class="fan-grid">
-                {#if isNukitControlsActive}
-                  <div data-nukit-fan-placement>
-                    {#each fanPlacementControls as control}
-                      <label class="field compact-field">
-                        <span>{control.label}</span>
-                        <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
-                          <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
-                          {#each fixedFanCountOptions as count}
-                            <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
-                          {/each}
-                        </select>
-                      </label>
-                    {/each}
-                  </div>
-                {/if}
-
                 {#if isDonutControlsActive}
                   <div data-donut-layout>
                     <label class="field">
@@ -1535,7 +1519,7 @@
                   </div>
                 {/if}
 
-                {#if !isTempestControlsActive}
+                {#if isDonutControlsActive}
                   <div class="fan-selection">
                     {@render fanSizeSegment()}
                   </div>
@@ -1580,6 +1564,37 @@
                   </div>
 
                 {/if}
+              </div>
+            </section>
+          {/if}
+
+          {#if isNukitControlsActive}
+            <section class="control-section fan-section" data-nukit-fan-controls>
+              <div class="section-heading">
+                <p class="eyebrow">Fan</p>
+                <h2>Fan</h2>
+              </div>
+              <div class="fan-column">
+                <div class="fan-selection">
+                  {@render fanSizeSegment()}
+
+                  <fieldset class="fan-placement-field" data-nukit-fan-auto>
+                    <legend>Fan placement {@render infoTip("info-fanPlacement", "Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.")}</legend>
+                    <div class="fan-placement-checks">
+                      {#each fanPlacementCheckboxControls as control}
+                        <label class="toggle-field">
+                          <input
+                            type="checkbox"
+                            name={`auto-${control.name}`}
+                            checked={settings[control.name] === automaticFanCount}
+                            onchange={(event) => updateFanAuto(control.name, event)}
+                          />
+                          <span>{control.label}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  </fieldset>
+                </div>
               </div>
             </section>
           {/if}
@@ -1899,6 +1914,20 @@
               </button>
               {#if showLaserAdvanced}
                 <div class="advanced-columns">
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Fan counts</p>
+                    {#each fanPlacementControls as control}
+                      <label class="field compact-field">
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "Exact number of fans on this wall. 'Auto' fills the wall with as many as fit.")}</span>
+                        <select name={control.name} onchange={(event) => updateFanCountSetting(control.name, event)}>
+                          <option value={automaticFanCount} selected={settings[control.name] === automaticFanCount}>Auto</option>
+                          {#each fixedFanCountOptions as count}
+                            <option value={count} selected={settings[control.name] === count}>{count === 0 ? "None" : String(count)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                    {/each}
+                  </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Finger joints</p>
                     {#each laserFingerJointControls as control}

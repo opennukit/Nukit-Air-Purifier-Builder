@@ -49,8 +49,8 @@ export type WorkbenchDesignContext =
   | {
       readonly type: "nukit";
       readonly preset: LaserCutDesignPreset;
-      readonly layoutSectionTitle: "Fan placement";
-      readonly partsSectionTitle: "Filter and fan";
+      readonly layoutSectionTitle: "Layout";
+      readonly partsSectionTitle: "Filter";
     }
   | {
       readonly type: "donut-filter-adapter";
@@ -201,8 +201,8 @@ function createWorkbenchDesignContext(
     return {
       type: "nukit",
       preset: isLaserCutDesignPreset(preset) ? preset : findLaserCutDesignPreset(),
-      layoutSectionTitle: "Fan placement",
-      partsSectionTitle: "Filter and fan",
+      layoutSectionTitle: "Layout",
+      partsSectionTitle: "Filter",
     };
   }
 
