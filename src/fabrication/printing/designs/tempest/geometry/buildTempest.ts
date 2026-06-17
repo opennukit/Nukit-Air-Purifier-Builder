@@ -144,7 +144,7 @@ function assembleSandwich<Solid, Region>(
 ): Solid {
   const { transforms } = ctx.modeling;
 
-  const bottomPanel = filterLayout.bottomPanel === "solid-plate" ? platePanel(ctx, model) : framePanel(ctx, model); // 1.
+  const bottomPanel = filterLayout.bottomPanel === "solid-plate" ? platePanel(ctx, model, fanLayout) : framePanel(ctx, model); // 1.
   const topFrame = transforms.translate(
     [0, 0, model.box.height - model.frame.outsideFlangeThickness],
     framePanel(ctx, model),

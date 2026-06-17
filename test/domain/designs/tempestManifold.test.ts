@@ -71,6 +71,28 @@ describe("Tempest meshes are 2-manifold", () => {
     });
   });
 
+  test('the one-side "Back" fan grid bores the bottom plate yet stays watertight', () => {
+    const oneSide = {
+      ...defaultTempestSettings,
+      // Plain openings keep this fast; the honeycomb grill's manifoldness is
+      // already covered above.
+      fan: { ...defaultTempestSettings.fan, opening: { type: "plain" as const } },
+      arrangement: {
+        type: "single-horizontal-top-filter" as const,
+        filter: { footprintWidth: 370, footprintDepth: 290, thickness: 40 },
+      },
+    };
+    const solid = createTempestPrintableKit(oneSide, "unsplit");
+    const withBack = createTempestPrintableKit(
+      { ...oneSide, fan: { ...oneSide.fan, bottomPlateFans: { type: "automatic" } } },
+      "unsplit",
+    );
+    expect(manifoldReport(withBack.parts[0].mesh)).toEqual(cleanManifold);
+    // Each bored fan opening + its screw holes raises the genus, so the back grid
+    // must add holes the solid plate did not have.
+    expect(totalGenus(withBack.parts[0].mesh)).toBeGreaterThan(totalGenus(solid.parts[0].mesh));
+  }, 30000);
+
   test("four-filter tower exports a watertight single body", () => {
     const kit = createTempestPrintableKit(
       { ...defaultTempestSettings, arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter } },

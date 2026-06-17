@@ -1,4 +1,5 @@
 import type {
+  TempestFanLayout,
   TempestFilterLayout,
   TempestModel,
   TempestWallFanLayout,
@@ -36,8 +37,12 @@ export function framePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, m
   return subtractAll(ctx, panel, [chamferedOpeningCutAlongZ(ctx, opening, model.frame.outsideFlangeThickness, model.frame.chamferSize)]);
 }
 
-export function platePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid {
-  return chamferedPrism(
+export function platePanel<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
+): Solid {
+  const plate = chamferedPrism(
     ctx,
     0,
     0,
@@ -47,6 +52,24 @@ export function platePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, m
     model.frame.outsideFlangeThickness,
     model.frame.chamferSize,
   );
+  // The "Back" fan grid: bore each fan opening + its screw holes straight through
+  // the solid plate (z), centered on the plate's thickness.
+  const grid = fanLayout.bottomPlate;
+  if (grid.fanCount === 0) {
+    return plate;
+  }
+  const cuts = grid.positionsX.flatMap((x) =>
+    grid.positionsY.map((y) =>
+      fanPatternCut(
+        ctx,
+        model,
+        "z",
+        [x, y, model.frame.outsideFlangeThickness / 2],
+        model.frame.outsideFlangeThickness + 2 * SHELL_OVERLAP_MM,
+      ),
+    ),
+  );
+  return subtractAll(ctx, plate, cuts);
 }
 
 export function flangePanel<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel, height: number): Solid {

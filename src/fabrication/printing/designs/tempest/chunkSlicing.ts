@@ -100,11 +100,17 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
     sandwich: ({ fanLayout }) => {
       const z = frame.outsideFlangeThickness + fanLayout.localVerticalCenter;
       const wall = frame.wallThickness / 2;
+      // The "Back" grid lies flat in the bottom plate (normal +z), centred on its
+      // thickness.
+      const plateZ = frame.outsideFlangeThickness / 2;
       return [
         ...fanLayout.walls.front.positionsAlongWall.map((p): GrillCentre => [p, wall, z]),
         ...fanLayout.walls.back.positionsAlongWall.map((p): GrillCentre => [box.width - p, box.depth - wall, z]),
         ...fanLayout.walls.left.positionsAlongWall.map((p): GrillCentre => [wall, box.depth - p, z]),
         ...fanLayout.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
+        ...fanLayout.bottomPlate.positionsX.flatMap((x) =>
+          fanLayout.bottomPlate.positionsY.map((y): GrillCentre => [x, y, plateZ]),
+        ),
       ];
     },
     quad: ({ fanLayout, filterLayout }) => {
