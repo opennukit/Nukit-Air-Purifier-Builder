@@ -227,6 +227,25 @@ describe('tempest "Back" panel alignment pins clear the fan grid', () => {
     // Without the back grid the same plate pins are all full-depth.
     expect(buildPlatePins(false).pins.every((p) => p.holeDepth === undefined)).toBe(true);
   });
+
+  test("no bottom-plate pin lands on a piece edge or 4-way chunk corner", () => {
+    const { m, pins } = buildPlatePins(true);
+    if (m.topology !== "sandwich" || m.settings.alignmentPins.type !== "enabled") throw new Error("expected sandwich w/ pins");
+    const clearance = m.settings.alignmentPins.holeDepth + m.settings.alignmentPins.diameter;
+    const interiorX = m.chunkGrid.boundariesX.slice(1, -1);
+    const interiorY = m.chunkGrid.boundariesY.slice(1, -1);
+    for (const p of pins) {
+      // a pin runs along its seam axis; its free in-plane coordinate is the other axis
+      const free = p.axis === "x" ? p.position[1] : p.position[0];
+      const extent = p.axis === "x" ? m.box.depth : m.box.width;
+      const perp = p.axis === "x" ? interiorY : interiorX;
+      expect(free).toBeGreaterThan(clearance); // off the near outer edge
+      expect(free).toBeLessThan(extent - clearance); // off the far outer edge
+      for (const seam of perp) {
+        expect(Math.abs(free - seam)).toBeGreaterThanOrEqual(clearance); // off the 4-way corner
+      }
+    }
+  });
 });
 
 describe('tempest "Back" fan collision with wall fans', () => {

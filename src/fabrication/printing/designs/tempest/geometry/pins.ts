@@ -185,6 +185,17 @@ function pinPlacementsSandwich(
   const pushBottomPin = (position: readonly [number, number, number], axis: "x" | "y", depth: number): void => {
     placements.push(depth < pin.holeDepth ? { position, axis, holeDepth: depth } : { position, axis });
   };
+  // Planar (bottom-plate / top-frame) pins run along a seam; their free
+  // coordinate must clear the 4-way chunk corners (the perpendicular interior
+  // seams) and the outer perimeter, so a pin never lands on a piece edge or
+  // corner where it has too little material around it.
+  const interiorSeamsX = chunkGrid.boundariesX.slice(1, -1);
+  const interiorSeamsY = chunkGrid.boundariesY.slice(1, -1);
+  const cornerClearance = pin.holeDepth + pin.diameter;
+  const planarCoordClear = (coord: number, perpendicularSeams: readonly number[], extent: number): boolean =>
+    coord > cornerClearance &&
+    coord < extent - cornerClearance &&
+    !perpendicularSeams.some((seam) => Math.abs(coord - seam) < cornerClearance);
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
@@ -196,14 +207,21 @@ function pinPlacementsSandwich(
       }
       for (const frameZ of horizontalFrameMidlinesWithOpening(model, filterLayout)) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.frame.rim, pin.spacing)) {
-          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
+          if (planarCoordClear(gridY, interiorSeamsY, model.box.depth)) {
+            placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
+          }
         }
         for (const gridY of rimPositions(model.box.depth - model.frame.rim, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
+          if (planarCoordClear(gridY, interiorSeamsY, model.box.depth)) {
+            placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
+          }
         }
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
+          if (!planarCoordClear(gridY, interiorSeamsY, model.box.depth)) {
+            continue;
+          }
           const depth = bottomPinDepth(seamX, gridY, "x");
           if (depth !== null) {
             pushBottomPin([seamX, gridY, frameZ], "x", depth);
@@ -223,14 +241,21 @@ function pinPlacementsSandwich(
       }
       for (const frameZ of horizontalFrameMidlinesWithOpening(model, filterLayout)) {
         for (const gridX of rimPositions(model.frame.wallThickness, model.frame.rim, pin.spacing)) {
-          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
+          if (planarCoordClear(gridX, interiorSeamsX, model.box.width)) {
+            placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
+          }
         }
         for (const gridX of rimPositions(model.box.width - model.frame.rim, model.box.width - model.frame.wallThickness, pin.spacing)) {
-          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
+          if (planarCoordClear(gridX, interiorSeamsX, model.box.width)) {
+            placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
+          }
         }
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridX of rimPositions(model.frame.wallThickness, model.box.width - model.frame.wallThickness, pin.spacing)) {
+          if (!planarCoordClear(gridX, interiorSeamsX, model.box.width)) {
+            continue;
+          }
           const depth = bottomPinDepth(gridX, seamY, "y");
           if (depth !== null) {
             pushBottomPin([gridX, seamY, frameZ], "y", depth);
