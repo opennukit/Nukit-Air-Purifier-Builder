@@ -166,11 +166,19 @@ export type TopExhaust = (typeof topExhausts)[number];
 
 // Tempest preset designs. "custom" is the fully user-driven build; named designs
 // (e.g. Nukit Tempest Euro) apply a complete tempest configuration when chosen.
-export const tempestDesigns = ["nukit-tempest-euro", "nukit-tempest-euro-cube", "custom"] as const;
+export const tempestDesigns = [
+  "nukit-tempest-euro",
+  "nukit-tempest-euro-cube",
+  "nukit-tempest-original",
+  "nukit-tempest-original-cube",
+  "custom",
+] as const;
 export type TempestDesign = (typeof tempestDesigns)[number];
 export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
   "nukit-tempest-euro": "Nukit Tempest Euro",
   "nukit-tempest-euro-cube": "Nukit Tempest Euro Cube",
+  "nukit-tempest-original": "Nukit Tempest Original",
+  "nukit-tempest-original-cube": "Nukit Tempest Original Cube",
   custom: "Custom",
 };
 
@@ -607,6 +615,47 @@ export const nukitTempestEuroCubeDesignOverrides = {
   ...boxExhaustDiametersForWidth(290),
 } satisfies Partial<RawPurifierSettings>;
 
+// The "Nukit Tempest Original": a 2-filter sandwich around a 495x495x44 filter
+// with side (left/right) fans, honeycomb grill, right-wall cord.
+export const nukitTempestOriginalDesignOverrides = {
+  filterWidth: 495,
+  filterDepth: 495,
+  filterThickness: 44,
+  rim: 30,
+  fanColor: "black",
+  fanDiameter: 140,
+  filters: 2,
+  fansLeft: automaticFanCount,
+  fansRight: automaticFanCount,
+  fansTop: 0,
+  fansBottom: 0,
+  tempestArrangement: "dual-horizontal-sandwich",
+  filterSlotWall: "back",
+  filterFitClearance: 1,
+  cordHoleDiameter: 8,
+  cordHoleWall: "right",
+  cordHoleSide: "right",
+  cordHoleCornerOffset: 17,
+  outsideFlangeThickness: 10,
+  hexGrill: true,
+  hexSize: 10,
+  hexSpacing: 1.6,
+  topExhaust: "fan-grid",
+  screwHoleDiameter: 5,
+  materialThickness: 5,
+  ...boxExhaustDiametersForWidth(495),
+} satisfies Partial<RawPurifierSettings>;
+
+// The "Nukit Tempest Original Cube": the Original rebuilt as a 4-side-filter
+// tower with top fans (same 495x495x44 filter).
+export const nukitTempestOriginalCubeDesignOverrides = {
+  ...nukitTempestOriginalDesignOverrides,
+  fansLeft: 0,
+  fansRight: 0,
+  fansTop: automaticFanCount,
+  tempestArrangement: "four-side-filter-tower",
+} satisfies Partial<RawPurifierSettings>;
+
 // Apply a named tempest design. "custom" just records the choice; a named design
 // applies its full configuration so the build matches the preset.
 export function applyTempestDesign(settings: RawPurifierSettings, design: TempestDesign): RawPurifierSettings {
@@ -615,6 +664,12 @@ export function applyTempestDesign(settings: RawPurifierSettings, design: Tempes
   }
   if (design === "nukit-tempest-euro-cube") {
     return { ...settings, ...nukitTempestEuroCubeDesignOverrides, tempestDesign: "nukit-tempest-euro-cube" };
+  }
+  if (design === "nukit-tempest-original") {
+    return { ...settings, ...nukitTempestOriginalDesignOverrides, tempestDesign: "nukit-tempest-original" };
+  }
+  if (design === "nukit-tempest-original-cube") {
+    return { ...settings, ...nukitTempestOriginalCubeDesignOverrides, tempestDesign: "nukit-tempest-original-cube" };
   }
   return { ...settings, tempestDesign: canonicalTempestDesign(design) };
 }
