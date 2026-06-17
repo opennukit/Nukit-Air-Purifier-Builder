@@ -497,7 +497,7 @@ export const defaultSettings: RawPurifierSettings = {
   hexSize: 10,
   hexSpacing: 1.6,
   backPlateFans: false,
-  boxDepth: 50,
+  boxDepth: 70,
   topExhaust: "fan-grid",
   // Box/exhaust sizes are concrete diameters, auto-populated from the filter
   // width (fan hole 70%, ring 1 80%, ring 2 90%) — here for the default width.
