@@ -230,6 +230,11 @@
   // box/exhaust option and its variables, hex size/spacing, fan screw holes,
   // material thickness, and the cord wall/position/offset controls.
   let showTempestAdvanced = false;
+  // The Laser Cut "Advanced" (joint tuning) accordion, collapsed by default to
+  // match the 3D Print Advanced layout.
+  let showLaserAdvanced = false;
+  const laserFingerJointControls = advancedJointControls.filter((control) => control.name.startsWith("finger"));
+  const laserDovetailControls = advancedJointControls.filter((control) => control.name.startsWith("dovetail"));
   // Chunk-label deboss is parked: hide its control until the placement is reworked.
   const SHOW_CHUNK_LABELS_CONTROL = false;
   let showBoxExhaustOption = false;
@@ -1883,28 +1888,57 @@
 
           {#if showAdvancedControls}
             <section class="control-section joint-tuning-section" data-generated-advanced-controls>
-              <div class="section-heading">
-                <p class="eyebrow">Advanced</p>
-                <h2>Joint tuning</h2>
-              </div>
-              <div class="advanced-field-grid">
-                {#each advancedJointControls as control}
-                  <label class="field">
-                    <span>{control.label}</span>
-                    <span class="input-shell">
-                      <input
-                        type="number"
-                        name={control.name}
-                        step={control.step}
-                        inputmode="decimal"
-                        value={settings[control.name]}
-                        onchange={(event) => updateNumberSetting(control.name, event)}
-                      />
-                      <small>{control.suffix}</small>
-                    </span>
-                  </label>
-                {/each}
-              </div>
+              <button
+                type="button"
+                class="advanced-accordion-toggle"
+                aria-expanded={showLaserAdvanced}
+                onclick={() => (showLaserAdvanced = !showLaserAdvanced)}
+              >
+                <span class="eyebrow">Advanced</span>
+                <svg class="advanced-accordion-chevron" class:is-open={showLaserAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
+              </button>
+              {#if showLaserAdvanced}
+                <div class="advanced-columns">
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Finger joints</p>
+                    {#each laserFingerJointControls as control}
+                      <label class="field">
+                        <span>{control.label}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name={control.name}
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
+                          />
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                  </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Dovetails</p>
+                    {#each laserDovetailControls as control}
+                      <label class="field">
+                        <span>{control.label}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name={control.name}
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
+                          />
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
             </section>
           {/if}
 
