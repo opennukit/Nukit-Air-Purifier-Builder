@@ -1314,6 +1314,17 @@
                 {/if}
               </div>
               <div class="fan-grid">
+                {#if isNukitControlsActive}
+                  <div data-nukit-layout>
+                    <label class="field compact-field" data-nukit-design>
+                      <span>Design</span>
+                      <select name="nukitDesign">
+                        <option value="custom" selected>Custom</option>
+                      </select>
+                    </label>
+                  </div>
+                {/if}
+
                 {#if isDonutControlsActive}
                   <div data-donut-layout>
                     <label class="field">
