@@ -69,7 +69,7 @@ export function tempestAlignmentPinPlacements(model: TempestModel, chunkGrid: Te
   }
 
   return matchTopology(model, {
-    sandwich: (m) => pinPlacementsSandwich(m, m.filterLayout, chunkGrid, pin),
+    sandwich: (m) => pinPlacementsSandwich(m, m.filterLayout, m.fanLayout, chunkGrid, pin),
     quad: (m) => pinPlacementsQuad(m, m.filterLayout, m.fanLayout, chunkGrid, pin),
   });
 }
@@ -169,10 +169,22 @@ function pinHoleCylinder<Solid, Region>(
 function pinPlacementsSandwich(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
   chunkGrid: TempestChunkGrid,
   pin: AlignmentPinSpec,
 ): TempestAlignmentPinPlacement[] {
   const placements: TempestAlignmentPinPlacement[] = [];
+  // The "Back" fan grid bores circular holes through the solid bottom plate, so a
+  // seam pin running along that plate must stop short of (or skip) them — the same
+  // treatment the tower's top-plate fan grid gets. Null when there is no grid.
+  const bottomHoles = sandwichBottomPlateHoles(model, fanLayout);
+  // A bottom-plate pin at (sx, sy) along `axis`: full depth when there are no back
+  // holes, otherwise clamped to stop short of them (null = skip this pin).
+  const bottomPinDepth = (sx: number, sy: number, axis: "x" | "y"): number | null =>
+    bottomHoles === null ? pin.holeDepth : clampedTopPinDepth(bottomHoles, sx, sy, axis, pin.holeDepth);
+  const pushBottomPin = (position: readonly [number, number, number], axis: "x" | "y", depth: number): void => {
+    placements.push(depth < pin.holeDepth ? { position, axis, holeDepth: depth } : { position, axis });
+  };
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
@@ -192,7 +204,10 @@ function pinPlacementsSandwich(
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridY of rimPositions(model.frame.wallThickness, model.box.depth - model.frame.wallThickness, pin.spacing)) {
-          placements.push({ position: [seamX, gridY, frameZ], axis: "x" });
+          const depth = bottomPinDepth(seamX, gridY, "x");
+          if (depth !== null) {
+            pushBottomPin([seamX, gridY, frameZ], "x", depth);
+          }
         }
       }
     }
@@ -216,7 +231,10 @@ function pinPlacementsSandwich(
       }
       for (const frameZ of horizontalSolidPlateMidlines(model, filterLayout)) {
         for (const gridX of rimPositions(model.frame.wallThickness, model.box.width - model.frame.wallThickness, pin.spacing)) {
-          placements.push({ position: [gridX, seamY, frameZ], axis: "y" });
+          const depth = bottomPinDepth(gridX, seamY, "y");
+          if (depth !== null) {
+            pushBottomPin([gridX, seamY, frameZ], "y", depth);
+          }
         }
       }
     }
@@ -442,6 +460,31 @@ function quadTopPlateHoles(
         for (const sy of [fy - screwDelta, fy + screwDelta]) {
           circles.push({ cx: sx, cy: sy, r: screwRadius });
         }
+      }
+    }
+  }
+  return circles;
+}
+
+// The perpendicular holes a sandwich bottom-plate ("Back" fan) pin must avoid:
+// each back fan's grill opening and its four screw holes, as circles in the plate
+// plane. Null when there is no back grid, which keeps the plate pins full-depth.
+function sandwichBottomPlateHoles(
+  model: TempestModel,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "sandwich" }>,
+): readonly TopPlateHoleCircle[] | null {
+  if (fanLayout.bottomPlate.fanCount === 0) {
+    return null;
+  }
+  const grillRadius = model.settings.fan.diameter / 2;
+  const screwRadius = model.settings.fan.screwHoleDiameter / 2;
+  const screwDelta = fanLayout.screwPitch / 2;
+  const circles: TopPlateHoleCircle[] = [];
+  for (const { x, y } of fanLayout.bottomPlate.positions) {
+    circles.push({ cx: x, cy: y, r: grillRadius });
+    for (const sx of [x - screwDelta, x + screwDelta]) {
+      for (const sy of [y - screwDelta, y + screwDelta]) {
+        circles.push({ cx: sx, cy: sy, r: screwRadius });
       }
     }
   }

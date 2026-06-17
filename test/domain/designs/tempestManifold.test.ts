@@ -93,6 +93,34 @@ describe("Tempest meshes are 2-manifold", () => {
     expect(totalGenus(withBack.parts[0].mesh)).toBeGreaterThan(totalGenus(solid.parts[0].mesh));
   }, 30000);
 
+  test('a split "Back" panel stays watertight with seam pins through the bored plate', () => {
+    const panel = {
+      ...defaultTempestSettings,
+      fan: {
+        ...defaultTempestSettings.fan,
+        opening: { type: "plain" as const },
+        bottomPlateFans: { type: "automatic" as const },
+        // No side-wall fans: a flat panel.
+        wallRequests: {
+          front: { type: "fixed" as const, count: 0 },
+          back: { type: "fixed" as const, count: 0 },
+          left: { type: "fixed" as const, count: 0 },
+          right: { type: "fixed" as const, count: 0 },
+        },
+      },
+      arrangement: {
+        type: "single-horizontal-top-filter" as const,
+        // Exceeds the 256mm bed so it splits and grows bottom-plate seam pins.
+        filter: { footprintWidth: 370, footprintDepth: 290, thickness: 40 },
+      },
+    };
+    const kit = createTempestPrintableKit(panel, "bed-256");
+    expect(kit.parts.length).toBeGreaterThan(1);
+    for (const part of kit.parts) {
+      expect(manifoldReport(part.mesh)).toEqual(cleanManifold);
+    }
+  }, 30000);
+
   test("four-filter tower exports a watertight single body", () => {
     const kit = createTempestPrintableKit(
       { ...defaultTempestSettings, arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter } },

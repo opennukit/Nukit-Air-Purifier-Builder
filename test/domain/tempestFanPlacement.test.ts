@@ -9,6 +9,7 @@ import {
 import { normalizeRawSettings } from "@/domain/purifier/airPurifier";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import { matchTopology } from "@/domain/designs/tempest/topology";
+import { tempestPinPlacementsClearOfFans } from "@/fabrication/printing/designs/tempest/geometry/pins";
 
 const oneSide =
   "printDesign=nukit-tempest&tempestArrangement=single-horizontal-top-filter&fanDiameter=140&filterWidth=370&filterDepth=290&filterThickness=40";
@@ -181,6 +182,50 @@ describe('tempest "Back" panel cord placement', () => {
     const m = modelFor(`${oneSide}&backPlateFans=false&cordHoleWall=right&cordHoleDiameter=8`);
     if (m.topology !== "sandwich" || m.cordPassThrough.type !== "wall-cylinder") throw new Error("expected sandwich cord");
     expect(m.cordPassThrough.verticalCenter).toBeCloseTo(m.box.height / 2);
+  });
+});
+
+describe('tempest "Back" panel alignment pins clear the fan grid', () => {
+  // A 370x290 filter exceeds the 256mm bed, so the panel splits and grows seam
+  // pins on the solid bottom plate the back grid bores.
+  const split =
+    "printDesign=nukit-tempest&tempestArrangement=single-horizontal-top-filter&filterWidth=370&filterDepth=290&filterThickness=40&fanDiameter=140&fansLeft=0&fansRight=0&fansTop=0&fansBottom=0&boxDepth=70";
+  const buildPlatePins = (backOn: boolean) => {
+    const m = createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(`${split}&backPlateFans=${backOn}`))));
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    const plateZ = m.frame.outsideFlangeThickness / 2;
+    const pins = tempestPinPlacementsClearOfFans(m, m.chunkGrid).filter((p) => Math.abs(p.position[2] - plateZ) < 1e-6);
+    return { m, pins };
+  };
+
+  test("the panel actually splits and grows bottom-plate seam pins", () => {
+    const { m, pins } = buildPlatePins(true);
+    expect(m.chunkGrid.countX * m.chunkGrid.countY).toBeGreaterThan(1);
+    expect(pins.length).toBeGreaterThan(0);
+  });
+
+  test("no bottom-plate pin sits inside a back fan opening or screw hole", () => {
+    const { m, pins } = buildPlatePins(true);
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    const r = m.settings.fan.diameter / 2;
+    const screwDelta = m.fanLayout.screwPitch / 2;
+    const screwR = m.settings.fan.screwHoleDiameter / 2;
+    const holes = m.fanLayout.bottomPlate.positions.flatMap(({ x, y }) => [
+      { cx: x, cy: y, rr: r },
+      ...[x - screwDelta, x + screwDelta].flatMap((sx) => [y - screwDelta, y + screwDelta].map((sy) => ({ cx: sx, cy: sy, rr: screwR }))),
+    ]);
+    for (const p of pins) {
+      const [px, py] = p.position;
+      for (const h of holes) {
+        expect(Math.hypot(px - h.cx, py - h.cy) >= h.rr).toBe(true);
+      }
+    }
+  });
+
+  test("some bottom-plate pins are shortened to clear the holes, only when Back is on", () => {
+    expect(buildPlatePins(true).pins.some((p) => p.holeDepth !== undefined)).toBe(true);
+    // Without the back grid the same plate pins are all full-depth.
+    expect(buildPlatePins(false).pins.every((p) => p.holeDepth === undefined)).toBe(true);
   });
 });
 
