@@ -174,6 +174,11 @@ function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans
 function resolvedTempestFanCount(fanLayout: TempestFanLayout): number {
   return matchTopology(fanLayout, {
     quad: (fans) => fans.fanCount,
-    sandwich: (fans) => fans.walls.front.actualCount + fans.walls.back.actualCount + fans.walls.left.actualCount + fans.walls.right.actualCount,
+    sandwich: (fans) =>
+      fans.walls.front.actualCount +
+      fans.walls.back.actualCount +
+      fans.walls.left.actualCount +
+      fans.walls.right.actualCount +
+      fans.bottomPlate.fanCount,
   });
 }

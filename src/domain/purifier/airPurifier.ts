@@ -146,6 +146,9 @@ export function normalizeRawSettings(
     hexGrill: input.hexGrill,
     hexSize: normalizeHexSize(input.hexSize),
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
+    // Preserved like hexGrill: toRawSettings re-emits the default, so restore the
+    // user's "Back" fan toggle from the raw input here.
+    backPlateFans: input.backPlateFans,
     ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
@@ -284,6 +287,7 @@ export function serializePurifierDraft(
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
+      backPlateFans: draft.design.backPlateFans,
       ...copyTempestExhaustFields(draft.design),
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,

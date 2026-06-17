@@ -7,6 +7,11 @@ import {
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
 import { normalizeRawSettings } from "@/domain/purifier/airPurifier";
+import { createTempestModel } from "@/domain/designs/tempest/model";
+import { matchTopology } from "@/domain/designs/tempest/topology";
+
+const oneSide =
+  "printDesign=nukit-tempest&tempestArrangement=single-horizontal-top-filter&fanDiameter=140&filterWidth=370&filterDepth=290&filterThickness=40";
 
 const sandwich =
   "printDesign=nukit-tempest&tempestArrangement=dual-horizontal-sandwich&fanDiameter=140";
@@ -58,5 +63,50 @@ describe("tempest per-wall fan placement (1-top / 2-sandwich)", () => {
     expect(switched.fansTop).toBe(0);
     expect(switched.fansBottom).toBe(0);
     expect(switched.fansLeft).toBe(-1);
+  });
+});
+
+describe('tempest "Back" fan grid (single-filter bottom plate)', () => {
+  test("the backPlateFans toggle survives the URL round-trip", () => {
+    const round = new URLSearchParams(
+      encodeSettings(decodeSettings(`${oneSide}&backPlateFans=true`)),
+    );
+    expect(round.get("backPlateFans")).toBe("true");
+  });
+
+  test("the toggle survives normalization (not dropped to the default)", () => {
+    expect(
+      normalizeRawSettings({
+        ...defaultSettings,
+        printDesign: "nukit-tempest",
+        tempestArrangement: "single-horizontal-top-filter",
+        backPlateFans: true,
+      } as const).backPlateFans,
+    ).toBe(true);
+  });
+
+  test("a checked Back toggle fills a fan grid on the one-side bottom plate", () => {
+    const settings = createTempestSettingsFromLayout(
+      createLayout(decodeSettings(`${oneSide}&backPlateFans=true`)),
+    );
+    expect(settings.fan.bottomPlateFans).toEqual({ type: "automatic" });
+    const grid = matchTopology(createTempestModel(settings).fanLayout, {
+      quad: () => ({ fanCount: 0 }),
+      sandwich: (fans) => fans.bottomPlate,
+    });
+    expect(grid.fanCount).toBeGreaterThan(0);
+  });
+
+  test("the bottom plate stays solid when Back is off", () => {
+    const grid = matchTopology(
+      createTempestModel(
+        createTempestSettingsFromLayout(createLayout(decodeSettings(oneSide))),
+      ).fanLayout,
+      {
+        quad: () => ({ fanCount: 0 }),
+        sandwich: (fans) => fans.bottomPlate,
+      },
+    );
+    expect(grid.fanCount).toBe(0);
   });
 });
