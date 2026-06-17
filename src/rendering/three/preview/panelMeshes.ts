@@ -123,7 +123,7 @@ export function createPanelGroup(
 ): Group {
   const panel = part.panel;
   const group = new Group();
-  const geometry = createPanelGeometry(panel, materialThickness);
+  const geometry = createPanelGeometry(panel, materialThickness, exploded);
   const mesh = new Mesh(geometry, material);
   mesh.name = panel.id;
   mesh.castShadow = true;
@@ -163,29 +163,49 @@ export function createPanelGroup(
   return group;
 }
 
-function createPanelGeometry(panel: CutPanel, materialThickness: number): ExtrudeGeometry {
+function createPanelGeometry(panel: CutPanel, materialThickness: number, exploded: boolean): ExtrudeGeometry {
   const shape = new Shape();
-  // Extrude the real toothed cut outline (finger combs + dovetail tails/sockets)
-  // so the joinery is visible in both the assembled and exploded 3D views. The
-  // cut geometry matches boxes.py, so the fingers interlock with their mating
-  // holes/notches. At nominal corner positions perpendicular walls' teeth still
-  // overlap visually (a flat-panel preview can't fold the lap), but the flat cut
-  // parts themselves mesh.
-  panel.outline.forEach((point, index) => {
-    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
-    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
-    if (index === 0) {
-      shape.moveTo(x, y);
-    } else {
-      shape.lineTo(x, y);
+  if (exploded) {
+    // Exploded view: extrude the real toothed cut outline (finger combs +
+    // dovetail tails/sockets) plus every hole, so the joinery is visible.
+    panel.outline.forEach((point, index) => {
+      const x = (point.x - panel.assemblyCenter.x) * sceneScale;
+      const y = (point.y - panel.assemblyCenter.y) * sceneScale;
+      if (index === 0) {
+        shape.moveTo(x, y);
+      } else {
+        shape.lineTo(x, y);
+      }
+    });
+    shape.closePath();
+    for (const cut of panel.cuts) {
+      const hole = createHolePath(cut, panel);
+      if (hole !== null) {
+        shape.holes.push(hole);
+      }
     }
-  });
-  shape.closePath();
-
-  for (const cut of panel.cuts) {
-    const hole = createHolePath(cut, panel);
-    if (hole !== null) {
-      shape.holes.push(hole);
+  } else {
+    // Assembled view: draw each part as a clean nominal rectangle so the box reads
+    // as a solid enclosure with no finger teeth or slots showing. Fan walls inset
+    // one thickness in width to seat between the side walls. Functional openings
+    // (fans, windows, vents) are kept; finger-hole / slot joinery is hidden.
+    const role = panel.assembly?.type === "placed" ? panel.assembly.role : undefined;
+    const widthInset = role === "front-fan-wall" || role === "rear-fan-wall" || role === "closed-back" ? materialThickness : 0;
+    const halfWidth = ((panel.nominalWidth - widthInset) / 2) * sceneScale;
+    const halfHeight = (panel.nominalHeight / 2) * sceneScale;
+    shape.moveTo(-halfWidth, -halfHeight);
+    shape.lineTo(halfWidth, -halfHeight);
+    shape.lineTo(halfWidth, halfHeight);
+    shape.lineTo(-halfWidth, halfHeight);
+    shape.closePath();
+    for (const cut of panel.cuts) {
+      if (cut.role === "finger-hole") {
+        continue;
+      }
+      const hole = createHolePath(cut, panel);
+      if (hole !== null) {
+        shape.holes.push(hole);
+      }
     }
   }
 

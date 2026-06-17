@@ -335,10 +335,13 @@
   $: layoutSectionTitleText = activeDesignContext.layoutSectionTitle;
   $: partsSectionTitleText = activeDesignContext.partsSectionTitle;
   $: exportActionText = workbenchView.exportActionLabel;
+  // Laser-drawing export is temporarily disabled: keep the buttons visible but
+  // inert, labelled "Export Disabled".
+  $: laserExportDisabled = fabricationMethod === "laser-svg";
   $: copyTopButtonText = transientButtonLabels["copy-top"] ?? "Copy URL";
   $: copyMobileButtonText = transientButtonLabels["copy-mobile"] ?? "Copy URL";
-  $: exportMainButtonText = transientButtonLabels["export-main"] ?? exportActionText;
-  $: exportMobileButtonText = transientButtonLabels["export-mobile"] ?? exportActionText;
+  $: exportMainButtonText = laserExportDisabled ? "Export Disabled" : transientButtonLabels["export-main"] ?? exportActionText;
+  $: exportMobileButtonText = laserExportDisabled ? "Export Disabled" : transientButtonLabels["export-mobile"] ?? exportActionText;
 
   // ##############################
   // Lifecycle
@@ -1215,6 +1218,7 @@
                 class="primary-button export-primary-button"
                 type="button"
                 data-export-primary
+                disabled={laserExportDisabled}
                 onclick={() => exportDrawing("export-main")}
               >
                 {exportMainButtonText}
@@ -2006,7 +2010,7 @@
     <button class="ghost-button" type="button" onclick={() => void copyUrl("copy-mobile")}>
       {copyMobileButtonText}
     </button>
-    <button class="primary-button" type="button" data-export-primary onclick={() => exportDrawing("export-mobile")}>
+    <button class="primary-button" type="button" data-export-primary disabled={laserExportDisabled} onclick={() => exportDrawing("export-mobile")}>
       {exportMobileButtonText}
     </button>
   </nav>
