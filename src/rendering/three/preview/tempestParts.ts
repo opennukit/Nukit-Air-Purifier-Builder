@@ -249,6 +249,62 @@ export function explodeTempestTopFanOutward(
   fan.position[plane.axis] -= plane.insideSign * distance;
 }
 
+// The "Back" fan grid on the single-filter solid bottom plate is the mirror of
+// the tower's top grid: recess each fan above the plate's interior surface, and
+// explode it straight out the bottom. `bottomInteriorZ` is the top of the bottom
+// plate in CSG coordinates.
+export function moveTempestFanInsideBottom(
+  fan: Group,
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  bottomInteriorZ: number,
+): void {
+  const bounds = new Box3().setFromObject(fan);
+  const plane = tempestBottomInteriorPlane(model, pose, bottomInteriorZ);
+  fan.position[plane.axis] += previewInteriorShiftForBounds(bounds, plane);
+}
+
+export function explodeTempestBottomFanOutward(
+  fan: Group,
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  bottomInteriorZ: number,
+  distance: number,
+): void {
+  const plane = tempestBottomInteriorPlane(model, pose, bottomInteriorZ);
+  fan.position[plane.axis] -= plane.insideSign * distance;
+}
+
+// The interior (upper) surface of the solid bottom plate, as a scene-space plane
+// — same shape as tempestTopInteriorPlane but probing upward (+z) into the box.
+function tempestBottomInteriorPlane(
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  bottomInteriorZ: number,
+): PreviewInteriorPlane {
+  const facePoint: TempestCsgPoint = { x: model.box.width / 2, y: model.box.depth / 2, z: bottomInteriorZ };
+  const sceneFacePoint = tempestCsgPointToScene(facePoint, pose);
+  const insideDirection = tempestCsgPointToScene({ ...facePoint, z: facePoint.z + 1 }, pose).sub(sceneFacePoint);
+  const axis = dominantVectorAxis(insideDirection);
+  const insideSign = vectorAxisValue(insideDirection, axis) >= 0 ? 1 : -1;
+  return {
+    axis,
+    coordinate: vectorAxisValue(sceneFacePoint, axis),
+    insideSign,
+    inset: previewTopFanGrillGap,
+  };
+}
+
+// The bottom-plate fans exhaust out the bottom (away from the interior), derived
+// from the same interior probe so it stays correct under the upright pose.
+export function tempestBottomFanFacing(
+  model: TempestModel,
+  pose: TempestPrintablePose,
+  bottomInteriorZ: number,
+): FanFacing {
+  return tempestBottomInteriorPlane(model, pose, bottomInteriorZ).insideSign >= 0 ? "axis-negative" : "axis-positive";
+}
+
 // The underside of the top plate, expressed as a scene-space interior plane —
 // same shape as the wall planes, but with a real gap so the fan drops clear of
 // the top fan-grid (the walls stop below the grid) rather than poking up level

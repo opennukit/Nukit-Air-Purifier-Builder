@@ -46,6 +46,9 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
             },
       // Tower top-panel fan grid toggle (top bank: automatic = grid on, 0 = off).
       topFans: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.top),
+      // "Back" fan grid on the single-filter solid plate (opposite the filter).
+      // The checkbox on/off maps to a full automatic grid or none.
+      bottomPlateFans: design.backPlateFans ? { type: "automatic" } : { type: "fixed", count: 0 },
       topExhaust: design.topExhaust,
       boxExhaust: resolveBoxExhaust(design),
     },

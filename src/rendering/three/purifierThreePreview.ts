@@ -124,10 +124,13 @@ import {
 import {
   createTempestPreviewBox,
   expectSandwichArrangementFilter,
+  explodeTempestBottomFanOutward,
   explodeTempestTopFanOutward,
   explodeTempestWallFanOutward,
+  moveTempestFanInsideBottom,
   moveTempestFanInsideTop,
   moveTempestFanInsideWall,
+  tempestBottomFanFacing,
   tempestCsgAxisToSceneAxis,
   tempestCsgPointToScene,
   tempestPosedPointToScene,
@@ -1318,6 +1321,27 @@ export class PurifierThreePreview {
         const { fanLayout } = m;
         for (const wall of tempestPreviewWalls) {
           this.addTempestWallFans(m, pose, fanLayout.walls[wall], fanLayout.localVerticalCenter, fanAppearance, exploded, chunkBoxes);
+        }
+        // The "Back" fan grid on the solid bottom plate (single-filter only).
+        const bottomInteriorZ = m.frame.outsideFlangeThickness;
+        const bottomFanCenterZ = bottomInteriorZ + fanPreviewRearDepthMillimeters;
+        for (const x of fanLayout.bottomPlate.positionsX) {
+          for (const y of fanLayout.bottomPlate.positionsY) {
+            const fan = createFan({
+              axis: tempestCsgAxisToSceneAxis("z", pose),
+              position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
+              radius: (model.settings.fan.diameter / 2) * sceneScale,
+              facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
+              appearance: fanAppearance,
+            });
+            fan.userData["tempestPreviewFan"] = true;
+            moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
+            this.parentPreviewFanToChunk(fan, chunkBoxes);
+            if (exploded) {
+              explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
+            }
+            collectFanRotors(fan, this.fanRotors);
+          }
         }
       },
       quad: (m) => {

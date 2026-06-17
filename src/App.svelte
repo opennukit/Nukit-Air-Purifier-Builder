@@ -309,6 +309,9 @@
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
   $: isFourFilterTower = isTempestControlsActive && settings.tempestArrangement === "four-side-filter-tower";
+  // One-side ("1-filter wall mount") has a solid plate opposite its filter, which
+  // can carry the extra "Back" fan grid.
+  $: isOneSideFilter = isTempestControlsActive && settings.tempestArrangement === "single-horizontal-top-filter";
   // The horizontal layouts (1 top / 2 sandwich) take per-wall fans; the tower
   // exhausts through the top instead.
   $: showTempestWallFanControls = isTempestControlsActive && !isFourFilterTower;
@@ -1681,6 +1684,17 @@
                             <span>{control.label}</span>
                           </label>
                         {/each}
+                        {#if isOneSideFilter}
+                          <label class="toggle-field">
+                            <input
+                              type="checkbox"
+                              name="backPlateFans"
+                              checked={settings.backPlateFans}
+                              onchange={(event) => updateBooleanSetting("backPlateFans", event)}
+                            />
+                            <span>Back</span>
+                          </label>
+                        {/if}
                       </div>
                     </fieldset>
                   </div>

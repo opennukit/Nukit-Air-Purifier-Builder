@@ -86,6 +86,7 @@ export type PurifierSettingsFieldFallbacks = {
   readonly hexGrill: boolean;
   readonly hexSize: number;
   readonly hexSpacing: number;
+  readonly backPlateFans: boolean;
   readonly boxFanHoleSize: number;
   readonly boxRingOneScrewHoles: number;
   readonly boxRingOneScrewDiameter: number;
@@ -148,6 +149,7 @@ export const createPurifierSettingsFieldsSchema = (
     hexGrill: zBooleanField(fallbacks.hexGrill),
     hexSize: zNumberField(fallbacks.hexSize),
     hexSpacing: zNumberField(fallbacks.hexSpacing),
+    backPlateFans: zBooleanField(fallbacks.backPlateFans),
     boxFanHoleSize: zNumberField(fallbacks.boxFanHoleSize),
     boxRingOneScrewHoles: zIntegerField(fallbacks.boxRingOneScrewHoles),
     boxRingOneScrewDiameter: zNumberField(fallbacks.boxRingOneScrewDiameter),

@@ -354,6 +354,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     hexGrill: defaultSettings.hexGrill,
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
+    backPlateFans: defaultSettings.backPlateFans,
     ...copyTempestExhaustFields(defaultSettings),
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -522,6 +523,7 @@ function createConfiguredPrintDesign(input: {
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
+      backPlateFans: input.raw.backPlateFans,
       ...normalizeTempestExhaustFields(input.raw),
     };
   }
@@ -630,6 +632,7 @@ function createPurifierDesignDraft(
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
+      backPlateFans: configuration.design.backPlateFans,
       ...copyTempestExhaustFields(configuration.design),
     };
   }

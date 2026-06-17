@@ -137,6 +137,17 @@ export type TempestWallFanLayout = {
   readonly positionsAlongWall: readonly Millimeters[];
 };
 
+// The fan grid on the single-filter sandwich's solid bottom plate (the "Back"
+// placement). Same row/column scheme as the tower top plate, positioned in model
+// (x, y) over the plate. fanCount === 0 means the plate stays solid.
+export type TempestPlateFanLayout = {
+  readonly columns: number;
+  readonly rows: number;
+  readonly positionsX: readonly Millimeters[];
+  readonly positionsY: readonly Millimeters[];
+  readonly fanCount: number;
+};
+
 export type TempestFanLayout =
   | {
       readonly topology: "sandwich";
@@ -145,6 +156,10 @@ export type TempestFanLayout =
       readonly cornerSafeMinimum: Millimeters;
       readonly localVerticalCenter: Millimeters;
       readonly walls: TempestWallMap<TempestWallFanLayout>;
+      // The "Back" fan grid on the solid bottom plate; single-filter layout only.
+      // fanCount === 0 for the dual sandwich (no solid plate) and whenever the
+      // grid is off.
+      readonly bottomPlate: TempestPlateFanLayout;
     }
   | {
       readonly topology: "quad";

@@ -112,6 +112,11 @@ export type TempestFanSettings = {
   // the grid; a fixed count of 0 removes the top fans. Ignored by horizontal
   // layouts, which use wallRequests instead.
   readonly topFans?: TempestFanCountRequest;
+  // Single-horizontal-top-filter ("One side") only: a fan grid on the solid plate
+  // opposite the filter (the "Back" fan placement — that plate stands as the back
+  // vertical wall in the printed/displayed pose). "automatic" fills a grid; omitted
+  // or a fixed count of 0 leaves the plate solid. Ignored by every other layout.
+  readonly bottomPlateFans?: TempestFanCountRequest;
   // Tower-only; defaults to "fan-grid" when omitted, and ignored by horizontal layouts.
   readonly topExhaust?: TempestTowerTopExhaust;
   // Tower box/exhaust geometry; only used when topExhaust === "box-exhaust".

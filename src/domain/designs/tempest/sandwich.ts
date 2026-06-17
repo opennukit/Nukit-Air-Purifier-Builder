@@ -21,6 +21,7 @@ import type {
   TempestHorizontalFlangeLayer,
   TempestModelPlan,
   TempestNoCord,
+  TempestPlateFanLayout,
   TempestPrintablePose,
   TempestSandwichCord,
   TempestWallFanLayout,
@@ -170,7 +171,63 @@ export function createSandwichFanLayout(
       left: createWallFanLayout("left", box.depth, settings.fan.wallRequests.left, cornerSafeMinimum, settings.fan.diameter),
       right: createWallFanLayout("right", box.depth, settings.fan.wallRequests.right, cornerSafeMinimum, settings.fan.diameter),
     },
+    bottomPlate: createBottomPlateFanLayout(settings, box, filterCount),
   };
+}
+
+// The "Back" fan grid lives on the solid bottom plate that the single-filter
+// layout puts opposite its one (top) filter. The dual sandwich has no solid plate
+// there, so it never gets a grid. The grid mirrors the tower top plate: a centred
+// row/column array spaced by fanSpacing, kept a fan-radius-plus-wall in from each
+// edge so the bodies clear the corner posts.
+function createBottomPlateFanLayout(
+  settings: TempestSettings,
+  box: TempestBoxEnvelope,
+  filterCount: 1 | 2,
+): TempestPlateFanLayout {
+  const requested = settings.fan.bottomPlateFans;
+  const off =
+    filterCount !== 1 ||
+    requested === undefined ||
+    (requested.type === "fixed" && requested.count === 0);
+  if (off) {
+    return { columns: 0, rows: 0, positionsX: [], positionsY: [], fanCount: 0 };
+  }
+  const minimumCenterFromEdge = settings.frame.wallThickness + settings.fan.diameter / 2;
+  const positionsX = plateFanPositions(
+    plateFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter),
+    box.width,
+    settings.fan.diameter,
+  );
+  const positionsY = plateFanPositions(
+    plateFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter),
+    box.depth,
+    settings.fan.diameter,
+  );
+  return {
+    columns: positionsX.length,
+    rows: positionsY.length,
+    positionsX,
+    positionsY,
+    fanCount: positionsX.length * positionsY.length,
+  };
+}
+
+function plateFansPerSide(length: Millimeters, minimumCenterFromEdge: Millimeters, fanDiameter: Millimeters): number {
+  const span = length - 2 * minimumCenterFromEdge;
+  if (span < 0) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(1 + span / fanSpacing(fanDiameter)));
+}
+
+function plateFanPositions(fanCount: number, length: Millimeters, fanDiameter: Millimeters): readonly Millimeters[] {
+  if (fanCount === 0) {
+    return [];
+  }
+  const total = fanCount <= 1 ? 0 : (fanCount - 1) * fanSpacing(fanDiameter);
+  const first = fanCount === 1 ? length / 2 : (length - total) / 2;
+  return Array.from({ length: fanCount }, (_, index) => first + index * fanSpacing(fanDiameter));
 }
 
 function createWallFanLayout(

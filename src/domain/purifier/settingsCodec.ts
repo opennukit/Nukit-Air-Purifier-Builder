@@ -88,6 +88,7 @@ export function encodeSettings(
   params.set("hexGrill", String(settings.hexGrill));
   params.set("hexSize", formatNumber(settings.hexSize));
   params.set("hexSpacing", formatNumber(settings.hexSpacing));
+  params.set("backPlateFans", String(settings.backPlateFans));
   params.set("topExhaust", settings.topExhaust);
   params.set("boxFanHoleSize", formatNumber(settings.boxFanHoleSize));
   params.set("boxRingOneScrewHoles", String(settings.boxRingOneScrewHoles));
@@ -425,6 +426,7 @@ const purifierSettingsFieldKeys: Record<
   hexGrill: "hexGrill",
   hexSize: "hexSize",
   hexSpacing: "hexSpacing",
+  backPlateFans: "backPlateFans",
   boxFanHoleSize: "boxFanHoleSize",
   boxRingOneScrewHoles: "boxRingOneScrewHoles",
   boxRingOneScrewDiameter: "boxRingOneScrewDiameter",
