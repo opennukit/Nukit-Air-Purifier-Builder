@@ -110,3 +110,40 @@ describe('tempest "Back" fan grid (single-filter bottom plate)', () => {
     expect(grid.fanCount).toBe(0);
   });
 });
+
+describe('tempest "Box depth" (one-side panel chamber)', () => {
+  const modelFor = (url: string) =>
+    createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(url))));
+
+  // The chamber between the inside filter flange and the inside back wall.
+  const chamberDepth = (m: ReturnType<typeof modelFor>) => {
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    return m.box.height - 2 * m.frame.outsideFlangeThickness - m.frame.insideFlangeThickness -
+      (m.settings.arrangement.type === "four-side-filter-tower" ? 0 : m.settings.arrangement.filter.thickness);
+  };
+
+  test("boxDepth survives the URL round-trip", () => {
+    const round = new URLSearchParams(
+      encodeSettings(decodeSettings(`${oneSide}&backPlateFans=true&boxDepth=72`)),
+    );
+    expect(round.get("boxDepth")).toBe("72");
+  });
+
+  test("with Back on, the chamber depth equals boxDepth", () => {
+    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=50`))).toBeCloseTo(50);
+    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=120`))).toBeCloseTo(120);
+  });
+
+  test("with Back off, boxDepth is ignored (fan-diameter drives the chamber)", () => {
+    const off = modelFor(`${oneSide}&backPlateFans=false&boxDepth=50`);
+    // 140mm fan + padding, never the 50mm panel depth.
+    expect(chamberDepth(off)).toBeGreaterThan(140);
+  });
+
+  test("a shallow panel turns off the side-wall fans (they cannot fit)", () => {
+    const m = modelFor(`${oneSide}&backPlateFans=true&boxDepth=50&fansLeft=-1&fansRight=-1`);
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    expect(m.fanLayout.walls.left.actualCount).toBe(0);
+    expect(m.fanLayout.walls.right.actualCount).toBe(0);
+  });
+});

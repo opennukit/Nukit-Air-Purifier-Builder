@@ -214,6 +214,10 @@ export type TempestSettings = {
   readonly arrangement: TempestFilterArrangement;
   readonly fan: TempestFanSettings;
   readonly frame: TempestFrameSettings;
+  // One-side "panel" only (single filter + a Back fan grid): the chamber depth
+  // between the inside filter flange and the inside back wall. When omitted, the
+  // one-side box height is driven by the fan diameter (the original wall-mount).
+  readonly oneSidePanelDepth?: Millimeters;
   readonly filterSlot: TempestFilterSlotSettings;
   readonly cordPassThrough: TempestCordPassThrough;
   readonly alignmentPins: TempestAlignmentPinSettings;

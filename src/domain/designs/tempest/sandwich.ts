@@ -57,9 +57,16 @@ function horizontalFilterCount(arrangement: SandwichArrangement): 1 | 2 {
 export function createSandwichBox(settings: TempestSettings, frame: TempestFrameModel): TempestBoxEnvelope {
   const arrangement = expectSandwichArrangement(settings.arrangement);
   const filterCount = horizontalFilterCount(arrangement);
+  // The chamber between the inside filter flange and the inside back wall. The
+  // one-side "panel" (Back fans on) takes it straight from oneSidePanelDepth so a
+  // shallow panel is possible; otherwise it's sized to clear a fan body, as the
+  // original wall-mount and the 2-filter sandwich both are.
+  const chamberDepth =
+    filterCount === 1 && settings.oneSidePanelDepth !== undefined
+      ? settings.oneSidePanelDepth
+      : settings.fan.diameter + HORIZONTAL_FAN_VERTICAL_PADDING_MM;
   const height =
-    settings.fan.diameter +
-    HORIZONTAL_FAN_VERTICAL_PADDING_MM +
+    chamberDepth +
     2 * frame.outsideFlangeThickness +
     filterCount * (arrangement.filter.thickness + frame.wallThickness);
   // The interior is the measured footprint plus the slide-in clearance per side,
@@ -159,6 +166,12 @@ export function createSandwichFanLayout(
     settings.frame.wallThickness,
     settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter : 0,
   );
+  // A shallow one-side panel can't fit a fan body in its short side walls, so the
+  // wall fans are forced off there (the Back grid lies flat on the plate and is
+  // unaffected). The taller wall-mount and 2-filter sandwich are never affected.
+  const wallFansFit = box.wallHeight >= settings.fan.diameter;
+  const wallRequest = (request: TempestFanCountRequest): TempestFanCountRequest =>
+    wallFansFit ? request : { type: "fixed", count: 0 };
   return {
     topology: "sandwich",
     bodyDepth,
@@ -166,10 +179,10 @@ export function createSandwichFanLayout(
     cornerSafeMinimum,
     localVerticalCenter,
     walls: {
-      front: createWallFanLayout("front", box.width, settings.fan.wallRequests.front, cornerSafeMinimum, settings.fan.diameter),
-      back: createWallFanLayout("back", box.width, settings.fan.wallRequests.back, cornerSafeMinimum, settings.fan.diameter),
-      left: createWallFanLayout("left", box.depth, settings.fan.wallRequests.left, cornerSafeMinimum, settings.fan.diameter),
-      right: createWallFanLayout("right", box.depth, settings.fan.wallRequests.right, cornerSafeMinimum, settings.fan.diameter),
+      front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter),
+      back: createWallFanLayout("back", box.width, wallRequest(settings.fan.wallRequests.back), cornerSafeMinimum, settings.fan.diameter),
+      left: createWallFanLayout("left", box.depth, wallRequest(settings.fan.wallRequests.left), cornerSafeMinimum, settings.fan.diameter),
+      right: createWallFanLayout("right", box.depth, wallRequest(settings.fan.wallRequests.right), cornerSafeMinimum, settings.fan.diameter),
     },
     bottomPlate: createBottomPlateFanLayout(settings, box, filterCount),
   };

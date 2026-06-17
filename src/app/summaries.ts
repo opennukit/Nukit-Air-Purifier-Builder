@@ -121,7 +121,10 @@ export function createPreviewSummaryItems(
             ? tempestDesignLabels[design.design]
             : currentLayout.configuration.printDesign.label,
       },
-      { label: "Arrangement", value: tempestArrangementLabel(model.settings.arrangement.type) },
+      {
+        label: "Arrangement",
+        value: tempestArrangementLabel(model.settings.arrangement.type, model.settings.oneSidePanelDepth !== undefined),
+      },
       { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
       { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
       { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
@@ -399,9 +402,9 @@ function staticPrintSpoolBudgetUsd(estimate: StaticPrintEstimate): number {
 // Layout Readings and Formatting
 // ##############################
 
-function tempestArrangementLabel(arrangement: string): string {
+function tempestArrangementLabel(arrangement: string, isPanel = false): string {
   if (arrangement === "single-horizontal-top-filter") {
-    return "1-filter wall mount";
+    return isPanel ? "1-filter panel" : "1-filter wall mount";
   }
   if (arrangement === "four-side-filter-tower") {
     return "Four-filter tower";

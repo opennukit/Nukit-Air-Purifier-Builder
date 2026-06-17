@@ -24,6 +24,10 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
     // that build TempestSettings with chunkLabels:true directly.
     chunkLabels: false,
     arrangement: tempestArrangementFromConfiguration(configuration),
+    // The one-side "panel" depth applies only when this is a single-filter layout
+    // with the Back fan grid on; otherwise the fan diameter drives the height.
+    oneSidePanelDepth:
+      design.arrangement === "single-horizontal-top-filter" && design.backPlateFans ? design.boxDepth : undefined,
     fan: {
       ...defaultTempestSettings.fan,
       diameter: configuration.fan.spec.diameter,

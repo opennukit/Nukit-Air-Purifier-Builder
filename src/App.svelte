@@ -1697,6 +1697,24 @@
                         {/if}
                       </div>
                     </fieldset>
+
+                    {#if isOneSideFilter && settings.backPlateFans}
+                      <label class="field">
+                        <span>Box depth</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="boxDepth"
+                            min="1"
+                            step="1"
+                            inputmode="decimal"
+                            value={settings.boxDepth}
+                            onchange={(event) => updateNumberSetting("boxDepth", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    {/if}
                   </div>
 
                   {#if showHexGrillControls}

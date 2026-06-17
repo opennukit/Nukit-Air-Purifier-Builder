@@ -149,6 +149,7 @@ export function normalizeRawSettings(
     // Preserved like hexGrill: toRawSettings re-emits the default, so restore the
     // user's "Back" fan toggle from the raw input here.
     backPlateFans: input.backPlateFans,
+    boxDepth: normalizeBoxDepth(input.boxDepth),
     ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
@@ -288,6 +289,7 @@ export function serializePurifierDraft(
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
       backPlateFans: draft.design.backPlateFans,
+      boxDepth: draft.design.boxDepth,
       ...copyTempestExhaustFields(draft.design),
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
@@ -359,6 +361,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
     backPlateFans: defaultSettings.backPlateFans,
+    boxDepth: defaultSettings.boxDepth,
     ...copyTempestExhaustFields(defaultSettings),
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -528,6 +531,7 @@ function createConfiguredPrintDesign(input: {
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
       backPlateFans: input.raw.backPlateFans,
+      boxDepth: normalizeBoxDepth(input.raw.boxDepth),
       ...normalizeTempestExhaustFields(input.raw),
     };
   }
@@ -637,6 +641,7 @@ function createPurifierDesignDraft(
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
       backPlateFans: configuration.design.backPlateFans,
+      boxDepth: configuration.design.boxDepth,
       ...copyTempestExhaustFields(configuration.design),
     };
   }
@@ -783,6 +788,10 @@ function normalizeHexSize(value: Millimeters): Millimeters {
 
 function normalizeHexSpacing(value: Millimeters): Millimeters {
   return clamp(value, 0.1, 20);
+}
+
+function normalizeBoxDepth(value: Millimeters): Millimeters {
+  return Number.isFinite(value) && value > 0 ? clamp(value, 1, 1000) : defaultSettings.boxDepth;
 }
 
 function normalizeJointSettings(settings: RawPurifierSettings): JointSettings {
