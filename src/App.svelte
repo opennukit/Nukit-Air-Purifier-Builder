@@ -235,6 +235,14 @@
   let showLaserAdvanced = false;
   const laserFingerJointControls = advancedJointControls.filter((control) => control.name.startsWith("finger"));
   const laserDovetailControls = advancedJointControls.filter((control) => control.name.startsWith("dovetail"));
+  // Laser Cut: "Filter rim" and "Fan screw size" live under Advanced; the main
+  // "Material and fit" section keeps just material thickness and fit allowance.
+  const laserAdvancedFrameControls = [
+    ...nukitPanelFitControls.filter((control) => control.name === "rim"),
+    ...generatedGeometryControls.filter((control) => control.name === "screwHoleDiameter"),
+  ];
+  const laserMaterialControls = generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter");
+  const laserPanelFitControls = nukitPanelFitControls.filter((control) => control.name !== "rim");
   // Chunk-label deboss is parked: hide its control until the placement is reworked.
   const SHOW_CHUNK_LABELS_CONTROL = false;
   let showBoxExhaustOption = false;
@@ -335,6 +343,9 @@
     (control) => control.name !== "materialThickness",
   );
   $: isNukitControlsActive = activeDesignContext.type === "nukit";
+  // Laser Cut drops "Fan screw size" from the main material section (moved to
+  // Advanced); other designs keep their full geometry control list.
+  $: geometryMaterialControls = isNukitControlsActive ? laserMaterialControls : visibleGeometryControls;
   $: showPrintSetupControls = fabricationMethod === "print-3mf" && activeControlPanels.setup.type === "available";
   $: showAdvancedControls = activeControlPanels.advanced.type === "available";
   $: layoutSectionTitleText = activeDesignContext.layoutSectionTitle;
@@ -1618,7 +1629,7 @@
                 <h2>{isTempestControlsActive ? "Fan" : "Material and fit"}</h2>
               </div>
               {#if !isTempestControlsActive}
-                {#each visibleGeometryControls as control}
+                {#each geometryMaterialControls as control}
                   <label class="field">
                     <span>{control.label}</span>
                     <span class="input-shell">
@@ -1637,7 +1648,7 @@
               {/if}
               {#if isNukitControlsActive}
                 <div data-nukit-panel-fit-controls>
-                  {#each nukitPanelFitControls as control}
+                  {#each laserPanelFitControls as control}
                     <label class="field">
                       <span>{control.label}</span>
                       <span class="input-shell">
@@ -1879,37 +1890,6 @@
             </section>
           {/if}
 
-          {#if fabricationMethod === "laser-svg"}
-            <section class="control-section laser-output-section" data-laser-output-controls>
-              <div class="section-heading">
-                <p class="eyebrow">Laser setup</p>
-                <h2>Drawing output</h2>
-              </div>
-              <label class="toggle-field">
-                <input
-                  type="checkbox"
-                  name="labels"
-                  checked={settings.labels}
-                  onchange={(event) => updateBooleanSetting("labels", event)}
-                />
-                <span>Engrave part labels</span>
-              </label>
-              <label class="field">
-                <span>Reference scale</span>
-                <span class="input-shell">
-                  <input
-                    type="number"
-                    name="referenceScale"
-                    step="1"
-                    inputmode="decimal"
-                    value={settings.referenceScale}
-                    onchange={(event) => updateNumberSetting("referenceScale", event)}
-                  />
-                  <small>mm</small>
-                </span>
-              </label>
-            </section>
-          {/if}
 
           {#if showAdvancedControls}
             <section class="control-section joint-tuning-section" data-generated-advanced-controls>
@@ -1937,6 +1917,51 @@
                         </select>
                       </label>
                     {/each}
+                  </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Frame</p>
+                    {#each laserAdvancedFrameControls as control}
+                      <label class="field">
+                        <span>{control.label}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name={control.name}
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
+                          />
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                  </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Drawing output</p>
+                    <label class="toggle-field">
+                      <input
+                        type="checkbox"
+                        name="labels"
+                        checked={settings.labels}
+                        onchange={(event) => updateBooleanSetting("labels", event)}
+                      />
+                      <span>Engrave part labels</span>
+                    </label>
+                    <label class="field">
+                      <span>Reference scale</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="referenceScale"
+                          step="1"
+                          inputmode="decimal"
+                          value={settings.referenceScale}
+                          onchange={(event) => updateNumberSetting("referenceScale", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
                   </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Finger joints</p>
