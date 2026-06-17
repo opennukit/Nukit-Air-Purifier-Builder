@@ -22,6 +22,7 @@ import type {
   TempestModelPlan,
   TempestNoCord,
   TempestPlateFanLayout,
+  TempestPlateFanPosition,
   TempestPrintablePose,
   TempestSandwichCord,
   TempestWallFanLayout,
@@ -172,31 +173,48 @@ export function createSandwichFanLayout(
   const wallFansFit = box.wallHeight >= settings.fan.diameter;
   const wallRequest = (request: TempestFanCountRequest): TempestFanCountRequest =>
     wallFansFit ? request : { type: "fixed", count: 0 };
+  const walls: Record<TempestWall, TempestWallFanLayout> = {
+    front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter),
+    back: createWallFanLayout("back", box.width, wallRequest(settings.fan.wallRequests.back), cornerSafeMinimum, settings.fan.diameter),
+    left: createWallFanLayout("left", box.depth, wallRequest(settings.fan.wallRequests.left), cornerSafeMinimum, settings.fan.diameter),
+    right: createWallFanLayout("right", box.depth, wallRequest(settings.fan.wallRequests.right), cornerSafeMinimum, settings.fan.diameter),
+  };
   return {
     topology: "sandwich",
     bodyDepth,
     screwPitch,
     cornerSafeMinimum,
     localVerticalCenter,
-    walls: {
-      front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter),
-      back: createWallFanLayout("back", box.width, wallRequest(settings.fan.wallRequests.back), cornerSafeMinimum, settings.fan.diameter),
-      left: createWallFanLayout("left", box.depth, wallRequest(settings.fan.wallRequests.left), cornerSafeMinimum, settings.fan.diameter),
-      right: createWallFanLayout("right", box.depth, wallRequest(settings.fan.wallRequests.right), cornerSafeMinimum, settings.fan.diameter),
-    },
-    bottomPlate: createBottomPlateFanLayout(settings, box, filterCount),
+    walls,
+    bottomPlate: createBottomPlateFanLayout(settings, box, filterCount, walls, localVerticalCenter),
   };
 }
+
+// Clearance kept between a back-plate fan body and a wall fan body before they are
+// treated as colliding (mm).
+const BACK_FAN_WALL_CLEARANCE_MM = 1;
+
+type Aabb = {
+  readonly x0: number;
+  readonly x1: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly z0: number;
+  readonly z1: number;
+};
 
 // The "Back" fan grid lives on the solid bottom plate that the single-filter
 // layout puts opposite its one (top) filter. The dual sandwich has no solid plate
 // there, so it never gets a grid. The grid mirrors the tower top plate: a centred
 // row/column array spaced by fanSpacing, kept a fan-radius-plus-wall in from each
-// edge so the bodies clear the corner posts.
+// edge so the bodies clear the corner posts. Any cell whose fan body would hit a
+// wall fan (left/right/top/bottom) is then dropped, so the two never intersect.
 function createBottomPlateFanLayout(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
   filterCount: 1 | 2,
+  walls: Record<TempestWall, TempestWallFanLayout>,
+  localVerticalCenter: number,
 ): TempestPlateFanLayout {
   const requested = settings.fan.bottomPlateFans;
   const off =
@@ -204,26 +222,75 @@ function createBottomPlateFanLayout(
     requested === undefined ||
     (requested.type === "fixed" && requested.count === 0);
   if (off) {
-    return { columns: 0, rows: 0, positionsX: [], positionsY: [], fanCount: 0 };
+    return { positions: [], fanCount: 0 };
   }
-  const minimumCenterFromEdge = settings.frame.wallThickness + settings.fan.diameter / 2;
-  const positionsX = plateFanPositions(
-    plateFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter),
-    box.width,
-    settings.fan.diameter,
+  const diameter = settings.fan.diameter;
+  const minimumCenterFromEdge = settings.frame.wallThickness + diameter / 2;
+  const xs = plateFanPositions(plateFansPerSide(box.width, minimumCenterFromEdge, diameter), box.width, diameter);
+  const ys = plateFanPositions(plateFansPerSide(box.depth, minimumCenterFromEdge, diameter), box.depth, diameter);
+
+  const radius = diameter / 2;
+  const bodyDepth = tempestFanBodyDepth(diameter);
+  const flange = settings.frame.outsideFlangeThickness;
+  // The back fan sits on the inside back wall (z = flange) and its body reaches up
+  // into the chamber by one body depth.
+  const backZ0 = flange;
+  const backZ1 = flange + bodyDepth;
+  const wallBoxes = wallFanFootprints(walls, box, settings, localVerticalCenter);
+
+  const positions: TempestPlateFanPosition[] = [];
+  for (const x of xs) {
+    for (const y of ys) {
+      const back: Aabb = { x0: x - radius, x1: x + radius, y0: y - radius, y1: y + radius, z0: backZ0, z1: backZ1 };
+      if (!wallBoxes.some((wallBox) => aabbOverlap(back, wallBox, BACK_FAN_WALL_CLEARANCE_MM))) {
+        positions.push({ x, y });
+      }
+    }
+  }
+  return { positions, fanCount: positions.length };
+}
+
+// The chamber-side body footprints of every wall fan, in model coordinates, so a
+// back-plate fan can be tested against them. Each wall fan is a square frame on
+// its wall plane whose body reaches one body depth into the chamber; vertically it
+// is centred on the wall fan centre.
+function wallFanFootprints(
+  walls: Record<TempestWall, TempestWallFanLayout>,
+  box: TempestBoxEnvelope,
+  settings: TempestSettings,
+  localVerticalCenter: number,
+): Aabb[] {
+  const radius = settings.fan.diameter / 2;
+  const bodyReach = settings.frame.wallThickness + tempestFanBodyDepth(settings.fan.diameter);
+  const z0 = settings.frame.outsideFlangeThickness + localVerticalCenter - radius;
+  const z1 = settings.frame.outsideFlangeThickness + localVerticalCenter + radius;
+  const boxes: Aabb[] = [];
+  for (const p of walls.front.positionsAlongWall) {
+    boxes.push({ x0: p - radius, x1: p + radius, y0: 0, y1: bodyReach, z0, z1 });
+  }
+  for (const p of walls.back.positionsAlongWall) {
+    const cx = box.width - p;
+    boxes.push({ x0: cx - radius, x1: cx + radius, y0: box.depth - bodyReach, y1: box.depth, z0, z1 });
+  }
+  for (const p of walls.left.positionsAlongWall) {
+    const cy = box.depth - p;
+    boxes.push({ x0: 0, x1: bodyReach, y0: cy - radius, y1: cy + radius, z0, z1 });
+  }
+  for (const p of walls.right.positionsAlongWall) {
+    boxes.push({ x0: box.width - bodyReach, x1: box.width, y0: p - radius, y1: p + radius, z0, z1 });
+  }
+  return boxes;
+}
+
+function aabbOverlap(a: Aabb, b: Aabb, clearance: number): boolean {
+  return (
+    a.x0 - clearance < b.x1 &&
+    b.x0 - clearance < a.x1 &&
+    a.y0 - clearance < b.y1 &&
+    b.y0 - clearance < a.y1 &&
+    a.z0 - clearance < b.z1 &&
+    b.z0 - clearance < a.z1
   );
-  const positionsY = plateFanPositions(
-    plateFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter),
-    box.depth,
-    settings.fan.diameter,
-  );
-  return {
-    columns: positionsX.length,
-    rows: positionsY.length,
-    positionsX,
-    positionsY,
-    fanCount: positionsX.length * positionsY.length,
-  };
 }
 
 function plateFansPerSide(length: Millimeters, minimumCenterFromEdge: Millimeters, fanDiameter: Millimeters): number {
@@ -337,12 +404,31 @@ export function createSandwichCordPlacement(
     side: cord.side,
     diameter: cord.diameter,
     positionAlongWall,
-    // Centered across the box height: for the standing dual sandwich this is the
-    // standing depth midline — inside the fan chamber, clear of both filter
-    // layers and their flanges.
-    verticalCenter: box.height / 2,
+    verticalCenter: sandwichCordVerticalCenter(settings, box),
     axis: cord.wall === "front" || cord.wall === "back" ? "y" : "x",
   };
+}
+
+// Where the side-wall cord bore sits across the box height. The dual sandwich
+// centres it on the box (the standing depth midline — inside the fan chamber,
+// clear of both filter layers). The one-side "Back" panel instead auto-places it
+// midway between the top of the back fan body and the inside filter flange, so the
+// cord clears both the flat Back fan grid and the filter it sits opposite.
+function sandwichCordVerticalCenter(settings: TempestSettings, box: TempestBoxEnvelope): Millimeters {
+  const arrangement = settings.arrangement;
+  const bottomFans = settings.fan.bottomPlateFans;
+  const backFansOn =
+    arrangement.type === "single-horizontal-top-filter" &&
+    bottomFans !== undefined &&
+    !(bottomFans.type === "fixed" && bottomFans.count === 0);
+  if (!backFansOn) {
+    return box.height / 2;
+  }
+  const flange = settings.frame.outsideFlangeThickness;
+  // insideFlangeThickness === wallThickness (see createFrameModel).
+  const fanBodyTop = flange + tempestFanBodyDepth(settings.fan.diameter);
+  const insideFilterFlange = box.height - flange - arrangement.filter.thickness - settings.frame.wallThickness;
+  return (fanBodyTop + insideFilterFlange) / 2;
 }
 
 // Both horizontal layouts — the single-filter wall mount and the 2-filter

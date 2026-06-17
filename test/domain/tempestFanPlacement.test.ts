@@ -129,9 +129,10 @@ describe('tempest "Box depth" (one-side panel chamber)', () => {
     expect(round.get("boxDepth")).toBe("72");
   });
 
-  test("with Back on, the chamber depth equals boxDepth", () => {
-    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=50`))).toBeCloseTo(50);
-    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=120`))).toBeCloseTo(120);
+  test("with Back on and no wall fans, the chamber depth equals boxDepth", () => {
+    const panel = "&fansLeft=0&fansRight=0&fansTop=0&fansBottom=0";
+    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=50${panel}`))).toBeCloseTo(50);
+    expect(chamberDepth(modelFor(`${oneSide}&backPlateFans=true&boxDepth=120${panel}`))).toBeCloseTo(120);
   });
 
   test("with Back off, boxDepth is ignored (fan-diameter drives the chamber)", () => {
@@ -140,10 +141,87 @@ describe('tempest "Box depth" (one-side panel chamber)', () => {
     expect(chamberDepth(off)).toBeGreaterThan(140);
   });
 
-  test("a shallow panel turns off the side-wall fans (they cannot fit)", () => {
+  test("engaging side fans reverts to a tall box so those fans fit", () => {
+    // A side fan disables the shallow panel depth, so the fan-driven height
+    // returns and the side fans are present (not silently dropped).
     const m = modelFor(`${oneSide}&backPlateFans=true&boxDepth=50&fansLeft=-1&fansRight=-1`);
     if (m.topology !== "sandwich") throw new Error("expected sandwich");
-    expect(m.fanLayout.walls.left.actualCount).toBe(0);
-    expect(m.fanLayout.walls.right.actualCount).toBe(0);
+    expect(m.settings.oneSidePanelDepth).toBeUndefined();
+    expect(m.box.wallHeight).toBeGreaterThanOrEqual(m.settings.fan.diameter);
+    expect(m.fanLayout.walls.left.actualCount).toBeGreaterThan(0);
+    expect(m.fanLayout.walls.right.actualCount).toBeGreaterThan(0);
+  });
+
+  test("panel depth is ignored once any wall fan is engaged", () => {
+    const m = modelFor(`${oneSide}&backPlateFans=true&boxDepth=50&fansTop=-1`);
+    expect(m.settings.oneSidePanelDepth).toBeUndefined();
+    // Fan-diameter drives the (tall) box, not the 50mm panel depth.
+    expect(m.box.height).toBeGreaterThan(180);
+  });
+});
+
+describe('tempest "Back" panel cord placement', () => {
+  const modelFor = (url: string) =>
+    createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(url))));
+
+  test("the cord auto-centres midway between the back fan and the inside filter flange", () => {
+    const m = modelFor(`${oneSide}&backPlateFans=true&boxDepth=80&cordHoleWall=right&cordHoleDiameter=8`);
+    if (m.topology !== "sandwich" || m.cordPassThrough.type !== "wall-cylinder") throw new Error("expected sandwich cord");
+    const flange = m.frame.outsideFlangeThickness;
+    const fanBodyTop = flange + 27; // 140mm fan body depth
+    const insideFilterFlange = m.box.height - flange - m.settings.arrangement.filter.thickness - m.frame.wallThickness;
+    const vc = m.cordPassThrough.verticalCenter;
+    expect(vc).toBeCloseTo((fanBodyTop + insideFilterFlange) / 2);
+    // and it sits strictly between the two (clear of both)
+    expect(vc).toBeGreaterThan(fanBodyTop);
+    expect(vc).toBeLessThan(insideFilterFlange);
+  });
+
+  test("without Back fans the cord stays box-centred (unchanged wall mount)", () => {
+    const m = modelFor(`${oneSide}&backPlateFans=false&cordHoleWall=right&cordHoleDiameter=8`);
+    if (m.topology !== "sandwich" || m.cordPassThrough.type !== "wall-cylinder") throw new Error("expected sandwich cord");
+    expect(m.cordPassThrough.verticalCenter).toBeCloseTo(m.box.height / 2);
+  });
+});
+
+describe('tempest "Back" fan collision with wall fans', () => {
+  const modelFor = (url: string) =>
+    createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(url))));
+  const backCount = (url: string) => {
+    const m = modelFor(url);
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    return m.fanLayout.bottomPlate.fanCount;
+  };
+
+  test("back fans clear of the walls are all kept", () => {
+    // No wall fans: the full grid stands.
+    expect(backCount(`${oneSide}&backPlateFans=true&fansTop=0&fansBottom=0&fansLeft=0&fansRight=0`)).toBeGreaterThan(0);
+  });
+
+  test("back fans that would hit front/back wall fans are dropped", () => {
+    const clear = backCount(`${oneSide}&backPlateFans=true&fansTop=0&fansBottom=0&fansLeft=0&fansRight=0`);
+    const collided = backCount(`${oneSide}&backPlateFans=true&fansTop=-1&fansBottom=-1&fansLeft=0&fansRight=0`);
+    expect(collided).toBeLessThan(clear);
+  });
+
+  test("no back fan body overlaps a wall fan body (3D footprints stay clear)", () => {
+    const m = modelFor(`${oneSide}&backPlateFans=true&fansTop=-1&fansBottom=-1&fansLeft=-1&fansRight=-1&boxDepth=50`);
+    if (m.topology !== "sandwich") throw new Error("expected sandwich");
+    const fl = m.fanLayout;
+    const r = m.settings.fan.diameter / 2;
+    // Project both onto the bottom plane; a back fan must be clear on x or y of
+    // every wall fan's in-plane centre (square frames, like the cord check).
+    const wallCentres: Array<[number, number]> = [
+      ...fl.walls.front.positionsAlongWall.map((p): [number, number] => [p, 0]),
+      ...fl.walls.back.positionsAlongWall.map((p): [number, number] => [m.box.width - p, m.box.depth]),
+      ...fl.walls.left.positionsAlongWall.map((p): [number, number] => [0, m.box.depth - p]),
+      ...fl.walls.right.positionsAlongWall.map((p): [number, number] => [m.box.width, p]),
+    ];
+    for (const { x, y } of fl.bottomPlate.positions) {
+      for (const [wx, wy] of wallCentres) {
+        // bodies only collide when close on BOTH axes; require clearance on one.
+        expect(Math.abs(x - wx) >= r || Math.abs(y - wy) >= r).toBe(true);
+      }
+    }
   });
 });

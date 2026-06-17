@@ -108,9 +108,7 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
         ...fanLayout.walls.back.positionsAlongWall.map((p): GrillCentre => [box.width - p, box.depth - wall, z]),
         ...fanLayout.walls.left.positionsAlongWall.map((p): GrillCentre => [wall, box.depth - p, z]),
         ...fanLayout.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
-        ...fanLayout.bottomPlate.positionsX.flatMap((x) =>
-          fanLayout.bottomPlate.positionsY.map((y): GrillCentre => [x, y, plateZ]),
-        ),
+        ...fanLayout.bottomPlate.positions.map(({ x, y }): GrillCentre => [x, y, plateZ]),
       ];
     },
     quad: ({ fanLayout, filterLayout }) => {

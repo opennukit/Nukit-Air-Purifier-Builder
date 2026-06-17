@@ -312,6 +312,10 @@
   // One-side ("1-filter wall mount") has a solid plate opposite its filter, which
   // can carry the extra "Back" fan grid.
   $: isOneSideFilter = isTempestControlsActive && settings.tempestArrangement === "single-horizontal-top-filter";
+  // The one-side box becomes a flat "panel" (with the Box depth control) only when
+  // none of the four side-wall fans are selected.
+  $: noWallFansSelected =
+    settings.fansLeft === 0 && settings.fansRight === 0 && settings.fansTop === 0 && settings.fansBottom === 0;
   // The horizontal layouts (1 top / 2 sandwich) take per-wall fans; the tower
   // exhausts through the top instead.
   $: showTempestWallFanControls = isTempestControlsActive && !isFourFilterTower;
@@ -1698,7 +1702,7 @@
                       </div>
                     </fieldset>
 
-                    {#if isOneSideFilter && settings.backPlateFans}
+                    {#if isOneSideFilter && settings.backPlateFans && noWallFansSelected}
                       <label class="field">
                         <span>Box depth</span>
                         <span class="input-shell">

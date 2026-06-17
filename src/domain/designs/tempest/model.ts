@@ -138,13 +138,17 @@ export type TempestWallFanLayout = {
 };
 
 // The fan grid on the single-filter sandwich's solid bottom plate (the "Back"
-// placement). Same row/column scheme as the tower top plate, positioned in model
-// (x, y) over the plate. fanCount === 0 means the plate stays solid.
+// placement), as explicit (x, y) centres in model coordinates. It starts as a
+// centred row/column grid; cells that would collide with a wall fan are dropped,
+// so the final set is a plain point list. fanCount === 0 means the plate stays
+// solid.
+export type TempestPlateFanPosition = {
+  readonly x: Millimeters;
+  readonly y: Millimeters;
+};
+
 export type TempestPlateFanLayout = {
-  readonly columns: number;
-  readonly rows: number;
-  readonly positionsX: readonly Millimeters[];
-  readonly positionsY: readonly Millimeters[];
+  readonly positions: readonly TempestPlateFanPosition[];
   readonly fanCount: number;
 };
 

@@ -58,15 +58,13 @@ export function platePanel<Solid, Region>(
   if (grid.fanCount === 0) {
     return plate;
   }
-  const cuts = grid.positionsX.flatMap((x) =>
-    grid.positionsY.map((y) =>
-      fanPatternCut(
-        ctx,
-        model,
-        "z",
-        [x, y, model.frame.outsideFlangeThickness / 2],
-        model.frame.outsideFlangeThickness + 2 * SHELL_OVERLAP_MM,
-      ),
+  const cuts = grid.positions.map(({ x, y }) =>
+    fanPatternCut(
+      ctx,
+      model,
+      "z",
+      [x, y, model.frame.outsideFlangeThickness / 2],
+      model.frame.outsideFlangeThickness + 2 * SHELL_OVERLAP_MM,
     ),
   );
   return subtractAll(ctx, plate, cuts);

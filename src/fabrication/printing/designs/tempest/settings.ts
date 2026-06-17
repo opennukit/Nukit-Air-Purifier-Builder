@@ -25,9 +25,12 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
     chunkLabels: false,
     arrangement: tempestArrangementFromConfiguration(configuration),
     // The one-side "panel" depth applies only when this is a single-filter layout
-    // with the Back fan grid on; otherwise the fan diameter drives the height.
+    // with the Back fan grid on AND no side-wall fans (a flat panel). With any
+    // wall fan engaged the fan diameter drives the height so those fans still fit.
     oneSidePanelDepth:
-      design.arrangement === "single-horizontal-top-filter" && design.backPlateFans ? design.boxDepth : undefined,
+      design.arrangement === "single-horizontal-top-filter" && design.backPlateFans && !hasAnyWallFan(configuration)
+        ? design.boxDepth
+        : undefined,
     fan: {
       ...defaultTempestSettings.fan,
       diameter: configuration.fan.spec.diameter,
@@ -81,6 +84,15 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
             cornerOffset: design.cordHoleCornerOffset,
           },
   };
+}
+
+// A wall fan bank is "engaged" when it asks for automatic placement or a fixed
+// count above zero; an explicit 0 is off. The one-side panel needs all four off.
+function hasAnyWallFan(configuration: PurifierSettings): boolean {
+  const banks = configuration.fan.banks;
+  const engaged = (request: PurifierFanCountRequest): boolean =>
+    request.type === "auto" || request.count > 0;
+  return engaged(banks.left) || engaged(banks.right) || engaged(banks.top) || engaged(banks.bottom);
 }
 
 function requireTempestDesign(configuration: PurifierSettings): Extract<PurifierSettings["design"], { readonly type: "tempest" }> {

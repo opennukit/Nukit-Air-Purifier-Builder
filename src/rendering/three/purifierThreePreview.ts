@@ -1325,23 +1325,21 @@ export class PurifierThreePreview {
         // The "Back" fan grid on the solid bottom plate (single-filter only).
         const bottomInteriorZ = m.frame.outsideFlangeThickness;
         const bottomFanCenterZ = bottomInteriorZ + fanPreviewRearDepthMillimeters;
-        for (const x of fanLayout.bottomPlate.positionsX) {
-          for (const y of fanLayout.bottomPlate.positionsY) {
-            const fan = createFan({
-              axis: tempestCsgAxisToSceneAxis("z", pose),
-              position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
-              radius: (model.settings.fan.diameter / 2) * sceneScale,
-              facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
-              appearance: fanAppearance,
-            });
-            fan.userData["tempestPreviewFan"] = true;
-            moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
-            this.parentPreviewFanToChunk(fan, chunkBoxes);
-            if (exploded) {
-              explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
-            }
-            collectFanRotors(fan, this.fanRotors);
+        for (const { x, y } of fanLayout.bottomPlate.positions) {
+          const fan = createFan({
+            axis: tempestCsgAxisToSceneAxis("z", pose),
+            position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
+            radius: (model.settings.fan.diameter / 2) * sceneScale,
+            facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
+            appearance: fanAppearance,
+          });
+          fan.userData["tempestPreviewFan"] = true;
+          moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
+          this.parentPreviewFanToChunk(fan, chunkBoxes);
+          if (exploded) {
+            explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
           }
+          collectFanRotors(fan, this.fanRotors);
         }
       },
       quad: (m) => {
