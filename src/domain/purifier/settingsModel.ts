@@ -706,6 +706,30 @@ export function applyTempestDesign(settings: RawPurifierSettings, design: Tempes
   return { ...settings, tempestDesign: canonicalTempestDesign(design) };
 }
 
+// The override set that defines each named tempest design. A design is "matched"
+// only while every one of its overridden fields still equals the preset value.
+const tempestDesignOverridesByName: Readonly<Record<Exclude<TempestDesign, "custom">, Partial<RawPurifierSettings>>> = {
+  "nukit-tempest-euro": nukitTempestEuroDesignOverrides,
+  "nukit-tempest-euro-cube": nukitTempestEuroCubeDesignOverrides,
+  "nukit-tempest-original": nukitTempestOriginalDesignOverrides,
+  "nukit-tempest-original-cube": nukitTempestOriginalCubeDesignOverrides,
+  "nukit-tempest-pro": nukitTempestProDesignOverrides,
+};
+
+// Switch the design selection to "Custom" once any of the selected preset's
+// defining fields has been edited away from the preset value. A no-op for
+// "custom" and for settings that still match their named design exactly.
+export function reconcileTempestDesign(settings: RawPurifierSettings): RawPurifierSettings {
+  if (settings.tempestDesign === "custom") {
+    return settings;
+  }
+  const overrides = tempestDesignOverridesByName[settings.tempestDesign];
+  const matchesPreset = (Object.keys(overrides) as (keyof RawPurifierSettings)[]).every(
+    (key) => settings[key] === overrides[key],
+  );
+  return matchesPreset ? settings : { ...settings, tempestDesign: "custom" };
+}
+
 export function applyTempestArrangementDefaults(
   settings: RawPurifierSettings,
   arrangement: TempestArrangementPreset,

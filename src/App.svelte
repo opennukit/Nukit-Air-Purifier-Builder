@@ -9,6 +9,7 @@
   import {
     applyTempestArrangement,
     applyTempestDesign,
+    reconcileTempestDesign,
     boxExhaustDiametersForWidth,
     cordHoleSides,
     cordHoleWalls,
@@ -393,7 +394,9 @@
   // #######################################
 
   function commitSettings(nextSettings: RawPurifierSettings): void {
-    const normalizedDraft = normalizePurifierDraft(nextSettings);
+    // Editing any field of a selected preset drops the Design back to "Custom";
+    // selecting a design re-applies its overrides, so it still matches and stays.
+    const normalizedDraft = normalizePurifierDraft(reconcileTempestDesign(nextSettings));
     draft = normalizedDraft;
     settings = serializePurifierDraft(normalizedDraft);
     printDesignSettingsMemory = rememberPrintDesignSettings(printDesignSettingsMemory, normalizedDraft);
