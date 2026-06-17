@@ -171,6 +171,7 @@ export const tempestDesigns = [
   "nukit-tempest-euro-cube",
   "nukit-tempest-original",
   "nukit-tempest-original-cube",
+  "nukit-tempest-pro",
   "custom",
 ] as const;
 export type TempestDesign = (typeof tempestDesigns)[number];
@@ -179,6 +180,7 @@ export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
   "nukit-tempest-euro-cube": "Nukit Tempest Euro Cube",
   "nukit-tempest-original": "Nukit Tempest Original",
   "nukit-tempest-original-cube": "Nukit Tempest Original Cube",
+  "nukit-tempest-pro": "Nukit Tempest Pro",
   custom: "Custom",
 };
 
@@ -518,7 +520,7 @@ export const defaultSettings: RawPurifierSettings = {
   showBananaScale: false,
   showPreviewEdges: false,
   previewMaterialColor: defaultPreviewMaterialColorId,
-  autoRotate: false,
+  autoRotate: true,
   cameraPreset: "official",
   labels: true,
   referenceScale: 100,
@@ -656,6 +658,21 @@ export const nukitTempestOriginalCubeDesignOverrides = {
   tempestArrangement: "four-side-filter-tower",
 } satisfies Partial<RawPurifierSettings>;
 
+// The "Nukit Tempest Pro": a 2-filter sandwich around a 500x622x19 filter with
+// left/right fans, matching 500mm box-exhaust rings.
+export const nukitTempestProDesignOverrides = {
+  ...nukitTempestOriginalDesignOverrides,
+  filterWidth: 500,
+  filterDepth: 622,
+  filterThickness: 19,
+  fansLeft: automaticFanCount,
+  fansRight: automaticFanCount,
+  fansTop: 0,
+  fansBottom: 0,
+  tempestArrangement: "dual-horizontal-sandwich",
+  ...boxExhaustDiametersForWidth(500),
+} satisfies Partial<RawPurifierSettings>;
+
 // Apply a named tempest design. "custom" just records the choice; a named design
 // applies its full configuration so the build matches the preset.
 export function applyTempestDesign(settings: RawPurifierSettings, design: TempestDesign): RawPurifierSettings {
@@ -670,6 +687,9 @@ export function applyTempestDesign(settings: RawPurifierSettings, design: Tempes
   }
   if (design === "nukit-tempest-original-cube") {
     return { ...settings, ...nukitTempestOriginalCubeDesignOverrides, tempestDesign: "nukit-tempest-original-cube" };
+  }
+  if (design === "nukit-tempest-pro") {
+    return { ...settings, ...nukitTempestProDesignOverrides, tempestDesign: "nukit-tempest-pro" };
   }
   return { ...settings, tempestDesign: canonicalTempestDesign(design) };
 }

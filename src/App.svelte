@@ -157,7 +157,7 @@
     "&hexSpacing=1.6&topExhaust=fan-grid&boxFanHoleSize=278&boxRingOneScrewHoles=4&boxRingOneScrewDiameter=6" +
     "&boxRingOneDiameter=370&boxRingTwoScrewHoles=4&boxRingTwoScrewDiameter=6&boxRingTwoDiameter=444&screwHoleDiameter=5" +
     "&materialThickness=5&showFilterMedia=false&showFans=true&showFilterFrame=true&previewMaterialColor=matte-gray" +
-    "&autoRotate=false&cameraPreset=official&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256";
+    "&autoRotate=true&cameraPreset=official&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256";
   const initialSearch =
     window.location.search.replace(/^\?/, "").length > 0 ? window.location.search : `?${DEFAULT_SESSION_QUERY}`;
   const initialUrlParams = new URLSearchParams(initialSearch.startsWith("?") ? initialSearch.slice(1) : initialSearch);
