@@ -388,23 +388,31 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(cutPanels(none).every((panel) => panel.cuts.every((cut) => !(cut.type === "circle" && cut.role === "cord")))).toBe(true);
   });
 
-  test("keeps the cord pass-through clear of the fans on its wall", () => {
-    // A corner offset that lands the cord right on a side-wall fan must be slid clear.
-    const layout = createLayout(
-      decodeSettings(
-        "printDesign=nukit-open-air&filterWidth=370&filterDepth=290&filterThickness=40&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=150&fansRight=-1",
-      ),
-    );
+  test("clears the cord/fan collision by shifting the fan row, not the cord (3D parity)", () => {
+    // Wide, short side wall with auto fans: a centered cord would sit on a fan, so
+    // the fan row shifts vertically to clear it while the cord stays put.
+    const q =
+      "printDesign=nukit-open-air&filterWidth=622.3&filterDepth=495.3&filterThickness=19.1&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=17&fansRight=-1";
+    const layout = createLayout(decodeSettings(q));
+    let checked = false;
     for (const panel of cutPanels(layout)) {
       const circles = panel.cuts.filter((cut): cut is Extract<typeof cut, { type: "circle" }> => cut.type === "circle");
       const cord = circles.find((cut) => cut.role === "cord");
-      if (cord === undefined) {
+      const fans = circles.filter((cut) => cut.role === "fan");
+      if (cord === undefined || fans.length === 0) {
         continue;
       }
-      for (const fan of circles.filter((cut) => cut.role === "fan")) {
+      checked = true;
+      // The cord stays at its requested corner-offset position (it was not nudged).
+      expect(cord.cx).toBeLessThan(30);
+      // The fans moved off the cord's centre line to make room.
+      expect(fans.every((fan) => Math.abs(fan.cy - cord.cy) > 1)).toBe(true);
+      // And nothing overlaps.
+      for (const fan of fans) {
         expect(Math.hypot(fan.cx - cord.cx, fan.cy - cord.cy)).toBeGreaterThan(fan.radius + cord.radius);
       }
     }
+    expect(checked).toBe(true);
   });
 
   test("carries measured filter dimensions straight into the structured settings", () => {

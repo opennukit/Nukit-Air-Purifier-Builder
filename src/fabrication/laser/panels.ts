@@ -348,10 +348,13 @@ function createFanWallPanel(input: {
   cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
-  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY);
-  const cord = input.cordHole
-    ? [resolveCordAgainstFans(input.cordHole, fanCuts, input.width, input.height, input.settings.cutting.materialThickness)]
-    : [];
+  let fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY);
+  if (input.cordHole) {
+    const shifted = fanCenterYClearOfCord(input.fanCenterY, input.cordHole, fanCuts, input.height, input.settings.fan.spec.diameter);
+    if (shifted !== input.fanCenterY) {
+      fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, shifted);
+    }
+  }
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -361,7 +364,7 @@ function createFanWallPanel(input: {
     thickness: input.settings.cutting.materialThickness,
     kerfFit: input.settings.cutting.kerfFit,
     jointSettings: input.settings.cutting.joints,
-    cuts: [...fanCuts, ...(input.cuts ?? []), ...cord],
+    cuts: [...fanCuts, ...(input.cuts ?? []), ...(input.cordHole ? [input.cordHole] : [])],
     assembly: input.assembly,
   });
 }
@@ -390,10 +393,13 @@ function createSideWallPanel(input: {
       input.settings.cutting.materialThickness,
       input.settings.filter.thickness,
     );
-  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY);
-  const cord = input.cordHole
-    ? [resolveCordAgainstFans(input.cordHole, fanCuts, input.width, input.height, input.settings.cutting.materialThickness)]
-    : [];
+  let fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY);
+  if (input.cordHole) {
+    const shifted = fanCenterYClearOfCord(fanCenterY, input.cordHole, fanCuts, input.height, input.settings.fan.spec.diameter);
+    if (shifted !== fanCenterY) {
+      fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, shifted);
+    }
+  }
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -411,7 +417,7 @@ function createSideWallPanel(input: {
         input.filterFingerHoleRows,
       ),
       ...(input.cuts ?? []),
-      ...cord,
+      ...(input.cordHole ? [input.cordHole] : []),
     ],
     assembly: input.assembly,
   });
@@ -462,51 +468,38 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
 // matching the 3D-print cord/fan anti-collision.
 const cordFanClearance = 1;
 
-// Keep the cord bore clear of the fans on its wall. If the cord overlaps any fan
-// footprint, slide it the SHORTEST distance to a clear spot: first along the wall
-// (same height) into the nearest gap between/beside the fans — which keeps the
-// cord on its chosen line and reads cleanly — and only if no clear spot exists at
-// that height does it slide vertically instead.
-function resolveCordAgainstFans(
+// Move the FANS to make room for the cord (matching the 3D print model), leaving
+// the cord exactly where the user placed it. Returns the fan row's vertical
+// centre shifted just enough that no fan overlaps the cord; if the wall is too
+// short to shift the fans clear, the natural centre is kept.
+function fanCenterYClearOfCord(
+  center: number,
   cord: CircleCut,
   fanCuts: readonly CutFeature[],
-  panelWidth: number,
-  panelHeight: number,
-  thickness: number,
-): CircleCut {
+  wallHeight: number,
+  fanDiameter: number,
+): number {
   const fans = fanCuts.filter((cut): cut is CircleCut => cut.type === "circle" && cut.role === "fan");
-  const hits = (cx: number, cy: number): boolean =>
-    fans.some((fan) => Math.hypot(fan.cx - cx, fan.cy - cy) < fan.radius + cord.radius + cordFanClearance);
-  if (!hits(cord.cx, cord.cy)) {
-    return cord;
+  if (fans.length === 0) {
+    return center;
   }
-  const margin = cord.radius + thickness;
-  // Nearest value of the moving axis (held at `fixed` on the other axis) that
-  // clears every fan, by stepping just outside each fan's forbidden interval.
-  const nearestClear = (desired: number, fixed: number, lo: number, hi: number, axis: "x" | "y"): number | null => {
-    const candidates = [desired, lo, hi];
-    for (const fan of fans) {
-      const reach = fan.radius + cord.radius + cordFanClearance;
-      const off = (axis === "x" ? fan.cy : fan.cx) - fixed;
-      const span = reach * reach - off * off;
-      if (span <= 0) continue;
-      const half = Math.sqrt(span);
-      const center = axis === "x" ? fan.cx : fan.cy;
-      candidates.push(center - half - 0.05, center + half + 0.05);
-    }
-    const ok = candidates
-      .filter((value) => value >= lo && value <= hi)
-      .filter((value) => (axis === "x" ? !hits(value, fixed) : !hits(fixed, value)))
-      .sort((a, b) => Math.abs(a - desired) - Math.abs(b - desired));
-    return ok.length > 0 ? ok[0] : null;
-  };
-
-  const cx = nearestClear(cord.cx, cord.cy, margin, panelWidth - margin, "x");
-  if (cx !== null) {
-    return { ...cord, cx };
+  const reach = fans[0].radius + cord.radius + cordFanClearance;
+  // The fan nearest the cord horizontally is the binding one; clearing it clears
+  // the rest (they sit further away along the row).
+  const nearestDx = Math.min(...fans.map((fan) => Math.abs(fan.cx - cord.cx)));
+  if (nearestDx >= reach) {
+    return center;
   }
-  const cy = nearestClear(cord.cy, cord.cx, margin, panelHeight - margin, "y");
-  return cy !== null ? { ...cord, cy } : cord;
+  const needDy = Math.sqrt(reach * reach - nearestDx * nearestDx);
+  const minCenter = fanDiameter / 2 + 4;
+  const maxCenter = wallHeight - fanDiameter / 2 - 4;
+  if (minCenter > maxCenter) {
+    return center;
+  }
+  const candidates = [cord.cy + needDy, cord.cy - needDy]
+    .filter((value) => value >= minCenter && value <= maxCenter)
+    .sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
+  return candidates.length > 0 ? candidates[0] : center;
 }
 
 // #######################################
