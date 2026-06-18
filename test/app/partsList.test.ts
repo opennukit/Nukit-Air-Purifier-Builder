@@ -39,19 +39,19 @@ describe("parts list", () => {
 
   test("the Filter row shows the stock filter name when a preset matches, else the measured size", () => {
     const starkvind = createLayout(
-      decodeSettings("printDesign=nukit-tempest&filterWidth=370&filterDepth=290&filterThickness=40"),
+      decodeSettings("printDesign=nukit-tempest&filterWidth=365&filterDepth=285&filterThickness=35"),
     );
     expect(
       createPartsListItems(starkvind, "print-3mf", starkvind.rawSettings, "bed-256").find((item) => item.category === "Filter")?.label,
-    ).toBe("STARKVIND (370 x 290 x 40 mm)");
+    ).toBe("STARKVIND (365 x 285 x 35 mm)");
 
     // swapped orientation still reads as STARKVIND
     const swapped = createLayout(
-      decodeSettings("printDesign=nukit-tempest&filterWidth=290&filterDepth=370&filterThickness=40"),
+      decodeSettings("printDesign=nukit-tempest&filterWidth=285&filterDepth=365&filterThickness=35"),
     );
     expect(
       createPartsListItems(swapped, "print-3mf", swapped.rawSettings, "bed-256").find((item) => item.category === "Filter")?.label,
-    ).toBe("STARKVIND (370 x 290 x 40 mm)");
+    ).toBe("STARKVIND (365 x 285 x 35 mm)");
 
     // a custom size falls back to the measured dimensions
     const custom = createLayout(

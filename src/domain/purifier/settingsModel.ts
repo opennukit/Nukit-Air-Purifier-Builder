@@ -587,14 +587,14 @@ export function applyTempestArrangement(
   };
 }
 
-// The "Nukit Tempest Euro" preset: a 2-filter sandwich tower around a 370x290x40
-// filter, fans on the top (back) wall, honeycomb grill, right-wall cord. These
-// are the tempest-defining fields the design sets; preview/fabrication choices
-// are left to the user (and seeded by the default load).
+// The "Nukit Tempest Euro" preset: a 2-filter sandwich tower around a 365x285x35
+// STARKVIND filter, fans on the top (back) wall, honeycomb grill, right-wall
+// cord. These are the tempest-defining fields the design sets; preview/
+// fabrication choices are left to the user (and seeded by the default load).
 export const nukitTempestEuroDesignOverrides = {
-  filterWidth: 370,
-  filterDepth: 290,
-  filterThickness: 40,
+  filterWidth: 365,
+  filterDepth: 285,
+  filterThickness: 35,
   rim: 30,
   fanColor: "black",
   fanDiameter: 140,
@@ -617,18 +617,18 @@ export const nukitTempestEuroDesignOverrides = {
   topExhaust: "fan-grid",
   screwHoleDiameter: 5,
   materialThickness: 5,
-  ...boxExhaustDiametersForWidth(370),
+  ...boxExhaustDiametersForWidth(365),
 } satisfies Partial<RawPurifierSettings>;
 
 // The "Nukit Tempest Euro Cube": the Euro preset rebuilt as a 4-side-filter
-// tower around a 290x370x40 filter (the Euro filter on its side), so the box
-// exhaust resizes to the 290 mm width.
+// tower around a 285x365x35 filter (the Euro STARKVIND filter on its side), so
+// the box exhaust resizes to the 285 mm width.
 export const nukitTempestEuroCubeDesignOverrides = {
   ...nukitTempestEuroDesignOverrides,
-  filterWidth: 290,
-  filterDepth: 370,
+  filterWidth: 285,
+  filterDepth: 365,
   tempestArrangement: "four-side-filter-tower",
-  ...boxExhaustDiametersForWidth(290),
+  ...boxExhaustDiametersForWidth(285),
 } satisfies Partial<RawPurifierSettings>;
 
 // The "Nukit Tempest Original": a 2-filter sandwich around a 495x495x44 filter
