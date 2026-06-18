@@ -430,17 +430,18 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
   const width = geometry.filterDimensions.width;
   const workingDepth = geometry.workingDepth;
   const chamberHeight = geometry.chamberHeight;
+  const filterHeight = geometry.filterDimensions.thickness;
 
   if (wall === "left" || wall === "right") {
-    // "Cord position" slides along the wall's long (depth) axis; corner offset is
-    // measured up from the bottom edge (so the cord defaults near the floor).
-    const along =
-      cord.side === "center" ? workingDepth / 2 : cord.side === "left" ? workingDepth * 0.25 : workingDepth * 0.75;
-    const cx = clamp(along, margin, workingDepth - margin);
-    // Corner offset is measured up from the box floor. In the cut outline cy=0 is
-    // the floor edge (it maps to the bottom of the assembled wall), so a small
-    // offset puts the cord near the floor.
-    const cy = clamp(Math.max(cord.cornerOffset, margin), margin, chamberHeight - margin);
+    const cx = clamp(Math.max(cord.cornerOffset, margin), margin, workingDepth - margin);
+    const low = filterHeight + t + r;
+    const high = chamberHeight - (settings.filterCount > 1 ? filterHeight + t : t) - r;
+    const cy =
+      cord.side === "center"
+        ? clamp(chamberHeight / 2, Math.min(low, high), Math.max(low, high))
+        : cord.side === "left"
+          ? Math.min(low, high)
+          : Math.max(low, high);
     return { type: "circle", cx, cy, radius, role: "cord" };
   }
 

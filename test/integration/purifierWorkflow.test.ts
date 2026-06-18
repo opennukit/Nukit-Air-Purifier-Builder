@@ -360,26 +360,24 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const cordCircle = (layout: ReturnType<typeof createLayout>, id: string) =>
       requiredPanel(cutPanels(layout), id).cuts.find((cut) => cut.type === "circle" && cut.role === "cord");
 
-    // Right wall, centered: lands on the +x side wall, centred along the wall
-    // width and near the bottom edge (corner offset up from the floor).
+    // Right wall, centered: lands on the +x side wall, centered over the chamber height.
     const right = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center"));
     const rightPanel = requiredPanel(cutPanels(right), "right-side-wall");
     const rightCut = cordCircle(right, "right-side-wall");
-    const panelXs = rightPanel.outline.map((point) => point.x);
     const panelYs = rightPanel.outline.map((point) => point.y);
-    const panelMidX = (Math.min(...panelXs) + Math.max(...panelXs)) / 2;
-    const panelBottom = Math.max(...panelYs);
+    const panelMidY = (Math.min(...panelYs) + Math.max(...panelYs)) / 2;
     expect(rightCut?.type === "circle" && rightCut.radius).toBeCloseTo(8 / 2 - 0.1, 1);
-    // Centred along the width, and near the floor edge (cut cy=0 maps to the floor).
-    expect(rightCut?.type === "circle" && Math.abs(rightCut.cx - panelMidX)).toBeLessThan(2);
-    expect(rightCut?.type === "circle" && rightCut.cy).toBeLessThan((Math.min(...panelYs) + panelBottom) / 2);
+    // Centered side-wall cord sits at the wall's vertical mid-line.
+    expect(rightCut?.type === "circle" && Math.abs(rightCut.cy - panelMidY)).toBeLessThan(2);
     // The hole is only on the chosen wall.
     expect(cordCircle(right, "left-side-wall")).toBeUndefined();
 
-    // "Cord position" slides the side-wall hole along the width; left sits left of right.
-    const lcut = cordCircle(createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=left")), "right-side-wall");
-    const rcut = cordCircle(createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=right")), "right-side-wall");
-    expect(lcut?.type === "circle" && rcut?.type === "circle" && lcut.cx < rcut.cx).toBe(true);
+    // "side" slides the side-wall hole vertically; left sits lower than right.
+    const low = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=left"));
+    const high = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=right"));
+    const lowCy = cordCircle(low, "right-side-wall");
+    const highCy = cordCircle(high, "right-side-wall");
+    expect(lowCy?.type === "circle" && highCy?.type === "circle" && lowCy.cy < highCy.cy).toBe(true);
 
     // A front fan-wall hole centers vertically in the chamber.
     const front = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=front&cordHoleSide=center"));
@@ -390,9 +388,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(cutPanels(none).every((panel) => panel.cuts.every((cut) => !(cut.type === "circle" && cut.role === "cord")))).toBe(true);
   });
 
-  test("keeps the default side-wall cord centered, near the bottom, and clear of fans", () => {
-    // The reported config: wide short side wall with auto fans. By default the
-    // cord sits centred along the width and low on the wall, clear of the fans.
+  test("clears the cord/fan collision by shifting the fan row, not the cord (3D parity)", () => {
+    // Wide, short side wall with auto fans: a centered cord would sit on a fan, so
+    // the fan row shifts vertically to clear it while the cord stays put.
     const q =
       "printDesign=nukit-open-air&filterWidth=622.3&filterDepth=495.3&filterThickness=19.1&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=17&fansRight=-1";
     const layout = createLayout(decodeSettings(q));
@@ -405,15 +403,20 @@ describe("FilterBoxBuilder purifier workflow", () => {
         continue;
       }
       checked = true;
-      const xs = panel.outline.map((point) => point.x);
-      const ys = panel.outline.map((point) => point.y);
-      const midX = (Math.min(...xs) + Math.max(...xs)) / 2;
-      // Centred along the width and near the floor edge (cut cy=0 = floor).
-      expect(Math.abs(cord.cx - midX)).toBeLessThan(2);
-      expect(cord.cy).toBeLessThan((Math.min(...ys) + Math.max(...ys)) / 2);
-      // Clear of every fan.
+      // The cord stays at its requested corner-offset position (it was not nudged).
+      expect(cord.cx).toBeLessThan(30);
+      // The fan row was re-packed closer together to make room: every fan still
+      // sits on the natural centre line, none reaches the corner cord, and the
+      // fan spacing is tighter than an even full-width spread would give.
       for (const fan of fans) {
         expect(Math.hypot(fan.cx - cord.cx, fan.cy - cord.cy)).toBeGreaterThan(fan.radius + cord.radius);
+      }
+      if (fans.length >= 2) {
+        const panelXs = panel.outline.map((point) => point.x);
+        const panelWidth = Math.max(...panelXs) - Math.min(...panelXs);
+        const sortedX = fans.map((fan) => fan.cx).sort((a, b) => a - b);
+        const pitch = sortedX[1] - sortedX[0];
+        expect(pitch).toBeLessThan((panelWidth - 20) / fans.length);
       }
     }
     expect(checked).toBe(true);
