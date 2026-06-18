@@ -22,7 +22,6 @@ const normalFilterMaximum = 760;
 const normalFilterThicknessMinimum = 12;
 const normalFilterThicknessMaximum = 80;
 const smallFanMargin = 12;
-const largeSheetDimension = 1500;
 
 export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[] {
   const diagnostics: BuildDiagnostic[] = [];
@@ -53,15 +52,6 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (resolvedFans.left + resolvedFans.right === 0) {
-    diagnostics.push({
-      id: "no-side-fans",
-      severity: "warning",
-      title: "No side fan bank",
-      detail: "The current enclosure has no fans on the left or right filter run.",
-    });
-  }
-
   const tightFanMargins = tightFanMarginLabels(layout);
   if (tightFanMargins.length > 0) {
     diagnostics.push({
@@ -81,18 +71,6 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       severity: "warning",
       title: "Large unsplit frame",
       detail: "The filter frame is wider than many desktop fabrication beds.",
-    });
-  }
-
-  if (
-    layout.summary.fabrication.type === "cut-panel-source" &&
-    Math.max(layout.summary.fabrication.sheetWidth, layout.summary.fabrication.sheetHeight) > largeSheetDimension
-  ) {
-    diagnostics.push({
-      id: "large-sheet",
-      severity: "warning",
-      title: "Large sheet layout",
-      detail: "The arranged laser drawing exceeds 1500 mm on one side and may need manual nesting.",
     });
   }
 

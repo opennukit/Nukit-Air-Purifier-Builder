@@ -25,14 +25,14 @@ function kitWithSummary(summary: PrintableKitSummary): PrintableKit {
 
 describe("export diagnostics severity", () => {
   test("advisories warn but do not block export", () => {
-    const noSideFanLayout = createLayout({ ...defaultSettings, fansLeft: 0, fansRight: 0, fansTop: 2, fansBottom: 2 });
-    const diagnostics = evaluateActiveExportDiagnostics(noSideFanLayout, "laser-svg", null);
+    const noFanLayout = createLayout({ ...defaultSettings, fansLeft: 0, fansRight: 0, fansTop: 0, fansBottom: 0 });
+    const diagnostics = evaluateActiveExportDiagnostics(noFanLayout, "laser-svg", null);
 
-    expect(diagnostics.map((diagnostic) => diagnostic.id)).toContain("no-side-fans");
+    expect(diagnostics.map((diagnostic) => diagnostic.id)).toContain("no-fans");
     expect(diagnostics.every((diagnostic) => diagnostic.severity === "warning")).toBe(true);
     expect(exportBlockingDiagnostics(diagnostics)).toEqual([]);
 
-    const summary = summarizeActiveBuildReadiness(noSideFanLayout, diagnostics, "laser-svg");
+    const summary = summarizeActiveBuildReadiness(noFanLayout, diagnostics, "laser-svg");
     expect(summary.severity).toBe("warning");
     expect(summary.title).toBe(`${diagnostics.length} advisor${diagnostics.length === 1 ? "y" : "ies"}`);
   });
