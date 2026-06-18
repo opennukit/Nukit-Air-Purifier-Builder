@@ -257,6 +257,7 @@ export function serializePurifierDraft(
       cordHoleWall: draft.design.cordHoleWall,
       cordHoleSide: draft.design.cordHoleSide,
       cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
+      backPlateFans: draft.design.backPlateFans,
     });
   }
 
@@ -421,6 +422,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       cordHoleWall: input.design.cordHoleWall,
       cordHoleSide: input.design.cordHoleSide,
       cordHoleCornerOffset: input.design.cordHoleCornerOffset,
+      backPlateFans: input.design.backPlateFans,
     };
   }
 
@@ -514,6 +516,7 @@ function createConfiguredPrintDesign(input: {
       cordHoleWall: input.raw.cordHoleWall,
       cordHoleSide: input.raw.cordHoleSide,
       cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
+      backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
     };
   }
 
@@ -629,6 +632,7 @@ function createPurifierDesignDraft(
       cordHoleWall: configuration.design.cordHoleWall,
       cordHoleSide: configuration.design.cordHoleSide,
       cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
+      backPlateFans: configuration.design.backPlateFans,
     };
   }
 

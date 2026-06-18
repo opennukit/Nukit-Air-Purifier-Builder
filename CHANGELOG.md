@@ -2,7 +2,7 @@
 
 All changes on this branch since `main`, grouped by area. The complete
 commit-by-commit list is in the Appendix at the bottom. Every change is
-committed; the build (`bun run build`) and full test suite (`bun test`, 240
+committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
 ## Laser cut — match the boxes.py generator (cut geometry)
@@ -34,6 +34,12 @@ tests) pass.
 - Side-wall cord defaults to the far (bottom) corner near the floor.
 - Cord wall selection maps to the *displayed* (swapped) side-panel names, so the
   control and the drawing always name the same panel.
+
+## Laser cut — one-side "Back" fans
+- On the One-side filter layout, a "Back" fan toggle cuts a centred fan grid
+  (auto fills the plate; a fixed count lays out as a centred near-square block,
+  four screw holes per fan) into the existing closed back panel. Nothing else in
+  the box changes — the filter slot and flanges are unaffected.
 
 ## Laser cut — Layout "Design" selector
 - Added a Design selector under Layout: Nukit Tempest Euro / Original / Pro /

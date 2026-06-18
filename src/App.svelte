@@ -325,6 +325,8 @@
   $: noWallFansSelected =
     settings.fansLeft === 0 && settings.fansRight === 0 && settings.fansTop === 0 && settings.fansBottom === 0;
   $: backFansSelected = isOneSideFilter && settings.backPlateFans !== 0;
+  // Laser Cut one-side: the closed back panel can carry the same "Back" fan grid.
+  $: isLaserOneSide = isNukitControlsActive && settings.filters === 1;
   // The Tempest model drives the per-wall fan maxima the Advanced "Fan tuning"
   // selects offer (Auto + 0..max), so a user can request fewer than Auto fills.
   $: tempestFanModel =
@@ -1677,6 +1679,17 @@
                           <span>{control.label}</span>
                         </label>
                       {/each}
+                      {#if isLaserOneSide}
+                        <label class="toggle-field">
+                          <input
+                            type="checkbox"
+                            name="backPlateFans"
+                            checked={settings.backPlateFans !== 0}
+                            onchange={(event) => updateBackFanAuto(event)}
+                          />
+                          <span>Back</span>
+                        </label>
+                      {/if}
                     </div>
                   </fieldset>
                 </div>

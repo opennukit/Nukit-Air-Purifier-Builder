@@ -56,6 +56,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const chamberHeight = geometry.chamberHeight;
   const filterCount = settings.filterCount;
   const usesSplitRails = settings.frameConstruction.type === "split-rails";
+  // One-side "Back" fans: the closed back panel gets a fan grid (the rest of the
+  // box is unchanged). 0 = off, -1 = auto fill, >0 = exact count.
+  const backPlateFans = settings.design.type === "laser-cut" ? settings.design.backPlateFans : 0;
   const panels: CutPanelDraft[] = [];
   const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
   const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
@@ -306,13 +309,14 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     panels.push(
       rectangularPanel({
         id: "closed-back-panel",
-        name: "Closed back panel",
+        name: backPlateFans !== 0 ? "Back plate (fans)" : "Closed back panel",
         width,
         height: workingDepth,
         edges: edgeSectionsFor("hhhh"),
         thickness,
         kerfFit: settings.cutting.kerfFit,
         jointSettings: settings.cutting.joints,
+        cuts: backPlateFans !== 0 ? createBackPlateFanGrid(width, workingDepth, backPlateFans, settings) : [],
         assembly: {
           type: "placed",
           role: "closed-back",
@@ -326,6 +330,133 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   }
 
   return panels;
+}
+
+// #######################################
+// Back-Plate Fan Grid (one-side "Back" fans)
+// #######################################
+
+// A centred grid of fan bores (+ four screw holes each) over the closed back
+// panel, kept a fan-radius-plus-wall in from each edge. `requested` < 0 fills the
+// grid; a positive count lays out as a centred near-square block. Mirrors the
+// 3D-Print bottom-plate grid.
+function createBackPlateFanGrid(width: number, height: number, requested: number, settings: PurifierSettings): CutFeature[] {
+  const fanDiameter = settings.fan.spec.diameter;
+  const t = settings.cutting.materialThickness;
+  const minEdge = t + fanDiameter / 2;
+  const pitch = fanDiameter + repackedFanGap;
+  const maxCols = backFansPerSide(width, minEdge, pitch);
+  const maxRows = backFansPerSide(height, minEdge, pitch);
+  const maximum = maxCols * maxRows;
+  if (maximum <= 0) {
+    return [];
+  }
+  const target = requested < 0 ? maximum : Math.min(requested, maximum);
+  if (target <= 0) {
+    return [];
+  }
+
+  const centers: { cx: number; cy: number }[] = [];
+  if (target >= maximum) {
+    const xs = centeredGridPositions(maxCols, width, pitch);
+    const ys = centeredGridPositions(maxRows, height, pitch);
+    for (const cy of ys) {
+      for (const cx of xs) {
+        centers.push({ cx, cy });
+      }
+    }
+  } else {
+    const { rows } = chooseBackGrid(target, maxCols, maxRows);
+    const rowCounts = distributeBackRows(target, rows);
+    const ys = centeredGridPositions(rows, height, pitch);
+    rowCounts.forEach((rowCount, rowIndex) => {
+      for (const cx of centeredGridPositions(rowCount, width, pitch)) {
+        centers.push({ cx, cy: ys[rowIndex] });
+      }
+    });
+  }
+
+  const kerfFit = settings.cutting.kerfFit;
+  const screwOffset = settings.fan.spec.screwSpacing / 2;
+  const cuts: CutFeature[] = [];
+  for (const { cx, cy } of centers) {
+    cuts.push({ type: "circle", cx, cy, radius: kerfCorrectedRadius(Math.max(4, (fanDiameter - 4) / 2), kerfFit), role: "fan" });
+    for (const dx of [-screwOffset, screwOffset]) {
+      for (const dy of [-screwOffset, screwOffset]) {
+        cuts.push({ type: "circle", cx: cx + dx, cy: cy + dy, radius: kerfCorrectedRadius(settings.cutting.screwHoleDiameter / 2, kerfFit), role: "screw" });
+      }
+    }
+  }
+  return cuts;
+}
+
+function backFansPerSide(length: number, minEdge: number, pitch: number): number {
+  const span = length - 2 * minEdge;
+  return span < 0 ? 0 : Math.max(0, Math.floor(1 + span / pitch));
+}
+
+function centeredGridPositions(count: number, length: number, pitch: number): number[] {
+  if (count <= 0) {
+    return [];
+  }
+  const total = count <= 1 ? 0 : (count - 1) * pitch;
+  const first = count === 1 ? length / 2 : (length - total) / 2;
+  return Array.from({ length: count }, (_, index) => first + index * pitch);
+}
+
+// Squarest rows x cols block holding `count` (4 -> 2x2, 6 -> 3x2, 3 -> 1x3),
+// preferring more columns than rows on a tie.
+function chooseBackGrid(count: number, maxCols: number, maxRows: number): { cols: number; rows: number } {
+  let best: { cols: number; rows: number; score: number[] } | null = null;
+  for (let cols = 1; cols <= maxCols; cols += 1) {
+    for (let rows = 1; rows <= maxRows; rows += 1) {
+      if (cols * rows < count) {
+        continue;
+      }
+      const score = [cols * rows - count, Math.abs(cols - rows), -cols, -rows];
+      if (best === null || backGridLess(score, best.score)) {
+        best = { cols, rows, score };
+      }
+    }
+  }
+  return best === null ? { cols: Math.max(1, Math.min(count, maxCols)), rows: 1 } : { cols: best.cols, rows: best.rows };
+}
+
+// Split `count` across `rows` evenly, heavier rows symmetric about the centre.
+function distributeBackRows(count: number, rows: number): number[] {
+  const base = Math.floor(count / rows);
+  const counts = new Array<number>(rows).fill(base);
+  let remaining = count - base * rows;
+  if (remaining % 2 === 1 && rows % 2 === 1) {
+    counts[(rows - 1) / 2] += 1;
+    remaining -= 1;
+  }
+  let low = 0;
+  let high = rows - 1;
+  while (remaining >= 2 && low < high) {
+    counts[low] += 1;
+    counts[high] += 1;
+    low += 1;
+    high -= 1;
+    remaining -= 2;
+  }
+  const centreOut = [...counts.keys()].sort((a, b) => Math.abs(a - (rows - 1) / 2) - Math.abs(b - (rows - 1) / 2));
+  let index = 0;
+  while (remaining > 0) {
+    counts[centreOut[index % rows]] += 1;
+    remaining -= 1;
+    index += 1;
+  }
+  return counts;
+}
+
+function backGridLess(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) {
+      return a[i] < b[i];
+    }
+  }
+  return false;
 }
 
 // #######################################

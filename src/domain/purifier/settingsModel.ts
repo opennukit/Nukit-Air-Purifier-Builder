@@ -321,6 +321,9 @@ export type LaserCutDesignDraft = {
   readonly cordHoleWall: CordHoleWall;
   readonly cordHoleSide: CordHoleSide;
   readonly cordHoleCornerOffset: Millimeters;
+  // One-side "Back" fan grid on the closed back panel: 0 = off, -1 = automatic
+  // (fill), >0 = exact count. Mirrors the 3D-Print Back fan toggle.
+  readonly backPlateFans: number;
 };
 
 export type DonutFilterAdapterPrintDesignDraft = {
@@ -400,6 +403,7 @@ export type ConfiguredPrintDesign =
       readonly cordHoleWall: CordHoleWall;
       readonly cordHoleSide: CordHoleSide;
       readonly cordHoleCornerOffset: Millimeters;
+      readonly backPlateFans: number;
     }
   | {
       readonly type: "donut-filter-adapter";
