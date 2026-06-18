@@ -465,16 +465,10 @@ export function createSandwichCordPlacement(
   const offset = horizontalCordOffset(settings);
   // Both horizontal layouts stand upright for printing and display
   // (createSandwichPose: build +y becomes the standing UP axis, so the front wall
-  // y=0 becomes the floor). A power cord should exit near the standing floor, so
-  // on the left and right walls — which stay vertical in that pose — the hole sits
-  // one corner-safe cord offset above the wall's floor end instead of following
-  // the side setting (offset = cord radius + wall + margin, so the bore clears the
-  // floor wall it stands next to). A hole through the front wall already exits at
-  // the floor; the back wall is the user's explicit choice of the standing top.
-  const positionAlongWall =
-    cord.wall === "left" || cord.wall === "right"
-      ? offset
-      : cordPositionAlongWall(wallLength, cord.side, offset);
+  // y=0 becomes the floor). The cord follows the chosen side on every wall —
+  // center sits at the wall midline, left/right one corner-safe offset in from the
+  // respective end — so the rendered hole matches the "Cord position" control.
+  const positionAlongWall = cordPositionAlongWall(wallLength, cord.side, offset);
   return {
     topology: "sandwich",
     type: "wall-cylinder",

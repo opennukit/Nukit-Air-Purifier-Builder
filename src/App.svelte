@@ -156,7 +156,7 @@
     "printDesign=nukit-tempest&filterWidth=370&filterDepth=290&filterThickness=40&rim=30&fanColor=black&fanDiameter=140" +
     "&fansLeft=0&fansRight=0&fansTop=-1&fansBottom=0&tempestArrangement=dual-horizontal-sandwich" +
     "&tempestDesign=nukit-tempest-euro&filterSlotWall=back&filterFitClearance=1&cordHoleDiameter=8&cordHoleWall=right" +
-    "&cordHoleSide=right&cordHoleCornerOffset=17&outsideFlangeThickness=10&chunkLabels=false&hexGrill=true&hexSize=10" +
+    "&cordHoleSide=center&cordHoleCornerOffset=17&outsideFlangeThickness=10&chunkLabels=false&hexGrill=true&hexSize=10" +
     "&hexSpacing=1.6&topExhaust=fan-grid&boxFanHoleSize=278&boxRingOneScrewHoles=4&boxRingOneScrewDiameter=6" +
     "&boxRingOneDiameter=370&boxRingTwoScrewHoles=4&boxRingTwoScrewDiameter=6&boxRingTwoDiameter=444&screwHoleDiameter=5" +
     "&materialThickness=5&showFilterMedia=false&showFans=true&showFilterFrame=true&previewMaterialColor=matte-gray" +

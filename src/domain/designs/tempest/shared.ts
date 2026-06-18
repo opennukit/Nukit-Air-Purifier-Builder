@@ -164,7 +164,7 @@ export const defaultTempestCordPassThrough = {
   type: "wall",
   diameter: 8,
   wall: "right",
-  side: "right",
+  side: "center",
   cornerOffset: 17,
 } as const satisfies TempestCordPassThrough;
 
