@@ -1,5 +1,6 @@
 import {
   BufferGeometry,
+  CanvasTexture,
   CircleGeometry,
   EdgesGeometry,
   Euler,
@@ -11,6 +12,9 @@ import {
   Mesh,
   Path,
   Shape,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
   Vector3,
 } from "three";
 import type { FanAppearance } from "@/domain/purifier/fans";
@@ -135,6 +139,13 @@ export function createPanelGroup(
 
   group.add(createPanelCutMarkGroup(panel, materialThickness, screwMarkMaterial));
 
+  // In the exploded view the parts are separated, so label each one with its
+  // laser-drawing name (a billboarded canvas sprite) to make assembly diagrams
+  // and part identification readable. The assembled view stays unlabeled.
+  if (exploded) {
+    group.add(createPanelNameLabel(panel.name));
+  }
+
   if (showFans) {
     const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
     for (const cut of panel.cuts) {
@@ -161,6 +172,46 @@ export function createPanelGroup(
   group.rotation.set(rx, ry, rz);
 
   return group;
+}
+
+// A billboarded canvas-texture label showing a part's laser-drawing name, placed
+// at the part center for the exploded view. depthTest is off so it stays legible
+// over the geometry; the font auto-shrinks to fit long names.
+function createPanelNameLabel(name: string): Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 84;
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("createPanelNameLabel: Could not create canvas context");
+  }
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(255, 253, 246, 0.96)";
+  context.fillRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.strokeStyle = "rgba(20, 77, 61, 0.85)";
+  context.lineWidth = 5;
+  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.fillStyle = "#111817";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  let fontSize = 46;
+  do {
+    context.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
+    if (context.measureText(name).width <= canvas.width - 40) {
+      break;
+    }
+    fontSize -= 2;
+  } while (fontSize > 16);
+  context.fillText(name, canvas.width / 2, canvas.height / 2 + 2);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  const material = new SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+  const sprite = new Sprite(material);
+  sprite.renderOrder = 20;
+  const widthInScene = 0.95;
+  sprite.scale.set(widthInScene, (widthInScene * canvas.height) / canvas.width, 1);
+  return sprite;
 }
 
 function createPanelGeometry(panel: CutPanel, materialThickness: number, exploded: boolean): ExtrudeGeometry {
