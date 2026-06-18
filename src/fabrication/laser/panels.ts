@@ -348,13 +348,7 @@ function createFanWallPanel(input: {
   cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
-  let fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY);
-  if (input.cordHole) {
-    const shifted = fanCenterYClearOfCord(input.fanCenterY, input.cordHole, fanCuts, input.height, input.settings.fan.spec.diameter);
-    if (shifted !== input.fanCenterY) {
-      fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, shifted);
-    }
-  }
+  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY, input.cordHole);
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -393,13 +387,7 @@ function createSideWallPanel(input: {
       input.settings.cutting.materialThickness,
       input.settings.filter.thickness,
     );
-  let fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY);
-  if (input.cordHole) {
-    const shifted = fanCenterYClearOfCord(fanCenterY, input.cordHole, fanCuts, input.height, input.settings.fan.spec.diameter);
-    if (shifted !== fanCenterY) {
-      fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, shifted);
-    }
-  }
+  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY, input.cordHole);
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -467,39 +455,42 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
 // Clearance kept between the cord bore and any fan opening on the same wall (mm),
 // matching the 3D-print cord/fan anti-collision.
 const cordFanClearance = 1;
+// Gap left between adjacent fans when they are re-packed to make room for a cord.
+const repackedFanGap = 10;
 
-// Move the FANS to make room for the cord (matching the 3D print model), leaving
-// the cord exactly where the user placed it. Returns the fan row's vertical
-// centre shifted just enough that no fan overlaps the cord; if the wall is too
-// short to shift the fans clear, the natural centre is kept.
-function fanCenterYClearOfCord(
-  center: number,
-  cord: CircleCut,
-  fanCuts: readonly CutFeature[],
-  wallHeight: number,
+// Fan-centre positions along a wall. Normally the fans are spread evenly, but if
+// they would collide with the cord, they are re-packed closer together (minimum
+// spacing, centred) and slid clear of the cord — exactly like the 3D print model
+// (which keeps its corner-safe spread, leaving the corner cord untouched). The
+// cord itself never moves.
+function fanCenterXs(
+  length: number,
+  fanCount: number,
   fanDiameter: number,
-): number {
-  const fans = fanCuts.filter((cut): cut is CircleCut => cut.type === "circle" && cut.role === "fan");
-  if (fans.length === 0) {
-    return center;
+  keepOut: { x: number; reach: number } | null,
+): number[] {
+  const segment = (length - 20) / fanCount;
+  const spread = Array.from({ length: fanCount }, (_, index) => 10 + segment / 2 + index * segment);
+  if (keepOut === null || !spread.some((cx) => Math.abs(cx - keepOut.x) < keepOut.reach)) {
+    return spread;
   }
-  const reach = fans[0].radius + cord.radius + cordFanClearance;
-  // The fan nearest the cord horizontally is the binding one; clearing it clears
-  // the rest (they sit further away along the row).
-  const nearestDx = Math.min(...fans.map((fan) => Math.abs(fan.cx - cord.cx)));
-  if (nearestDx >= reach) {
-    return center;
+  const pitch = fanDiameter + repackedFanGap;
+  const groupWidth = (fanCount - 1) * pitch;
+  const edge = fanDiameter / 2 + 4;
+  const loFirst = edge;
+  const hiFirst = length - edge - groupWidth;
+  if (hiFirst < loFirst) {
+    return spread; // not enough room to re-pack; leave the even spread
   }
-  const needDy = Math.sqrt(reach * reach - nearestDx * nearestDx);
-  const minCenter = fanDiameter / 2 + 4;
-  const maxCenter = wallHeight - fanDiameter / 2 - 4;
-  if (minCenter > maxCenter) {
-    return center;
-  }
-  const candidates = [cord.cy + needDy, cord.cy - needDy]
-    .filter((value) => value >= minCenter && value <= maxCenter)
-    .sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
-  return candidates.length > 0 ? candidates[0] : center;
+  const centeredFirst = (length - groupWidth) / 2;
+  const positions = (first: number): number[] => Array.from({ length: fanCount }, (_, index) => first + index * pitch);
+  const hits = (first: number): boolean => positions(first).some((cx) => Math.abs(cx - keepOut.x) < keepOut.reach);
+  const first =
+    [centeredFirst, keepOut.x + keepOut.reach, keepOut.x - keepOut.reach - groupWidth]
+      .map((value) => clamp(value, loFirst, hiFirst))
+      .filter((value) => !hits(value))
+      .sort((a, b) => Math.abs(a - centeredFirst) - Math.abs(b - centeredFirst))[0] ?? clamp(centeredFirst, loFirst, hiFirst);
+  return positions(first);
 }
 
 // #######################################
@@ -572,6 +563,7 @@ function createFanCuts(
   requestedFans: FanCountRequest,
   settings: PurifierSettings,
   centerY: number,
+  cord?: CircleCut | null,
 ): CutFeature[] {
   const fanDiameter = settings.fan.spec.diameter;
   const kerfFit = settings.cutting.kerfFit;
@@ -581,14 +573,17 @@ function createFanCuts(
   }
 
   const cuts: CutFeature[] = [];
-  const segment = (length - 20) / fanCount;
   const screwOffset = settings.fan.spec.screwSpacing / 2;
   const minCenter = fanDiameter / 2 + 4;
   const maxCenter = height - fanDiameter / 2 - 4;
   const center = minCenter <= maxCenter ? clamp(centerY, minCenter, maxCenter) : height / 2;
+  // Only avoid the cord horizontally if it actually shares the fan row's height.
+  const reach = fanDiameter / 2 + (cord?.radius ?? 0) + cordFanClearance;
+  const keepOut = cord && Math.abs(cord.cy - center) < reach ? { x: cord.cx, reach } : null;
+  const xs = fanCenterXs(length, fanCount, fanDiameter, keepOut);
 
   for (let index = 0; index < fanCount; index += 1) {
-    const cx = 10 + segment / 2 + index * segment;
+    const cx = xs[index];
     cuts.push({
       type: "circle",
       cx,
