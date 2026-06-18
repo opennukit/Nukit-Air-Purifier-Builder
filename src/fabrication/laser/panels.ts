@@ -462,10 +462,11 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
 // matching the 3D-print cord/fan anti-collision.
 const cordFanClearance = 1;
 
-// Keep the cord bore clear of the fans on its wall (the 3D print model does the
-// same). If the cord overlaps any fan's footprint, slide it perpendicular
-// (vertically) just past the blocking fans' band; if it can't fit there, slide
-// it horizontally clear of the nearest fan instead.
+// Keep the cord bore clear of the fans on its wall. If the cord overlaps any fan
+// footprint, slide it the SHORTEST distance to a clear spot: first along the wall
+// (same height) into the nearest gap between/beside the fans — which keeps the
+// cord on its chosen line and reads cleanly — and only if no clear spot exists at
+// that height does it slide vertically instead.
 function resolveCordAgainstFans(
   cord: CircleCut,
   fanCuts: readonly CutFeature[],
@@ -474,29 +475,38 @@ function resolveCordAgainstFans(
   thickness: number,
 ): CircleCut {
   const fans = fanCuts.filter((cut): cut is CircleCut => cut.type === "circle" && cut.role === "fan");
-  const reachX = (fan: CircleCut): number => fan.radius + cord.radius + cordFanClearance;
-  const blocking = fans.filter((fan) => Math.abs(fan.cx - cord.cx) < reachX(fan));
-  if (blocking.length === 0) {
-    return cord;
-  }
-  const bandTop = Math.max(...blocking.map((fan) => fan.cy + fan.radius)) + cord.radius + cordFanClearance;
-  const bandBottom = Math.min(...blocking.map((fan) => fan.cy - fan.radius)) - cord.radius - cordFanClearance;
-  if (cord.cy <= bandBottom || cord.cy >= bandTop) {
+  const hits = (cx: number, cy: number): boolean =>
+    fans.some((fan) => Math.hypot(fan.cx - cx, fan.cy - cy) < fan.radius + cord.radius + cordFanClearance);
+  if (!hits(cord.cx, cord.cy)) {
     return cord;
   }
   const margin = cord.radius + thickness;
-  const belowFits = bandBottom >= margin;
-  const aboveFits = bandTop <= panelHeight - margin;
-  if (belowFits && (!aboveFits || cord.cy - bandBottom <= bandTop - cord.cy)) {
-    return { ...cord, cy: bandBottom };
+  // Nearest value of the moving axis (held at `fixed` on the other axis) that
+  // clears every fan, by stepping just outside each fan's forbidden interval.
+  const nearestClear = (desired: number, fixed: number, lo: number, hi: number, axis: "x" | "y"): number | null => {
+    const candidates = [desired, lo, hi];
+    for (const fan of fans) {
+      const reach = fan.radius + cord.radius + cordFanClearance;
+      const off = (axis === "x" ? fan.cy : fan.cx) - fixed;
+      const span = reach * reach - off * off;
+      if (span <= 0) continue;
+      const half = Math.sqrt(span);
+      const center = axis === "x" ? fan.cx : fan.cy;
+      candidates.push(center - half - 0.05, center + half + 0.05);
+    }
+    const ok = candidates
+      .filter((value) => value >= lo && value <= hi)
+      .filter((value) => (axis === "x" ? !hits(value, fixed) : !hits(fixed, value)))
+      .sort((a, b) => Math.abs(a - desired) - Math.abs(b - desired));
+    return ok.length > 0 ? ok[0] : null;
+  };
+
+  const cx = nearestClear(cord.cx, cord.cy, margin, panelWidth - margin, "x");
+  if (cx !== null) {
+    return { ...cord, cx };
   }
-  if (aboveFits) {
-    return { ...cord, cy: bandTop };
-  }
-  // Fan band taller than the wall: slide horizontally past the nearest fan.
-  const nearest = blocking.reduce((a, b) => (Math.abs(b.cx - cord.cx) < Math.abs(a.cx - cord.cx) ? b : a));
-  const target = cord.cx <= nearest.cx ? nearest.cx - reachX(nearest) : nearest.cx + reachX(nearest);
-  return { ...cord, cx: clamp(target, margin, panelWidth - margin) };
+  const cy = nearestClear(cord.cy, cord.cx, margin, panelHeight - margin, "y");
+  return cy !== null ? { ...cord, cy } : cord;
 }
 
 // #######################################
