@@ -773,8 +773,8 @@ export const nukitLaserDesignLabels: Readonly<Record<NukitLaserDesign, string>> 
 const nukitLaserDesignFields = {
   // STARKVIND, top fans.
   "nukit-tempest-euro": { filterWidth: 365, filterDepth: 285, filterThickness: 35, fansLeft: 0, fansRight: 0, fansTop: automaticFanCount, fansBottom: 0 },
-  // Original 495 cube, side fans.
-  "nukit-tempest-original": { filterWidth: 495, filterDepth: 495, filterThickness: 44, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: 0, fansBottom: 0 },
+  // Original 495 cube, right + top fans.
+  "nukit-tempest-original": { filterWidth: 495, filterDepth: 495, filterThickness: 44, fansLeft: 0, fansRight: automaticFanCount, fansTop: automaticFanCount, fansBottom: 0 },
   // Pro 500x622, side fans.
   "nukit-tempest-pro": { filterWidth: 500, filterDepth: 622, filterThickness: 19, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: 0, fansBottom: 0 },
 } satisfies Readonly<Record<Exclude<NukitLaserDesign, "custom">, Partial<RawPurifierSettings>>>;
