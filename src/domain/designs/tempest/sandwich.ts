@@ -461,14 +461,21 @@ export function createSandwichCordPlacement(
     return { type: "none" };
   }
   const cord = settings.cordPassThrough;
-  const wallLength = cord.wall === "front" || cord.wall === "back" ? box.width : box.depth;
   const offset = horizontalCordOffset(settings);
-  // Both horizontal layouts stand upright for printing and display
-  // (createSandwichPose: build +y becomes the standing UP axis, so the front wall
-  // y=0 becomes the floor). The cord follows the chosen side on every wall —
-  // center sits at the wall midline, left/right one corner-safe offset in from the
-  // respective end — so the rendered hole matches the "Cord position" control.
-  const positionAlongWall = cordPositionAlongWall(wallLength, cord.side, offset);
+  const filterCount = horizontalFilterCount(expectSandwichArrangement(settings.arrangement));
+  const isSideWall = cord.wall === "left" || cord.wall === "right";
+  // The box stands upright for display/print: the front/back walls span the box
+  // WIDTH (which reads horizontally), while the left/right walls span the box
+  // DEPTH (which the upright pose tips up to read VERTICALLY). So "Cord position"
+  // left/center/right has to drive a different axis per wall to always slide the
+  // hole HORIZONTALLY across the panel as seen:
+  //   - front/back: slide along the wall width, stay at the chamber-centre height.
+  //   - left/right: stay centred along the depth, slide UP/DOWN the chamber height
+  //     (which the upright pose renders as horizontal).
+  const positionAlongWall = isSideWall ? box.depth / 2 : cordPositionAlongWall(box.width, cord.side, offset);
+  const verticalCenter = isSideWall
+    ? sideWallCordHeight(settings, box, cord.side, filterCount)
+    : sandwichCordVerticalCenter(settings, box);
   return {
     topology: "sandwich",
     type: "wall-cylinder",
@@ -476,9 +483,35 @@ export function createSandwichCordPlacement(
     side: cord.side,
     diameter: cord.diameter,
     positionAlongWall,
-    verticalCenter: sandwichCordVerticalCenter(settings, box),
+    verticalCenter,
     axis: cord.wall === "front" || cord.wall === "back" ? "y" : "x",
   };
+}
+
+// For a cord on a left/right wall, the chosen side slides the hole along the box
+// height, kept inside the fan chamber (between the bottom obstacle — the lower
+// filter, the solid plate, or the back fan bodies — and the top filter flange).
+// center sits at the chamber midline; left/right go to the chamber ends.
+function sideWallCordHeight(settings: TempestSettings, box: TempestBoxEnvelope, side: "left" | "center" | "right", filterCount: 1 | 2): Millimeters {
+  if (side === "center") {
+    return sandwichCordVerticalCenter(settings, box);
+  }
+  const arrangement = expectSandwichArrangement(settings.arrangement);
+  const flange = settings.frame.outsideFlangeThickness;
+  const wall = settings.frame.wallThickness;
+  const cordRadius = settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter / 2 : 0;
+  const bottomFans = settings.fan.bottomPlateFans;
+  const backFansOn = filterCount === 1 && bottomFans !== undefined && !(bottomFans.type === "fixed" && bottomFans.count === 0);
+  const bottomObstacleTop =
+    filterCount === 2
+      ? flange + arrangement.filter.thickness + wall
+      : backFansOn
+        ? flange + tempestFanBodyDepth(settings.fan.diameter)
+        : flange;
+  const topObstacleBottom = box.height - flange - arrangement.filter.thickness - wall;
+  const low = bottomObstacleTop + cordRadius;
+  const high = topObstacleBottom - cordRadius;
+  return side === "left" ? Math.min(low, high) : Math.max(low, high);
 }
 
 // Where the side-wall cord bore sits across the box height. The dual sandwich

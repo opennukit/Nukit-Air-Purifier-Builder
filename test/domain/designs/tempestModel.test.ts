@@ -90,22 +90,30 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.cordPassThrough.positionAlongWall).toBe(model.box.depth / 2);
   });
 
-  test("a side-wall cord honors left/right, mirrored about the wall midline", () => {
+  test("a side-wall cord slides along the box height (horizontal in the upright view)", () => {
     const sideCord = (side: "left" | "center" | "right") =>
       createTempestModel({
         ...defaultTempestSettings,
         cordPassThrough: { type: "wall", wall: "right", side, diameter: 8, cornerOffset: 17 },
       });
     const left = sideCord("left");
+    const center = sideCord("center");
     const right = sideCord("right");
-    if (left.cordPassThrough.type !== "wall-cylinder" || right.cordPassThrough.type !== "wall-cylinder") {
+    if (
+      left.cordPassThrough.type !== "wall-cylinder" ||
+      center.cordPassThrough.type !== "wall-cylinder" ||
+      right.cordPassThrough.type !== "wall-cylinder"
+    ) {
       throw new Error("expected wall cords");
     }
-    // left sits at the offset; right is the mirror (wallLength - offset); they are
-    // distinct and symmetric about the midline.
-    expect(left.cordPassThrough.positionAlongWall).toBeLessThan(left.box.depth / 2);
-    expect(right.cordPassThrough.positionAlongWall).toBeGreaterThan(right.box.depth / 2);
-    expect(left.cordPassThrough.positionAlongWall + right.cordPassThrough.positionAlongWall).toBeCloseTo(left.box.depth);
+    // It stays centred along the depth (the vertical axis in the upright pose)...
+    expect(left.cordPassThrough.positionAlongWall).toBe(left.box.depth / 2);
+    expect(center.cordPassThrough.positionAlongWall).toBe(center.box.depth / 2);
+    expect(right.cordPassThrough.positionAlongWall).toBe(right.box.depth / 2);
+    // ...and the side moves it up/down the height (which renders horizontally):
+    // left low, center mid, right high.
+    expect(left.cordPassThrough.verticalCenter).toBeLessThan(center.cordPassThrough.verticalCenter);
+    expect(right.cordPassThrough.verticalCenter).toBeGreaterThan(center.cordPassThrough.verticalCenter);
   });
 
   test("single-filter wall mount centers its side-wall cord by default", () => {
