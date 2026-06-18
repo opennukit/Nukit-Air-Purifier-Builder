@@ -621,6 +621,19 @@
     commitSettings({ ...settings, cordHoleWall: (event.target as HTMLSelectElement).value as CordHoleWall });
   }
 
+  // The upright preview pose stands the box so the back wall reads at the TOP and
+  // the front wall at the BOTTOM (matching the Top/Bottom fan-placement labels), so
+  // label the cord-wall options to match what the user sees.
+  function cordWallLabel(wall: CordHoleWall): string {
+    if (wall === "back") {
+      return "Top";
+    }
+    if (wall === "front") {
+      return "Bottom";
+    }
+    return titleCase(wall);
+  }
+
   function updateCordHoleSide(event: Event): void {
     commitSettings({ ...settings, cordHoleSide: (event.target as HTMLSelectElement).value as CordHoleSide });
   }
@@ -1897,7 +1910,7 @@
                         {:else}
                           <select name="cordHoleWall" onchange={updateCordHoleWall}>
                             {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
-                              <option value={wall} selected={settings.cordHoleWall === wall}>{titleCase(wall)}</option>
+                              <option value={wall} selected={settings.cordHoleWall === wall}>{cordWallLabel(wall)}</option>
                             {/each}
                           </select>
                         {/if}
