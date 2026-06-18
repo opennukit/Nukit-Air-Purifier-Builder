@@ -137,7 +137,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
-      cordHole: cordCut("left"),
+      // This panel is DISPLAYED as "Right side wall" (the id keeps the geometric
+      // -x sense), so the user's "right" cord selection belongs here.
+      cordHole: cordCut("right"),
       assembly: {
         type: "placed",
         role: "left-side-wall",
@@ -162,7 +164,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
-      cordHole: cordCut("right"),
+      // This panel is DISPLAYED as "Left side wall", so the user's "left" cord
+      // selection belongs here.
+      cordHole: cordCut("left"),
       assembly: {
         type: "placed",
         role: "right-side-wall",

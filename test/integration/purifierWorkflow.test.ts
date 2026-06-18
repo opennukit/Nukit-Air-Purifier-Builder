@@ -360,23 +360,24 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const cordCircle = (layout: ReturnType<typeof createLayout>, id: string) =>
       requiredPanel(cutPanels(layout), id).cuts.find((cut) => cut.type === "circle" && cut.role === "cord");
 
-    // Right wall, centered: lands on the +x side wall, centered over the chamber height.
+    // "right" maps to the panel DISPLAYED as "Right side wall" (id left-side-wall),
+    // so the interface selection and the drawing agree.
     const right = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center"));
-    const rightPanel = requiredPanel(cutPanels(right), "right-side-wall");
-    const rightCut = cordCircle(right, "right-side-wall");
+    const rightPanel = requiredPanel(cutPanels(right), "left-side-wall");
+    const rightCut = cordCircle(right, "left-side-wall");
     const panelYs = rightPanel.outline.map((point) => point.y);
     const panelMidY = (Math.min(...panelYs) + Math.max(...panelYs)) / 2;
     expect(rightCut?.type === "circle" && rightCut.radius).toBeCloseTo(8 / 2 - 0.1, 1);
     // Centered side-wall cord sits at the wall's vertical mid-line.
     expect(rightCut?.type === "circle" && Math.abs(rightCut.cy - panelMidY)).toBeLessThan(2);
     // The hole is only on the chosen wall.
-    expect(cordCircle(right, "left-side-wall")).toBeUndefined();
+    expect(cordCircle(right, "right-side-wall")).toBeUndefined();
 
     // "side" slides the side-wall hole vertically; left sits lower than right.
     const low = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=left"));
     const high = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=right"));
-    const lowCy = cordCircle(low, "right-side-wall");
-    const highCy = cordCircle(high, "right-side-wall");
+    const lowCy = cordCircle(low, "left-side-wall");
+    const highCy = cordCircle(high, "left-side-wall");
     expect(lowCy?.type === "circle" && highCy?.type === "circle" && lowCy.cy < highCy.cy).toBe(true);
 
     // A front fan-wall hole centers vertically in the chamber.
