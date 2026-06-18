@@ -388,6 +388,25 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(cutPanels(none).every((panel) => panel.cuts.every((cut) => !(cut.type === "circle" && cut.role === "cord")))).toBe(true);
   });
 
+  test("keeps the cord pass-through clear of the fans on its wall", () => {
+    // A corner offset that lands the cord right on a side-wall fan must be slid clear.
+    const layout = createLayout(
+      decodeSettings(
+        "printDesign=nukit-open-air&filterWidth=370&filterDepth=290&filterThickness=40&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=150&fansRight=-1",
+      ),
+    );
+    for (const panel of cutPanels(layout)) {
+      const circles = panel.cuts.filter((cut): cut is Extract<typeof cut, { type: "circle" }> => cut.type === "circle");
+      const cord = circles.find((cut) => cut.role === "cord");
+      if (cord === undefined) {
+        continue;
+      }
+      for (const fan of circles.filter((cut) => cut.role === "fan")) {
+        expect(Math.hypot(fan.cx - cord.cx, fan.cy - cord.cy)).toBeGreaterThan(fan.radius + cord.radius);
+      }
+    }
+  });
+
   test("carries measured filter dimensions straight into the structured settings", () => {
     const normalized = normalizeSettings(defaultSettings);
     const normalizedAgain = normalizeSettings(normalized);

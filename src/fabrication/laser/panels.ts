@@ -57,10 +57,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const filterCount = settings.filterCount;
   const usesSplitRails = settings.frameConstruction.type === "split-rails";
   const panels: CutPanelDraft[] = [];
-  const cordCut = (wall: CordHoleWall): CutFeature[] => {
-    const cut = createCordHoleCut(wall, geometry, settings);
-    return cut === null ? [] : [cut];
-  };
+  const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
   const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
   // The side walls carry the front fan wall's joint as FingerHoleEdge ("h")
   // slots set in from their edge by edge_width + thickness/2. So the front fan
@@ -79,7 +76,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.top,
       fanCenterY: fanDiameter / 2,
       settings,
-      cuts: cordCut("back"),
+      cordHole: cordCut("back"),
       assembly: {
         type: "placed",
         role: "rear-fan-wall",
@@ -100,7 +97,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.bottom,
       fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight),
       settings,
-      cuts: [...createFilterFingerHoleCuts(width, settings, fanWallFilterRows), ...cordCut("front")],
+      cuts: createFilterFingerHoleCuts(width, settings, fanWallFilterRows),
+      cordHole: cordCut("front"),
       assembly: {
         type: "placed",
         role: "front-fan-wall",
@@ -139,7 +137,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
-      cuts: cordCut("left"),
+      cordHole: cordCut("left"),
       assembly: {
         type: "placed",
         role: "left-side-wall",
@@ -164,7 +162,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
-      cuts: cordCut("right"),
+      cordHole: cordCut("right"),
       assembly: {
         type: "placed",
         role: "right-side-wall",
@@ -347,8 +345,13 @@ function createFanWallPanel(input: {
   fanCenterY: number;
   settings: PurifierSettings;
   cuts?: CutFeature[];
+  cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
+  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY);
+  const cord = input.cordHole
+    ? [resolveCordAgainstFans(input.cordHole, fanCuts, input.width, input.height, input.settings.cutting.materialThickness)]
+    : [];
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -358,10 +361,7 @@ function createFanWallPanel(input: {
     thickness: input.settings.cutting.materialThickness,
     kerfFit: input.settings.cutting.kerfFit,
     jointSettings: input.settings.cutting.joints,
-    cuts: [
-      ...createFanCuts(input.width, input.height, input.requestedFans, input.settings, input.fanCenterY),
-      ...(input.cuts ?? []),
-    ],
+    cuts: [...fanCuts, ...(input.cuts ?? []), ...cord],
     assembly: input.assembly,
   });
 }
@@ -380,6 +380,7 @@ function createSideWallPanel(input: {
   settings: PurifierSettings;
   filterFingerHoleRows: readonly FilterFingerHoleRow[];
   cuts?: CutFeature[];
+  cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
   const fanCenterY =
@@ -389,6 +390,10 @@ function createSideWallPanel(input: {
       input.settings.cutting.materialThickness,
       input.settings.filter.thickness,
     );
+  const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY);
+  const cord = input.cordHole
+    ? [resolveCordAgainstFans(input.cordHole, fanCuts, input.width, input.height, input.settings.cutting.materialThickness)]
+    : [];
   return rectangularPanel({
     id: input.id,
     name: input.name,
@@ -399,13 +404,14 @@ function createSideWallPanel(input: {
     kerfFit: input.settings.cutting.kerfFit,
     jointSettings: input.settings.cutting.joints,
     cuts: [
-      ...createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY),
+      ...fanCuts,
       ...createFilterFingerHoleCuts(
         input.width,
         input.settings,
         input.filterFingerHoleRows,
       ),
       ...(input.cuts ?? []),
+      ...cord,
     ],
     assembly: input.assembly,
   });
@@ -450,6 +456,47 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
   const along = cord.side === "center" ? width / 2 : cord.side === "left" ? Math.max(cord.cornerOffset, margin) : width - Math.max(cord.cornerOffset, margin);
   const cx = clamp(along, margin, width - margin);
   return { type: "circle", cx, cy: panelHeight / 2, radius, role: "cord" };
+}
+
+// Clearance kept between the cord bore and any fan opening on the same wall (mm),
+// matching the 3D-print cord/fan anti-collision.
+const cordFanClearance = 1;
+
+// Keep the cord bore clear of the fans on its wall (the 3D print model does the
+// same). If the cord overlaps any fan's footprint, slide it perpendicular
+// (vertically) just past the blocking fans' band; if it can't fit there, slide
+// it horizontally clear of the nearest fan instead.
+function resolveCordAgainstFans(
+  cord: CircleCut,
+  fanCuts: readonly CutFeature[],
+  panelWidth: number,
+  panelHeight: number,
+  thickness: number,
+): CircleCut {
+  const fans = fanCuts.filter((cut): cut is CircleCut => cut.type === "circle" && cut.role === "fan");
+  const reachX = (fan: CircleCut): number => fan.radius + cord.radius + cordFanClearance;
+  const blocking = fans.filter((fan) => Math.abs(fan.cx - cord.cx) < reachX(fan));
+  if (blocking.length === 0) {
+    return cord;
+  }
+  const bandTop = Math.max(...blocking.map((fan) => fan.cy + fan.radius)) + cord.radius + cordFanClearance;
+  const bandBottom = Math.min(...blocking.map((fan) => fan.cy - fan.radius)) - cord.radius - cordFanClearance;
+  if (cord.cy <= bandBottom || cord.cy >= bandTop) {
+    return cord;
+  }
+  const margin = cord.radius + thickness;
+  const belowFits = bandBottom >= margin;
+  const aboveFits = bandTop <= panelHeight - margin;
+  if (belowFits && (!aboveFits || cord.cy - bandBottom <= bandTop - cord.cy)) {
+    return { ...cord, cy: bandBottom };
+  }
+  if (aboveFits) {
+    return { ...cord, cy: bandTop };
+  }
+  // Fan band taller than the wall: slide horizontally past the nearest fan.
+  const nearest = blocking.reduce((a, b) => (Math.abs(b.cx - cord.cx) < Math.abs(a.cx - cord.cx) ? b : a));
+  const target = cord.cx <= nearest.cx ? nearest.cx - reachX(nearest) : nearest.cx + reachX(nearest);
+  return { ...cord, cx: clamp(target, margin, panelWidth - margin) };
 }
 
 // #######################################
