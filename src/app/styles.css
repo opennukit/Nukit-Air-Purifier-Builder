@@ -890,6 +890,24 @@ Panel Grids
   align-content: start;
 }
 
+/* The laser Advanced section has five groups of uneven height. A row-flowing
+   grid leaves ragged vertical gaps and orphans the fifth group in a half-empty
+   row, so flow these into two height-balanced columns that pack tightly. */
+.advanced-columns-flow {
+  display: block;
+  column-count: 2;
+  column-gap: 18px;
+}
+
+.advanced-columns-flow .advanced-group {
+  break-inside: avoid;
+  margin-bottom: 14px;
+}
+
+.advanced-columns-flow .advanced-group:last-child {
+  margin-bottom: 0;
+}
+
 .advanced-group-label {
   margin: 0 0 2px;
 }
@@ -2008,6 +2026,10 @@ Narrow Control Stack
   .advanced-field-grid,
   .advanced-columns {
     grid-template-columns: 1fr;
+  }
+
+  .advanced-columns-flow {
+    column-count: 1;
   }
 
   .parts-section,

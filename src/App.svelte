@@ -1996,7 +1996,7 @@
                 <svg class="advanced-accordion-chevron" class:is-open={showLaserAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
               </button>
               {#if showLaserAdvanced}
-                <div class="advanced-columns">
+                <div class="advanced-columns advanced-columns-flow">
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Fan counts</p>
                     {#each fanPlacementControls as control}
