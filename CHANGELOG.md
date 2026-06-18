@@ -2,7 +2,7 @@
 
 All changes on this branch since `main`, grouped by area. The complete
 commit-by-commit list is in the Appendix at the bottom. Every change is
-committed; the build (`bun run build`) and full test suite (`bun test`, 210
+committed; the build (`bun run build`) and full test suite (`bun test`, 240
 tests) pass.
 
 ## Laser cut — match the boxes.py generator (cut geometry)
@@ -17,9 +17,48 @@ tests) pass.
 - Prevented unbuildable finger-hole collisions at panel corners (filter rows vs.
   edge columns) — drops the minimum holes so every pair keeps ≥1 thickness of
   material; verified across 800 dimension/fan/thickness/filter combinations.
+- Matched boxes.py part *sizes* exactly via per-edge `spacing()` outsets
+  (`startWidth + margin` per edge: e=0, E=t, f/F/h via their profiles) plus
+  corner spacers; finger-hole rows shifted to stay aligned with the new edge
+  outsets. Fixed the four outer filter-flange rails that were 2×thickness too
+  short.
 - Verified the generated cut sheet matches the reference `AirPurifier.svg`.
 
+## Laser cut — cord pass-through (ported from 3D Print)
+- Added a Cord Pass-Through hole to Laser Cut with the same controls as 3D Print
+  (wall, side, corner offset); the hole is punched into the cut sheet and shown
+  as a hole in the 3D preview.
+- 3D-parity anti-collision: when the cord would land under a fan, the fan bank
+  re-packs tighter (min spacing `fanDiameter + 10`) and re-centres to clear the
+  cord — the cord stays put — instead of nudging the cord into a corner.
+- Side-wall cord defaults to the far (bottom) corner near the floor.
+- Cord wall selection maps to the *displayed* (swapped) side-panel names, so the
+  control and the drawing always name the same panel.
+
+## Laser cut — Layout "Design" selector
+- Added a Design selector under Layout: Nukit Tempest Euro / Original / Pro /
+  Custom. It defaults to **Nukit Tempest Euro**, switches to **Custom**
+  (listed last) whenever an underlying variable is edited, and applies each
+  design's filter + fan configuration. The Original laser design uses right +
+  top fans.
+
+## Laser cut — Back fans & Box depth (one-side)
+- Added a "Back" fan placement that cuts a symmetric fan grid (plus screw holes)
+  into the one-side bottom plate, with its own per-side maximum in the selects
+  and fan/cord collision avoidance.
+- Added a "Box depth" control for one-side + Back builds (default 70 mm), with
+  Back-panel seam pins clamped clear of the bottom-plate fan grid.
+- Re-enabled the laser drawing export buttons.
+
+## Build diagnostics
+- The "No fans" advisory now appears only when the box has no fans on *any*
+  surface. Removed the no-side-fans advisory and the large-sheet advisory.
+
 ## 3D preview / assembly
+- Swapped the two inner filter rails' assembly seats and flipped them 180° about
+  their long axis, then renamed them to match their final positions ("inner top
+  rail" / "inner bottom rail").
+- Hid the per-part name labels in the exploded view.
 - Assembled "box" view renders clean nominal walls (no teeth/slots); the
   exploded view shows the real toothed outline + finger/dovetail holes.
 - Fixed assembly placement (lap joints): front fan wall seats into the side-wall
@@ -39,12 +78,15 @@ tests) pass.
   scale) plus "Fan screw size" and "Filter rim" into Advanced.
 - Filter-layout buttons unified to "One side" / "Both sides" (+ "Four sides" for
   3D Print); balanced the control columns to remove empty gaps.
-- Laser drawing export buttons disabled and relabelled "Export Disabled".
+- Tidied the Advanced layout into balanced columns.
 - Number inputs no longer crop their value (spinners removed, min widths added).
 
 ## Filter size presets
-- Expanded the "Filter size" dropdown to the full catalog (STARKVIND, FORNUFTIG,
-  and the standard 16/20/24-inch sizes) with mm-accurate dimensions.
+- Expanded the "Filter size" dropdown to the full catalog with mm-accurate
+  dimensions.
+- Updated STARKVIND to 365 × 285 × 35 mm and removed FORNUFTIG; updated the real
+  dimensions of every layout design that uses STARKVIND (including the Nukit
+  Tempest Euro default).
 
 ## 3D Print (Tempest) design presets
 - Added design presets: Nukit Tempest Euro, Euro Cube, Original, Original Cube,
@@ -64,6 +106,48 @@ tests) pass.
 
 ## Appendix — full commit list (newest first)
 ```
+df83454 Update Nukit Tempest Original laser design to right + top fans
+639281c Drop the no-side-fans and large-sheet advisories
+3da3ec1 Add Laser Cut "Design" selector (Euro/Original/Pro/Custom)
+fdb729c Map cord wall selection to the displayed panel names
+b2da4df Default the side-wall cord to the far (bottom) corner
+28d4285 Revert "Default the side-wall cord to the floor, centered along the wall"
+da4863e Default the side-wall cord to the floor, centered along the wall
+762810f Laser cord/fan: re-pack fans closer together, keep cord put (3D parity)
+5e4a2d8 Laser cord/fan anti-collision: move the fans, not the cord (3D parity)
+f5d0fb4 Slide laser cord along its wall (into the fan gap) instead of into a corner
+141dec5 Keep the laser cord hole clear of fans (anti-collision)
+c42d4b7 Add cord pass-through hole to Laser Cut mode
+fc506c5 Tidy the Laser Cut Advanced layout into balanced columns
+4743b7f Update STARKVIND filter to 365x285x35 and drop FORNUFTIG
+c86e0ec Hide part-name labels in the 3D exploded view
+fa316b3 Rename inner top/bottom rails to match their swapped seats
+b0b27d1 Flip inner top/bottom rails 180deg about their long axis
+1d6a15d Swap inner top/bottom rails' assembly seats (not their labels)
+23169fe Swap inner top/bottom rail labels to match part positions
+f4861fe Align FingerHoleEdge holes with the new edge outsets
+c2fd939 Match boxes.py part sizes via per-edge spacing outsets
+4732911 Fix outer filter flange rails being 2*thickness too short
+59c2486 Rename laser parts to match their position in the 3D view
+37f4c2b Re-enable per-part name labels in the exploded 3D view
+d2e562f Label cord Front/Back walls as Bottom/Top to match the 3D view
+0d97117 Honor cord corner offset on side walls (near the floor) + horizontal slide
+255f9ea Cord position slides horizontally on left/right wall panels
+662b8ec Center the cord by default and honor side on all walls
+aa99766 Lay out a fixed Back fan count symmetrically and centred
+640c3c4 Add Back to Fan tuning; show real per-side maxima in the selects
+0766f79 Switch Design to "Custom" when a preset variable is edited
+c872b76 Keep sandwich plate/frame pins off piece edges and chunk corners
+4e396e8 Clamp Back-panel seam pins clear of the bottom-plate fan grid
+4dd75f5 Default Back-panel box depth to 70mm
+596406c Back panel: fan/cord collision avoidance + Box-depth gating
+04bfa4e Add "Box depth" panel control for one-side + Back
+b93c8df Phase 2: cut "Back" fan + screw holes into the one-side bottom plate
+a12a5ee Fix "Back" fan toggle dropped through draft/raw normalization
+9576cb7 Add "Back" fan placement (bottom-plate grid) for one-side tempest
+bc2e072 Re-enable laser drawing export buttons
+f2e7a82 Document beta deploy without touching main (DEPLOY-BETA.md)
+68e76d8 Document port-tempest-features changes in CHANGELOG.md
 c5be4b7 Add Nukit Tempest Pro preset; default auto-rotate on
 ce5a896 Fix Nukit Tempest Original fan placement
 21edcb4 Add Nukit Tempest Original and Original Cube design presets
