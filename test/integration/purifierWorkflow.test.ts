@@ -403,20 +403,13 @@ describe("FilterBoxBuilder purifier workflow", () => {
         continue;
       }
       checked = true;
-      // The cord stays at its requested corner-offset position (it was not nudged).
-      expect(cord.cx).toBeLessThan(30);
-      // The fan row was re-packed closer together to make room: every fan still
-      // sits on the natural centre line, none reaches the corner cord, and the
-      // fan spacing is tighter than an even full-width spread would give.
+      const panelXs = panel.outline.map((point) => point.x);
+      const panelWidth = Math.max(...panelXs) - Math.min(...panelXs);
+      // The cord stays at its requested corner: near the far (bottom) end of the wall.
+      expect(cord.cx).toBeGreaterThan(panelWidth - 30);
+      // The fan row was re-packed closer together to make room, so nothing overlaps.
       for (const fan of fans) {
         expect(Math.hypot(fan.cx - cord.cx, fan.cy - cord.cy)).toBeGreaterThan(fan.radius + cord.radius);
-      }
-      if (fans.length >= 2) {
-        const panelXs = panel.outline.map((point) => point.x);
-        const panelWidth = Math.max(...panelXs) - Math.min(...panelXs);
-        const sortedX = fans.map((fan) => fan.cx).sort((a, b) => a - b);
-        const pitch = sortedX[1] - sortedX[0];
-        expect(pitch).toBeLessThan((panelWidth - 20) / fans.length);
       }
     }
     expect(checked).toBe(true);

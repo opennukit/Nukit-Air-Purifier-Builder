@@ -433,7 +433,9 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
   const filterHeight = geometry.filterDimensions.thickness;
 
   if (wall === "left" || wall === "right") {
-    const cx = clamp(Math.max(cord.cornerOffset, margin), margin, workingDepth - margin);
+    // Corner offset is measured from the far (bottom) end of the wall, so the
+    // cord defaults to the bottom corner rather than the top.
+    const cx = clamp(workingDepth - Math.max(cord.cornerOffset, margin), margin, workingDepth - margin);
     const low = filterHeight + t + r;
     const high = chamberHeight - (settings.filterCount > 1 ? filterHeight + t : t) - r;
     const cy =
