@@ -44,6 +44,10 @@ export type CutFeature = CircleCut | RectCut;
 export type AssemblyPlacement = {
   position: readonly [number, number, number];
   rotation: readonly [number, number, number];
+  // Preview only: reflect the rendered mesh across its local X axis so an
+  // asymmetric part can be shown as a true mirror of its opposite-side twin
+  // (rotation alone can't mirror). Does not affect the flat cut part.
+  mirrored?: boolean;
 };
 
 export type StructuralAssemblyRole =

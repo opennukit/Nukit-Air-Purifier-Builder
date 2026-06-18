@@ -1,6 +1,7 @@
 import {
   BufferGeometry,
   CircleGeometry,
+  DoubleSide,
   EdgesGeometry,
   Euler,
   ExtrudeGeometry,
@@ -100,15 +101,29 @@ export function createPrintableMeshContourEdgeGeometry(source: BufferGeometry): 
   return geometry;
 }
 
-function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: number): number {
+// Extra inward shift applied to fans in the exploded view so they pull toward the
+// explosion centre (along the panel's inward normal) instead of protruding out to
+// touch the surrounding exploded panels.
+const explodedFanInwardShiftMm = 30;
+
+function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: number, exploded: boolean): number {
   const [rx, ry, rz] = part.rotation;
   const localPositiveNormal = new Vector3(0, 0, 1).applyEuler(new Euler(rx, ry, rz));
   const assembledPosition = new Vector3(part.position[0], part.position[1], part.position[2]);
   const localPositiveNormalPointsOutward = localPositiveNormal.dot(assembledPosition) > 0;
   const panelHalfThickness = (materialThickness * sceneScale) / 2;
+  // The interior side is toward the box centre; in the exploded view push the fan
+  // further that way so it clears the outward-displaced panels.
+  const inwardShift = exploded ? explodedFanInwardShiftMm * sceneScale : 0;
   return localPositiveNormalPointsOutward
-    ? -(panelHalfThickness + fanPreviewRearDepth)
-    : panelHalfThickness + fanPreviewFrontDepth;
+    ? -(panelHalfThickness + fanPreviewRearDepth) - inwardShift
+    : panelHalfThickness + fanPreviewFrontDepth + inwardShift;
+}
+
+function withDoubleSide(material: Material): Material {
+  const clone = material.clone();
+  clone.side = DoubleSide;
+  return clone;
 }
 
 export function createPanelGroup(
@@ -124,7 +139,11 @@ export function createPanelGroup(
   const panel = part.panel;
   const group = new Group();
   const geometry = createPanelGeometry(panel, materialThickness, exploded);
-  const mesh = new Mesh(geometry, material);
+  // Mirrored panels are reflected via a negative group scale (below), which flips
+  // triangle winding; render that one mesh double-sided so the (default
+  // front-side) wood material isn't back-face culled.
+  const meshMaterial = part.mirrored ? withDoubleSide(material) : material;
+  const mesh = new Mesh(geometry, meshMaterial);
   mesh.name = panel.id;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -136,7 +155,7 @@ export function createPanelGroup(
   group.add(createPanelCutMarkGroup(panel, materialThickness, screwMarkMaterial));
 
   if (showFans) {
-    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness);
+    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness, exploded);
     for (const cut of panel.cuts) {
       if (cut.type === "circle" && cut.role === "fan") {
         group.add(
@@ -159,6 +178,12 @@ export function createPanelGroup(
   const [rx, ry, rz] = part.rotation;
   group.position.copy(toScenePosition(part.position, part.explodeDirection, exploded));
   group.rotation.set(rx, ry, rz);
+  if (part.mirrored) {
+    // three.js composes the group matrix as T * R * S, so a local X scale of -1
+    // reflects the panel across its own X axis after rotation — turning the
+    // rotation into the true mirror of the opposite side wall.
+    group.scale.x = -1;
+  }
 
   return group;
 }

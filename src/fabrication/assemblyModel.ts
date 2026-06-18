@@ -19,6 +19,8 @@ export type AssemblyPanelPart = {
   position: MillimeterVector3;
   rotation: EulerRotation;
   explodeDirection: UnitVector3;
+  // Preview only: render this panel reflected across its local X axis.
+  mirrored: boolean;
 };
 
 export type AssemblyBoxPart = {
@@ -119,8 +121,18 @@ function createFilterRailParts(layout: LayoutResult): AssemblyPanelPart[] {
   });
 }
 
+// Exploded view only: the left, right, and bottom walls get pushed ~10 mm
+// further out (on top of the shared explode distance) so the inner filter
+// flanges that seat against them are left with a visible gap, not touching.
+const explodeBoostRoles = new Set<AssemblyPanelRole>(["left-side-wall", "right-side-wall", "front-fan-wall"]);
+const explodeBoostFactor = (72 + 10) / 72;
+
 function createPanelPart(panel: CutPanel, role: AssemblyPanelRole, placement: AssemblyPlacement): AssemblyPanelPart {
   const [x, y, z] = placement.position;
+  const direction = normalize([x, y, z]);
+  const boosted: UnitVector3 = explodeBoostRoles.has(role)
+    ? [direction[0] * explodeBoostFactor, direction[1] * explodeBoostFactor, direction[2] * explodeBoostFactor]
+    : direction;
   return {
     kind: "cut-panel",
     id: panel.id,
@@ -128,7 +140,8 @@ function createPanelPart(panel: CutPanel, role: AssemblyPanelRole, placement: As
     panel,
     position: placement.position,
     rotation: placement.rotation,
-    explodeDirection: normalize([x, y, z]),
+    explodeDirection: boosted,
+    mirrored: placement.mirrored ?? false,
   };
 }
 

@@ -147,10 +147,13 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "left-side-wall",
         placement: {
-          // Flipped top-to-bottom (180 deg about its own normal axis) while still
-          // facing outward, so the left wall is no longer upside down.
+          // Preview only. The two-filter side wall is symmetric, so the 180deg
+          // flip reads correctly. The one-filter wall is asymmetric, so it must be
+          // a true mirror (reflection) of the right wall — rotation alone can't do
+          // that, so reflect it (mirrored) and place it un-flipped.
           position: [-width / 2, 0, 0],
-          rotation: [Math.PI, -Math.PI / 2, 0],
+          rotation: filterCount === 1 ? [0, -Math.PI / 2, 0] : [Math.PI, -Math.PI / 2, 0],
+          mirrored: filterCount === 1,
         },
       },
     }),
