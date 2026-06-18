@@ -146,7 +146,7 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
   // "finger-holes" ("h") edges are drawn as a plain straight edge; the holes the
   // mating fingers pass through are rectangular cuts added here (boxes.py
   // FingerHoleEdge), set in from the edge by edge_width + thickness/2.
-  const edgeHoles = createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings);
+  const edgeHoles = createFingerHoleCutsForEdges(input.width, input.height, input.edges, input.thickness, kerfFit, jointSettings, [0, 1, 2, 3].map((i) => edgeOutset(input.edges[i], input.thickness)));
   // Near a corner, finger-hole rows/columns from different joints can run into
   // each other (an interior filter-rail row into an edge wall-joint column, or
   // two edge columns where they meet). boxes.py keeps a clear gap there; we do
@@ -342,12 +342,17 @@ function createFingerHoleCutsForEdges(
   thickness: number,
   kerfFit: number,
   jointSettings: CutJointSettings,
+  outsets: readonly number[] = [0, 0, 0, 0],
 ): CutFeature[] {
   const cuts: CutFeature[] = [];
   const offset = (jointSettings.finger.holeOffsetMultiplier + 0.5) * thickness;
   const edgeLengths = [width, height, width, height];
+  // boxes.py drills the FingerHoleEdge holes edge_width+t/2 in from the *drawn*
+  // edge, which sits `outset` beyond the nominal rectangle, so push the holes out
+  // by the edge's outset to keep them aligned with the mating wall's fingers.
   for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
     const sections = edges[edgeIndex];
+    const o = outsets[edgeIndex] ?? 0;
     const totalSpecified = sections.reduce((sum, section) => sum + section.length, 0);
     const normalized =
       totalSpecified > 0 ? sections : sections.map((section) => ({ ...section, length: edgeLengths[edgeIndex] }));
@@ -356,13 +361,13 @@ function createFingerHoleCutsForEdges(
       const length = section.length;
       if (section.kind === "finger-holes") {
         if (edgeIndex === 0) {
-          cuts.push(...fingerHoleCutsAt(cursor, offset, length, 0, thickness, kerfFit, jointSettings));
+          cuts.push(...fingerHoleCutsAt(cursor, offset - o, length, 0, thickness, kerfFit, jointSettings));
         } else if (edgeIndex === 1) {
-          cuts.push(...fingerHoleCutsAt(width - offset, cursor, length, 90, thickness, kerfFit, jointSettings));
+          cuts.push(...fingerHoleCutsAt(width - offset + o, cursor, length, 90, thickness, kerfFit, jointSettings));
         } else if (edgeIndex === 2) {
-          cuts.push(...fingerHoleCutsAt(width - cursor - length, height - offset, length, 0, thickness, kerfFit, jointSettings));
+          cuts.push(...fingerHoleCutsAt(width - cursor - length, height - offset + o, length, 0, thickness, kerfFit, jointSettings));
         } else {
-          cuts.push(...fingerHoleCutsAt(offset, height - cursor - length, length, 90, thickness, kerfFit, jointSettings));
+          cuts.push(...fingerHoleCutsAt(offset - o, height - cursor - length, length, 90, thickness, kerfFit, jointSettings));
         }
       }
       cursor += length;
