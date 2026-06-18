@@ -466,13 +466,14 @@ export function createSandwichCordPlacement(
   const isSideWall = cord.wall === "left" || cord.wall === "right";
   // The box stands upright for display/print: the front/back walls span the box
   // WIDTH (which reads horizontally), while the left/right walls span the box
-  // DEPTH (which the upright pose tips up to read VERTICALLY). So "Cord position"
-  // left/center/right has to drive a different axis per wall to always slide the
-  // hole HORIZONTALLY across the panel as seen:
-  //   - front/back: slide along the wall width, stay at the chamber-centre height.
-  //   - left/right: stay centred along the depth, slide UP/DOWN the chamber height
-  //     (which the upright pose renders as horizontal).
-  const positionAlongWall = isSideWall ? box.depth / 2 : cordPositionAlongWall(box.width, cord.side, offset);
+  // DEPTH (which the upright pose tips up to read VERTICALLY).
+  //   - front/back: "Cord position" slides along the wall width (horizontal), at
+  //     the chamber-centre height.
+  //   - left/right: the cord sits the Cord-corner-offset up from the floor (the
+  //     box depth — vertical in the view), and "Cord position" slides it
+  //     HORIZONTALLY along the box height (center = chamber midline, left/right =
+  //     the chamber ends).
+  const positionAlongWall = isSideWall ? offset : cordPositionAlongWall(box.width, cord.side, offset);
   const verticalCenter = isSideWall
     ? sideWallCordHeight(settings, box, cord.side, filterCount)
     : sandwichCordVerticalCenter(settings, box);

@@ -62,9 +62,9 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 253.5, 405]);
     expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 253.5, 405]);
 
-    // The cord defaults to the wall midline ("center"), on the standing depth
-    // midline (height/2), inside the fan chamber. The control value and the
-    // rendered position match.
+    // The cord defaults to "center": it sits the corner offset up from the floor
+    // (near the bottom in the upright view) and centred horizontally along the
+    // chamber height. The control value and the rendered position match.
     expect(model.cordPassThrough).toMatchObject({
       topology: "sandwich",
       type: "wall-cylinder",
@@ -74,20 +74,26 @@ describe("Tempest OpenSCAD model port", () => {
       axis: "x",
     });
     if (model.cordPassThrough.type !== "wall-cylinder") throw new Error("expected wall cord");
-    expect(model.cordPassThrough.positionAlongWall).toBe(model.box.depth / 2);
-    expect(model.cordPassThrough.verticalCenter).toBe(model.box.height / 2);
+    expect(model.cordPassThrough.positionAlongWall).toBeGreaterThan(0);
+    expect(model.cordPassThrough.positionAlongWall).toBeLessThan(model.box.depth / 2); // near the floor
+    expect(model.cordPassThrough.verticalCenter).toBe(model.box.height / 2); // horizontal centre
   });
 
-  test("the cord honors the chosen side: center sits at the wall midline", () => {
+  test("a side-wall cord sits near the floor via the corner offset", () => {
     const model = createTempestModel();
     expect(model.printablePose.type).toBe("upright-dual-filter");
     if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
       throw new Error("Expected a sandwich wall cord");
     }
-    // Default side is "center", so the cord sits at the right wall's midline (the
-    // wall runs along the box depth).
-    expect(model.cordPassThrough.side).toBe("center");
-    expect(model.cordPassThrough.positionAlongWall).toBe(model.box.depth / 2);
+    // Near the floor (depth = vertical in the view), not the depth midline.
+    expect(model.cordPassThrough.positionAlongWall).toBeLessThan(model.box.depth / 2);
+    // A larger corner offset lifts it further from the floor.
+    const lifted = createTempestModel({
+      ...defaultTempestSettings,
+      cordPassThrough: { type: "wall", wall: "right", side: "center", diameter: 8, cornerOffset: 60 },
+    });
+    if (lifted.cordPassThrough.type !== "wall-cylinder") throw new Error("expected wall cord");
+    expect(lifted.cordPassThrough.positionAlongWall).toBeGreaterThan(model.cordPassThrough.positionAlongWall);
   });
 
   test("a side-wall cord slides along the box height (horizontal in the upright view)", () => {
@@ -106,17 +112,19 @@ describe("Tempest OpenSCAD model port", () => {
     ) {
       throw new Error("expected wall cords");
     }
-    // It stays centred along the depth (the vertical axis in the upright pose)...
-    expect(left.cordPassThrough.positionAlongWall).toBe(left.box.depth / 2);
-    expect(center.cordPassThrough.positionAlongWall).toBe(center.box.depth / 2);
-    expect(right.cordPassThrough.positionAlongWall).toBe(right.box.depth / 2);
-    // ...and the side moves it up/down the height (which renders horizontally):
+    // It sits near the floor along the depth — same for every side (the corner
+    // offset, not the side, drives that axis)...
+    const floorPos = center.cordPassThrough.positionAlongWall;
+    expect(floorPos).toBeLessThan(center.box.depth / 2);
+    expect(left.cordPassThrough.positionAlongWall).toBe(floorPos);
+    expect(right.cordPassThrough.positionAlongWall).toBe(floorPos);
+    // ...and the side slides it along the height (which renders horizontally):
     // left low, center mid, right high.
     expect(left.cordPassThrough.verticalCenter).toBeLessThan(center.cordPassThrough.verticalCenter);
     expect(right.cordPassThrough.verticalCenter).toBeGreaterThan(center.cordPassThrough.verticalCenter);
   });
 
-  test("single-filter wall mount centers its side-wall cord by default", () => {
+  test("single-filter wall mount sits its side-wall cord near the floor by default", () => {
     const model = createTempestModel({
       ...defaultTempestSettings,
       arrangement: { type: "single-horizontal-top-filter", filter: defaultTempestHorizontalFilter },
@@ -125,7 +133,7 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.cordPassThrough.type === "none" || model.cordPassThrough.topology !== "sandwich") {
       throw new Error("Expected a sandwich wall cord");
     }
-    expect(model.cordPassThrough.positionAlongWall).toBe(model.box.depth / 2);
+    expect(model.cordPassThrough.positionAlongWall).toBeLessThan(model.box.depth / 2);
     expect(model.cordPassThrough.verticalCenter).toBe(model.box.height / 2);
   });
 
