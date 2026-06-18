@@ -123,7 +123,10 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   panels.push(
     createSideWallPanel({
       id: "left-side-wall",
-      name: "Left side wall",
+      // Named for where it reads in the standing 3D view (this wall sits at -x,
+      // which the default camera shows on the right). The id/role keep the
+      // geometric -x ("left") sense.
+      name: "Right side wall",
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.left,
@@ -146,7 +149,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   panels.push(
     createSideWallPanel({
       id: "right-side-wall",
-      name: "Right side wall",
+      // Named for the view (+x reads on the left at the default camera).
+      name: "Left side wall",
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.right,
@@ -168,9 +172,13 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     const longEdge = compound("DeD", [rim, width - 2 * rim, rim]);
     for (let filterIndex = 0; filterIndex < filterCount; filterIndex += 1) {
       const labelPrefix = filterCount === 1 ? "Filter frame" : `Filter ${filterIndex + 1}`;
+      // Stable ids keep their original boxes.py rail-key slug; only the display
+      // name was re-mapped to the part's position in the 3D view.
+      const idBase = slugify(labelPrefix);
       panels.push(
         createRailPanel(
-          `${labelPrefix} front long rail`,
+          `${idBase}-front-long-rail`,
+          `${labelPrefix} outer top rail`,
           width,
           rim,
           [edgeSections("E"), edgeSections("h"), longEdge, edgeSections("h")],
@@ -180,7 +188,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} rear long rail`,
+          `${idBase}-rear-long-rail`,
+          `${labelPrefix} outer right rail`,
           workingDepth - 2 * rim,
           rim,
           edgeSectionsFor("hded"),
@@ -190,7 +199,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} left short rail`,
+          `${idBase}-left-short-rail`,
+          `${labelPrefix} outer left rail`,
           workingDepth - 2 * rim,
           rim,
           edgeSectionsFor("hded"),
@@ -200,7 +210,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} right short rail`,
+          `${idBase}-right-short-rail`,
+          `${labelPrefix} outer bottom rail`,
           width,
           rim,
           [longEdge, edgeSections("h"), edgeSections("h"), edgeSections("h")],
@@ -211,7 +222,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 
       panels.push(
         createRailPanel(
-          `${labelPrefix} inner long rail`,
+          `${idBase}-inner-long-rail`,
+          `${labelPrefix} inner bottom rail`,
           width,
           rim,
           [edgeSections("F"), edgeSections("f"), longEdge, edgeSections("f")],
@@ -221,7 +233,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} outer long rail`,
+          `${idBase}-outer-long-rail`,
+          `${labelPrefix} inner right rail`,
           workingDepth - 2 * rim,
           rim,
           edgeSectionsFor("fded"),
@@ -231,7 +244,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} inner short rail`,
+          `${idBase}-inner-short-rail`,
+          `${labelPrefix} inner left rail`,
           workingDepth - 2 * rim,
           rim,
           edgeSectionsFor("fded"),
@@ -241,7 +255,8 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       );
       panels.push(
         createRailPanel(
-          `${labelPrefix} outer short rail`,
+          `${idBase}-outer-short-rail`,
+          `${labelPrefix} inner top rail`,
           width,
           rim,
           // Inner flange rear rail keeps its fingers (only the OUTER-frame rear
@@ -391,6 +406,7 @@ function createSideWallPanel(input: {
 // #######################################
 
 function createRailPanel(
+  id: string,
   name: string,
   width: number,
   height: number,
@@ -399,7 +415,7 @@ function createRailPanel(
   assembly: CutPanelAssembly,
 ): CutPanelDraft {
   return rectangularPanel({
-    id: slugify(name),
+    id,
     name,
     width: Math.max(1, width),
     height: Math.max(1, height),
