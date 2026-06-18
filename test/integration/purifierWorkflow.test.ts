@@ -6,7 +6,6 @@ import {
   applyTempestArrangementDefaults,
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
-import { defaultRectangularFilterDimensions } from "@/domain/purifier/filter";
 import {
   defaultFilterDimensionsByTempestArrangement,
   printDesignPresets,
@@ -65,9 +64,10 @@ describe("FilterBoxBuilder purifier workflow", () => {
     const bareDefaults = decodeSettings("");
     const explicitDesignDefaults = decodeSettings("printDesign=nukit-open-air");
 
-    expect(bareDefaults.filterWidth).toBe(defaultRectangularFilterDimensions.width);
-    expect(bareDefaults.filterDepth).toBe(defaultRectangularFilterDimensions.depth);
-    expect(bareDefaults.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
+    // Laser Cut defaults to the Nukit Tempest Euro (STARKVIND) filter.
+    expect(bareDefaults.filterWidth).toBe(365);
+    expect(bareDefaults.filterDepth).toBe(285);
+    expect(bareDefaults.filterThickness).toBe(35);
     expect(explicitDesignDefaults.filterWidth).toBe(bareDefaults.filterWidth);
     expect(explicitDesignDefaults.filterDepth).toBe(bareDefaults.filterDepth);
     expect(explicitDesignDefaults.filterThickness).toBe(bareDefaults.filterThickness);
@@ -78,7 +78,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
 
     expect(partialMeasurement.filterWidth).toBe(500);
     expect(partialMeasurement.filterDepth).toBe(400);
-    expect(partialMeasurement.filterThickness).toBe(defaultRectangularFilterDimensions.thickness);
+    // Unmentioned thickness falls back to the laser default (Euro / STARKVIND).
+    expect(partialMeasurement.filterThickness).toBe(35);
   });
 
   test("preserves custom measured filter dimensions through the URL codec", () => {
@@ -393,7 +394,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     // Wide, short side wall with auto fans: a centered cord would sit on a fan, so
     // the fan row shifts vertically to clear it while the cord stays put.
     const q =
-      "printDesign=nukit-open-air&filterWidth=622.3&filterDepth=495.3&filterThickness=19.1&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=17&fansRight=-1";
+      "printDesign=nukit-open-air&filterWidth=622.3&filterDepth=495.3&filterThickness=19.1&materialThickness=3&fabricationMethod=laser-svg&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center&cordHoleCornerOffset=17&fansLeft=-1&fansRight=-1";
     const layout = createLayout(decodeSettings(q));
     let checked = false;
     for (const panel of cutPanels(layout)) {
@@ -558,9 +559,20 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("reports export readiness warnings before drawing export", () => {
-    const defaultLayout = createLayout(defaultSettings);
-    expect(evaluateBuildDiagnostics(defaultLayout)).toEqual([]);
-    expect(summarizeBuildReadiness(defaultLayout).severity).toBe("info");
+    // A clean side-fan build has no advisories (the Euro default carries the
+    // intentional "no side fans" advisory, so use an explicit side-fan config).
+    const cleanLayout = createLayout({
+      ...defaultSettings,
+      filterWidth: 622.3,
+      filterDepth: 495.3,
+      filterThickness: 19.1,
+      fansLeft: -1,
+      fansRight: -1,
+      fansTop: 0,
+      fansBottom: 0,
+    });
+    expect(evaluateBuildDiagnostics(cleanLayout)).toEqual([]);
+    expect(summarizeBuildReadiness(cleanLayout).severity).toBe("info");
 
     const noFanLayout = createLayout({
       ...defaultSettings,

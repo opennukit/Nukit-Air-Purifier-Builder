@@ -198,14 +198,15 @@ export const printDesignPresets: readonly PrintDesignPreset[] = [
     releaseVisibility: "public",
     implementation: {
       type: "laser-cut",
+      // Defaults to the Nukit Tempest Euro design: STARKVIND filter, top fans.
       defaults: {
-        filter: defaultRectangularFilterDimensions,
+        filter: { width: 365, depth: 285, thickness: 35 },
         fanDiameter: 140,
         filterCount: 2,
         fanBanks: {
-          left: { type: "auto" },
-          right: { type: "auto" },
-          top: { type: "fixed", count: 0 },
+          left: { type: "fixed", count: 0 },
+          right: { type: "fixed", count: 0 },
+          top: { type: "auto" },
           bottom: { type: "fixed", count: 0 },
         },
         splitFrames: true,

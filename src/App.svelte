@@ -16,9 +16,14 @@
     previewMaterialColorPresets,
     tempestDesigns,
     tempestDesignLabels,
+    applyNukitLaserDesign,
+    matchedNukitLaserDesign,
+    nukitLaserDesigns,
+    nukitLaserDesignLabels,
     type CordHoleSide,
     type CordHoleWall,
     type FilterSlotWall,
+    type NukitLaserDesign,
     type PreviewMaterialColorId,
     type PurifierDraft,
     type RawPurifierSettings,
@@ -489,6 +494,10 @@
 
   function updateTempestDesign(event: Event): void {
     commitSettings(applyTempestDesign(settings, (event.target as HTMLSelectElement).value as TempestDesign));
+  }
+
+  function updateNukitDesign(event: Event): void {
+    commitSettings(applyNukitLaserDesign(settings, (event.target as HTMLSelectElement).value as NukitLaserDesign));
   }
 
   // "Filter slot placement" picks which wall the filter insertion slots open on
@@ -1382,8 +1391,10 @@
                   <div data-nukit-layout>
                     <label class="field compact-field" data-nukit-design>
                       <span>Design</span>
-                      <select name="nukitDesign">
-                        <option value="custom" selected>Custom</option>
+                      <select name="nukitDesign" onchange={updateNukitDesign}>
+                        {#each nukitLaserDesigns as design}
+                          <option value={design} selected={matchedNukitLaserDesign(settings) === design}>{nukitLaserDesignLabels[design]}</option>
+                        {/each}
                       </select>
                     </label>
                   </div>

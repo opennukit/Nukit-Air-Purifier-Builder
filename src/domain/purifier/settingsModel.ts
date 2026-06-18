@@ -491,17 +491,19 @@ export type PurifierInput =
 
 export const defaultSettings: RawPurifierSettings = {
   printDesign: defaultPrintDesignId,
-  filterWidth: defaultRectangularFilterDimensions.width,
-  filterDepth: defaultRectangularFilterDimensions.depth,
-  filterThickness: defaultRectangularFilterDimensions.thickness,
+  // Laser Cut is the default fabrication method; default it to the Nukit Tempest
+  // Euro design (STARKVIND filter, top fans).
+  filterWidth: 365,
+  filterDepth: 285,
+  filterThickness: 35,
   rim: 30,
   fanColor: defaultFanColor,
   fanDiameter: 140,
   filters: 2,
   splitFrames: true,
-  fansLeft: automaticFanCount,
-  fansRight: automaticFanCount,
-  fansTop: 0,
+  fansLeft: 0,
+  fansRight: 0,
+  fansTop: automaticFanCount,
   fansBottom: 0,
   tempestArrangement: "dual-horizontal-sandwich",
   tempestDesign: "custom",
@@ -748,6 +750,52 @@ export function reconcileTempestDesign(settings: RawPurifierSettings): RawPurifi
     (key) => settings[key] === overrides[key],
   );
   return matchesPreset ? settings : { ...settings, tempestDesign: "custom" };
+}
+
+// ##############################
+// Laser Cut "Design" presets
+// ##############################
+
+// The Laser Cut Layout "Design" selector. Each named design is just a filter
+// size + fan placement; everything else (rim, cord, joints, split frames) is the
+// shared laser default. The selection is derived from the settings — editing any
+// of a design's fields makes it read as "Custom" — so there is no stored field.
+export const nukitLaserDesigns = ["nukit-tempest-euro", "nukit-tempest-original", "nukit-tempest-pro", "custom"] as const;
+export type NukitLaserDesign = (typeof nukitLaserDesigns)[number];
+
+export const nukitLaserDesignLabels: Readonly<Record<NukitLaserDesign, string>> = {
+  "nukit-tempest-euro": "Nukit Tempest Euro",
+  "nukit-tempest-original": "Nukit Tempest Original",
+  "nukit-tempest-pro": "Nukit Tempest Pro",
+  custom: "Custom",
+};
+
+const nukitLaserDesignFields = {
+  // STARKVIND, top fans.
+  "nukit-tempest-euro": { filterWidth: 365, filterDepth: 285, filterThickness: 35, fansLeft: 0, fansRight: 0, fansTop: automaticFanCount, fansBottom: 0 },
+  // Original 495 cube, side fans.
+  "nukit-tempest-original": { filterWidth: 495, filterDepth: 495, filterThickness: 44, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: 0, fansBottom: 0 },
+  // Pro 500x622, side fans.
+  "nukit-tempest-pro": { filterWidth: 500, filterDepth: 622, filterThickness: 19, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: 0, fansBottom: 0 },
+} satisfies Readonly<Record<Exclude<NukitLaserDesign, "custom">, Partial<RawPurifierSettings>>>;
+
+export function applyNukitLaserDesign(settings: RawPurifierSettings, design: NukitLaserDesign): RawPurifierSettings {
+  if (design === "custom") {
+    return settings;
+  }
+  return { ...settings, ...nukitLaserDesignFields[design] };
+}
+
+// The design whose filter size and fan placement match the current settings, or
+// "custom" if none do.
+export function matchedNukitLaserDesign(settings: RawPurifierSettings): NukitLaserDesign {
+  const match = (Object.keys(nukitLaserDesignFields) as Exclude<NukitLaserDesign, "custom">[]).find((id) => {
+    const fields = nukitLaserDesignFields[id] as Partial<Record<keyof RawPurifierSettings, number>>;
+    return (Object.keys(fields) as (keyof RawPurifierSettings)[]).every(
+      (key) => Math.round(settings[key] as number) === fields[key],
+    );
+  });
+  return match ?? "custom";
 }
 
 export function applyTempestArrangementDefaults(

@@ -6,6 +6,21 @@ import { edgeSections } from "@/fabrication/laser/cutGeometry";
 // `generateAirPurifier` is the boxes.py golden reference (see src/ports/boxes/reference/README.md).
 import { generateAirPurifier } from "@/ports/boxes/reference/airPurifierGenerator";
 
+// These equivalence checks validate the boxes.py-style layout with a wide filter
+// and auto side fans (the historical default, before Laser Cut defaulted to the
+// top-fan Euro design). Pin that config explicitly so they don't depend on the
+// default design.
+const referenceSettings = {
+  ...defaultSettings,
+  filterWidth: 622.3,
+  filterDepth: 495.3,
+  filterThickness: 19.1,
+  fansLeft: -1,
+  fansRight: -1,
+  fansTop: 0,
+  fansBottom: 0,
+};
+
 describe("Air purifier cut-sheet equivalence", () => {
   test("uses the generated Boxes document for summary and SVG output", () => {
     const layout = createLayout(defaultSettings);
@@ -23,7 +38,7 @@ describe("Air purifier cut-sheet equivalence", () => {
   });
 
   test("keeps the boxes.py golden-reference generator available as a correctness oracle", () => {
-    const generator = generateAirPurifier(defaultSettings);
+    const generator = generateAirPurifier(referenceSettings);
     const document = generator.toDocument();
     const circles = document.shapes.filter((shape) => shape.type === "circle");
     const cutRects = document.shapes.filter((shape) => shape.type === "rect" && shape.color === "cut");
@@ -35,7 +50,7 @@ describe("Air purifier cut-sheet equivalence", () => {
   });
 
   test("uses cut panel outlines as the SVG and 3D preview source of truth", () => {
-    const layout = createLayout(defaultSettings);
+    const layout = createLayout(referenceSettings);
     const svg = createLaserSvg(layout);
     const outerPathShapes = cutSheet(layout).shapes.filter((shape) => shape.type === "path" && shape.color === "cut");
     const innerPathShapes = cutSheet(layout).shapes.filter((shape) => shape.type === "path" && shape.color === "inner-cut");
@@ -71,7 +86,7 @@ describe("Air purifier cut-sheet equivalence", () => {
   });
 
   test("matches upstream AirPurifier layout direction and burn-corrected inner cuts", () => {
-    const layout = createLayout(defaultSettings);
+    const layout = createLayout(referenceSettings);
     const firstPanel = cutPanels(layout)[0];
     const secondPanel = cutPanels(layout)[1];
     const sidePanel = requiredPanel(cutPanels(layout), "left-side-wall");
@@ -95,7 +110,7 @@ describe("Air purifier cut-sheet equivalence", () => {
   });
 
   test("keeps boundary settings separate from the structured build configuration", () => {
-    const layout = createLayout(defaultSettings);
+    const layout = createLayout(referenceSettings);
     const draftPanels = createAirPurifierCutPanels(layout.configuration);
 
     expect(layout.rawSettings.filterWidth).toBe(layout.configuration.filter.width);
