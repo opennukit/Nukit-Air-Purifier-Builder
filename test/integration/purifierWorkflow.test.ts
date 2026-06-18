@@ -430,7 +430,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     // Flipped 180deg about its long axis so it is not upside down.
     expect(frontRail?.rotation).toEqual([-Math.PI / 2, 0, 0]);
     expect(innerRail?.position[1]).toBeCloseTo(lowerInnerFrameY);
-    expect(innerRail?.position[2]).toBeCloseTo(-layout.summary.workingDepth / 2 + defaultSettings.rim / 2);
+    // inner-long ("inner bottom rail") and outer-short ("inner top rail") swap
+    // seats: the inner-long rail sits on the rear edge (+workingDepth/2).
+    expect(innerRail?.position[2]).toBeCloseTo(layout.summary.workingDepth / 2 - defaultSettings.rim / 2);
     expect(innerRail?.rotation).toEqual([Math.PI / 2, 0, 0]);
     expect(assembly.filterMedia[0]?.position[1]).toBeCloseTo(lowerFilterY);
     expect(assembly.filterMedia[1]?.position[1]).toBeCloseTo(upperFilterY);

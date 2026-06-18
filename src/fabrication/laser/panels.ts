@@ -223,7 +223,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       panels.push(
         createRailPanel(
           `${idBase}-inner-long-rail`,
-          `${labelPrefix} inner top rail`,
+          `${labelPrefix} inner bottom rail`,
           width,
           rim,
           [edgeSections("F"), edgeSections("f"), longEdge, edgeSections("f")],
@@ -256,7 +256,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       panels.push(
         createRailPanel(
           `${idBase}-outer-short-rail`,
-          `${labelPrefix} inner bottom rail`,
+          `${labelPrefix} inner top rail`,
           width,
           rim,
           // Inner flange rear rail keeps its fingers (only the OUTER-frame rear

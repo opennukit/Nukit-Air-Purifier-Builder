@@ -162,8 +162,11 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
     // Flipped 180deg about its long (X) axis so it is no longer upside down.
     rotation: [-Math.PI / 2, 0, 0],
   }),
+  // inner-long ("inner bottom rail") and outer-short ("inner top rail") swap
+  // their seats in the assembly: the inner-bottom rail seats at the rear (+z,
+  // the "top" of the upright view) and the inner-top rail at the front (-z).
   "inner-long": ({ layer, depth, rim }) => ({
-    position: [0, layer.innerFrameY, -depth / 2 + rim / 2],
+    position: [0, layer.innerFrameY, depth / 2 - rim / 2],
     rotation: [Math.PI / 2, 0, 0],
   }),
   "outer-long": ({ layer, width, rim }) => ({
@@ -176,7 +179,7 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
     rotation: [Math.PI / 2, 0, Math.PI / 2],
   }),
   "outer-short": ({ layer, depth, rim }) => ({
-    position: [0, layer.innerFrameY, depth / 2 - rim / 2],
+    position: [0, layer.innerFrameY, -depth / 2 + rim / 2],
     rotation: [Math.PI / 2, 0, 0],
   }),
 };
