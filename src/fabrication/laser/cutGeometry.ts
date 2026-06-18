@@ -97,7 +97,7 @@ export type LaidOutCutPanel = CutPanelDraft & {
 
 export type CutPanel = LaidOutCutPanel;
 
-export type EdgeKind = "plain" | "finger" | "finger-counter" | "finger-holes" | "dovetail" | "dovetail-counter";
+export type EdgeKind = "plain" | "plain-outset" | "finger" | "finger-counter" | "finger-holes" | "dovetail" | "dovetail-counter";
 
 export type EdgeSection = {
   kind: EdgeKind;
@@ -384,7 +384,14 @@ function buildRectangularOutline(input: RectangularPanelInput): CutPoint[] {
     { axis: { x: 0, y: -1 }, outward: { x: -1, y: 0 } },
   ];
   const fallbackLengths = [input.width, input.height, input.width, input.height];
-  const points: CutPoint[] = [{ x: 0, y: 0 }];
+  // boxes.py rectangularWall reserves edges[i].spacing() = startWidth()+margin()
+  // outside the inner rectangle on each edge, so the part grows perpendicular to
+  // every non-plain edge: OutSetEdge "E" and FingerJoint counterpart "F" by one
+  // thickness, FingerHoleEdge "h" by edge_width(=t)+t = 2t. Finger "f" and
+  // dovetail "d" already reach outward via their drawn profiles, so their extra
+  // perpendicular reach is 0 here (counted by the profile). Order: [bottom,right,top,left].
+  const outsets = [0, 1, 2, 3].map((i) => edgeOutset(input.edges[i], input.thickness));
+  const points: CutPoint[] = [{ x: -outsets[3], y: -outsets[0] }];
 
   input.edges.forEach((sections, edgeIndex) => {
     const direction = directions[edgeIndex];
@@ -394,13 +401,31 @@ function buildRectangularOutline(input: RectangularPanelInput): CutPoint[] {
         ? sections
         : sections.map((section) => ({ ...section, length: fallbackLengths[edgeIndex] }));
 
+    // Plain corner runs of the neighbouring edges' outsets, so the four edges
+    // meet at the outset-expanded corners (boxes.py's spacing() straight bits).
+    const startSpacer = outsets[(edgeIndex + 3) % 4];
+    const endSpacer = outsets[(edgeIndex + 1) % 4];
+    if (startSpacer > 0) appendLine(points, moveBy(lastPoint(points), direction.axis, startSpacer));
     for (const section of normalizedSections) {
       appendEdgeSection(points, section.kind, section.length, direction, input.thickness, jointSettings);
     }
+    if (endSpacer > 0) appendLine(points, moveBy(lastPoint(points), direction.axis, endSpacer));
   });
 
   removeClosingDuplicate(points);
   return points;
+}
+
+// Perpendicular outset (boxes.py edge.startWidth()) the part gains on the side of
+// this edge. Taken as the max across the edge's sections so a CompoundEdge uses
+// its outset-bearing parts (e.g. "EFE" -> t). Finger/dovetail/plain add nothing.
+function edgeOutset(sections: readonly EdgeSection[], thickness: number): number {
+  let outset = 0;
+  for (const section of sections) {
+    if (section.kind === "finger-holes") outset = Math.max(outset, 2 * thickness);
+    else if (section.kind === "finger-counter" || section.kind === "plain-outset") outset = Math.max(outset, thickness);
+  }
+  return outset;
 }
 
 function appendEdgeSection(
@@ -858,8 +883,12 @@ function removeClosingDuplicate(points: CutPoint[]): void {
 // #######################################
 
 function edgeKindFromChar(char: string): EdgeKind {
-  if (char === "e" || char === "E") {
+  if (char === "e") {
     return "plain";
+  }
+  // boxes.py OutSetEdge: a straight edge set out by one thickness (startWidth = t).
+  if (char === "E") {
+    return "plain-outset";
   }
   if (char === "f") {
     return "finger";

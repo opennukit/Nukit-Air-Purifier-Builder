@@ -170,16 +170,6 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 
   if (usesSplitRails) {
     const longEdge = compound("DeD", [rim, width - 2 * rim, rim]);
-    // boxes.py draws the OUTER top/bottom flange rails one material thickness
-    // longer per end than their nominal width: a finger-type perpendicular end
-    // edge ("h") contributes its `spacing()` (= thickness) to the adjacent long
-    // edges, so the part comes out at width + 2*thickness. Our outline builder
-    // omits that spacing, leaving these four rails 2*thickness short. Add the
-    // thickness-wide plain overhang at each end here (only for the outer rails),
-    // keeping the dovetail pattern in the original central span so its offset
-    // from the part centre — and therefore the joinery — is unchanged.
-    const outerRailWidth = width + 2 * thickness;
-    const outerLongEdge = compound("eDeDe", [thickness, rim, width - 2 * rim, rim, thickness]);
     for (let filterIndex = 0; filterIndex < filterCount; filterIndex += 1) {
       const labelPrefix = filterCount === 1 ? "Filter frame" : `Filter ${filterIndex + 1}`;
       // Stable ids keep their original boxes.py rail-key slug; only the display
@@ -189,9 +179,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         createRailPanel(
           `${idBase}-front-long-rail`,
           `${labelPrefix} outer top rail`,
-          outerRailWidth,
+          width,
           rim,
-          [edgeSections("E"), edgeSections("h"), outerLongEdge, edgeSections("h")],
+          [edgeSections("E"), edgeSections("h"), longEdge, edgeSections("h")],
           settings,
           filterRailAssembly(filterIndex, "front-long"),
         ),
@@ -222,9 +212,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         createRailPanel(
           `${idBase}-right-short-rail`,
           `${labelPrefix} outer bottom rail`,
-          outerRailWidth,
+          width,
           rim,
-          [outerLongEdge, edgeSections("h"), edgeSections("h"), edgeSections("h")],
+          [longEdge, edgeSections("h"), edgeSections("h"), edgeSections("h")],
           settings,
           filterRailAssembly(filterIndex, "right-short"),
         ),
