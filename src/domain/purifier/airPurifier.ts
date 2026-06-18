@@ -91,6 +91,12 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
     labels: raw.labels,
     referenceScale: referenceScaleFromNumber(raw.referenceScale),
     joints: normalizeJointSettings(raw),
+    cordHole: {
+      diameter: normalizeCordHoleDiameter(raw.cordHoleDiameter),
+      wall: raw.cordHoleWall,
+      side: raw.cordHoleSide,
+      cornerOffset: normalizeCordHoleCornerOffset(raw.cordHoleCornerOffset),
+    },
   };
 
   return {
@@ -247,6 +253,10 @@ export function serializePurifierDraft(
       fansRight: fanCountRequestToRawSetting(draft.design.fanBanks.right),
       fansTop: fanCountRequestToRawSetting(draft.design.fanBanks.top),
       fansBottom: fanCountRequestToRawSetting(draft.design.fanBanks.bottom),
+      cordHoleDiameter: draft.design.cordHoleDiameter,
+      cordHoleWall: draft.design.cordHoleWall,
+      cordHoleSide: draft.design.cordHoleSide,
+      cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
     });
   }
 
@@ -351,10 +361,10 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     tempestDesign: defaultSettings.tempestDesign,
     filterSlotWall: defaultSettings.filterSlotWall,
     filterFitClearance: defaultSettings.filterFitClearance,
-    cordHoleDiameter: defaultSettings.cordHoleDiameter,
-    cordHoleWall: defaultSettings.cordHoleWall,
-    cordHoleSide: defaultSettings.cordHoleSide,
-    cordHoleCornerOffset: defaultSettings.cordHoleCornerOffset,
+    cordHoleDiameter: input.cutting.cordHole.diameter,
+    cordHoleWall: input.cutting.cordHole.wall,
+    cordHoleSide: input.cutting.cordHole.side,
+    cordHoleCornerOffset: input.cutting.cordHole.cornerOffset,
     outsideFlangeThickness: defaultSettings.outsideFlangeThickness,
     chunkLabels: defaultSettings.chunkLabels,
     hexGrill: defaultSettings.hexGrill,
@@ -407,6 +417,10 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       fansRight: fanCountRequestToRawSetting(input.design.fanBanks.right),
       fansTop: fanCountRequestToRawSetting(input.design.fanBanks.top),
       fansBottom: fanCountRequestToRawSetting(input.design.fanBanks.bottom),
+      cordHoleDiameter: input.design.cordHoleDiameter,
+      cordHoleWall: input.design.cordHoleWall,
+      cordHoleSide: input.design.cordHoleSide,
+      cordHoleCornerOffset: input.design.cordHoleCornerOffset,
     };
   }
 
@@ -496,6 +510,10 @@ function createConfiguredPrintDesign(input: {
       filterCount: input.filterCount,
       fanBanks: input.fan.banks,
       frameConstruction: input.frameConstruction,
+      cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
+      cordHoleWall: input.raw.cordHoleWall,
+      cordHoleSide: input.raw.cordHoleSide,
+      cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
     };
   }
 
@@ -607,6 +625,10 @@ function createPurifierDesignDraft(
       filterCount: configuration.design.filterCount,
       fanBanks: configuration.design.fanBanks,
       frameConstruction: configuration.design.frameConstruction,
+      cordHoleDiameter: configuration.design.cordHoleDiameter,
+      cordHoleWall: configuration.design.cordHoleWall,
+      cordHoleSide: configuration.design.cordHoleSide,
+      cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
     };
   }
 

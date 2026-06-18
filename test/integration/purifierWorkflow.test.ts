@@ -354,6 +354,40 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(hasRecess).toBe(true);
   });
 
+  test("cuts a power-cord pass-through hole in the chosen laser wall", () => {
+    const base =
+      "printDesign=nukit-open-air&filterWidth=370&filterDepth=290&filterThickness=40&materialThickness=3&cordHoleCornerOffset=17&fabricationMethod=laser-svg";
+    const cordCircle = (layout: ReturnType<typeof createLayout>, id: string) =>
+      requiredPanel(cutPanels(layout), id).cuts.find((cut) => cut.type === "circle" && cut.role === "cord");
+
+    // Right wall, centered: lands on the +x side wall, centered over the chamber height.
+    const right = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=center"));
+    const rightPanel = requiredPanel(cutPanels(right), "right-side-wall");
+    const rightCut = cordCircle(right, "right-side-wall");
+    const panelYs = rightPanel.outline.map((point) => point.y);
+    const panelMidY = (Math.min(...panelYs) + Math.max(...panelYs)) / 2;
+    expect(rightCut?.type === "circle" && rightCut.radius).toBeCloseTo(8 / 2 - 0.1, 1);
+    // Centered side-wall cord sits at the wall's vertical mid-line.
+    expect(rightCut?.type === "circle" && Math.abs(rightCut.cy - panelMidY)).toBeLessThan(2);
+    // The hole is only on the chosen wall.
+    expect(cordCircle(right, "left-side-wall")).toBeUndefined();
+
+    // "side" slides the side-wall hole vertically; left sits lower than right.
+    const low = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=left"));
+    const high = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=right&cordHoleSide=right"));
+    const lowCy = cordCircle(low, "right-side-wall");
+    const highCy = cordCircle(high, "right-side-wall");
+    expect(lowCy?.type === "circle" && highCy?.type === "circle" && lowCy.cy < highCy.cy).toBe(true);
+
+    // A front fan-wall hole centers vertically in the chamber.
+    const front = createLayout(decodeSettings(base + "&cordHoleDiameter=8&cordHoleWall=front&cordHoleSide=center"));
+    expect(cordCircle(front, "bottom-fan-wall")?.type === "circle").toBe(true);
+
+    // Diameter 0 means no hole anywhere.
+    const none = createLayout(decodeSettings(base + "&cordHoleDiameter=0&cordHoleWall=right"));
+    expect(cutPanels(none).every((panel) => panel.cuts.every((cut) => !(cut.type === "circle" && cut.role === "cord")))).toBe(true);
+  });
+
   test("carries measured filter dimensions straight into the structured settings", () => {
     const normalized = normalizeSettings(defaultSettings);
     const normalizedAgain = normalizeSettings(normalized);

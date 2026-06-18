@@ -114,6 +114,16 @@ export type CuttingSettings = {
   labels: boolean;
   referenceScale: ReferenceScale;
   joints: JointSettings;
+  cordHole: CuttingCordHole;
+};
+
+// Power-cord pass-through bore for the laser enclosure. diameter <= 0 (or
+// wall "none") means no hole. Mirrors the 3D-print cord pass-through controls.
+export type CuttingCordHole = {
+  readonly diameter: Millimeters;
+  readonly wall: CordHoleWall;
+  readonly side: CordHoleSide;
+  readonly cornerOffset: Millimeters;
 };
 
 export type JointSettings = CutJointSettings;
@@ -307,6 +317,10 @@ export type LaserCutDesignDraft = {
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
   readonly frameConstruction: FilterFrameConstruction;
+  readonly cordHoleDiameter: Millimeters;
+  readonly cordHoleWall: CordHoleWall;
+  readonly cordHoleSide: CordHoleSide;
+  readonly cordHoleCornerOffset: Millimeters;
 };
 
 export type DonutFilterAdapterPrintDesignDraft = {
@@ -382,6 +396,10 @@ export type ConfiguredPrintDesign =
       readonly filterCount: FilterCount;
       readonly fanBanks: FanBanks<FanCountRequest>;
       readonly frameConstruction: FilterFrameConstruction;
+      readonly cordHoleDiameter: Millimeters;
+      readonly cordHoleWall: CordHoleWall;
+      readonly cordHoleSide: CordHoleSide;
+      readonly cordHoleCornerOffset: Millimeters;
     }
   | {
       readonly type: "donut-filter-adapter";

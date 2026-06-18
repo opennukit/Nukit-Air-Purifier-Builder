@@ -2094,6 +2094,57 @@
                       </label>
                     {/each}
                   </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Cord pass-through</p>
+                    <label class="field">
+                      <span>Cord hole diameter {@render infoTip("info-laser-cordHoleDiameter", cordHoleInfo + " Set the diameter to 0 for no cord hole.")}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="cordHoleDiameter"
+                          min="0"
+                          step="1"
+                          inputmode="decimal"
+                          value={settings.cordHoleDiameter}
+                          onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                    {#if settings.cordHoleDiameter > 0}
+                      <label class="field">
+                        <span>Power cord wall {@render infoTip("info-laser-cordHoleWall", cordHoleInfo)}</span>
+                        <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                          {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
+                            <option value={wall} selected={settings.cordHoleWall === wall}>{cordWallLabel(wall)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Cord position {@render infoTip("info-laser-cordHoleSide", advancedControlInfo.cordHoleSide)}</span>
+                        <select name="cordHoleSide" onchange={updateCordHoleSide}>
+                          {#each cordHoleSides as side}
+                            <option value={side} selected={settings.cordHoleSide === side}>{titleCase(side)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Cord corner offset {@render infoTip("info-laser-cordHoleCornerOffset", advancedControlInfo.cordHoleCornerOffset)}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="cordHoleCornerOffset"
+                            min="0"
+                            step="1"
+                            inputmode="numeric"
+                            value={settings.cordHoleCornerOffset}
+                            onchange={(event) => updateNumberSetting("cordHoleCornerOffset", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    {/if}
+                  </div>
                 </div>
               {/if}
             </section>

@@ -1,13 +1,14 @@
-import type { PurifierSettings } from "@/domain/purifier/settingsModel";
+import type { CordHoleWall, PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
 import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fans";
-import { createAirPurifierGeometry, fanCenterYForWall } from "@/domain/purifier/geometry";
+import { createAirPurifierGeometry, fanCenterYForWall, type AirPurifierGeometry } from "@/domain/purifier/geometry";
 import {
   cutPanelsToDocument,
   edgeSections,
   fingerHoleCutsAt,
   layoutCutPanelsInColumn,
   rectangularPanel,
+  type CircleCut,
   type CutPanelAssembly,
   type CutPanelDraft,
   type CutFeature,
@@ -56,6 +57,10 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const filterCount = settings.filterCount;
   const usesSplitRails = settings.frameConstruction.type === "split-rails";
   const panels: CutPanelDraft[] = [];
+  const cordCut = (wall: CordHoleWall): CutFeature[] => {
+    const cut = createCordHoleCut(wall, geometry, settings);
+    return cut === null ? [] : [cut];
+  };
   const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
   // The side walls carry the front fan wall's joint as FingerHoleEdge ("h")
   // slots set in from their edge by edge_width + thickness/2. So the front fan
@@ -74,6 +79,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.top,
       fanCenterY: fanDiameter / 2,
       settings,
+      cuts: cordCut("back"),
       assembly: {
         type: "placed",
         role: "rear-fan-wall",
@@ -94,7 +100,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.bottom,
       fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight),
       settings,
-      cuts: createFilterFingerHoleCuts(width, settings, fanWallFilterRows),
+      cuts: [...createFilterFingerHoleCuts(width, settings, fanWallFilterRows), ...cordCut("front")],
       assembly: {
         type: "placed",
         role: "front-fan-wall",
@@ -133,6 +139,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
+      cuts: cordCut("left"),
       assembly: {
         type: "placed",
         role: "left-side-wall",
@@ -157,6 +164,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
       filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
+      cuts: cordCut("right"),
       assembly: {
         type: "placed",
         role: "right-side-wall",
@@ -371,6 +379,7 @@ function createSideWallPanel(input: {
   edgeSpec: RectPanelEdges;
   settings: PurifierSettings;
   filterFingerHoleRows: readonly FilterFingerHoleRow[];
+  cuts?: CutFeature[];
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
   const fanCenterY =
@@ -396,9 +405,51 @@ function createSideWallPanel(input: {
         input.settings,
         input.filterFingerHoleRows,
       ),
+      ...(input.cuts ?? []),
     ],
     assembly: input.assembly,
   });
+}
+
+// Power-cord pass-through bore for one wall, mirroring the 3D-print cord rules.
+// Returns null unless this wall is the chosen cord wall and the bore is real.
+//   - left/right side walls: the hole sits `cornerOffset` along the depth, and
+//     "Cord position" (side) slides it vertically inside the fan chamber, clear
+//     of the filter flanges (center = chamber midline, left/right = the ends).
+//   - front/back fan walls: centred vertically; "Cord position" slides it along
+//     the wall width.
+function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, settings: PurifierSettings): CircleCut | null {
+  const cord = settings.cutting.cordHole;
+  if (cord.wall !== wall || cord.diameter <= 0) {
+    return null;
+  }
+  const t = settings.cutting.materialThickness;
+  const r = cord.diameter / 2;
+  const margin = r + t;
+  const radius = kerfCorrectedRadius(r, settings.cutting.kerfFit);
+  const width = geometry.filterDimensions.width;
+  const workingDepth = geometry.workingDepth;
+  const chamberHeight = geometry.chamberHeight;
+  const filterHeight = geometry.filterDimensions.thickness;
+
+  if (wall === "left" || wall === "right") {
+    const cx = clamp(Math.max(cord.cornerOffset, margin), margin, workingDepth - margin);
+    const low = filterHeight + t + r;
+    const high = chamberHeight - (settings.filterCount > 1 ? filterHeight + t : t) - r;
+    const cy =
+      cord.side === "center"
+        ? clamp(chamberHeight / 2, Math.min(low, high), Math.max(low, high))
+        : cord.side === "left"
+          ? Math.min(low, high)
+          : Math.max(low, high);
+    return { type: "circle", cx, cy, radius, role: "cord" };
+  }
+
+  // The back (top) fan wall is only as tall as the fan band.
+  const panelHeight = wall === "back" ? settings.fan.spec.diameter : chamberHeight;
+  const along = cord.side === "center" ? width / 2 : cord.side === "left" ? Math.max(cord.cornerOffset, margin) : width - Math.max(cord.cornerOffset, margin);
+  const cx = clamp(along, margin, width - margin);
+  return { type: "circle", cx, cy: panelHeight / 2, radius, role: "cord" };
 }
 
 // #######################################

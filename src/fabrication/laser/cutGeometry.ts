@@ -26,7 +26,7 @@ export type CircleCut = {
   cx: number;
   cy: number;
   radius: number;
-  role: "fan" | "screw" | "reference";
+  role: "fan" | "screw" | "reference" | "cord";
 };
 
 export type RectCut = {
