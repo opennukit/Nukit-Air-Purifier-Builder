@@ -167,7 +167,8 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   // the "top" of the upright view) and the inner-top rail at the front (-z).
   "inner-long": ({ layer, depth, rim }) => ({
     position: [0, layer.innerFrameY, depth / 2 - rim / 2],
-    rotation: [Math.PI / 2, 0, 0],
+    // Flipped 180deg about its long (X) axis so the rail is not upside down.
+    rotation: [-Math.PI / 2, 0, 0],
   }),
   "outer-long": ({ layer, width, rim }) => ({
     position: [-width / 2 + rim / 2, layer.innerFrameY, 0],
@@ -180,7 +181,8 @@ const filterRailPlacements: Record<FilterRailKey, (input: FilterRailPlacementInp
   }),
   "outer-short": ({ layer, depth, rim }) => ({
     position: [0, layer.innerFrameY, -depth / 2 + rim / 2],
-    rotation: [Math.PI / 2, 0, 0],
+    // Flipped 180deg about its long (X) axis so the rail is not upside down.
+    rotation: [-Math.PI / 2, 0, 0],
   }),
 };
 
