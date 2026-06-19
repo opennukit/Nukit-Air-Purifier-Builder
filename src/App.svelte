@@ -1555,7 +1555,7 @@
                 {#if isNukitControlsActive}
                   <div data-nukit-layout>
                     <label class="field compact-field" data-nukit-design>
-                      <span>Design {@render infoTip("info-laser-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
+                      <span>Design {@render infoTip("info-laser-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick a design you like, then fine-tune anything below. Actual filter sizes vary between brands so be sure to measure yours before fabrication.")}</span>
                       <select name="nukitDesign" onchange={updateNukitDesign}>
                         {#each nukitLaserDesigns as design}
                           <option value={design} selected={matchedNukitLaserDesign(settings) === design}>{nukitLaserDesignLabels[design]}</option>
@@ -1610,7 +1610,7 @@
                 {#if isTempestControlsActive}
                   <div data-tempest-layout>
                     <label class="field compact-field" data-tempest-design>
-                      <span>Design {@render infoTip("info-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
+                      <span>Design {@render infoTip("info-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick a design you like, then fine-tune anything below. Actual filter sizes vary between brands so be sure to measure yours before fabrication.")}</span>
                       <select name="tempestDesign" onchange={updateTempestDesign}>
                         {#each tempestDesigns as design}
                           <option value={design} selected={settings.tempestDesign === design}>{tempestDesignLabels[design]}</option>
@@ -1618,7 +1618,7 @@
                       </select>
                     </label>
                     <fieldset class="segmented-field segmented-field-three">
-                      <legend>Filter layout {@render infoTip("info-filterLayout", "How the filters sit in the box: a single top filter, two filters sandwiched with fans pulling through both, or a four-sided filter tower.")}</legend>
+                      <legend>Filter layout {@render infoTip("info-filterLayout", "How the filters sit in the box: a single side filter for wall or ceiling mount, two filters sandwiched with fans pulling air through both, or a four-sided filter tower.")}</legend>
                       <div>
                         {#each tempestArrangementOptions as option}
                           <label>
@@ -1708,7 +1708,7 @@
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
                     <label class="field" data-filter-size-preset>
-                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1) to fill in its dimensions, or pick Custom and enter your own. Nominal sizes aren't the real measurements, so measure your filter.")}</span>
+                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1), or pick Custom and enter your own. Nominal sizes aren't the real measurements, and actual filter sizes vary between brands. Be sure to measure yours before fabrication.")}</span>
                       <select name="filterSizePreset" onchange={updateFilterSizePreset}>
                         {#each filterSizePresets as preset}
                           <option value={preset.id} selected={selectedFilterSize === preset.id}>{preset.label}</option>
@@ -1857,7 +1857,7 @@
                   </fieldset>
 
                   <fieldset class="fan-placement-field" data-nukit-hex-grill>
-                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced.")}</legend>
+                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
                     <div class="fan-placement-checks">
                       <label class="toggle-field">
                         <input
@@ -1873,7 +1873,7 @@
 
                   {#if laserBackFansSelected && noWallFansSelected}
                     <label class="field">
-                      <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is: the chamber between the filter and the back plate. Used instead of the fan-diameter chamber when Back fans are on.")}</span>
+                      <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is: the chamber between the filter and the back plate.")}</span>
                       <span class="input-shell">
                         <input
                           type="number"
@@ -2207,7 +2207,7 @@
                       </fieldset>
                     {/if}
                     <label class="field">
-                      <span>Download format {@render infoTip("info-print-downloadFormat", "File downloaded by the export button. A 3MF ZIP (default) keeps part colours and units; an STL ZIP is the plainer mesh format every slicer reads. Both bundle one file per print chunk.")}</span>
+                      <span>Download format {@render infoTip("info-print-downloadFormat", "File downloaded by the export button. A 3MF ZIP (default) keeps part colors and units; an STL ZIP is the plainer mesh format every slicer reads. Both bundle one file per print chunk.")}</span>
                       <select name="printDownloadFormat" bind:value={printDownloadFormat}>
                         <option value="3mf">3MF (zip)</option>
                         <option value="stl">STL (zip)</option>
