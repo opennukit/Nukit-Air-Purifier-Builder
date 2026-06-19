@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact: Nukit FilterBoxBuilder</title>
+    <meta
+      name="description"
+      content="Get in touch with Nukit about the FilterBoxBuilder, the Nukit Tempest Pro, or anything else. Send a message and an optional attachment."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --surface: #f8f5ec;
+        --surface-strong: #fffdf6;
+        --ink: #17201c;
+        --muted: #59635b;
+        --line: #d9d0bf;
+        --line-soft: rgb(217 208 191 / 54%);
+        --accent: #1f6f56;
+        --accent-strong: #164d3d;
+        --accent-wash: rgb(31 111 86 / 8%);
+        --focus-ring: #2f65c8;
+        --wood: #be8d55;
+        --danger: #b3261e;
+        --shadow: 0 20px 70px rgb(51 42 27 / 12%);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ece8dc;
+        background-image: radial-gradient(rgb(190 141 85 / 9%) 1px, transparent 1px);
+        background-size: 42px 42px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+      }
+      a { color: var(--accent-strong); }
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+      }
+      .page { max-width: 760px; margin: 0 auto; padding: 32px 24px 96px; }
+      header.masthead {
+        padding: 28px 30px;
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        border-radius: 2px;
+      }
+      header.masthead h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.01em; }
+      header.masthead p { margin: 0; max-width: 70ch; color: var(--muted); }
+      .home-link {
+        display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 2px;
+        background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 0.85rem;
+      }
+      section.card {
+        margin-top: 28px; padding: 26px 30px; background: var(--surface-strong);
+        border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 10px 40px rgb(51 42 27 / 7%);
+      }
+      .field { display: grid; gap: 6px; margin: 0 0 18px; }
+      .field label { font-size: 0.82rem; font-weight: 600; }
+      .field .req { color: var(--accent-strong); }
+      .field .hint { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
+      .field input, .field textarea {
+        width: 100%; padding: 10px 12px; font: inherit; color: var(--ink);
+        background: var(--surface); border: 1px solid var(--line); border-radius: 2px;
+      }
+      .field textarea { min-height: 150px; resize: vertical; }
+      .field input[type="file"] { padding: 8px; background: var(--surface); cursor: pointer; }
+      .field input:focus, .field textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .h-captcha { margin: 0 0 18px; }
+      .btn {
+        appearance: none; border: 0; cursor: pointer; padding: 12px 22px; border-radius: 2px;
+        background: var(--accent); color: #fff; font-weight: 700; font-size: 0.95rem;
+      }
+      .btn:hover { background: var(--accent-strong); }
+      .btn:disabled { opacity: 0.6; cursor: progress; }
+      .form-status { margin: 0 0 18px; padding: 12px 16px; border-radius: 2px; font-size: 0.9rem; display: none; }
+      .form-status.is-ok { display: block; background: var(--accent-wash); border-left: 3px solid var(--accent); color: var(--accent-strong); }
+      .form-status.is-error { display: block; background: rgb(179 38 30 / 8%); border-left: 3px solid var(--danger); color: var(--danger); }
+      .note { margin: 16px 0 0; font-size: 0.82rem; color: var(--muted); }
+      .honeypot { position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden; }
+      @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Nukit FilterBoxBuilder</p>
+        <h1>Contact us</h1>
+        <p>
+          Questions about the builder, the Nukit Tempest Pro, bulk or custom builds, or anything else? Send us a
+          message below and we will get back to you. You can attach a file if it helps (a photo, drawing, or export).
+        </p>
+        <a class="home-link" href="./">&#8592; Back to the builder</a>
+      </header>
+
+      <section class="card">
+        <!--
+          Web3Forms delivery. Messages are emailed to whichever address the access
+          key below is registered to. Create a free key at https://web3forms.com
+          using sales@machineryenchantress.com, then paste it into the value of the
+          access_key field. The key is a public form identifier, not a secret.
+          In the Web3Forms dashboard, enable hCaptcha as the spam protection so the
+          captcha on this page is enforced server-side.
+        -->
+        <p id="formStatus" class="form-status" role="status" aria-live="polite"></p>
+
+        <form
+          id="contactForm"
+          action="https://api.web3forms.com/submit"
+          method="POST"
+          enctype="multipart/form-data"
+        >
+          <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY" />
+          <input type="hidden" name="from_name" value="Machinery Enchantress website" />
+
+          <!-- Honeypot: bots fill this hidden field; real visitors never see it. -->
+          <div class="honeypot" aria-hidden="true">
+            <label>Do not fill this in <input type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" /></label>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="name">Name <span class="req">*</span></label>
+              <input id="name" type="text" name="name" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="email">Email <span class="req">*</span></label>
+              <input id="email" type="email" name="email" autocomplete="email" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="company">Company <span class="hint">(optional)</span></label>
+            <input id="company" type="text" name="company" autocomplete="organization" />
+          </div>
+
+          <div class="field">
+            <label for="subject">Subject <span class="req">*</span></label>
+            <input id="subject" type="text" name="subject" required />
+          </div>
+
+          <div class="field">
+            <label for="message">Message <span class="req">*</span></label>
+            <textarea id="message" name="message" required></textarea>
+          </div>
+
+          <div class="field">
+            <label for="attachment">Attachment <span class="hint">(optional, up to 1 MB)</span></label>
+            <input
+              id="attachment"
+              type="file"
+              name="attachment"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.svg,.dxf,.stl,.3mf,.zip,.txt,.doc,.docx"
+            />
+          </div>
+
+          <div class="h-captcha" data-captcha="true"></div>
+
+          <button id="submitBtn" class="btn" type="submit">Send message</button>
+          <p class="note">
+            Your message goes to sales@machineryenchantress.com. We will only use your details to reply.
+          </p>
+        </form>
+      </section>
+    </div>
+
+    <!-- Web3Forms client script: renders the hCaptcha widget and wires the proxy. -->
+    <script src="https://web3forms.com/client/script.js" async defer></script>
+    <script>
+      (function () {
+        var form = document.getElementById("contactForm");
+        var status = document.getElementById("formStatus");
+        var button = document.getElementById("submitBtn");
+        var fileInput = document.getElementById("attachment");
+        var MAX_BYTES = 1024 * 1024; // Web3Forms free-plan attachment limit.
+
+        function show(kind, message) {
+          status.className = "form-status " + kind;
+          status.textContent = message;
+        }
+
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+
+          if (fileInput.files.length > 0 && fileInput.files[0].size > MAX_BYTES) {
+            show("is-error", "That attachment is larger than 1 MB. Please attach a smaller file or send a link instead.");
+            return;
+          }
+
+          var captcha = form.querySelector('textarea[name="h-captcha-response"]');
+          if (!captcha || !captcha.value) {
+            show("is-error", "Please complete the captcha so we know you are human.");
+            return;
+          }
+
+          button.disabled = true;
+          show("is-ok", "Sending your message...");
+
+          fetch(form.action, { method: "POST", body: new FormData(form) })
+            .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
+            .then(function (result) {
+              if (result.ok) {
+                show("is-ok", "Thanks! Your message has been sent. We will be in touch soon.");
+                form.reset();
+                if (window.hcaptcha) { try { window.hcaptcha.reset(); } catch (e) {} }
+              } else {
+                show("is-error", (result.data && result.data.message) || "Something went wrong. Please try again, or email sales@machineryenchantress.com directly.");
+              }
+            })
+            .catch(function () {
+              show("is-error", "Network error. Please try again, or email sales@machineryenchantress.com directly.");
+            })
+            .then(function () { button.disabled = false; });
+        });
+      })();
+    </script>
+  </body>
+</html>
