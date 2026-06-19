@@ -120,10 +120,11 @@
       <header class="masthead">
         <p class="eyebrow">Nukit FilterBoxBuilder</p>
         <h1>Help &amp; documentation</h1>
-        <p>
-          This page explains what this kind of air cleaner is and why it works. It covers why Nukit provides the builder
-          for free, how to use each setting, and how to build your box from laser-cut plywood or on a 3D printer.
-          Tooltips in the builder link directly to the matching section here.
+                <p>
+          This page is here to help you get started with DIY air purifiers. We explain what this kind of air cleaner
+          is and why it works, how to use each setting in the parametric builder, and how to build your box with a
+          laser cutter or 3D printer. Tooltips next to the controls in the builder link directly to the matching
+          section here.
         </p>
         <a class="home-link" href="./">← Back to the builder</a>
         <a class="home-link" href="contact.html" style="margin-left: 8px; background: transparent; color: var(--accent-strong); border: 1px solid var(--line);">Contact us</a>
@@ -132,7 +133,7 @@
       <div class="layout">
         <nav class="toc" aria-label="Contents">
           <strong>Start here</strong>
-          <a href="#about">Why a MERV 13 PC-fan filter box</a>
+          <a href="#about">Why a PC-fan filter box</a>
           <a href="#opensource">Free &amp; open, and the Tempest Pro</a>
           <a href="#overview">How the builder works</a>
           <strong>Layout &amp; design</strong>
@@ -150,7 +151,6 @@
           <strong>Drawing &amp; output</strong>
           <a href="#labels">Engrave labels</a>
           <a href="#referenceScale">Reference scale</a>
-          <a href="#chunkLabels">Chunk labels</a>
           <strong>Build it</strong>
           <a href="#fabrication">Fabrication &amp; assembly</a>
           <strong>Reference</strong>
@@ -160,11 +160,10 @@
         <main>
           <section class="card" id="about">
             <p class="eyebrow">Start here</p>
-            <h2>Why a MERV&nbsp;13 PC-fan filter box</h2>
+            <h2>Why a PC-fan filter box</h2>
             <p class="lede">
-              A box of MERV&nbsp;13 filter media driven by a few quiet PC fans is often called a "filter cube" or PC-fan
-              filter box. It is one of the cheapest, highest-airflow air cleaners you can build or buy. Here is what it is
-              and why it works, with sources.
+              Extensive testing has shown that the combination of MERV&nbsp;13 furnace filters and PC fans can make one of
+              the cheapest, quietest, highest-performance air cleaners you can build or buy.
             </p>
             <div class="photo-row">
               <div class="photo"><span>PHOTO PLACEHOLDER: a finished laser-cut plywood filter box running in a room.</span></div>
@@ -174,23 +173,11 @@
             <div class="var">
               <h3>The idea</h3>
               <p>
-                Furnace filters are inexpensive, easy to find, and surprisingly effective. Mount several of them in a box.
-                Pull air through all of them at once with a bank of computer fans. The result is a large, quiet, low-cost
-                air cleaner. Because the filter area is large, the air passes through the media slowly. That keeps the
-                capture rate high and the noise low, while the total airflow stays high.
-              </p>
-            </div>
-
-            <div class="var">
-              <h3>What MERV&nbsp;13 means</h3>
-              <p>
-                MERV stands for Minimum Efficiency Reporting Value. It comes from the
-                <a href="https://www.ashrae.org/technical-resources/bookstore/standard-52-2" target="_blank" rel="noopener">ASHRAE&nbsp;52.2</a>
-                test [<a href="#ref-ashrae">1</a>]. The test measures how well a filter traps particles from 0.3&nbsp;to
-                10&nbsp;µm, across twelve size groups. It then reports a single score from 1 to 16. A MERV&nbsp;13 filter
-                captures most of the fine (PM<sub>2.5</sub>) particles that matter for smoke, pollen, and germs.
-                Independent testing shows roughly half of the hardest 0.35&nbsp;µm size, rising to about 85 to 90% by
-                1&nbsp;µm [<a href="#ref-diy">2</a>].
+                Standard furnace or HVAC filters are inexpensive, easy to find, and surprisingly effective. Mount several
+                of them in a box. Pull air through all of them at once with a bank of computer fans. The result is a large,
+                low-cost, very powerful, and very quiet air cleaner. Because the filter area is large, air passes through
+                the media easily, eliminating the need for a very large, powerful fan. That keeps the capture rate high and
+                the noise low, while the total airflow stays high.
               </p>
             </div>
 
@@ -200,25 +187,11 @@
                 How quickly a room is cleaned is its <strong>Clean Air Delivery Rate</strong>, or CADR. It is defined by
                 the <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">AHAM&nbsp;AC-1</a>
                 standard [<a href="#ref-aham">3</a>]. CADR is the capture rate multiplied by the airflow. So airflow
-                matters just as much as the percentage the filter traps. True <strong>HEPA</strong> media captures 99.97%
-                at 0.3&nbsp;µm. But it is dense, so it restricts airflow and the fan moves less air
-                [<a href="#ref-hepa">4</a>]. A MERV&nbsp;13 filter lets far more air through for the same fan. In fact, a
-                denser, higher-rated filter does not always raise CADR, because the lost airflow can cancel the gain
-                [<a href="#ref-aaqr">5</a>].
+                matters just as much as the percentage the filter traps. True HEPA media captures 99.97% at 0.3&nbsp;µm.
+                But it is dense, so it restricts airflow and the fan moves less air [<a href="#ref-hepa">4</a>]. A
+                MERV&nbsp;13 filter lets far more air through for the same fan. In fact, denser, higher-rated filters do not
+                always raise CADR, because the lost airflow can cancel the gain [<a href="#ref-aaqr">5</a>].
               </p>
-              <p>
-                The trick is to use a large area of MERV&nbsp;13 media. Then push steady airflow through all of it. A
-                five-filter DIY box-fan unit was measured at roughly 600 to 850&nbsp;CFM (1,000 to 1,440&nbsp;m³/h). That
-                is several times the output of a typical portable HEPA unit [<a href="#ref-diy">2</a>]. The
-                U.S.&nbsp;EPA tested these DIY cleaners. It found that a MERV&nbsp;13 box-fan filter is a cheap, effective
-                way to reduce indoor wildfire smoke [<a href="#ref-epa">6</a>, <a href="#ref-ncceh">7</a>]. The EPA
-                recommends at least MERV&nbsp;13 for smoke and airborne germs [<a href="#ref-epa">6</a>].
-              </p>
-              <div class="tip">
-                <strong>Rule of thumb:</strong> a lot of air through "good enough" media usually cleans a room faster
-                than a little air through "perfect" media. A large filter area plus several fans gives a high CADR at low
-                noise.
-              </div>
             </div>
 
             <div class="var">
@@ -226,43 +199,44 @@
               <p>
                 The box has a large filter area, so each fan only has to overcome a little resistance. That is exactly
                 where <strong>PC case fans</strong> excel. Good 120 or 140&nbsp;mm PWM fans move 45 to 70&nbsp;CFM at
-                roughly 12 to 25&nbsp;dBA [<a href="#ref-fans">8</a>]. That is far quieter than a box fan at full speed.
-                <strong>140&nbsp;mm</strong> fans reach a given airflow at a lower speed, so they are quieter still. Other
-                advantages:
+                roughly 12 to 25&nbsp;dBA [<a href="#ref-fans">8</a>]. That is far quieter than a box fan at full speed, so
+                more tolerable and less likely to be turned off or down by those sensitive to noise. 140&nbsp;mm fans
+                deliver a given airflow at a lower speed, so they are even quieter. Other advantages:
               </p>
               <ul>
                 <li><strong>Speed control:</strong> a 4-pin PWM fan lets you trade noise for airflow, or run it quietly overnight.</li>
                 <li><strong>Safe, low voltage:</strong> 12&nbsp;V DC fans are simple to wire and stay cool.</li>
-                <li><strong>Cheap and repairable:</strong> fans are standardised and easy to swap. The filters are common furnace filters you replace on a schedule.</li>
-                <li><strong>Redundancy:</strong> if one fan fails, the rest keep running.</li>
+                <li><strong>Cheap and repairable:</strong> fans are standardized and easy to swap. The filters are common furnace filters you replace on a schedule.</li>
+                <li><strong>Redundancy:</strong> if one fan fails, the rest keep running until you can replace it.</li>
               </ul>
               <p class="note">
-                Replace the filters when the airflow noticeably drops, or whenever the maker recommends. Heavy smoke can
-                clog a MERV&nbsp;13 within weeks. A clogged filter restricts airflow and lowers CADR, so timely changes
-                keep the box performing.
+                Replace the filters approximately every 6 to 12 months during standard use. Very heavy smoke, like from
+                wildfires, can clog a MERV&nbsp;13 within weeks. A clogged filter restricts airflow and lowers CADR, so
+                timely changes keep the box performing.
               </p>
             </div>
           </section>
 
           <section class="card" id="opensource">
             <p class="eyebrow">Free &amp; open</p>
-            <h2>Why this builder is free, and the Nukit Tempest Pro</h2>
+            <h2>Why this builder is free</h2>
             <p class="lede">
-              Nukit designs and sells air purifiers. But clean air should not depend on being able to buy one. That is
-              why we provide this builder for free and open. It is a genuine alternative, not a trial.
+              Nukit designs and sells air purifiers. But clean air should not depend on being able to buy one. That is why
+              we provide this open source builder for free.
             </p>
 
             <div class="var">
               <h3>Free, open, and yours to make</h3>
               <p>
-                FilterBoxBuilder lets anyone with a laser cutter or 3D printer make a capable MERV&nbsp;13 PC-fan air
-                cleaner. You use cheap, common parts. No account, purchase, or sign-up is required. We believe clean
-                indoor air is a public good. The more people who can make a good purifier from local materials, the
-                better. There is no catch: the builder produces complete, ready-to-make files for free.
+                The FilterBoxBuilder lets anyone with a laser cutter or 3D printer make several different types of DIY air
+                cleaners to suit nearly every situation. You use cheap, common parts. No account, purchase, or sign-up is
+                required. We believe clean indoor air is a public good. The more people who can make a good purifier from
+                local materials, the better. There is no catch: the builder produces complete, ready-to-make files for
+                free.
               </p>
               <p>
-                If the builder saves you money or helps you breathe easier, you can support the work. Tell others,
-                contribute, or buy the kit below.
+                If the builder saves you money or helps you breathe easier, you can support our work. Tell others about our
+                products, or buy our kit below.
               </p>
             </div>
 
@@ -282,10 +256,10 @@
                   <ul>
                     <li><strong>All-metal, buy-it-for-life construction.</strong> It will not warp, sag, yellow, or off-gas over years of use, the way wood or plastic eventually can.</li>
                     <li><strong>Everything included:</strong> custom high-pressure 140&nbsp;mm fans, fan and filter grills, a 12&nbsp;V power supply with a 5&nbsp;m cable, a PWM speed controller, wiring, and cable management. You simply add two standard 20×25×1 MERV&nbsp;13 filters.</li>
-                    <li><strong>Independently lab-measured performance:</strong> 222&nbsp;CFM CADR at a quiet 37&nbsp;dBA (about 39&nbsp;dBA at full speed). That is one of the best noise-to-airflow ratios available, with faster fan options if you want them.</li>
+                    <li><strong>Independently lab-measured performance:</strong> 222&nbsp;CFM CADR at a quiet 37&nbsp;dBA (about 39&nbsp;dBA at full speed). That is one of the best noise-to-airflow ratios available, easily equipped with more powerful (so louder) fans for higher CADR if you want it.</li>
                     <li><strong>No fit-and-tune step.</strong> It assembles like a PC case with a screwdriver and has no sharp edges. There are no kerf tests, print fitting, or parts hunting.</li>
                     <li><strong>Low profile and easy to mount.</strong> It looks like a tower PC. It includes a wall and ceiling mount, anchors, and VESA holes, and the filters still swap in place.</li>
-                    <li><strong>Repairable and standard:</strong> no app, no cloud, and no "smart" parts. Every component is an ordinary PC part, and you can paint it any color.</li>
+                    <li><strong>Repairable and standard:</strong> no app, no cloud, and no "smart" parts. Nearly every component is an ordinary PC part, and you can paint it any color.</li>
                     <li><strong>Off-grid friendly:</strong> it runs on 12&nbsp;V DC with very low power draw. So it works well on solar or a battery.</li>
                   </ul>
                   <a class="cta" href="https://cybernightmarket.com/products/the-nukit-tempest-pro-complete-air-purifier-kit-usa" target="_blank" rel="noopener">View the Nukit Tempest Pro →</a>
@@ -293,76 +267,81 @@
                 </div>
               </div>
               <p class="note">
-                Either way you get clean air. Make it yourself with this builder, or buy a finished unit that lasts
-                longer and support the work. Both are good choices.
+                Either way you get clean air. Make it yourself with this builder, or buy a finished unit that lasts longer
+                and support our work.
               </p>
             </div>
           </section>
 
           <section class="card" id="overview">
-            <p class="eyebrow">Using the builder</p>
+            <p class="eyebrow">Overview</p>
             <h2>How the builder works</h2>
             <p class="lede">
               FilterBoxBuilder turns a few measurements into a complete air-cleaner box. It is built around standard
               furnace filters and off-the-shelf PC fans.
             </p>
             <div class="photo"><span>PHOTO PLACEHOLDER: screenshot of the builder: 3D view on the left, controls on the right.</span></div>
-            <p>
-              Choose a method at the top: <strong>3D&nbsp;print</strong> or <strong>Laser&nbsp;cut</strong>. Then set
-              your filter size, fan size, and fan placement. The 3D view updates as you work. The
-              <em>What&nbsp;you&nbsp;need</em> panel lists the parts. The export button produces the files for your
-              method: a 3MF print kit, or an SVG cut sheet.
-            </p>
-            <p>
-              You set the numbers, and the box is generated to match. So any filter and fan combination produces a box
-              you can build. The sections below explain each control. Most are in the main panel, and a few are under
-              <em>Advanced</em>.
-            </p>
+            <div class="var">
+              <p>
+                Choose a method at the top: 3D print or Laser cut. Then set your filter size, fan size, and fan placement.
+                The 3D view updates as you work. The export button produces the files for your method: a 3MF print kit, or
+                an SVG cut sheet.
+              </p>
+              <p>
+                You set the numbers, and the box is generated to match. So any filter and fan combination produces a box
+                you can build. The sections below explain each control. Most are in the main panel, and a few are under the
+                Advanced accordion that opens when you click it.
+              </p>
+            </div>
           </section>
 
           <section class="card">
             <p class="eyebrow">Layout &amp; design</p>
             <h2>Layout &amp; design</h2>
-            <p class="lede">Choose the overall shape of the box and where the air moves through it.</p>
+            <p class="lede">
+              Choose the overall design and size of the box. Higher CADR is always better, but it requires more filter
+              surface area, and so a larger box.
+            </p>
             <div class="photo"><span>PHOTO PLACEHOLDER: 3D view of the three layouts: one-side, both-sides (sandwich), and the four-side tower.</span></div>
 
             <div class="var" id="filterLayout">
               <h3>Filter layout</h3>
               <p>
-                <strong>One side</strong> places a single filter on one face of the box. <strong>Both sides</strong> puts
-                a filter on two faces, for roughly twice the filter area and airflow in the same footprint.
-                3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter on each wall and exhaust
-                through the top.
+                <strong>One side</strong> places a single filter on one face of the box, ideal for wall or ceiling
+                mounting. <strong>Both sides</strong> puts a filter on two faces, for roughly twice the filter area and
+                airflow in the same footprint. 3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter
+                on each wall and fans on top.
               </p>
               <p class="note">More filter area slows the air through the media. That raises the capture rate and lowers
-                noise (see <a href="#about">Why a MERV&nbsp;13 PC-fan filter box</a>).</p>
+                noise (see <a href="#about">Why a PC-fan filter box</a>).</p>
             </div>
 
             <div class="var" id="backPlateFansCount">
               <h3>Back fans (one-side box)</h3>
               <p>
-                On a one-side box, the wall opposite the filter is a solid plate. It can carry its own grid of fans.
-                <strong>Auto</strong> fills the plate, or you can choose a fixed number for fewer. A fixed count is laid
-                out as a centred, near-square block (for example, 4&nbsp;becomes&nbsp;2×2), not bunched into a corner.
+                After choosing a one-side box for your filter layout, if you select <strong>Back</strong> for the fan
+                placement with no wall fans, you can create a panel-style air purifier. This is a slim box that takes air
+                in through the front filter panel and pushes it out through the array of fans on the back plate.
               </p>
+              <div class="photo"><span>PHOTO PLACEHOLDER: panel-style air purifier.</span></div>
               <p>
-                Turn <strong>Back</strong> on with no wall fans, and the box becomes a shallow back-fan panel. The filter
-                is on the front, and all the fans sit on the back plate. This is the classic single-filter wall-mount or
-                window arrangement.
+                This design can offer the most portable CADR, but may be a little louder than other designs due to its
+                single filter and large number of fans. A portable folding music stand is an ideal way to mount and use
+                this style.
               </p>
+              <div class="photo"><span>PHOTO PLACEHOLDER: portable folding music stand.</span></div>
             </div>
 
             <div class="var" id="boxDepth">
               <h3>Box depth</h3>
               <p>
-                On the one-side back-fan panel, <strong>Box depth</strong> sets how deep the box is. It is the gap
-                between the filter and the back plate, used instead of the fan-diameter chamber. The default is
-                <code>70&nbsp;mm</code>. A shallow box is more compact and easy to wall-mount. A deeper box gives the air
-                a larger plenum, which can even out the flow. It only applies when <strong>Back</strong> fans are on and
-                no wall fans are selected.
+                On the one-side back-fan panel, <strong>Box depth</strong> sets how deep the box is. It is the gap between
+                the filter and the back plate, used instead of the fan-diameter chamber. The default is <code>70&nbsp;mm</code>.
+                A shallow box is more compact. A deeper box gives the air a larger plenum, which can even out the flow and
+                prevent uneven filter loading. This setting only applies when <strong>Back</strong> fans are on and no wall
+                fans are selected.
               </p>
             </div>
-
           </section>
 
           <section class="card">
@@ -371,18 +350,16 @@
             <p class="lede">The box is sized to your actual filter, so measure it rather than trusting the nominal size.</p>
 
             <div class="var" id="filterSize">
-              <span class="anchor" id="filterWidth"></span><span class="anchor" id="filterDepth"></span>
-              <span class="anchor" id="filterThickness"></span>
               <h3>Filter size (width, length, thickness)</h3>
               <p>
                 Choose a stock size from the menu, or enter your own. Filters are sold by a rounded nominal size, such as
-                20"×20"×1". But the real part is a few millimetres smaller. So measure your filter, and enter the true
-                width, length, and thickness in millimetres so the housing fits. Thicker filters with deeper pleats hold
-                more media, so they capture more and clog more slowly. A 2" (about 50&nbsp;mm) MERV&nbsp;13 outperforms
-                and outlasts a 1" filter at the same airflow. Use the swap button to exchange width and length.
+                20"×20"×1". But the actual size can be very different depending on the brand. So measure your filter, and
+                enter the true width, length, and thickness in millimetres so the housing fits. Thicker filters with
+                deeper pleats hold more media, so they capture more and clog more slowly. A 2" (about 50&nbsp;mm)
+                MERV&nbsp;13 outperforms and outlasts a 1" filter at the same airflow. Use the swap button to exchange
+                width and length, changing the box from portrait to landscape.
               </p>
             </div>
-
           </section>
 
           <section class="card">
@@ -394,13 +371,12 @@
             <div class="var" id="fanSize">
               <h3>Fan size</h3>
               <p>
-                This is the diameter of the PC fans you will use, commonly 120 or 140&nbsp;mm. It sets each fan opening
-                and screw pattern, and sizes the housing around them. <strong>140&nbsp;mm</strong> fans move the same air
-                at a lower speed, so they tend to be quieter. <strong>120&nbsp;mm</strong> fans are easier to source and
-                pack more densely. Match this to fans you can actually buy.
+                This is the diameter of the PC fans you will use, commonly 120 or 140&nbsp;mm. It sets each fan opening and
+                screw pattern, and sizes the housing around them. <strong>140&nbsp;mm</strong> fans move the same air at a
+                lower speed, so they tend to be quieter. <strong>120&nbsp;mm</strong> fans are easier to source and pack
+                more densely. Match this to fans you can actually buy.
               </p>
             </div>
-
           </section>
 
           <section class="card">
@@ -411,9 +387,10 @@
             <div class="var" id="printVolume">
               <h3>Print volume</h3>
               <p>
-                This is your 3D printer's usable bed size. Pick the volume that matches your machine. Any part that is
-                too big for the bed is automatically split into chunks that fit, so a large box still prints on a small
-                printer. The chunks glue together, and <a href="#chunkLabels">chunk labels</a> can mark how they line up.
+                This is your 3D printer's usable bed size. Check the manufacturer's website to be sure. Pick the volume
+                that matches your machine. Any part that is too big for the bed is automatically split into chunks that
+                fit, so a large box still prints on a small printer. The chunks glue together using short lengths of 3D
+                printer filament as alignment pins.
               </p>
             </div>
           </section>
@@ -421,19 +398,22 @@
           <section class="card">
             <p class="eyebrow">Cord pass-through</p>
             <h2>Cord pass-through</h2>
-            <p class="lede">An optional bore for the fan power cable, so the box can close up neatly.</p>
+            <p class="lede">An optional bore for a DC power jack or power cable.</p>
 
             <div class="var" id="cordHoleDiameter">
               <h3>Cord hole diameter</h3>
               <p>
-                This is the diameter of the power-cord pass-through. Set it to fit your cable or barrel-jack grommet. Set
-                it to <code>0</code> for no hole at all. The builder keeps the bore clear of the fan openings. If it would
-                land under a fan, the fan bank re-packs to make room, rather than moving the cord.
+                This is the diameter of the DC power-jack body, cord grommet, or power-cord pass-through. Set it to fit
+                whichever you decide to use. Set it to <code>0</code> for no hole at all. The builder keeps the bore clear
+                of the fan openings. If it would land under a fan, the fan bank re-packs to make room, rather than moving
+                the cord.
               </p>
+              <div class="photo"><span>PHOTO PLACEHOLDER: DC power jack, cord grommet, or power cord.</span></div>
             </div>
             <div class="var" id="cordHoleCornerOffset">
               <h3>Cord corner offset</h3>
-              <p>This is the distance from the corner to the cord hole. It is used when the cord is positioned toward one end of the wall.</p>
+              <p>This is the distance from the corner to the cord hole. It is used when the cord is positioned toward one
+                end of the wall and you want to give it a little extra space.</p>
             </div>
           </section>
 
@@ -454,16 +434,8 @@
               <h3>Reference scale</h3>
               <p>
                 This draws a ruler of a known length on the sheet. You can then confirm your cut came out at 1:1 before
-                committing material. After importing the SVG, measure the line. If it is off, fix your document units or
-                printer scaling.
-              </p>
-            </div>
-            <div class="var" id="chunkLabels">
-              <h3>Chunk labels (3D print)</h3>
-              <p>
-                When a part is too big for the print bed, it is split into chunks. Chunk labels deboss a short matching
-                code on each piece, so you can line them up when gluing. This only matters for prints split into multiple
-                pieces.
+                committing material. After importing the SVG or DXF, measure the line. If it is off, fix your document
+                units or printer scaling.
               </p>
             </div>
           </section>
@@ -471,59 +443,64 @@
           <section class="card" id="fabrication">
             <p class="eyebrow">Build it</p>
             <h2>Fabrication, gluing &amp; assembly</h2>
-            <p class="lede">
-              You can make the same box two ways. Pick the workflow that fits your tools, then follow its tips.
-            </p>
+            <p class="lede">You can make the same box two ways. Pick the workflow that fits your tools, then follow its tips.</p>
 
-            <h3>A. Laser-cut plywood (or acrylic)</h3>
-            <p><strong>Cutting</strong></p>
-            <ul>
-              <li>Use flat, void-free plywood. Baltic birch 3&nbsp;mm or 6&nbsp;mm is ideal, because warped stock fights the joints.</li>
-              <li>Measure the thickness with calipers, and set the material thickness to the real value.</li>
-              <li>Cut one test finger joint first. Tune the kerf / fit allowance until it taps together snugly without forcing.</li>
-              <li>Keep <a href="#labels">Engrave labels</a> on for your first build. Sand off any scorch with a light pass of fine sandpaper.</li>
-            </ul>
-            <p><strong>Dry-fit, then glue</strong></p>
-            <ul>
-              <li>Assemble the whole box without glue first, to confirm every joint and the filter slot work.</li>
-              <li>Glue plywood with wood PVA (such as Titebond), or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
-              <li>Leave the filter-slot wall un-glued, or make it a removable panel, so you can change filters.</li>
-              <li>Square the box against a flat surface, and clamp or tape it lightly. Wipe off any squeeze-out before it cures.</li>
-              <li>Seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
-            </ul>
-            <div class="photo-row">
-              <div class="photo"><span>PHOTO PLACEHOLDER: laser-cut plywood panels laid out flat, with finger joints.</span></div>
-              <div class="photo"><span>PHOTO PLACEHOLDER: the dry-fitted plywood box before gluing.</span></div>
+            <div class="var">
+              <h3>A. Laser-cut plywood (or acrylic)</h3>
+              <p><strong>Cutting</strong></p>
+              <ul>
+                <li>Use flat, void-free plywood. Baltic birch 3&nbsp;mm or 6&nbsp;mm is ideal, because warped stock fights the joints. There are purpose-made materials (laserply, MDF) made specifically for laser cutting that should be used whenever possible.</li>
+                <li>Measure the thickness with calipers and set the material thickness to the real value.</li>
+                <li>Cut one test finger joint first. Tune the kerf / fit allowance until it taps together snugly without forcing.</li>
+                <li>Keep Engrave labels on for your first build. Sand off any scorch with a light pass of fine sandpaper.</li>
+              </ul>
+              <p><strong>Dry-fit, then glue</strong></p>
+              <ul>
+                <li>Assemble the whole box without glue first, to confirm every joint and the filter slot work.</li>
+                <li>Glue plywood with wood PVA (such as Titebond), or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
+                <li>Leave the filter-slot wall unglued, or make it a removable panel, so you can change filters.</li>
+                <li>Square the box against a flat surface, and clamp or tape it lightly. Wipe off any squeeze-out before it cures.</li>
+                <li>Seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
+                <li>If you choose to paint or seal the box, use low- or no-VOC products and allow substantial curing time.</li>
+              </ul>
+              <div class="photo-row">
+                <div class="photo"><span>PHOTO PLACEHOLDER: laser-cut plywood panels laid out flat, with finger joints.</span></div>
+                <div class="photo"><span>PHOTO PLACEHOLDER: the dry-fitted plywood box before gluing.</span></div>
+              </div>
             </div>
 
-            <h3>B. 3D-printed with alignment pins</h3>
-            <p><strong>Printing</strong></p>
-            <ul>
-              <li>Print in PLA, PETG, or ASA. PETG and ASA tolerate heat and sunlight better for a unit left running.</li>
-              <li>Walls of 2 to 3&nbsp;mm (3 to 4 perimeters) are plenty, since the box carries little load. 15 to 20% infill is fine.</li>
-              <li>Large parts are split into bed-sized chunks. Keep <a href="#chunkLabels">chunk labels</a> on, to print the matching codes on each piece.</li>
-              <li>Orient parts so the joints are strong across the layer lines. The exporter auto-orients chunks to minimise supports.</li>
-            </ul>
-            <p><strong>Alignment pins &amp; gluing</strong></p>
-            <ul>
-              <li>Split faces meet on printed <strong>alignment pins</strong> and matching holes. Dry-fit them to confirm the chunks seat flush before gluing.</li>
-              <li>Glue chunk seams with cyanoacrylate (super glue) for PLA and PETG, or a plastic solvent or epoxy for ASA. The pins hold registration while the glue sets.</li>
-              <li>Match the <a href="#chunkLabels">chunk codes</a>, so each pair goes together as it was generated.</li>
-              <li>Test-fit the filter and fans before final gluing. Leave the filter face removable.</li>
-            </ul>
-            <div class="photo-row">
-              <div class="photo"><span>PHOTO PLACEHOLDER: 3D-printed chunks showing alignment pins and matching codes.</span></div>
-              <div class="photo"><span>PHOTO PLACEHOLDER: the assembled 3D-printed housing.</span></div>
+            <div class="var">
+              <h3>B. 3D-printed with alignment pins</h3>
+              <p><strong>Printing</strong></p>
+              <ul>
+                <li>Print in PLA or PETG. PETG tolerates heat and sunlight better for a unit left running, and tends to last longer.</li>
+                <li>Walls of 2 to 3&nbsp;mm (3 to 4 perimeters) are plenty, at the maximum layer height for your nozzle diameter. 10% infill is fine, since the box carries little load.</li>
+                <li>Large parts are split into bed-sized chunks.</li>
+                <li>The exporter auto-orients chunks to minimize supports. If you print hexagonal fan grills vertically, cleaning out the supports will be difficult.</li>
+              </ul>
+              <p><strong>Alignment pins &amp; gluing</strong></p>
+              <ul>
+                <li>Split faces meet on printed alignment pins and matching holes. Dry-fit them to confirm the chunks seat flush before gluing.</li>
+                <li>Glue chunk seams with cyanoacrylate (super glue) for PLA and PETG, or a plastic solvent or epoxy for ASA. The pins hold registration while the glue sets.</li>
+                <li>Test-fit the filter and fans before final gluing. Leave the filter face removable.</li>
+                <li>Glue two pieces at a time, wait for that to cure, then glue those assemblies two at a time. Three or more seams in a row can be difficult to clamp without the whole thing buckling.</li>
+              </ul>
+              <div class="photo-row">
+                <div class="photo"><span>PHOTO PLACEHOLDER: 3D-printed chunks showing alignment pins and matching codes.</span></div>
+                <div class="photo"><span>PHOTO PLACEHOLDER: the assembled 3D-printed housing.</span></div>
+              </div>
             </div>
 
-            <h3>Mounting the fans (both methods)</h3>
-            <ul>
-              <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub.</li>
-              <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into plywood or plastic.</li>
-              <li>Wire PWM fans to a 12&nbsp;V supply or hub sized for the total current. Route the cable through the <a href="#cordHoleDiameter">cord pass-through</a>.</li>
-              <li>Add the optional honeycomb grill or a snap-on finger guard on any exposed fan.</li>
-            </ul>
-            <div class="photo"><span>PHOTO PLACEHOLDER: fans mounted to the back plate / walls, with the cord routed through the pass-through, plus the wiring and PWM controller.</span></div>
+            <div class="var">
+              <h3>Mounting the fans (both methods)</h3>
+              <ul>
+                <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub.</li>
+                <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into the plastic body of the fan, or you can use bolts or pull-through rubber fasteners.</li>
+                <li>Wire PWM fans to a 12&nbsp;V supply or hub sized for the total current. Route the cable through the cord pass-through.</li>
+                <li>Add grills to any exposed fan if you did not include the optional honeycomb feature.</li>
+              </ul>
+              <div class="photo"><span>PHOTO PLACEHOLDER: fans mounted to the back plate / walls, with the cord routed through the pass-through, plus the wiring and PWM controller.</span></div>
+            </div>
           </section>
 
           <section class="card refs" id="references">

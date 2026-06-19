@@ -769,7 +769,6 @@
   // anchor in help.html.
   const tipsWithHelpLink = new Set<string>([
     "info-backPlateFansCount",
-    "info-chunkLabels",
     "info-fanSize",
     "info-filterLayout",
     "info-filterSize",
