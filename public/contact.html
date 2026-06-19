@@ -55,7 +55,10 @@
         border-radius: 2px;
       }
       header.masthead h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.01em; }
-      header.masthead p { margin: 0; max-width: 70ch; color: var(--muted); }
+      header.masthead p { margin: 0 0 12px; max-width: 70ch; color: var(--muted); }
+      header.masthead p:last-of-type { margin-bottom: 0; }
+      .forum-links { margin: 8px 0 0; padding-left: 22px; }
+      .forum-links li { margin: 4px 0; }
       .home-link {
         display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 2px;
         background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 0.85rem;
@@ -106,13 +109,12 @@
         <p>
           Unfortunately, we cannot respond to questions regarding tool operation, fabrication specifics or parts sourcing.
           Please visit these forums:
-          <br />
-          <a href="https://www.reddit.com/r/crboxes/">r/crboxes/</a>
-          <br />
-          <a href="https://www.reddit.com/r/3Dprinting/">r/3Dprinting/</a>
-          <br />
-          <a href="https://www.reddit.com/r/lasercutting/">r/lasercutting/</a>
         </p>
+        <ul class="forum-links">
+          <li><a href="https://www.reddit.com/r/crboxes/">r/crboxes</a></li>
+          <li><a href="https://www.reddit.com/r/3Dprinting/">r/3Dprinting</a></li>
+          <li><a href="https://www.reddit.com/r/lasercutting/">r/lasercutting</a></li>
+        </ul>
 
         <a class="home-link" href="./">&#8592; Back to the builder</a>
       </header>
