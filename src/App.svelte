@@ -764,6 +764,16 @@
   // or tap) we anchor it above its "i" button and clamp it inside the viewport.
   // One delegated listener handles every tip in the pane.
   function infoTipPositioning(root: HTMLElement) {
+    // Mouse: the bubble sits in a gap above the "i" button, so we keep it open
+    // while the pointer is over the button OR the bubble, plus a short grace
+    // delay to bridge the gap as the pointer travels between them — otherwise it
+    // closes before the "More" link can be clicked.
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function bubbleId(tip: HTMLElement): string | null {
+      return tip.querySelector('[role="tooltip"]')?.id ?? null;
+    }
+
     function place(tip: HTMLElement): void {
       const button = tip.querySelector("button");
       const bubble = tip.querySelector<HTMLElement>('[role="tooltip"]');
@@ -785,7 +795,14 @@
       bubble.style.top = `${Math.round(top)}px`;
     }
 
-    function update(): void {
+    function cancelClose(): void {
+      if (closeTimer !== undefined) {
+        clearTimeout(closeTimer);
+        closeTimer = undefined;
+      }
+    }
+
+    function reposition(): void {
       const tip = root.querySelector<HTMLElement>(
         ".info-tip.is-open, .info-tip:focus-within, .info-tip:hover",
       );
@@ -794,23 +811,79 @@
       }
     }
 
-    function updateNextFrame(): void {
-      requestAnimationFrame(update);
+    function repositionNextFrame(): void {
+      requestAnimationFrame(reposition);
     }
 
-    root.addEventListener("pointerover", update);
-    root.addEventListener("focusin", update);
-    root.addEventListener("click", updateNextFrame);
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
+    function onPointerOver(event: PointerEvent): void {
+      if (event.pointerType !== "mouse") {
+        return;
+      }
+      const tip = (event.target as Element | null)?.closest?.(".info-tip");
+      if (!(tip instanceof HTMLElement)) {
+        return;
+      }
+      const id = bubbleId(tip);
+      if (id === null) {
+        return;
+      }
+      cancelClose();
+      if (openInfoTipId === id) {
+        // Already open and positioned — just keep it alive.
+        return;
+      }
+      openInfoTipId = id;
+      place(tip);
+    }
+
+    function onPointerOut(event: PointerEvent): void {
+      if (event.pointerType !== "mouse") {
+        return;
+      }
+      const tip = (event.target as Element | null)?.closest?.(".info-tip");
+      if (!(tip instanceof HTMLElement)) {
+        return;
+      }
+      const related = event.relatedTarget;
+      if (related instanceof Node && tip.contains(related)) {
+        // Still moving between the button and its own bubble — keep it open.
+        return;
+      }
+      const id = bubbleId(tip);
+      if (id === null) {
+        return;
+      }
+      cancelClose();
+      closeTimer = setTimeout(() => {
+        if (openInfoTipId === id) {
+          openInfoTipId = null;
+        }
+      }, 220);
+    }
+
+    function onFocusIn(event: FocusEvent): void {
+      const tip = (event.target as Element | null)?.closest?.(".info-tip");
+      if (tip instanceof HTMLElement) {
+        place(tip);
+      }
+    }
+
+    root.addEventListener("pointerover", onPointerOver);
+    root.addEventListener("pointerout", onPointerOut);
+    root.addEventListener("focusin", onFocusIn);
+    root.addEventListener("click", repositionNextFrame);
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
 
     return {
       destroy(): void {
-        root.removeEventListener("pointerover", update);
-        root.removeEventListener("focusin", update);
-        root.removeEventListener("click", updateNextFrame);
-        window.removeEventListener("scroll", update, true);
-        window.removeEventListener("resize", update);
+        cancelClose();
+        root.removeEventListener("pointerover", onPointerOver);
+        root.removeEventListener("pointerout", onPointerOut);
+        root.removeEventListener("focusin", onFocusIn);
+        root.removeEventListener("click", repositionNextFrame);
+        window.removeEventListener("scroll", reposition, true);
+        window.removeEventListener("resize", reposition);
       },
     };
   }
