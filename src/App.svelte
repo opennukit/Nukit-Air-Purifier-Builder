@@ -1033,7 +1033,7 @@
 
   <header class="topbar">
     <div>
-      <p class="eyebrow">Parametric browser generator</p>
+      <p class="eyebrow">Parametric design generator</p>
       <h1>Nukit FilterBoxBuilder: DIY clean air</h1>
     </div>
     <div class="topbar-actions">
