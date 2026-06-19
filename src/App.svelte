@@ -1555,7 +1555,7 @@
                 {#if isNukitControlsActive}
                   <div data-nukit-layout>
                     <label class="field compact-field" data-nukit-design>
-                      <span>Design</span>
+                      <span>Design {@render infoTip("info-laser-design", "A starting preset for the whole build — it sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
                       <select name="nukitDesign" onchange={updateNukitDesign}>
                         {#each nukitLaserDesigns as design}
                           <option value={design} selected={matchedNukitLaserDesign(settings) === design}>{nukitLaserDesignLabels[design]}</option>
@@ -1610,7 +1610,7 @@
                 {#if isTempestControlsActive}
                   <div data-tempest-layout>
                     <label class="field compact-field" data-tempest-design>
-                      <span>Design</span>
+                      <span>Design {@render infoTip("info-design", "A starting preset for the whole build — it sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
                       <select name="tempestDesign" onchange={updateTempestDesign}>
                         {#each tempestDesigns as design}
                           <option value={design} selected={settings.tempestDesign === design}>{tempestDesignLabels[design]}</option>
@@ -1618,7 +1618,7 @@
                       </select>
                     </label>
                     <fieldset class="segmented-field segmented-field-three">
-                      <legend>Filter layout</legend>
+                      <legend>Filter layout {@render infoTip("info-filterLayout", "How the filters sit in the box: a single top filter, two filters sandwiched with fans pulling through both, or a four-sided filter tower.")}</legend>
                       <div>
                         {#each tempestArrangementOptions as option}
                           <label>
@@ -1640,7 +1640,7 @@
               {#if isNukitControlsActive}
                 <div data-nukit-filter-count>
                   <fieldset class="segmented-field">
-                    <legend>Filter layout</legend>
+                    <legend>Filter layout {@render infoTip("info-laser-filterLayout", "Where the filters sit: 'One side' uses a single filter with a closed back plate; 'Both sides' sandwiches two filters with fans pulling air through both.")}</legend>
                     <div>
                       <label>
                         <input
@@ -1708,7 +1708,7 @@
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
                     <label class="field" data-filter-size-preset>
-                      <span>Filter size</span>
+                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1) to fill in its dimensions, or pick Custom and enter your own. Nominal sizes aren't the real measurements — measure your filter.")}</span>
                       <select name="filterSizePreset" onchange={updateFilterSizePreset}>
                         {#each filterSizePresets as preset}
                           <option value={preset.id} selected={selectedFilterSize === preset.id}>{preset.label}</option>
