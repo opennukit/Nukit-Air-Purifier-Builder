@@ -115,9 +115,13 @@ function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: num
   // The interior side is toward the box centre; in the exploded view push the fan
   // further that way so it clears the outward-displaced panels.
   const inwardShift = exploded ? explodedFanInwardShiftMm * sceneScale : 0;
+  // The back plate mounts its fans fully inside the box (rear flush with the inner
+  // face) so they don't protrude out the back; wall fans keep the shallow grille
+  // offset so their bodies read as exhausting through the wall.
+  const interiorClearance = part.role === "closed-back" ? fanPreviewRearDepth : fanPreviewFrontDepth;
   return localPositiveNormalPointsOutward
     ? -(panelHalfThickness + fanPreviewRearDepth) - inwardShift
-    : panelHalfThickness + fanPreviewFrontDepth + inwardShift;
+    : panelHalfThickness + interiorClearance + inwardShift;
 }
 
 function withDoubleSide(material: Material): Material {

@@ -327,6 +327,7 @@
   $: backFansSelected = isOneSideFilter && settings.backPlateFans !== 0;
   // Laser Cut one-side: the closed back panel can carry the same "Back" fan grid.
   $: isLaserOneSide = isNukitControlsActive && settings.filters === 1;
+  $: laserBackFansSelected = isLaserOneSide && settings.backPlateFans !== 0;
   // The Tempest model drives the per-wall fan maxima the Advanced "Fan tuning"
   // selects offer (Auto + 0..max), so a user can request fewer than Auto fills.
   $: tempestFanModel =
@@ -533,6 +534,19 @@
     hexSpacing: "Rib (wall) thickness between honeycomb cells.",
     cordHoleSide: "Where along the wall the cord hole sits.",
     cordHoleCornerOffset: "Distance from the corner to the cord hole.",
+    // Laser Cut material, fit, frame, and joint tuning.
+    materialThickness: "Thickness of your sheet stock. It drives the finger-joint sizing and every slot width — set it to your actual material.",
+    kerfFit: "Kerf (burn) compensation: how much width the laser removes. Increase if joints come out loose, decrease if they're too tight.",
+    filterFitClearance: "Extra gap left around the filter so it slides in without forcing. Larger = looser fit.",
+    rim: "Width of the filter-frame border around the air opening.",
+    fingerWidthMultiplier: "Finger width, as a multiple of material thickness. Larger = fewer, wider fingers.",
+    fingerSpaceMultiplier: "Gap between fingers, as a multiple of material thickness.",
+    fingerHoleWidthMultiplier: "Width of the slots that the mating fingers pass through, as a multiple of thickness.",
+    fingerHoleOffsetMultiplier: "How far the finger-hole rows sit in from the panel edge, as a multiple of thickness.",
+    fingerPlayMultiplier: "Extra play added to finger slots for an easier fit, as a multiple of thickness. 0 = tight press fit.",
+    dovetailSizeMultiplier: "Dovetail tooth size, as a multiple of material thickness.",
+    dovetailDepthMultiplier: "How far the dovetails interlock, as a multiple of thickness.",
+    dovetailTaper: "Dovetail flare angle in degrees. Steeper locks harder but is tighter to assemble.",
   };
 
   $: filterSlotPlacementControls = isFourFilterTower
@@ -1012,8 +1026,8 @@
 
   <header class="topbar">
     <div>
-      <p class="eyebrow">Browser generator</p>
-      <h1>FilterBoxBuilder: DIY clean air</h1>
+      <p class="eyebrow">Parametric browser generator</p>
+      <h1>Nukit FilterBoxBuilder: DIY clean air</h1>
     </div>
     <div class="topbar-actions">
       <a
@@ -1692,6 +1706,24 @@
                       {/if}
                     </div>
                   </fieldset>
+
+                  {#if laserBackFansSelected && noWallFansSelected}
+                    <label class="field">
+                      <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is — the chamber between the filter and the back plate. Used instead of the fan-diameter chamber when Back fans are on.")}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="boxDepth"
+                          min="1"
+                          step="1"
+                          inputmode="decimal"
+                          value={settings.boxDepth}
+                          onchange={(event) => updateNumberSetting("boxDepth", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                  {/if}
                 </div>
               </div>
             </section>
@@ -1708,7 +1740,7 @@
               {#if !isTempestControlsActive}
                 {#each geometryMaterialControls as control}
                   <label class="field">
-                    <span>{control.label}</span>
+                    <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
                     <span class="input-shell">
                       <input
                         type="number"
@@ -1727,7 +1759,7 @@
                 <div data-nukit-panel-fit-controls>
                   {#each laserPanelFitControls as control}
                     <label class="field">
-                      <span>{control.label}</span>
+                      <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
                       <span class="input-shell">
                         <input
                           type="number"
@@ -2039,7 +2071,7 @@
                     <p class="eyebrow advanced-group-label">Frame</p>
                     {#each laserAdvancedFrameControls as control}
                       <label class="field">
-                        <span>{control.label}</span>
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
                         <span class="input-shell">
                           <input
                             type="number"
@@ -2063,10 +2095,10 @@
                         checked={settings.labels}
                         onchange={(event) => updateBooleanSetting("labels", event)}
                       />
-                      <span>Engrave part labels</span>
+                      <span>Engrave part labels {@render infoTip("info-labels", "Etches each part's name onto the cut sheet so you can tell the pieces apart when assembling.")}</span>
                     </label>
                     <label class="field">
-                      <span>Reference scale</span>
+                      <span>Reference scale {@render infoTip("info-referenceScale", "Length of a reference ruler drawn on the sheet so you can confirm your cut/export is at 1:1 scale.")}</span>
                       <span class="input-shell">
                         <input
                           type="number"
@@ -2084,7 +2116,7 @@
                     <p class="eyebrow advanced-group-label">Finger joints</p>
                     {#each laserFingerJointControls as control}
                       <label class="field">
-                        <span>{control.label}</span>
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
                         <span class="input-shell">
                           <input
                             type="number"
@@ -2103,7 +2135,7 @@
                     <p class="eyebrow advanced-group-label">Dovetails</p>
                     {#each laserDovetailControls as control}
                       <label class="field">
-                        <span>{control.label}</span>
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
                         <span class="input-shell">
                           <input
                             type="number"

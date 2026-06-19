@@ -125,7 +125,7 @@ describe("Air purifier cut-sheet equivalence", () => {
     expect(layout.configuration.preview.enclosure.autoRotate).toBe(true);
     expect(layout.configuration.preview.cutSheet.referenceScale).toEqual({ type: "enabled", length: 100 });
     expect(layout.configuration.cutting.referenceScale).toEqual({ type: "enabled", length: 100 });
-    expect(layout.summary.fans).toEqual({ type: "wall-banks", resolvedFans: { left: 3, right: 3, top: 0, bottom: 0 } });
+    expect(layout.summary.fans).toEqual({ type: "wall-banks", resolvedFans: { left: 3, right: 3, top: 0, bottom: 0 }, backPlateFans: 0 });
     expect("sheet" in draftPanels[0]!).toBe(false);
     expect(cutPanels(layout).every((panel) => panel.sheet.x >= 0 && panel.sheet.y >= 0)).toBe(true);
   });

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createLayout, requireCutPanelFabricationPlan } from "@/fabrication/purifierLayout";
+import { evaluateBuildDiagnostics } from "@/fabrication/buildDiagnostics";
 import { defaultSettings } from "@/domain/purifier/settingsModel";
 import type { CircleCut, CutPanel } from "@/fabrication/laser/cutGeometry";
 
@@ -44,17 +45,43 @@ describe("laser one-side Back fans (closed back panel)", () => {
     expect(fans(back, "screw")).toBe(fans(back, "fan") * 4);
   });
 
-  test("turning Back on changes nothing but the back panel", () => {
-    const off = panelsFor(0);
-    const on = panelsFor(-1);
-    // Same parts in the same order; only the back panel differs.
-    expect(on.map((panel) => panel.id)).toEqual(off.map((panel) => panel.id));
-    for (let i = 0; i < off.length; i += 1) {
-      if (off[i].id === "closed-back-panel") {
-        continue;
-      }
-      expect(on[i].cuts.length).toBe(off[i].cuts.length);
-      expect(on[i].outline.length).toBe(off[i].outline.length);
+  test("the Back fan grid counts toward the fan total (clears the 'no fans' advisory)", () => {
+    const layout = createLayout({ ...baseRaw, backPlateFans: -1 } as never);
+    expect(layout.summary.fans.type).toBe("wall-banks");
+    if (layout.summary.fans.type === "wall-banks") {
+      expect(layout.summary.fans.backPlateFans).toBeGreaterThan(0);
     }
+    expect(evaluateBuildDiagnostics(layout).some((d) => d.id === "no-fans")).toBe(false);
+  });
+
+  test("turning Back on keeps the full part set (slot + flanges + walls intact)", () => {
+    // Back on resizes the box to the Box depth, but the box keeps all its parts.
+    expect(panelsFor(-1).map((panel) => panel.id)).toEqual(panelsFor(0).map((panel) => panel.id));
+  });
+});
+
+function sideWallHeight(raw: typeof baseRaw): number {
+  const wall = createLayout(raw as never);
+  const panel = requireCutPanelFabricationPlan(wall, "test").cutPanels.find((p) => p.id === "left-side-wall");
+  if (panel === undefined) {
+    throw new Error("missing side wall");
+  }
+  return panel.height;
+}
+
+describe("laser one-side Box depth", () => {
+  test("Box depth sets the chamber: a deeper box gives taller side walls", () => {
+    const shallow = sideWallHeight({ ...baseRaw, backPlateFans: -1, boxDepth: 60 });
+    const deep = sideWallHeight({ ...baseRaw, backPlateFans: -1, boxDepth: 120 });
+    expect(deep - shallow).toBeCloseTo(60, 1);
+  });
+
+  test("Box depth is ignored unless Back fans are on with no wall fans", () => {
+    const back = sideWallHeight({ ...baseRaw, backPlateFans: -1, boxDepth: 60 });
+    const noBack = sideWallHeight({ ...baseRaw, backPlateFans: 0, boxDepth: 60 });
+    const withWallFan = sideWallHeight({ ...baseRaw, backPlateFans: -1, boxDepth: 60, fansLeft: -1 });
+    // Without the Back box, the chamber is the fan-diameter chamber, not Box depth.
+    expect(noBack).toBe(withWallFan);
+    expect(back).toBeLessThan(noBack);
   });
 });

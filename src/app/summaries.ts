@@ -424,7 +424,7 @@ function configuredFanCountFor(currentLayout: LayoutResult, currentFabricationMe
 
 function totalConfiguredFans(fans: LayoutResult["summary"]["fans"]): number {
   if (fans.type === "wall-banks") {
-    return fans.resolvedFans.left + fans.resolvedFans.right + fans.resolvedFans.top + fans.resolvedFans.bottom;
+    return fans.resolvedFans.left + fans.resolvedFans.right + fans.resolvedFans.top + fans.resolvedFans.bottom + fans.backPlateFans;
   }
   return fans.fanCount;
 }

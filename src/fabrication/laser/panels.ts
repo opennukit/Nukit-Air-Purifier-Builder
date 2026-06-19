@@ -1,7 +1,7 @@
 import type { CordHoleWall, PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
 import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fans";
-import { createAirPurifierGeometry, fanCenterYForWall, type AirPurifierGeometry } from "@/domain/purifier/geometry";
+import { createAirPurifierGeometry, fanCenterYForWall, oneSideBackFanBoxDepth, type AirPurifierGeometry } from "@/domain/purifier/geometry";
 import {
   cutPanelsToDocument,
   edgeSections,
@@ -59,6 +59,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   // One-side "Back" fans: the closed back panel gets a fan grid (the rest of the
   // box is unchanged). 0 = off, -1 = auto fill, >0 = exact count.
   const backPlateFans = settings.design.type === "laser-cut" ? settings.design.backPlateFans : 0;
+  // When the one-side Back box sets a Box depth, the chamber (and so the rear wall
+  // that covers it) is that deep instead of the fan diameter.
+  const rearWallHeight = oneSideBackFanBoxDepth(settings) ?? fanDiameter;
   const panels: CutPanelDraft[] = [];
   const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
   const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
@@ -68,16 +71,16 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   // through those slots. This is a placement (lap-joint) offset, not a geometry
   // change. (The rear fan wall mates the "EFE" edge notch and stays flush.)
   const fingerHoleInset = (settings.cutting.joints.finger.holeOffsetMultiplier + 0.5) * thickness;
-  const rearFanWallY = rearFanWallCenterY(filterCount, chamberHeight, fanDiameter);
+  const rearFanWallY = rearFanWallCenterY(filterCount, chamberHeight, rearWallHeight);
 
   panels.push(
     createFanWallPanel({
       id: "top-fan-wall",
       name: "Top fan wall",
       width,
-      height: fanDiameter,
+      height: rearWallHeight,
       requestedFans: settings.fan.banks.top,
-      fanCenterY: fanDiameter / 2,
+      fanCenterY: rearWallHeight / 2,
       settings,
       cordHole: cordCut("back"),
       assembly: {
@@ -115,14 +118,16 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 
   // boxes.py: side walls = [be, "h", te, le]. be = te = "fff" compound (split) or
   // "f"; le = "EFE" (2 filters) / "FE" (1 filter), where the "F" counterpart
-  // section spans the back fan wall (d + 2) and the "E" plain sections cover the
-  // open filter regions.
+  // section spans the chamber (back fan wall) and the "E" plain sections cover the
+  // open filter regions. The chamber-clear span is the fan-diameter chamber, or
+  // the user's Box depth for the one-side Back box.
+  const chamberClear = chamberHeight - filterCount * (filterHeight + thickness);
   const bottomEdge = usesSplitRails ? compound("fff", [rim, workingDepth - 2 * rim, rim]) : edgeSections("f");
   let topEdge = bottomEdge;
   const leftEdge =
     filterCount === 2
-      ? compound("EFE", [filterHeight + thickness, fanDiameter + 2, filterHeight + thickness])
-      : compound("FE", [fanDiameter + 2, filterHeight + thickness]);
+      ? compound("EFE", [filterHeight + thickness, chamberClear, filterHeight + thickness])
+      : compound("FE", [chamberClear, filterHeight + thickness]);
   if (filterCount === 1) {
     topEdge = edgeSections("f");
   }

@@ -73,7 +73,7 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
   const summary: BuildSummary = {
     chamberHeight: geometry.chamberHeight,
     workingDepth: geometry.workingDepth,
-    fans: createBuildFanSummary(configuration, resolvedFans),
+    fans: createBuildFanSummary(configuration, resolvedFans, backPlateFanCount(fabrication)),
     fabrication: createBuildFabricationSummary(fabrication),
   };
 
@@ -141,7 +141,23 @@ function createBuildFabricationSummary(fabrication: LayoutFabricationPlan): Buil
   return fabrication;
 }
 
-function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans: ResolvedFanBanks): BuildFanSummary {
+// Fans cut into the one-side closed back panel (the "Back" fan grid). They are
+// not wall banks, so count them off the built panel to add to the fan totals.
+function backPlateFanCount(fabrication: LayoutFabricationPlan): number {
+  if (fabrication.type !== "cut-panel-source") {
+    return 0;
+  }
+  const backPanel = fabrication.cutPanels.find((panel) => panel.id === "closed-back-panel");
+  return backPanel === undefined
+    ? 0
+    : backPanel.cuts.filter((cut) => cut.type === "circle" && cut.role === "fan").length;
+}
+
+function createBuildFanSummary(
+  configuration: PurifierSettings,
+  resolvedWallFans: ResolvedFanBanks,
+  backPlateFans: number,
+): BuildFanSummary {
   if (configuration.design.type === "donut-filter-adapter") {
     return {
       type: "donut-filter-adapter",
@@ -168,6 +184,7 @@ function createBuildFanSummary(configuration: PurifierSettings, resolvedWallFans
   return {
     type: "wall-banks",
     resolvedFans: resolvedWallFans,
+    backPlateFans,
   };
 }
 

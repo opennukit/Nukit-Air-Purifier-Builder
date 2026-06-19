@@ -79,6 +79,8 @@ export type BuildFanSummary =
   | {
       readonly type: "wall-banks";
       readonly resolvedFans: ResolvedFanBanks;
+      // One-side "Back" fan grid count (laser), in addition to the wall banks.
+      readonly backPlateFans: number;
     }
   | {
       readonly type: "donut-filter-adapter";
@@ -324,6 +326,9 @@ export type LaserCutDesignDraft = {
   // One-side "Back" fan grid on the closed back panel: 0 = off, -1 = automatic
   // (fill), >0 = exact count. Mirrors the 3D-Print Back fan toggle.
   readonly backPlateFans: number;
+  // One-side "Back" box depth: the chamber depth between the filter and the back
+  // plate, used in place of the fan-diameter chamber. Mirrors 3D Print.
+  readonly boxDepth: Millimeters;
 };
 
 export type DonutFilterAdapterPrintDesignDraft = {
@@ -404,6 +409,7 @@ export type ConfiguredPrintDesign =
       readonly cordHoleSide: CordHoleSide;
       readonly cordHoleCornerOffset: Millimeters;
       readonly backPlateFans: number;
+      readonly boxDepth: Millimeters;
     }
   | {
       readonly type: "donut-filter-adapter";

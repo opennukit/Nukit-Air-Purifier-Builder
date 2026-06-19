@@ -59,10 +59,18 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
   const fanSpec = findFanSpec(raw.fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
   const workingDepth = dimensions.depth - materialThickness;
-  const chamberHeight =
-    fanSpec.diameter +
-    2 +
-    filterCount * (dimensions.thickness + materialThickness);
+  // Mirror geometry.oneSideBackFanBoxDepth: the one-side Back box uses Box depth
+  // as the chamber instead of the fan diameter (kept in sync for the rim clamp).
+  const oneSideBackFan =
+    isLaserCutDesignPreset(printDesign) &&
+    filterCount === 1 &&
+    normalizeBackFanCount(raw.backPlateFans) !== 0 &&
+    raw.fansLeft === 0 &&
+    raw.fansRight === 0 &&
+    raw.fansTop === 0 &&
+    raw.fansBottom === 0;
+  const chamberClearDepth = oneSideBackFan ? normalizeBoxDepth(raw.boxDepth) : fanSpec.diameter + 2;
+  const chamberHeight = chamberClearDepth + filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(
     raw.rim,
     dimensions.width,
@@ -258,6 +266,7 @@ export function serializePurifierDraft(
       cordHoleSide: draft.design.cordHoleSide,
       cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
       backPlateFans: draft.design.backPlateFans,
+      boxDepth: draft.design.boxDepth,
     });
   }
 
@@ -423,6 +432,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       cordHoleSide: input.design.cordHoleSide,
       cordHoleCornerOffset: input.design.cordHoleCornerOffset,
       backPlateFans: input.design.backPlateFans,
+      boxDepth: input.design.boxDepth,
     };
   }
 
@@ -517,6 +527,7 @@ function createConfiguredPrintDesign(input: {
       cordHoleSide: input.raw.cordHoleSide,
       cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
+      boxDepth: normalizeBoxDepth(input.raw.boxDepth),
     };
   }
 
@@ -633,6 +644,7 @@ function createPurifierDesignDraft(
       cordHoleSide: configuration.design.cordHoleSide,
       cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
       backPlateFans: configuration.design.backPlateFans,
+      boxDepth: configuration.design.boxDepth,
     };
   }
 

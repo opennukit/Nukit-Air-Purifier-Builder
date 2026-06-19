@@ -40,8 +40,8 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     return diagnostics;
   }
 
-  const { resolvedFans } = layout.summary.fans;
-  const totalFans = resolvedFans.left + resolvedFans.right + resolvedFans.top + resolvedFans.bottom;
+  const { resolvedFans, backPlateFans } = layout.summary.fans;
+  const totalFans = resolvedFans.left + resolvedFans.right + resolvedFans.top + resolvedFans.bottom + backPlateFans;
 
   if (totalFans === 0) {
     diagnostics.push({

@@ -1,6 +1,7 @@
 import type { PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
 import type { FilterDimensions } from "@/domain/purifier/filter";
+import type { FanCountRequest } from "@/domain/purifier/fans";
 
 export type FilterFrameFace = "inner" | "outer";
 
@@ -33,9 +34,11 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   const materialThickness = settings.cutting.materialThickness;
   const fanDiameter = settings.fan.spec.diameter;
   const workingDepth = dimensions.depth - materialThickness;
+  // The one-side "Back" box uses the user's Box depth as the chamber instead of
+  // the fan-diameter chamber (fans live on the back plate, not the walls).
+  const backFanChamberDepth = oneSideBackFanBoxDepth(settings);
   const chamberHeight =
-    fanDiameter +
-    2 +
+    (backFanChamberDepth ?? fanDiameter + 2) +
     settings.filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(settings.cutting.rim, dimensions.width, workingDepth, chamberHeight);
 
@@ -50,6 +53,21 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
     filterLayers: createFilterLayers(settings.filterCount, chamberHeight, dimensions.thickness, materialThickness),
     filterFingerHoleYs: createFilterFingerHoleYs(settings.filterCount, chamberHeight, dimensions.thickness, materialThickness),
   };
+}
+
+// The one-side "Back" box (laser cut, single filter, Back fan grid on, no wall
+// fans) takes its chamber depth from the user's Box depth instead of the fan
+// diameter. Returns that depth, or undefined when the regular fan chamber applies.
+export function oneSideBackFanBoxDepth(settings: PurifierSettings): number | undefined {
+  if (settings.design.type !== "laser-cut" || settings.filterCount !== 1 || settings.design.backPlateFans === 0) {
+    return undefined;
+  }
+  const banks = settings.fan.banks;
+  const off = (bank: FanCountRequest): boolean => bank.type === "fixed" && bank.count === 0;
+  if (!(off(banks.left) && off(banks.right) && off(banks.top) && off(banks.bottom))) {
+    return undefined;
+  }
+  return settings.design.boxDepth;
 }
 
 export function clampRimForGeometry(requestedRim: number, filterWidth: number, workingDepth: number, chamberHeight: number): number {
