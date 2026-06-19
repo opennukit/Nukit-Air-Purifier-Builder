@@ -136,27 +136,17 @@
           <a href="#opensource">Free &amp; open, and the Tempest Pro</a>
           <a href="#overview">How the builder works</a>
           <strong>Layout &amp; design</strong>
-          <a href="#design">Design presets</a>
           <a href="#filterLayout">Filter layout</a>
-          <a href="#fanPlacement">Fan placement</a>
           <a href="#backPlateFansCount">Back fans</a>
           <a href="#boxDepth">Box depth</a>
-          <a href="#filterSlotPlacement">Filter slot placement</a>
           <strong>Filter</strong>
           <a href="#filterSize">Filter size</a>
-          <a href="#filterFitClearance">Filter fit clearance</a>
-          <a href="#rim">Filter rim</a>
           <strong>Fans</strong>
           <a href="#fanSize">Fan size</a>
-          <a href="#screwHoleDiameter">Fan screw size</a>
-          <a href="#hexSize">Honeycomb grill</a>
+          <strong>Printing</strong>
+          <a href="#printVolume">Print volume</a>
           <strong>Cord pass-through</strong>
           <a href="#cordHoleDiameter">Cord hole</a>
-          <strong>Material &amp; joints (laser)</strong>
-          <a href="#materialThickness">Material thickness</a>
-          <a href="#kerfFit">Kerf / fit allowance</a>
-          <a href="#fingerJoints">Finger joints</a>
-          <a href="#dovetails">Dovetails</a>
           <strong>Drawing &amp; output</strong>
           <a href="#labels">Engrave labels</a>
           <a href="#referenceScale">Reference scale</a>
@@ -336,15 +326,6 @@
             <p class="lede">Choose the overall shape of the box and where the air moves through it.</p>
             <div class="photo"><span>PHOTO PLACEHOLDER: 3D view of the three layouts: one-side, both-sides (sandwich), and the four-side tower.</span></div>
 
-            <div class="var" id="design">
-              <h3>Design presets</h3>
-              <p>
-                The <strong>Design</strong> menu loads a complete setup for a known build: the filter, the fans, and the
-                box. Picking one fills in every field at once. Changing any value switches the menu to <code>Custom</code>,
-                so you know you have left the preset. Start with the preset closest to your parts, then fine-tune.
-              </p>
-            </div>
-
             <div class="var" id="filterLayout">
               <h3>Filter layout</h3>
               <p>
@@ -355,23 +336,6 @@
               </p>
               <p class="note">More filter area slows the air through the media. That raises the capture rate and lowers
                 noise (see <a href="#about">Why a MERV&nbsp;13 PC-fan filter box</a>).</p>
-            </div>
-
-            <div class="var" id="fanPlacement">
-              <span class="anchor" id="fansLeft"></span><span class="anchor" id="fansRight"></span>
-              <span class="anchor" id="fansTop"></span><span class="anchor" id="fansBottom"></span>
-              <h3>Fan placement &amp; per-wall fan counts</h3>
-              <p>
-                The checkboxes choose which walls carry fans. <strong>Auto</strong> fills a wall with as many fans as
-                physically fit. Under <em>Advanced</em> you can instead set an exact count per wall: <strong>Left</strong>,
-                <strong>Right</strong>, <strong>Top</strong>, <strong>Bottom</strong>, and <strong>Back</strong>. More
-                fans mean more airflow, but more cost and power. Spread them across several walls to keep each opening
-                clear of the corners.
-              </p>
-              <p>
-                Fans are usually arranged to pull air in through the filters and push it out through the fan openings.
-                Keep the filter area large relative to the fan area to stay quiet.
-              </p>
             </div>
 
             <div class="var" id="backPlateFansCount">
@@ -399,14 +363,6 @@
               </p>
             </div>
 
-            <div class="var" id="filterSlotPlacement">
-              <h3>Filter slot placement</h3>
-              <p>
-                This sets which wall the filter slides in through. That wall gets the open loading slot, so you can change
-                the filter without taking the box apart. The other walls stay closed. Put the slot on whichever face is
-                easiest to reach once the box is installed, often the back or a side.
-              </p>
-            </div>
           </section>
 
           <section class="card">
@@ -427,24 +383,6 @@
               </p>
             </div>
 
-            <div class="var" id="filterFitClearance">
-              <h3>Filter fit clearance</h3>
-              <p>
-                This is the extra gap left around the filter, per side, so it slides in without forcing. Increase it if
-                the filter is a tight push, or if your parts come out slightly oversized. Decrease it for a snugger, more
-                sealed fit. About 1&nbsp;mm is usually enough. Too much clearance lets unfiltered air slip past the
-                edges, so seal any gaps with foam tape.
-              </p>
-            </div>
-
-            <div class="var" id="rim">
-              <h3>Filter rim</h3>
-              <p>
-                This is the width of the frame border that overlaps the filter and the air opening. The rim holds the
-                filter and gives the frame its strength. A wider rim is sturdier, but it covers more of the open area.
-                Keep it just wide enough to capture the filter and carry the joints.
-              </p>
-            </div>
           </section>
 
           <section class="card">
@@ -463,24 +401,19 @@
               </p>
             </div>
 
-            <div class="var" id="screwHoleDiameter">
-              <h3>Fan screw size</h3>
-              <p>
-                This is the diameter of each fan mounting-screw hole. PC fans use roughly a 4.3&nbsp;mm hole for standard
-                fan screws. Match it to your screws: a little smaller for self-tappers that bite into plywood or plastic,
-                exact for machine screws and nuts. Four holes are placed at each fan in the standard pattern.
-              </p>
-            </div>
+          </section>
 
-            <div class="var" id="hexSize">
-              <span class="anchor" id="hexSpacing"></span>
-              <h3>Honeycomb grill (cell size &amp; rib spacing)</h3>
+          <section class="card">
+            <p class="eyebrow">Printing</p>
+            <h2>Printing (3D print)</h2>
+            <p class="lede">Settings for fabricating the box on a 3D printer.</p>
+
+            <div class="var" id="printVolume">
+              <h3>Print volume</h3>
               <p>
-                This is an optional honeycomb pattern over a fan opening. It guards fingers and the blades while letting
-                air through. <strong>Grill hex size</strong> is the cell width, measured flat to flat.
-                <strong>Grill hex spacing</strong> is the rib thickness between cells. Larger cells and thinner ribs let
-                more air through with less noise. Smaller cells are safer and stiffer. Ribs that are too thin may be
-                fragile.
+                This is your 3D printer's usable bed size. Pick the volume that matches your machine. Any part that is
+                too big for the bed is automatically split into chunks that fit, so a large box still prints on a small
+                printer. The chunks glue together, and <a href="#chunkLabels">chunk labels</a> can mark how they line up.
               </p>
             </div>
           </section>
@@ -498,95 +431,9 @@
                 land under a fan, the fan bank re-packs to make room, rather than moving the cord.
               </p>
             </div>
-            <div class="var" id="cordHoleWall">
-              <h3>Power cord wall</h3>
-              <p>This is the wall the cord exits through. Choose the side that faces your outlet or hub once the box is placed.</p>
-            </div>
-            <div class="var" id="cordHoleSide">
-              <h3>Cord position</h3>
-              <p>This slides the hole along the chosen wall (centre, or toward one end) so it lines up with your wiring.</p>
-            </div>
             <div class="var" id="cordHoleCornerOffset">
               <h3>Cord corner offset</h3>
               <p>This is the distance from the corner to the cord hole. It is used when the cord is positioned toward one end of the wall.</p>
-            </div>
-          </section>
-
-          <section class="card">
-            <p class="eyebrow">Material &amp; joints</p>
-            <h2>Material &amp; joints (laser cut)</h2>
-            <p class="lede">
-              These settings tune the flat-pack joinery for laser-cut sheet stock. The defaults match the
-              <a href="https://florianfesti.github.io/boxes/" target="_blank" rel="noopener">boxes.py</a> generator the
-              cut geometry is ported from.
-            </p>
-
-            <div class="var" id="materialThickness">
-              <h3>Material thickness</h3>
-              <p>
-                This is the thickness of your sheet stock. It is the most important laser setting, because it drives the
-                finger length and every slot width. Measure your plywood or acrylic with calipers. (Nominal "3&nbsp;mm"
-                ply is often 2.7 to 3.2&nbsp;mm.) Enter the real value, or the joints will be loose or will not close.
-              </p>
-            </div>
-
-            <div class="var" id="kerfFit">
-              <h3>Kerf / fit allowance</h3>
-              <p>
-                This compensates for the width the laser beam burns away, known as the kerf. The exported tool-path is
-                offset by this amount, so the finished part keeps its size and the joints fit. Increase it if joints come
-                out loose. Decrease it if they are too tight to assemble. Most lasers want roughly
-                <code>0.05 to 0.15&nbsp;mm</code>, so cut a test joint to find yours.
-              </p>
-            </div>
-
-            <div class="var" id="fingerJoints">
-              <h3>Finger joints</h3>
-              <p>
-                These are the interlocking comb joints that hold the walls together. All five values are multiples of the
-                material thickness, so they scale with your stock. The defaults work well. Change them only to suit a
-                particular fit or appearance.
-              </p>
-              <div class="var" id="fingerWidthMultiplier">
-                <h4>Finger width</h4>
-                <p>The width of each finger, as a multiple of thickness. Larger gives fewer, wider fingers. Smaller gives more, finer ones.</p>
-              </div>
-              <div class="var" id="fingerSpaceMultiplier">
-                <h4>Finger spacing</h4>
-                <p>The gap between fingers, as a multiple of thickness. It is usually kept equal to the finger width, for an even comb.</p>
-              </div>
-              <div class="var" id="fingerHoleWidthMultiplier">
-                <h4>Finger hole width</h4>
-                <p>The width of the slots the mating fingers pass through, as a multiple of thickness. It determines how tightly the fingers seat.</p>
-              </div>
-              <div class="var" id="fingerHoleOffsetMultiplier">
-                <h4>Finger hole offset</h4>
-                <p>How far the finger-hole rows sit in from the panel edge, as a multiple of thickness. It controls how deeply a lapped panel seats.</p>
-              </div>
-              <div class="var" id="fingerPlayMultiplier">
-                <h4>Finger play</h4>
-                <p>Extra slack added to the slots for an easier fit, as a multiple of thickness. <code>0</code> is a tight press fit. Add a little for hand assembly or a glue gap.</p>
-              </div>
-            </div>
-
-            <div class="var" id="dovetails">
-              <h3>Dovetails</h3>
-              <p>
-                These are the angled, self-locking joints on the filter-frame rails. They are again sized as multiples of
-                the material thickness.
-              </p>
-              <div class="var" id="dovetailSizeMultiplier">
-                <h4>Dovetail size</h4>
-                <p>The tooth size, as a multiple of thickness. Bigger teeth are stronger and easier to align. Smaller teeth give you more of them.</p>
-              </div>
-              <div class="var" id="dovetailDepthMultiplier">
-                <h4>Dovetail depth</h4>
-                <p>How far the dovetails interlock, as a multiple of thickness.</p>
-              </div>
-              <div class="var" id="dovetailTaper">
-                <h4>Dovetail taper</h4>
-                <p>The flare angle, in degrees. A steeper angle locks harder. But it is tighter to assemble and less forgiving of kerf error.</p>
-              </div>
             </div>
           </section>
 
@@ -632,15 +479,15 @@
             <p><strong>Cutting</strong></p>
             <ul>
               <li>Use flat, void-free plywood. Baltic birch 3&nbsp;mm or 6&nbsp;mm is ideal, because warped stock fights the joints.</li>
-              <li>Measure the thickness with calipers, and set <a href="#materialThickness">Material thickness</a> to the real value.</li>
-              <li>Cut one test finger joint first. Tune <a href="#kerfFit">Kerf / fit allowance</a> until it taps together snugly without forcing.</li>
+              <li>Measure the thickness with calipers, and set the material thickness to the real value.</li>
+              <li>Cut one test finger joint first. Tune the kerf / fit allowance until it taps together snugly without forcing.</li>
               <li>Keep <a href="#labels">Engrave labels</a> on for your first build. Sand off any scorch with a light pass of fine sandpaper.</li>
             </ul>
             <p><strong>Dry-fit, then glue</strong></p>
             <ul>
               <li>Assemble the whole box without glue first, to confirm every joint and the filter slot work.</li>
               <li>Glue plywood with wood PVA (such as Titebond), or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
-              <li>Leave the <a href="#filterSlotPlacement">filter-slot wall</a> un-glued, or make it a removable panel, so you can change filters.</li>
+              <li>Leave the filter-slot wall un-glued, or make it a removable panel, so you can change filters.</li>
               <li>Square the box against a flat surface, and clamp or tape it lightly. Wipe off any squeeze-out before it cures.</li>
               <li>Seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
             </ul>
@@ -672,9 +519,9 @@
             <h3>Mounting the fans (both methods)</h3>
             <ul>
               <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub.</li>
-              <li>Use the four <a href="#screwHoleDiameter">fan-screw</a> holes per fan. Self-tapping fan screws bite directly into plywood or plastic.</li>
+              <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into plywood or plastic.</li>
               <li>Wire PWM fans to a 12&nbsp;V supply or hub sized for the total current. Route the cable through the <a href="#cordHoleDiameter">cord pass-through</a>.</li>
-              <li>Add the optional <a href="#hexSize">honeycomb grill</a> or a snap-on finger guard on any exposed fan.</li>
+              <li>Add the optional honeycomb grill or a snap-on finger guard on any exposed fan.</li>
             </ul>
             <div class="photo"><span>PHOTO PLACEHOLDER: fans mounted to the back plate / walls, with the cord routed through the pass-through, plus the wiring and PWM controller.</span></div>
           </section>

@@ -765,48 +765,20 @@
 
   // Tooltip ids that show a "More" link to their help.html#<anchor> section. Only
   // ids listed here render the link; everything else shows text only. Managed via
-  // TOOLTIPS.txt (Section 2): true = listed here, false = omitted. Keep an id out
-  // until help.html actually has the matching anchor, or the link jumps to the top.
+  // TOOLTIPS.txt (the per-tooltip "more:" flag). Every id here must have a matching
+  // anchor in help.html.
   const tipsWithHelpLink = new Set<string>([
     "info-backPlateFansCount",
     "info-chunkLabels",
-    "info-cordHoleCornerOffset",
-    "info-cordHoleSide",
-    "info-cordHoleWall",
-    "info-design",
-    "info-dovetailDepthMultiplier",
-    "info-dovetailSizeMultiplier",
-    "info-dovetailTaper",
-    "info-fanPlacement",
     "info-fanSize",
-    "info-fansBottom",
-    "info-fansLeft",
-    "info-fansRight",
-    "info-fansTop",
-    "info-filterFitClearance",
     "info-filterLayout",
     "info-filterSize",
-    "info-filterSlotPlacement",
-    "info-fingerHoleOffsetMultiplier",
-    "info-fingerHoleWidthMultiplier",
-    "info-fingerPlayMultiplier",
-    "info-fingerSpaceMultiplier",
-    "info-fingerWidthMultiplier",
-    "info-hexSize",
-    "info-hexSpacing",
-    "info-kerfFit",
     "info-labels",
     "info-laser-boxDepth",
     "info-laser-cordHoleCornerOffset",
     "info-laser-cordHoleDiameter",
-    "info-laser-cordHoleSide",
-    "info-laser-cordHoleWall",
-    "info-laser-design",
-    "info-laser-filterLayout",
-    "info-materialThickness",
+    "info-printVolume",
     "info-referenceScale",
-    "info-rim",
-    "info-screwHoleDiameter",
   ]);
 
   // Tooltip bubbles are position: fixed so they escape the controls-pane scroll
@@ -1561,7 +1533,7 @@
           {/snippet}
           {#snippet fanSizeSegment()}
             <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
-              <legend>Fan size {@render infoTip("info-fanSize", "The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them.")}</legend>
+              <legend>Fan size {@render infoTip("info-fanSize", "The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them. For a traditional single-fan filter cube design, select Filter layout-> Four sides-> Advanced-> Box/Exhaust")}</legend>
               <div>
                 {#each recommendedFanDiameterOptions as diameter}
                   <label>
@@ -1687,7 +1659,7 @@
               {#if isNukitControlsActive}
                 <div data-nukit-filter-count>
                   <fieldset class="segmented-field">
-                    <legend>Filter layout {@render infoTip("info-laser-filterLayout", "Where the filters sit: 'One side' uses a single filter with a closed back plate; 'Both sides' sandwiches two filters with fans pulling air through both.")}</legend>
+                    <legend>Filter layout {@render infoTip("info-laser-filterLayout", "How the filters sit in the box: a single side filter for wall or ceiling mount, two filters sandwiched with fans pulling air through both.")}</legend>
                     <div>
                       <label>
                         <input
@@ -1724,7 +1696,7 @@
               </div>
               <div data-print-volume-control>
                 <label class="field">
-                  <span>Print volume {@render infoTip("info-printVolume", "Your printer's usable bed size. Parts too big for the bed are automatically split into chunks that fit, so pick the volume that matches your machine.")}</span>
+                  <span>Print volume {@render infoTip("info-printVolume", "Your 3D printer's usable bed size. Parts too big for the bed are automatically split into chunks that fit, so pick the volume that matches your machine.")}</span>
                   <select name="printVolume" onchange={setPrintVolume}>
                     {#each printVolumePresets as preset}
                       <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
@@ -1755,7 +1727,7 @@
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
                     <label class="field" data-filter-size-preset>
-                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1), or pick Custom and enter your own. Nominal sizes aren't the real measurements, and actual filter sizes vary between brands. Be sure to measure yours before fabrication.")}</span>
+                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size, or pick Custom and enter your own. Nominal sizes aren't the real measurements, and actual filter sizes vary between brands. Be sure to measure yours before fabrication.")}</span>
                       <select name="filterSizePreset" onchange={updateFilterSizePreset}>
                         {#each filterSizePresets as preset}
                           <option value={preset.id} selected={selectedFilterSize === preset.id}>{preset.label}</option>
@@ -2169,7 +2141,7 @@
                     <p class="eyebrow advanced-group-label">Cord &amp; grill</p>
                     {#if settings.cordHoleDiameter > 0}
                       <label class="field">
-                        <span>Power cord wall {@render infoTip("info-cordHoleWall", cordHoleInfo)}</span>
+                        <span>Power cord wall {@render infoTip("info-cordHoleWall", "Diameter of the hole the fan power cables exit through. The 4-side tower routes it through the top-plate corner instead.")}</span>
                         {#if isFourFilterTower}
                           <select name="cordHoleWall">
                             <option value={settings.cordHoleWall} selected>Top</option>
@@ -2231,7 +2203,7 @@
                           checked={settings.hexFullCellsOnly}
                           onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
                         />
-                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.")}</span>
+                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
                       </label>
                     {/if}
                     <!-- Chunk-label deboss is parked for now: control hidden and the
@@ -2366,7 +2338,7 @@
                           checked={settings.hexFullCellsOnly}
                           onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
                         />
-                        <span>Full cells only {@render infoTip("info-laser-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.")}</span>
+                        <span>Full cells only {@render infoTip("info-laser-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
                       </label>
                     </div>
                   {/if}
@@ -2411,7 +2383,7 @@
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Cord pass-through</p>
                     <label class="field">
-                      <span>Cord hole diameter {@render infoTip("info-laser-cordHoleDiameter", cordHoleInfo + " Set the diameter to 0 for no cord hole.")}</span>
+                      <span>Cord hole diameter {@render infoTip("info-laser-cordHoleDiameter", "Diameter of the hole the power jack is inserted into or the power cable exits through. The 4-side tower routes it through the top-plate. Set the diameter to 0 for no cord hole.")}</span>
                       <span class="input-shell">
                         <input
                           type="number"
@@ -2427,7 +2399,7 @@
                     </label>
                     {#if settings.cordHoleDiameter > 0}
                       <label class="field">
-                        <span>Power cord wall {@render infoTip("info-laser-cordHoleWall", cordHoleInfo)}</span>
+                        <span>Power cord wall {@render infoTip("info-laser-cordHoleWall", "Selects which wall the hole the power jack or power cable is set. The 4-side tower routes it through the top-plate.")}</span>
                         <select name="cordHoleWall" onchange={updateCordHoleWall}>
                           {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
                             <option value={wall} selected={settings.cordHoleWall === wall}>{cordWallLabel(wall)}</option>
