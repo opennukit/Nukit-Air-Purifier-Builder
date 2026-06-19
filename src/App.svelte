@@ -763,6 +763,52 @@
     return tipId.replace(/^info-/, "").replace(/^laser-/, "");
   }
 
+  // Tooltip ids that show a "More" link to their help.html#<anchor> section. Only
+  // ids listed here render the link; everything else shows text only. Managed via
+  // TOOLTIPS.txt (Section 2): true = listed here, false = omitted. Keep an id out
+  // until help.html actually has the matching anchor, or the link jumps to the top.
+  const tipsWithHelpLink = new Set<string>([
+    "info-backPlateFansCount",
+    "info-chunkLabels",
+    "info-cordHoleCornerOffset",
+    "info-cordHoleSide",
+    "info-cordHoleWall",
+    "info-design",
+    "info-dovetailDepthMultiplier",
+    "info-dovetailSizeMultiplier",
+    "info-dovetailTaper",
+    "info-fanPlacement",
+    "info-fanSize",
+    "info-fansBottom",
+    "info-fansLeft",
+    "info-fansRight",
+    "info-fansTop",
+    "info-filterFitClearance",
+    "info-filterLayout",
+    "info-filterSize",
+    "info-filterSlotPlacement",
+    "info-fingerHoleOffsetMultiplier",
+    "info-fingerHoleWidthMultiplier",
+    "info-fingerPlayMultiplier",
+    "info-fingerSpaceMultiplier",
+    "info-fingerWidthMultiplier",
+    "info-hexSize",
+    "info-hexSpacing",
+    "info-kerfFit",
+    "info-labels",
+    "info-laser-boxDepth",
+    "info-laser-cordHoleCornerOffset",
+    "info-laser-cordHoleDiameter",
+    "info-laser-cordHoleSide",
+    "info-laser-cordHoleWall",
+    "info-laser-design",
+    "info-laser-filterLayout",
+    "info-materialThickness",
+    "info-referenceScale",
+    "info-rim",
+    "info-screwHoleDiameter",
+  ]);
+
   // Tooltip bubbles are position: fixed so they escape the controls-pane scroll
   // container (overflow: auto), which would otherwise crop them at the column edge.
   // Fixed elements need explicit coordinates, so when a tip is shown (hover, focus,
@@ -1510,7 +1556,7 @@
                 onblur={() => closeInfoTip(id)}
                 onkeydown={(event) => handleInfoTipKeydown(id, event)}
               >i</button>
-              <p {id} role="tooltip">{text} <a class="info-tip-more" href={`help.html#${helpAnchor(id)}`} target="_blank" rel="noopener">More</a></p>
+              <p {id} role="tooltip">{text}{#if tipsWithHelpLink.has(id)} <a class="info-tip-more" href={`help.html#${helpAnchor(id)}`} target="_blank" rel="noopener">More</a>{/if}</p>
             </span>
           {/snippet}
           {#snippet fanSizeSegment()}

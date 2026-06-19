@@ -1,0 +1,201 @@
+Nukit FilterBoxBuilder: tooltip text + Help-link flags (editable)
+
+HOW TO EDIT:
+  SECTION 1 sets the tooltip TEXT. Change the text under each [key];
+  leave the [key] lines unchanged. Shared text is edited once in the
+  Shared block.
+  SECTION 2 controls the 'More' link. Set each id to true or false.
+  true  = show a 'More' link that jumps to help.html#<anchor>.
+  false = no 'More' link. Lines marked (no anchor yet) have no matching
+  Help section, so leave them false until that anchor is added to help.html.
+  Lines starting with # are comments. Do not use em-dashes.
+
+=========================================================
+# SECTION 1: TOOLTIP TEXT
+=========================================================
+
+## Inline tooltips
+
+[info-backPlateFansCount]
+Number of fans on the back plate. 'Auto' fills it with as many as fit; choose fewer if you prefer.
+
+[info-chunkLabels]
+Debosses a two-letter code on each piece so you can match the printed chunks when gluing. Only affects prints split into multiple pieces.
+
+[info-design]
+A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick a design you like, then fine-tune anything below. Actual filter sizes vary between brands so be sure to measure yours before fabrication.
+
+[info-fanPlacement]
+Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.
+
+[info-fanSize]
+The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them.
+
+[info-filterLayout]
+How the filters sit in the box: a single side filter for wall or ceiling mount, two filters sandwiched with fans pulling air through both, or a four-sided filter tower.
+
+[info-filterSize]
+Choose your filter's nominal size (like 20×20×1), or pick Custom and enter your own. Nominal sizes aren't the real measurements, and actual filter sizes vary between brands. Be sure to measure yours before fabrication.
+
+[info-filterSlotPlacement]
+Which wall the filter slides in through. The chosen wall gets the open loading slot; the others stay closed.
+
+[info-hexFullCellsOnly]
+Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.
+
+[info-hexGrill]
+Print a honeycomb of hexagons across each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.
+
+[info-labels]
+Etches each part's name onto the cut sheet so you can tell the pieces apart when assembling.
+
+[info-laser-boxDepth]
+How deep the box is: the chamber between the filter and the back plate.
+
+[info-laser-design]
+A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick a design you like, then fine-tune anything below. Actual filter sizes vary between brands so be sure to measure yours before fabrication.
+
+[info-laser-downloadFormat]
+File downloaded by the export button. SVG (default) is the vector cut sheet; DXF is the CAD interchange format most laser software imports.
+
+[info-laser-filterLayout]
+Where the filters sit: 'One side' uses a single filter with a closed back plate; 'Both sides' sandwiches two filters with fans pulling air through both.
+
+[info-laser-hexFullCellsOnly]
+Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.
+
+[info-laser-hexGrill]
+Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.
+
+[info-print-downloadFormat]
+File downloaded by the export button. A 3MF ZIP (default) keeps part colors and units; an STL ZIP is the plainer mesh format every slicer reads. Both bundle one file per print chunk.
+
+[info-printVolume]
+Your printer's usable bed size. Parts too big for the bed are automatically split into chunks that fit, so pick the volume that matches your machine.
+
+[info-referenceScale]
+Length of a reference ruler drawn on the sheet so you can confirm your cut/export is at 1:1 scale.
+
+## Advanced control tooltips
+
+[adv:fansLeft]
+Fans on the left wall. Auto fits as many as the wall allows.
+
+[adv:fansRight]
+Fans on the right wall. Auto fits as many as the wall allows.
+
+[adv:fansTop]
+Fans on the top wall. Auto fits as many as the wall allows.
+
+[adv:fansBottom]
+Fans on the bottom wall. Auto fits as many as the wall allows.
+
+[adv:screwHoleDiameter]
+Diameter of each PC-fan mounting screw hole.
+
+[adv:hexSize]
+Honeycomb cell size, measured flat to flat.
+
+[adv:hexSpacing]
+Rib (wall) thickness between honeycomb cells.
+
+[adv:cordHoleSide]
+Where along the wall the cord hole sits.
+
+[adv:cordHoleCornerOffset]
+Distance from the corner to the cord hole.
+
+[adv:materialThickness]
+Thickness of your sheet stock. It drives the finger-joint sizing and every slot width, so set it to your actual material.
+
+[adv:kerfFit]
+Kerf (burn) compensation: how much width the laser removes. Increase if joints come out loose, decrease if they're too tight.
+
+[adv:filterFitClearance]
+Extra gap left around the filter so it slides in without forcing. Larger = looser fit.
+
+[adv:rim]
+Width of the filter-frame border around the air opening.
+
+[adv:fingerWidthMultiplier]
+Finger width, as a multiple of material thickness. Larger = fewer, wider fingers.
+
+[adv:fingerSpaceMultiplier]
+Gap between fingers, as a multiple of material thickness.
+
+[adv:fingerHoleWidthMultiplier]
+Width of the slots that the mating fingers pass through, as a multiple of thickness.
+
+[adv:fingerHoleOffsetMultiplier]
+How far the finger-hole rows sit in from the panel edge, as a multiple of thickness.
+
+[adv:fingerPlayMultiplier]
+Extra play added to finger slots for an easier fit, as a multiple of thickness. 0 = tight press fit.
+
+[adv:dovetailSizeMultiplier]
+Dovetail tooth size, as a multiple of material thickness.
+
+[adv:dovetailDepthMultiplier]
+How far the dovetails interlock, as a multiple of thickness.
+
+[adv:dovetailTaper]
+Dovetail flare angle in degrees. Steeper locks harder but is tighter to assemble.
+
+## Shared text (reused by several tooltips)
+
+[shared:cordHoleInfo]
+Diameter of the hole the fan power cables exit through, near the bottom of the right wall. The 4-side tower routes it through the matching top-plate corner instead.
+
+[shared:filterFitClearance]
+Extra space added around your measured filter so it slides in instead of press-fitting. 1 mm per side works for most printers; 0 makes the cavity exactly the measured size.
+
+=========================================================
+# SECTION 2: MORE LINK (one line per tooltip)
+=========================================================
+
+info-backPlateFansCount = true   -> help.html#backPlateFansCount
+info-chunkLabels = true   -> help.html#chunkLabels
+info-cordHoleCornerOffset = true   -> help.html#cordHoleCornerOffset
+info-cordHoleSide = true   -> help.html#cordHoleSide
+info-cordHoleWall = true   -> help.html#cordHoleWall
+info-design = true   -> help.html#design
+info-dovetailDepthMultiplier = true   -> help.html#dovetailDepthMultiplier
+info-dovetailSizeMultiplier = true   -> help.html#dovetailSizeMultiplier
+info-dovetailTaper = true   -> help.html#dovetailTaper
+info-fanPlacement = true   -> help.html#fanPlacement
+info-fanSize = true   -> help.html#fanSize
+info-fansBottom = true   -> help.html#fansBottom
+info-fansLeft = true   -> help.html#fansLeft
+info-fansRight = true   -> help.html#fansRight
+info-fansTop = true   -> help.html#fansTop
+info-filterFitClearance = true   -> help.html#filterFitClearance
+info-filterLayout = true   -> help.html#filterLayout
+info-filterSize = true   -> help.html#filterSize
+info-filterSlotPlacement = true   -> help.html#filterSlotPlacement
+info-fingerHoleOffsetMultiplier = true   -> help.html#fingerHoleOffsetMultiplier
+info-fingerHoleWidthMultiplier = true   -> help.html#fingerHoleWidthMultiplier
+info-fingerPlayMultiplier = true   -> help.html#fingerPlayMultiplier
+info-fingerSpaceMultiplier = true   -> help.html#fingerSpaceMultiplier
+info-fingerWidthMultiplier = true   -> help.html#fingerWidthMultiplier
+info-hexFullCellsOnly = false   -> help.html#hexFullCellsOnly  (no anchor yet)
+info-hexGrill = false   -> help.html#hexGrill  (no anchor yet)
+info-hexSize = true   -> help.html#hexSize
+info-hexSpacing = true   -> help.html#hexSpacing
+info-kerfFit = true   -> help.html#kerfFit
+info-labels = true   -> help.html#labels
+info-laser-boxDepth = true   -> help.html#boxDepth
+info-laser-cordHoleCornerOffset = true   -> help.html#cordHoleCornerOffset
+info-laser-cordHoleDiameter = true   -> help.html#cordHoleDiameter
+info-laser-cordHoleSide = true   -> help.html#cordHoleSide
+info-laser-cordHoleWall = true   -> help.html#cordHoleWall
+info-laser-design = true   -> help.html#design
+info-laser-downloadFormat = false   -> help.html#downloadFormat  (no anchor yet)
+info-laser-filterLayout = true   -> help.html#filterLayout
+info-laser-hexFullCellsOnly = false   -> help.html#hexFullCellsOnly  (no anchor yet)
+info-laser-hexGrill = false   -> help.html#hexGrill  (no anchor yet)
+info-materialThickness = true   -> help.html#materialThickness
+info-print-downloadFormat = false   -> help.html#print-downloadFormat  (no anchor yet)
+info-printVolume = false   -> help.html#printVolume  (no anchor yet)
+info-referenceScale = true   -> help.html#referenceScale
+info-rim = true   -> help.html#rim
+info-screwHoleDiameter = true   -> help.html#screwHoleDiameter
