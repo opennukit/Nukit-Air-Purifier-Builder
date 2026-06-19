@@ -540,7 +540,7 @@
     cordHoleSide: "Where along the wall the cord hole sits.",
     cordHoleCornerOffset: "Distance from the corner to the cord hole.",
     // Laser Cut material, fit, frame, and joint tuning.
-    materialThickness: "Thickness of your sheet stock. It drives the finger-joint sizing and every slot width — set it to your actual material.",
+    materialThickness: "Thickness of your sheet stock. It drives the finger-joint sizing and every slot width, so set it to your actual material.",
     kerfFit: "Kerf (burn) compensation: how much width the laser removes. Increase if joints come out loose, decrease if they're too tight.",
     filterFitClearance: "Extra gap left around the filter so it slides in without forcing. Larger = looser fit.",
     rim: "Width of the filter-frame border around the air opening.",
@@ -1555,7 +1555,7 @@
                 {#if isNukitControlsActive}
                   <div data-nukit-layout>
                     <label class="field compact-field" data-nukit-design>
-                      <span>Design {@render infoTip("info-laser-design", "A starting preset for the whole build — it sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
+                      <span>Design {@render infoTip("info-laser-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
                       <select name="nukitDesign" onchange={updateNukitDesign}>
                         {#each nukitLaserDesigns as design}
                           <option value={design} selected={matchedNukitLaserDesign(settings) === design}>{nukitLaserDesignLabels[design]}</option>
@@ -1610,7 +1610,7 @@
                 {#if isTempestControlsActive}
                   <div data-tempest-layout>
                     <label class="field compact-field" data-tempest-design>
-                      <span>Design {@render infoTip("info-design", "A starting preset for the whole build — it sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
+                      <span>Design {@render infoTip("info-design", "A starting preset for the whole build. It sets sensible defaults for size, fans, and joinery. Pick the closest match, then fine-tune anything below.")}</span>
                       <select name="tempestDesign" onchange={updateTempestDesign}>
                         {#each tempestDesigns as design}
                           <option value={design} selected={settings.tempestDesign === design}>{tempestDesignLabels[design]}</option>
@@ -1708,7 +1708,7 @@
                 {#if !isDonutControlsActive}
                   <div data-rectangular-filter-controls>
                     <label class="field" data-filter-size-preset>
-                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1) to fill in its dimensions, or pick Custom and enter your own. Nominal sizes aren't the real measurements — measure your filter.")}</span>
+                      <span>Filter size {@render infoTip("info-filterSize", "Choose your filter's nominal size (like 20×20×1) to fill in its dimensions, or pick Custom and enter your own. Nominal sizes aren't the real measurements, so measure your filter.")}</span>
                       <select name="filterSizePreset" onchange={updateFilterSizePreset}>
                         {#each filterSizePresets as preset}
                           <option value={preset.id} selected={selectedFilterSize === preset.id}>{preset.label}</option>
@@ -1857,7 +1857,7 @@
                   </fieldset>
 
                   <fieldset class="fan-placement-field" data-nukit-hex-grill>
-                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore — it looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced.")}</legend>
+                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced.")}</legend>
                     <div class="fan-placement-checks">
                       <label class="toggle-field">
                         <input
@@ -1873,7 +1873,7 @@
 
                   {#if laserBackFansSelected && noWallFansSelected}
                     <label class="field">
-                      <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is — the chamber between the filter and the back plate. Used instead of the fan-diameter chamber when Back fans are on.")}</span>
+                      <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is: the chamber between the filter and the back plate. Used instead of the fan-diameter chamber when Back fans are on.")}</span>
                       <span class="input-shell">
                         <input
                           type="number"

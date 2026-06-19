@@ -104,7 +104,7 @@ export function summarizeDiagnostics(diagnostics: readonly BuildDiagnostic[], re
       id: "advisories",
       severity: "warning",
       title: diagnostics.length === 1 ? "1 advisory" : `${diagnostics.length} advisories`,
-      detail: "Review the notes below — export is still available.",
+      detail: "Review the notes below. Export is still available.",
     };
   }
   return ready;
