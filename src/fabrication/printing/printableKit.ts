@@ -1,4 +1,5 @@
 import { orientChunkVerticesForPrinting } from "@/fabrication/printing/partOrientation";
+import { createBinaryStl } from "@/fabrication/printing/stl";
 import {
   createStoredZipPackage,
   createThreeMfPackage,
@@ -144,6 +145,20 @@ export type PrintablePartThreeMf = {
 // reliably loads a single-object 3MF, so splitting the kit this way avoids
 // slicers that ignore Bambu/Orca plate metadata and stack every chunk on one
 // bed.
+export type PrintablePartStl = {
+  readonly part: PrintablePart;
+  readonly filename: string;
+  readonly bytes: Uint8Array;
+};
+
+export type PrintableStlZip = {
+  readonly filename: string;
+  readonly mimeType: string;
+  readonly bytes: Uint8Array;
+  readonly kit: PrintableKit;
+  readonly entries: readonly PrintablePartStl[];
+};
+
 export type PrintableThreeMfZip = {
   readonly filename: string;
   readonly mimeType: string;
@@ -351,6 +366,32 @@ export function createPrintableThreeMfZipFromKit(
   };
 }
 
+// The STL counterpart of the per-chunk ZIP: one binary STL per print chunk,
+// each auto-oriented for printing and seated at the origin, bundled into a
+// stored ZIP. STL carries no plate/units metadata, so slicers auto-place each
+// part (STL is conventionally millimetres, matching the kit).
+export function createPrintableStlZipFromKit(kit: PrintableKit, baseName: string): PrintableStlZip {
+  const usedNames = new Set<string>();
+  const entries: PrintablePartStl[] = kit.parts.map((part, index) => {
+    const oriented = orientPrintablePart(part);
+    return {
+      part,
+      filename: uniquePartFileName(usedNames, baseName, part, index, "stl"),
+      bytes: createBinaryStl(oriented.mesh.vertices, oriented.mesh.triangles),
+    };
+  });
+
+  const zipFiles: StoredZipFile[] = entries.map((entry) => ({ name: entry.filename, content: entry.bytes }));
+
+  return {
+    filename: `${baseName}.zip`,
+    mimeType: "application/zip",
+    bytes: createStoredZipPackage(zipFiles),
+    kit,
+    entries,
+  };
+}
+
 // A single part as its own 3MF: one object, no plate metadata (every slicer
 // auto-places a lone object), translated so its footprint sits centered on the
 // bed with its base on z=0.
@@ -458,13 +499,13 @@ function bedCenteredPosition(bounds: MeshBounds, bed: PrintBed): MeshVertex {
 // Per-Part Filenames
 // ##############################
 
-function uniquePartFileName(used: Set<string>, baseName: string, part: PrintablePart, index: number): string {
+function uniquePartFileName(used: Set<string>, baseName: string, part: PrintablePart, index: number, extension = "3mf"): string {
   const ordinal = String(index + 1).padStart(2, "0");
   const slug = fileNameSlug(part.name);
-  let candidate = `${baseName}-${ordinal}-${slug}.3mf`;
+  let candidate = `${baseName}-${ordinal}-${slug}.${extension}`;
   let suffix = 2;
   while (used.has(candidate)) {
-    candidate = `${baseName}-${ordinal}-${slug}-${suffix}.3mf`;
+    candidate = `${baseName}-${ordinal}-${slug}-${suffix}.${extension}`;
     suffix += 1;
   }
   used.add(candidate);

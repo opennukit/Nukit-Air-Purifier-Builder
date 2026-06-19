@@ -110,7 +110,7 @@
     type WorkbenchViewModel,
   } from "@/app/workbench/workbenchViewModel";
   import { exportBlockingDiagnostics, summarizeBuildReadiness, type BuildDiagnostic } from "@/fabrication/buildDiagnostics";
-  import { createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
+  import { createLaserDxf, createLaserSvg, createLayout, type LayoutResult } from "@/fabrication/purifierLayout";
   import { createTempestModel } from "@/domain/designs/tempest/model";
   import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
   import {
@@ -122,7 +122,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignThreeMfZipFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignStlZipFromKit, createPrintDesignThreeMfZipFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
@@ -241,6 +241,11 @@
   // The Laser Cut "Advanced" (joint tuning) accordion, collapsed by default to
   // match the 3D Print Advanced layout.
   let showLaserAdvanced = false;
+  // Download file format per mode (a download-time choice, not a design setting):
+  // laser exports SVG by default with DXF as an alternative; 3D print exports a
+  // per-chunk 3MF ZIP by default with a per-chunk STL ZIP as an alternative.
+  let laserDownloadFormat: "svg" | "dxf" = "svg";
+  let printDownloadFormat: "3mf" | "stl" = "3mf";
   const laserFingerJointControls = advancedJointControls.filter((control) => control.name.startsWith("finger"));
   const laserDovetailControls = advancedJointControls.filter((control) => control.name.startsWith("dovetail"));
   // Laser Cut: "Filter rim" and "Fan screw size" live under Advanced; the main
@@ -921,17 +926,21 @@
       return;
     }
 
-    exportSvgDrawing(layout);
+    if (laserDownloadFormat === "dxf") {
+      exportLaserDrawing(createLaserDxf(layout), "nukit-open-air-purifier.dxf", "application/dxf");
+      showTransientButtonLabel(buttonKey, "Exported DXF", 1400);
+      return;
+    }
+    exportLaserDrawing(createLaserSvg(layout), "nukit-open-air-purifier.svg", "image/svg+xml;charset=utf-8");
     showTransientButtonLabel(buttonKey, "Exported SVG", 1400);
   }
 
-  function exportSvgDrawing(currentLayout: LayoutResult): void {
-    const svg = createLaserSvg(currentLayout);
-    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  function exportLaserDrawing(content: string, filename: string, mimeType: string): void {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "nukit-open-air-purifier.svg";
+    link.download = filename;
     document.body.append(link);
     link.click();
     link.remove();
@@ -964,7 +973,10 @@
       requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
       return "Still updating…";
     }
-    const printExport = createPrintDesignThreeMfZipFromKit(currentLayout, currentGeneratedPlan.kit);
+    const printExport =
+      printDownloadFormat === "stl"
+        ? createPrintDesignStlZipFromKit(currentLayout, currentGeneratedPlan.kit)
+        : createPrintDesignThreeMfZipFromKit(currentLayout, currentGeneratedPlan.kit);
     const blob = new Blob([toArrayBuffer(printExport.bytes)], { type: printExport.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -974,7 +986,7 @@
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return "Downloaded kit";
+    return printDownloadFormat === "stl" ? "Downloaded STL kit" : "Downloaded kit";
   }
 
   function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -2194,6 +2206,13 @@
                         </div>
                       </fieldset>
                     {/if}
+                    <label class="field">
+                      <span>Download format {@render infoTip("info-print-downloadFormat", "File downloaded by the export button. A 3MF ZIP (default) keeps part colours and units; an STL ZIP is the plainer mesh format every slicer reads. Both bundle one file per print chunk.")}</span>
+                      <select name="printDownloadFormat" bind:value={printDownloadFormat}>
+                        <option value="3mf">3MF (zip)</option>
+                        <option value="stl">STL (zip)</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
               {/if}
@@ -2249,6 +2268,13 @@
                   </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Drawing output</p>
+                    <label class="field">
+                      <span>Download format {@render infoTip("info-laser-downloadFormat", "File downloaded by the export button. SVG (default) is the vector cut sheet; DXF is the CAD interchange format most laser software imports.")}</span>
+                      <select name="laserDownloadFormat" bind:value={laserDownloadFormat}>
+                        <option value="svg">SVG</option>
+                        <option value="dxf">DXF</option>
+                      </select>
+                    </label>
                     <label class="toggle-field">
                       <input
                         type="checkbox"

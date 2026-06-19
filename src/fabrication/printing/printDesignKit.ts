@@ -3,9 +3,11 @@ import { createTempestPrintableKitFromLayout } from "@/fabrication/printing/desi
 import { findPreviewMaterialColorPreset, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
+  createPrintableStlZipFromKit,
   createPrintableThreeMfExportFromKit,
   createPrintableThreeMfZipFromKit,
   type PrintableKit,
+  type PrintableStlZip,
   type PrintableThreeMfExport,
   type PrintableThreeMfZip,
   type PrintVolumePresetId,
@@ -86,6 +88,13 @@ export function createPrintDesignThreeMfZip(
   presetId: PrintVolumePresetId,
 ): PrintableThreeMfZip {
   return createPrintDesignThreeMfZipFromKit(layout, createPrintDesignKit(layout, presetId));
+}
+
+export function createPrintDesignStlZipFromKit(
+  layout: LayoutResult,
+  kit: PrintableKit,
+): PrintableStlZip {
+  return createPrintableStlZipFromKit(kit, `${layout.configuration.printDesign.id}-print-kit`);
 }
 
 export function createPrintDesignThreeMfZipFromKit(

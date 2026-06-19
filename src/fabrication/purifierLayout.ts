@@ -21,6 +21,7 @@ import type { CutPanel } from "@/fabrication/laser/cutGeometry";
 import { createAirPurifierCutSheet, resolveFanCount } from "@/fabrication/laser/panels";
 import { createTempestSettingsFromConfiguration } from "@/fabrication/printing/designs/tempest/settings";
 import { renderBoxesDocumentSvg } from "@/ports/boxes/svg";
+import { renderBoxesDocumentDxf } from "@/ports/boxes/dxf";
 
 type CutSheetDocument = ReturnType<typeof createAirPurifierCutSheet>["document"];
 
@@ -88,6 +89,10 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
 
 export function createLaserSvg(layout: LayoutResult): string {
   return renderBoxesDocumentSvg(requireCutPanelFabricationPlan(layout, "createLaserSvg").cutSheet);
+}
+
+export function createLaserDxf(layout: LayoutResult): string {
+  return renderBoxesDocumentDxf(requireCutPanelFabricationPlan(layout, "createLaserDxf").cutSheet);
 }
 
 export function requireCutPanelFabricationPlan(layout: LayoutResult, caller: string): CutPanelFabricationPlan {
