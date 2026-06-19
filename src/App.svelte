@@ -1677,7 +1677,7 @@
               </div>
               <div data-print-volume-control>
                 <label class="field">
-                  <span>Print volume</span>
+                  <span>Print volume {@render infoTip("info-printVolume", "Your printer's usable bed size. Parts too big for the bed are automatically split into chunks that fit, so pick the volume that matches your machine.")}</span>
                   <select name="printVolume" onchange={setPrintVolume}>
                     {#each printVolumePresets as preset}
                       <option value={preset.id} selected={printVolumePresetId === preset.id}>{preset.label}</option>
@@ -1993,7 +1993,7 @@
 
                   {#if showHexGrillControls}
                     <fieldset class="fan-placement-field" data-tempest-hex-grill>
-                      <legend>Honeycomb grill</legend>
+                      <legend>Honeycomb grill {@render infoTip("info-hexGrill", "Print a honeycomb of hexagons across each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
                       <div class="fan-placement-checks">
                         <label class="toggle-field">
                           <input
