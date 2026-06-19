@@ -1542,13 +1542,18 @@ WCAG-minimum 24px. */
   border-color: var(--accent-line-strong);
 }
 
+/* Fixed (not absolute) so the bubble escapes the controls-pane scroll container
+   (overflow: auto), which would otherwise crop it at the column edge. A use:action
+   sets top/left on show and clamps it inside the viewport; top:-9999px is just the
+   pre-placement parking spot to avoid a flash. */
 .info-tip p {
-  position: absolute;
-  z-index: 4;
-  bottom: 22px;
-  left: -8px;
+  position: fixed;
+  z-index: 50;
+  top: -9999px;
+  left: 0;
   display: none;
-  width: min(320px, 72vw);
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--line-medium);

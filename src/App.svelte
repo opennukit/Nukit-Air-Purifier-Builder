@@ -758,6 +758,63 @@
     return tipId.replace(/^info-/, "").replace(/^laser-/, "");
   }
 
+  // Tooltip bubbles are position: fixed so they escape the controls-pane scroll
+  // container (overflow: auto), which would otherwise crop them at the column edge.
+  // Fixed elements need explicit coordinates, so when a tip is shown (hover, focus,
+  // or tap) we anchor it above its "i" button and clamp it inside the viewport.
+  // One delegated listener handles every tip in the pane.
+  function infoTipPositioning(root: HTMLElement) {
+    function place(tip: HTMLElement): void {
+      const button = tip.querySelector("button");
+      const bubble = tip.querySelector<HTMLElement>('[role="tooltip"]');
+      if (button === null || bubble === null) {
+        return;
+      }
+      const rect = button.getBoundingClientRect();
+      const margin = 8;
+      const width = bubble.offsetWidth;
+      const height = bubble.offsetHeight;
+      let left = Math.min(rect.left - 8, window.innerWidth - width - margin);
+      left = Math.max(margin, left);
+      let top = rect.top - height - 6;
+      if (top < margin) {
+        // No room above: drop the bubble below the button instead.
+        top = rect.bottom + 6;
+      }
+      bubble.style.left = `${Math.round(left)}px`;
+      bubble.style.top = `${Math.round(top)}px`;
+    }
+
+    function update(): void {
+      const tip = root.querySelector<HTMLElement>(
+        ".info-tip.is-open, .info-tip:focus-within, .info-tip:hover",
+      );
+      if (tip !== null) {
+        place(tip);
+      }
+    }
+
+    function updateNextFrame(): void {
+      requestAnimationFrame(update);
+    }
+
+    root.addEventListener("pointerover", update);
+    root.addEventListener("focusin", update);
+    root.addEventListener("click", updateNextFrame);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+
+    return {
+      destroy(): void {
+        root.removeEventListener("pointerover", update);
+        root.removeEventListener("focusin", update);
+        root.removeEventListener("click", updateNextFrame);
+        window.removeEventListener("scroll", update, true);
+        window.removeEventListener("resize", update);
+      },
+    };
+  }
+
   // ##############################
   // Workbench Navigation
   // ##############################
@@ -1306,7 +1363,7 @@
       Control Sidebar
       ############################## -->
 
-      <aside class="controls-pane" aria-label="Build settings">
+      <aside class="controls-pane" aria-label="Build settings" use:infoTipPositioning>
         <section class="persistent-output-panel" data-persistent-output-panel aria-label="Build output">
           <div class="export-readiness-summary" id="exportReadinessSummary">
             <div class={`diagnostic-item ${exportReadiness.severity}`}>
