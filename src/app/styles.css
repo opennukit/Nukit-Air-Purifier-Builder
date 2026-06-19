@@ -196,6 +196,14 @@ Shared Buttons
   color: white;
 }
 
+/* The header "Contact" link reuses the ghost-button pill but is an anchor, so it
+   needs flex centring and no underline to match the real buttons. */
+a.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .ghost-button,
 .mode-button {
   border: 1px solid var(--line);
