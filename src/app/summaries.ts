@@ -134,8 +134,10 @@ export function createPreviewSummaryItems(
   const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
   return [
     { label: "Panels", value: String(cutPanelSummary.panelCount) },
-    { label: "Chamber height", value: formatMillimeters(currentLayout.summary.chamberHeight) },
-    { label: "Working depth", value: formatMillimeters(currentLayout.summary.workingDepth) },
+    // Labelled to match the 3D dimension guides: the preview tilts the model so
+    // workingDepth reads as the outside height and chamberHeight as the outside depth.
+    { label: "Outside height", value: formatMillimeters(currentLayout.summary.workingDepth) },
+    { label: "Outside depth", value: formatMillimeters(currentLayout.summary.chamberHeight) },
     { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
     {
       label: "Sheet",
