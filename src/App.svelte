@@ -2268,13 +2268,6 @@
                   </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Drawing output</p>
-                    <label class="field">
-                      <span>Download format {@render infoTip("info-laser-downloadFormat", "File downloaded by the export button. SVG (default) is the vector cut sheet; DXF is the CAD interchange format most laser software imports.")}</span>
-                      <select name="laserDownloadFormat" bind:value={laserDownloadFormat}>
-                        <option value="svg">SVG</option>
-                        <option value="dxf">DXF</option>
-                      </select>
-                    </label>
                     <label class="toggle-field">
                       <input
                         type="checkbox"
@@ -2418,6 +2411,16 @@
                         </span>
                       </label>
                     {/if}
+                  </div>
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Download</p>
+                    <label class="field">
+                      <span>Download format {@render infoTip("info-laser-downloadFormat", "File downloaded by the export button. SVG (default) is the vector cut sheet; DXF is the CAD interchange format most laser software imports.")}</span>
+                      <select name="laserDownloadFormat" bind:value={laserDownloadFormat}>
+                        <option value="svg">SVG</option>
+                        <option value="dxf">DXF</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
               {/if}
