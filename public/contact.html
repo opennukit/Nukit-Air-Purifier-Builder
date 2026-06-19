@@ -79,18 +79,14 @@
       .field input[type="file"] { padding: 8px; background: var(--surface); cursor: pointer; }
       .field input:focus, .field textarea:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-      .h-captcha { margin: 0 0 18px; }
       .btn {
         appearance: none; border: 0; cursor: pointer; padding: 12px 22px; border-radius: 2px;
         background: var(--accent); color: #fff; font-weight: 700; font-size: 0.95rem;
       }
       .btn:hover { background: var(--accent-strong); }
-      .btn:disabled { opacity: 0.6; cursor: progress; }
       .form-status { margin: 0 0 18px; padding: 12px 16px; border-radius: 2px; font-size: 0.9rem; display: none; }
-      .form-status.is-ok { display: block; background: var(--accent-wash); border-left: 3px solid var(--accent); color: var(--accent-strong); }
       .form-status.is-error { display: block; background: rgb(179 38 30 / 8%); border-left: 3px solid var(--danger); color: var(--danger); }
       .note { margin: 16px 0 0; font-size: 0.82rem; color: var(--muted); }
-      .honeypot { position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden; }
       @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -121,28 +117,32 @@
 
       <section class="card">
         <!--
-          Web3Forms delivery. Messages are emailed to whichever address the access
-          key below is registered to. Create a free key at https://web3forms.com
-          using sales@machineryenchantress.com, then paste it into the value of the
-          access_key field. The key is a public form identifier, not a secret.
-          In the Web3Forms dashboard, enable hCaptcha as the spam protection so the
-          captcha on this page is enforced server-side.
+          FormSubmit delivery (free; supports file attachments up to 10 MB total).
+          The form posts to a FormSubmit alias so the destination address never
+          appears in the page. To get the alias (one time):
+            1. Temporarily set the action below to
+               https://formsubmit.co/<your-destination-email> and load this page
+               locally (before deploying).
+            2. Send one test message and solve the reCAPTCHA FormSubmit shows.
+            3. In that inbox, open the FormSubmit activation email, click Activate,
+               and copy the random alias string it gives you.
+            4. Replace YOUR_FORMSUBMIT_ALIAS below with that string.
+          reCAPTCHA is provided by FormSubmit at submit time, so no captcha keys
+          live here.
         -->
         <p id="formStatus" class="form-status" role="status" aria-live="polite"></p>
 
         <form
           id="contactForm"
-          action="https://api.web3forms.com/submit"
+          action="https://formsubmit.co/YOUR_FORMSUBMIT_ALIAS"
           method="POST"
           enctype="multipart/form-data"
         >
-          <input type="hidden" name="access_key" value="f160393b-6708-469b-b9cb-b0f7184cf542" />
-          <input type="hidden" name="from_name" value="Machinery Enchantress website" />
+          <input type="hidden" name="_subject" value="New FilterBoxBuilder contact message" />
+          <input type="hidden" name="_template" value="table" />
 
-          <!-- Honeypot: bots fill this hidden field; real visitors never see it. -->
-          <div class="honeypot" aria-hidden="true">
-            <label>Do not fill this in <input type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" /></label>
-          </div>
+          <!-- Honeypot: hidden field; if a bot fills it, FormSubmit silently drops the submission. -->
+          <input type="text" name="_honey" style="display: none" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
           <div class="row">
             <div class="field">
@@ -171,7 +171,7 @@
           </div>
 
           <div class="field">
-            <label for="attachment">Attachment <span class="hint">(optional, up to 1 MB)</span></label>
+            <label for="attachment">Attachment <span class="hint">(optional, up to 10 MB)</span></label>
             <input
               id="attachment"
               type="file"
@@ -180,63 +180,31 @@
             />
           </div>
 
-          <div class="h-captcha" data-captcha="true"></div>
-
           <button id="submitBtn" class="btn" type="submit">Send message</button>
           <p class="note">
-            Your message goes to sales@machineryenchantress.com. We will only use your details to reply.
+            Your message goes straight to our team. We will only use your details to reply.
           </p>
         </form>
       </section>
     </div>
 
-    <!-- Web3Forms client script: renders the hCaptcha widget and wires the proxy. -->
-    <script src="https://web3forms.com/client/script.js" async defer></script>
     <script>
+      // The only client-side check: stop oversized attachments before they fail at
+      // FormSubmit (10 MB total limit). Everything else (reCAPTCHA, delivery) is
+      // handled by FormSubmit after the form posts.
       (function () {
         var form = document.getElementById("contactForm");
         var status = document.getElementById("formStatus");
-        var button = document.getElementById("submitBtn");
         var fileInput = document.getElementById("attachment");
-        var MAX_BYTES = 1024 * 1024; // Web3Forms free-plan attachment limit.
-
-        function show(kind, message) {
-          status.className = "form-status " + kind;
-          status.textContent = message;
-        }
+        var MAX_BYTES = 10 * 1024 * 1024;
 
         form.addEventListener("submit", function (event) {
-          event.preventDefault();
-
           if (fileInput.files.length > 0 && fileInput.files[0].size > MAX_BYTES) {
-            show("is-error", "That attachment is larger than 1 MB. Please attach a smaller file or send a link instead.");
-            return;
+            event.preventDefault();
+            status.className = "form-status is-error";
+            status.textContent = "That attachment is larger than 10 MB. Please attach a smaller file or include a link instead.";
+            fileInput.focus();
           }
-
-          var captcha = form.querySelector('textarea[name="h-captcha-response"]');
-          if (!captcha || !captcha.value) {
-            show("is-error", "Please complete the captcha so we know you are human.");
-            return;
-          }
-
-          button.disabled = true;
-          show("is-ok", "Sending your message...");
-
-          fetch(form.action, { method: "POST", body: new FormData(form) })
-            .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
-            .then(function (result) {
-              if (result.ok) {
-                show("is-ok", "Thanks! Your message has been sent. We will be in touch soon.");
-                form.reset();
-                if (window.hcaptcha) { try { window.hcaptcha.reset(); } catch (e) {} }
-              } else {
-                show("is-error", (result.data && result.data.message) || "Something went wrong. Please try again, or email sales@machineryenchantress.com directly.");
-              }
-            })
-            .catch(function () {
-              show("is-error", "Network error. Please try again, or email sales@machineryenchantress.com directly.");
-            })
-            .then(function () { button.disabled = false; });
         });
       })();
     </script>
