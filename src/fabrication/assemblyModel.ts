@@ -270,15 +270,18 @@ function createDimensionGuides(width: number, height: number, depth: number): Di
       labelOffset: [-26, 52, 0],
     },
     {
-      label: "H",
-      measurement: { value: height, description: "outside height" },
+      // The preview tilts the model -90° about X (homePreviewRotationX), so the
+      // model-Y axis (chamberHeight) reads as depth into the screen, not height.
+      label: "D",
+      measurement: { value: height, description: "outside depth" },
       from: [width / 2 + 34, -height / 2, -depth / 2],
       to: [width / 2 + 34, height / 2, -depth / 2],
       labelOffset: [-41.6, 0, 0],
     },
     {
-      label: "D",
-      measurement: { value: depth, description: "outside depth" },
+      // ...and the model-Z axis (workingDepth) reads as the vertical height.
+      label: "H",
+      measurement: { value: depth, description: "outside height" },
       from: [width / 2 + 28, yTop, -depth / 2],
       to: [width / 2 + 28, yTop, depth / 2],
       labelOffset: [20.8, 41.6, 0],
