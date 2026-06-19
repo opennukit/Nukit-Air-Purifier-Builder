@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Help &amp; documentation — Nukit FilterBoxBuilder</title>
+    <meta
+      name="description"
+      content="How every FilterBoxBuilder setting works, plus fabrication, gluing and assembly tips and the filtration science behind MERV 13 PC-fan filter boxes."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --surface: #f8f5ec;
+        --surface-strong: #fffdf6;
+        --ink: #17201c;
+        --muted: #59635b;
+        --line: #d9d0bf;
+        --line-soft: rgb(217 208 191 / 54%);
+        --accent: #1f6f56;
+        --accent-strong: #164d3d;
+        --accent-wash: rgb(31 111 86 / 8%);
+        --focus-ring: #2f65c8;
+        --wood: #be8d55;
+        --shadow: 0 20px 70px rgb(51 42 27 / 12%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ece8dc;
+        background-image: radial-gradient(rgb(190 141 85 / 9%) 1px, transparent 1px);
+        background-size: 42px 42px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+      }
+      a {
+        color: var(--accent-strong);
+      }
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+      }
+      .page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 32px 24px 96px;
+      }
+      header.masthead {
+        padding: 28px 30px;
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        border-radius: 2px;
+      }
+      header.masthead h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.7rem, 3vw, 2.4rem);
+        letter-spacing: -0.01em;
+      }
+      header.masthead p {
+        margin: 0;
+        max-width: 70ch;
+        color: var(--muted);
+      }
+      .home-link {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 8px 14px;
+        border-radius: 2px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 28px;
+        margin-top: 28px;
+      }
+      nav.toc {
+        position: sticky;
+        top: 18px;
+        align-self: start;
+        max-height: calc(100vh - 36px);
+        overflow: auto;
+        padding: 18px 18px 22px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        font-size: 0.86rem;
+      }
+      nav.toc strong {
+        display: block;
+        margin: 14px 0 6px;
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      nav.toc strong:first-child {
+        margin-top: 0;
+      }
+      nav.toc a {
+        display: block;
+        padding: 3px 0;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      nav.toc a:hover {
+        color: var(--accent-strong);
+        text-decoration: underline;
+      }
+      main {
+        min-width: 0;
+      }
+      section.card {
+        padding: 26px 30px;
+        margin-bottom: 22px;
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        box-shadow: 0 10px 40px rgb(51 42 27 / 7%);
+      }
+      section.card > h2 {
+        margin: 0 0 4px;
+        font-size: 1.45rem;
+      }
+      .lede {
+        margin: 0 0 18px;
+        color: var(--muted);
+      }
+      .var {
+        scroll-margin-top: 18px;
+        padding: 16px 0;
+        border-top: 1px solid var(--line-soft);
+      }
+      .var:first-of-type {
+        border-top: 0;
+      }
+      .var h3,
+      .var h4 {
+        margin: 0 0 6px;
+        font-size: 1.06rem;
+      }
+      .var p {
+        margin: 0 0 8px;
+      }
+      .var p:last-child {
+        margin-bottom: 0;
+      }
+      code {
+        padding: 1px 5px;
+        background: var(--accent-wash);
+        border: 1px solid var(--line-soft);
+        border-radius: 3px;
+        font-size: 0.85em;
+      }
+      ul,
+      ol {
+        margin: 8px 0;
+        padding-left: 22px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      .tip {
+        margin: 14px 0;
+        padding: 12px 16px;
+        background: var(--accent-wash);
+        border-left: 3px solid var(--accent);
+        border-radius: 2px;
+      }
+      .tip strong {
+        color: var(--accent-strong);
+      }
+      .photo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        min-height: 150px;
+        margin: 16px 0;
+        padding: 20px;
+        color: var(--muted);
+        background: repeating-linear-gradient(
+          45deg,
+          rgb(190 141 85 / 7%),
+          rgb(190 141 85 / 7%) 12px,
+          transparent 12px,
+          transparent 24px
+        );
+        border: 1px dashed var(--wood);
+        border-radius: 2px;
+        font-size: 0.85rem;
+      }
+      .photo span {
+        max-width: 46ch;
+      }
+      .refs {
+        font-size: 0.9rem;
+      }
+      .refs li {
+        margin: 8px 0;
+      }
+      .note {
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      table.specs {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: 0.9rem;
+      }
+      table.specs th,
+      table.specs td {
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        text-align: left;
+      }
+      table.specs th {
+        background: var(--accent-wash);
+      }
+      @media (max-width: 820px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        nav.toc {
+          position: static;
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Nukit FilterBoxBuilder</p>
+        <h1>Help &amp; documentation</h1>
+        <p>
+          A reference for every setting in the parametric builder, how to fabricate and assemble your box in
+          laser-cut plywood or on a 3D printer, and the filtration science behind a MERV&nbsp;13 PC-fan filter box.
+          Tooltips in the builder link straight to the matching section here.
+        </p>
+        <a class="home-link" href="./">← Back to the builder</a>
+      </header>
+
+      <div class="layout">
+        <nav class="toc" aria-label="Contents">
+          <strong>Getting started</strong>
+          <a href="#overview">How the builder works</a>
+          <strong>Layout &amp; design</strong>
+          <a href="#design">Design presets</a>
+          <a href="#filterLayout">Filter layout</a>
+          <a href="#fanPlacement">Fan placement</a>
+          <a href="#backPlateFansCount">Back fans</a>
+          <a href="#boxDepth">Box depth</a>
+          <a href="#filterSlotPlacement">Filter slot placement</a>
+          <strong>Filter</strong>
+          <a href="#filterSize">Filter size</a>
+          <a href="#filterFitClearance">Filter fit clearance</a>
+          <a href="#rim">Filter rim</a>
+          <strong>Fans</strong>
+          <a href="#fanSize">Fan size</a>
+          <a href="#screwHoleDiameter">Fan screw size</a>
+          <a href="#hexSize">Honeycomb grill</a>
+          <strong>Cord pass-through</strong>
+          <a href="#cordHoleDiameter">Cord hole</a>
+          <strong>Material &amp; joints (laser)</strong>
+          <a href="#materialThickness">Material thickness</a>
+          <a href="#kerfFit">Kerf / fit allowance</a>
+          <a href="#fingerJoints">Finger joints</a>
+          <a href="#dovetails">Dovetails</a>
+          <strong>Drawing &amp; output</strong>
+          <a href="#labels">Engrave labels</a>
+          <a href="#referenceScale">Reference scale</a>
+          <a href="#chunkLabels">Chunk labels</a>
+          <strong>Build it</strong>
+          <a href="#fabrication">Fabrication &amp; assembly</a>
+          <strong>Why this works</strong>
+          <a href="#filtration">MERV 13 &amp; PC fans</a>
+          <a href="#references">References</a>
+        </nav>
+
+        <main>
+          <section class="card" id="overview">
+            <p class="eyebrow">Getting started</p>
+            <h2>How the builder works</h2>
+            <p class="lede">
+              FilterBoxBuilder turns a few measurements into a complete, ready-to-make air-cleaner box built around
+              standard rectangular furnace filters and off-the-shelf PC case fans.
+            </p>
+            <p>
+              Pick a fabrication method at the top — <strong>3D&nbsp;print</strong> or <strong>Laser&nbsp;cut</strong> —
+              then set your filter size, fan size and fan placement. The 3D preview updates live, the
+              <em>What&nbsp;you&nbsp;need</em> panel lists parts, and the export button produces the files for your
+              chosen method (a 3MF print kit, or an SVG cut sheet).
+            </p>
+            <p>
+              Everything is parametric: the housing is generated from your numbers, so any filter and fan combination
+              produces a buildable box. The sections below explain each control. Most are in the main panel; a few live
+              under <em>Advanced</em>.
+            </p>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Layout &amp; design</p>
+            <h2>Layout &amp; design</h2>
+            <p class="lede">Choose the overall shape of the box and where air moves through it.</p>
+
+            <div class="var" id="design">
+              <h3>Design presets</h3>
+              <p>
+                The <strong>Design</strong> dropdown loads a complete starting configuration (filter, fan and box
+                settings) for a known build. Picking a preset fills in every field at once; editing any value
+                afterwards switches the dropdown to <code>Custom</code> so you know you have diverged from the preset.
+                Start from the preset closest to your parts, then fine-tune.
+              </p>
+            </div>
+
+            <div class="var" id="filterLayout">
+              <h3>Filter layout</h3>
+              <p>
+                <strong>One side</strong> uses a single filter on one face of the box (a shallow panel or a deeper
+                chamber). <strong>Both sides</strong> sandwiches the chamber between two filters for roughly double the
+                filter area and clean-air delivery in the same footprint. 3D&nbsp;Print also offers
+                <strong>Four sides</strong> — a tower with a filter on each wall and exhaust through the top.
+              </p>
+              <p class="note">More filter area lowers the air speed through the media, which raises efficiency and
+                lowers noise (see <a href="#filtration">MERV&nbsp;13 &amp; PC fans</a>).</p>
+            </div>
+
+            <div class="var" id="fanPlacement">
+              <span class="anchor" id="fansLeft"></span><span class="anchor" id="fansRight"></span>
+              <span class="anchor" id="fansTop"></span><span class="anchor" id="fansBottom"></span>
+              <h3>Fan placement &amp; per-wall fan counts</h3>
+              <p>
+                The placement checkboxes choose which walls carry fans. <strong>Auto</strong> fills a wall with as many
+                fans as physically fit; under <em>Advanced</em> you can instead set an exact count per wall
+                (<strong>Left</strong>, <strong>Right</strong>, <strong>Top</strong>, <strong>Bottom</strong>, and
+                <strong>Back</strong>). More fans raise airflow and clean-air delivery but draw more power and cost
+                more; spreading them over several walls keeps each opening clear of the corners.
+              </p>
+              <p>
+                Fans are typically arranged to <em>pull</em> air in through the filter(s) and push it out the fan
+                openings. Keeping intake (filter) area large relative to fan area keeps the system quiet.
+              </p>
+            </div>
+
+            <div class="var" id="backPlateFansCount">
+              <h3>Back fans (one-side box)</h3>
+              <p>
+                On a one-side layout, the wall opposite the filter is a solid plate that can carry its own grid of
+                fans. <strong>Auto</strong> fills the plate with as many fans as fit; choose a fixed number if you
+                prefer fewer. A fixed count is laid out as a centred, near-square block (for example 4&nbsp;→&nbsp;2×2)
+                rather than bunched in a corner.
+              </p>
+              <p>
+                Turning <strong>Back</strong> on (with no wall fans) makes the box a shallow back-fan panel: the filter
+                is on the front face and all the fans sit on the back plate. This is the classic single-filter
+                wall-mount or window arrangement.
+              </p>
+            </div>
+
+            <div class="var" id="boxDepth">
+              <h3>Box depth</h3>
+              <p>
+                For the one-side back-fan panel, <strong>Box depth</strong> sets the chamber depth — the gap between the
+                filter and the back plate — in place of the fan-diameter chamber the deeper boxes use. A shallower box
+                (the default is <code>70&nbsp;mm</code>) is more compact and wall-friendly; a deeper box gives the air a
+                larger plenum, which can even out flow across the filter. It only applies when <strong>Back</strong>
+                fans are on and no wall fans are selected.
+              </p>
+            </div>
+
+            <div class="var" id="filterSlotPlacement">
+              <h3>Filter slot placement</h3>
+              <p>
+                Sets which wall the filter slides in through. The chosen wall gets the open loading slot so you can
+                change the filter without taking the box apart; the other walls stay closed. Put the slot on whichever
+                face is easiest to reach once the box is installed (often the back or a side).
+              </p>
+            </div>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Filter</p>
+            <h2>Filter</h2>
+            <p class="lede">The builder is sized around your actual filter — measure it, do not trust the nominal size.</p>
+
+            <div class="var" id="filterSize">
+              <span class="anchor" id="filterWidth"></span><span class="anchor" id="filterDepth"></span>
+              <span class="anchor" id="filterThickness"></span>
+              <h3>Filter size (width, length, thickness)</h3>
+              <p>
+                Choose a stock size from the dropdown or enter your own. Filters are sold by a <em>nominal</em> size
+                (e.g. 20"×20"×1") that is rounded up; the real part is a few millimetres smaller. <strong>Measure your
+                filter</strong> and enter the true width, length and thickness in millimetres so the housing fits.
+              </p>
+              <p>
+                Thicker, deeper-pleated filters hold more media, so they capture more and clog more slowly — a 2"
+                (≈50&nbsp;mm) MERV&nbsp;13 will out-perform and out-last a 1" filter at the same airflow. Use the swap
+                button to exchange width and length if your filter is portrait vs landscape.
+              </p>
+            </div>
+
+            <div class="var" id="filterFitClearance">
+              <h3>Filter fit clearance</h3>
+              <p>
+                Extra gap left around the filter footprint, per side, so it slides into the box without forcing.
+                Increase it if your filter is a tight push or your material/print runs oversized; decrease it for a
+                snugger, more airtight fit. A small clearance (≈1&nbsp;mm) is usually enough; too much lets unfiltered
+                air leak around the edges, so seal any gaps with foam tape if you open it up.
+              </p>
+            </div>
+
+            <div class="var" id="rim">
+              <h3>Filter rim</h3>
+              <p>
+                Width of the frame border that overlaps the edge of the filter and the air opening. The rim holds the
+                filter in place and gives the frame rails their strength. A wider rim is sturdier but shrinks the open
+                area the air passes through; keep it just wide enough to capture the filter gasket and carry the joints.
+              </p>
+            </div>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Fans</p>
+            <h2>Fans</h2>
+            <p class="lede">Standard PC case fans — quiet, cheap, PWM-controllable and easy to replace.</p>
+
+            <div class="var" id="fanSize">
+              <h3>Fan size</h3>
+              <p>
+                The nominal diameter of the PC fans you will mount (commonly 120&nbsp;mm or 140&nbsp;mm). This sets the
+                size of every fan opening and screw pattern and sizes the housing around them. <strong>140&nbsp;mm</strong>
+                fans move the same air as 120&nbsp;mm fans at a lower RPM, so they are usually quieter for the same
+                airflow; <strong>120&nbsp;mm</strong> fans are easier to source and pack more densely. Match the value
+                to fans you can actually buy.
+              </p>
+            </div>
+
+            <div class="var" id="screwHoleDiameter">
+              <h3>Fan screw size</h3>
+              <p>
+                Diameter of each fan mounting-screw hole. PC fans use a roughly 4.3&nbsp;mm hole for standard
+                self-tapping fan screws; set this to match your screws (a touch smaller for self-tappers that bite into
+                plywood or plastic, exact for machine screws and nuts). Four holes are placed at each fan on the
+                standard fan bolt pattern.
+              </p>
+            </div>
+
+            <div class="var" id="hexSize">
+              <span class="anchor" id="hexSpacing"></span>
+              <h3>Honeycomb grill (cell size &amp; rib spacing)</h3>
+              <p>
+                An optional honeycomb pattern over a fan opening that protects fingers and the fan blades while passing
+                air. <strong>Grill hex size</strong> is the cell width, flat-to-flat; <strong>Grill hex spacing</strong>
+                is the rib (wall) thickness between cells. Bigger cells and thinner ribs let more air through with less
+                noise; smaller cells are safer and stiffer. Ribs that are too thin may be fragile when printed or cut.
+              </p>
+            </div>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Cord pass-through</p>
+            <h2>Cord pass-through</h2>
+            <p class="lede">An optional bore for the fan power cable so the box can close up neatly.</p>
+
+            <div class="var" id="cordHoleDiameter">
+              <h3>Cord hole diameter</h3>
+              <p>
+                Diameter of the power-cord pass-through. Set it to fit your cable or barrel-jack grommet; set it to
+                <code>0</code> for no cord hole at all. The builder keeps the bore clear of fan openings — if it would
+                land under a fan, the fan bank re-packs to make room rather than moving the cord.
+              </p>
+            </div>
+            <div class="var" id="cordHoleWall">
+              <h3>Power cord wall</h3>
+              <p>Which wall the cord exits through. Choose the side that faces your outlet or hub once the box is placed.</p>
+            </div>
+            <div class="var" id="cordHoleSide">
+              <h3>Cord position</h3>
+              <p>Slides the hole along the chosen wall — centre, or toward one end — so it lines up with your wiring.</p>
+            </div>
+            <div class="var" id="cordHoleCornerOffset">
+              <h3>Cord corner offset</h3>
+              <p>Distance from the corner to the cord hole, used when the cord is positioned toward an end of the wall.</p>
+            </div>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Material &amp; joints</p>
+            <h2>Material &amp; joints (laser cut)</h2>
+            <p class="lede">
+              These tune the flat-pack joinery for laser-cut sheet stock. The defaults match the
+              <a href="https://florianfesti.github.io/boxes/" target="_blank" rel="noopener">boxes.py</a> generator the
+              cut geometry is ported from.
+            </p>
+
+            <div class="var" id="materialThickness">
+              <h3>Material thickness</h3>
+              <p>
+                Thickness of your sheet stock. This is the most important laser setting: it drives finger length, every
+                slot width and the overall joinery. Measure your plywood or acrylic with calipers (nominal "3&nbsp;mm"
+                ply is often 2.7–3.2&nbsp;mm) and enter the real value, or the joints will be loose or won't close.
+              </p>
+            </div>
+
+            <div class="var" id="kerfFit">
+              <h3>Kerf / fit allowance</h3>
+              <p>
+                Compensation for the width the laser beam burns away (the kerf). The exported tool-path is offset by
+                this amount so the finished part keeps its nominal size and the joints fit. Increase it if joints come
+                out loose, decrease it if they are too tight to assemble. Typical values are around
+                <code>0.05–0.15&nbsp;mm</code> depending on your laser and material; cut a test joint to dial it in.
+              </p>
+            </div>
+
+            <div class="var" id="fingerJoints">
+              <h3>Finger joints</h3>
+              <p>
+                The interlocking "comb" joints that hold the walls together. All five tuning values are multiples of the
+                material thickness, so they scale with your stock. Defaults are sensible — only change them to suit a
+                particular fit or look.
+              </p>
+              <div class="var" id="fingerWidthMultiplier">
+                <h4>Finger width</h4>
+                <p>Width of each finger, as a multiple of material thickness. Larger gives fewer, chunkier fingers; smaller gives more, finer ones.</p>
+              </div>
+              <div class="var" id="fingerSpaceMultiplier">
+                <h4>Finger spacing</h4>
+                <p>Gap between fingers, as a multiple of material thickness. Usually kept equal to the finger width for an even comb.</p>
+              </div>
+              <div class="var" id="fingerHoleWidthMultiplier">
+                <h4>Finger hole width</h4>
+                <p>Width of the slots that the mating fingers pass through, as a multiple of thickness. Affects how tightly fingers seat in their holes.</p>
+              </div>
+              <div class="var" id="fingerHoleOffsetMultiplier">
+                <h4>Finger hole offset</h4>
+                <p>How far the finger-hole rows sit in from the panel edge, as a multiple of thickness. Controls how deep a lapped panel seats.</p>
+              </div>
+              <div class="var" id="fingerPlayMultiplier">
+                <h4>Finger play</h4>
+                <p>Extra slack added to the finger slots for an easier fit, as a multiple of thickness. <code>0</code> is a tight press fit; add a little for hand assembly or glue gap.</p>
+              </div>
+            </div>
+
+            <div class="var" id="dovetails">
+              <h3>Dovetails</h3>
+              <p>
+                The angled, self-locking joints used on the filter-frame rails. Again, sizes are multiples of material
+                thickness.
+              </p>
+              <div class="var" id="dovetailSizeMultiplier">
+                <h4>Dovetail size</h4>
+                <p>Tooth size, as a multiple of material thickness. Larger teeth are stronger and easier to align; smaller teeth give more of them.</p>
+              </div>
+              <div class="var" id="dovetailDepthMultiplier">
+                <h4>Dovetail depth</h4>
+                <p>How far the dovetails interlock, as a multiple of thickness.</p>
+              </div>
+              <div class="var" id="dovetailTaper">
+                <h4>Dovetail taper</h4>
+                <p>Flare angle of the dovetail, in degrees. Steeper locks harder and resists pull-apart, but is tighter to assemble and less forgiving of kerf error.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <p class="eyebrow">Drawing &amp; output</p>
+            <h2>Drawing &amp; output</h2>
+
+            <div class="var" id="labels">
+              <h3>Engrave part labels</h3>
+              <p>
+                Etches each part's name lightly onto the cut sheet so you can tell the pieces apart while assembling.
+                Turn it off for a clean, unmarked cut. Engraving adds laser time; place labels on what will be the
+                inside face if you want them hidden.
+              </p>
+            </div>
+            <div class="var" id="referenceScale">
+              <h3>Reference scale</h3>
+              <p>
+                Draws a ruler of a known length on the sheet so you can confirm your cut or export came out at 1:1
+                before committing material. After importing the SVG, measure the reference line; if it is off, fix your
+                document units or printer scaling.
+              </p>
+            </div>
+            <div class="var" id="chunkLabels">
+              <h3>Chunk labels (3D print)</h3>
+              <p>
+                When a part is too big for the print bed it is split into chunks. Chunk labels deboss a short matching
+                code on each piece so you can line up the right chunks when gluing. Only relevant to prints split into
+                multiple pieces.
+              </p>
+            </div>
+          </section>
+
+          <section class="card" id="fabrication">
+            <p class="eyebrow">Build it</p>
+            <h2>Fabrication, gluing &amp; assembly</h2>
+            <p class="lede">
+              The same box can be made two ways. Pick the workflow that matches your tools, then follow the tips for
+              that method.
+            </p>
+
+            <h3>A. Laser-cut plywood (or acrylic)</h3>
+            <p><strong>Cutting</strong></p>
+            <ul>
+              <li>Use flat, void-free plywood — Baltic birch 3&nbsp;mm or 6&nbsp;mm is ideal. Warped stock fights the joints.</li>
+              <li>Measure thickness with calipers and set <a href="#materialThickness">Material thickness</a> to the real value.</li>
+              <li>Cut one test finger joint first and tune <a href="#kerfFit">Kerf / fit allowance</a> until the joint taps together snugly without forcing.</li>
+              <li>Keep <a href="#labels">Engrave labels</a> on for your first build; mask or sand off scorch with a light pass of fine sandpaper.</li>
+            </ul>
+            <p><strong>Dry-fit, then glue</strong></p>
+            <ul>
+              <li>Assemble the whole box <em>without</em> glue first to confirm every joint and the filter slot work.</li>
+              <li>Glue with wood PVA (e.g. Titebond) for plywood, or acrylic cement for acrylic. Apply a thin bead inside the finger slots, not on the faces.</li>
+              <li>Leave the <a href="#filterSlotPlacement">filter loading slot</a> wall un-glued (or make it a removable panel) so you can change filters.</li>
+              <li>Square the box against a flat surface and clamp or tape lightly; wipe squeeze-out before it cures.</li>
+              <li>Seal any small gaps around the filter with self-adhesive foam weatherstrip so all the air goes through the media, not around it.</li>
+            </ul>
+            <div class="photo"><span>Photo placeholder — laser-cut plywood panels laid out with finger joints, and the dry-fitted box. (Drop a real photograph here.)</span></div>
+
+            <h3>B. 3D-printed with alignment pins</h3>
+            <p><strong>Printing</strong></p>
+            <ul>
+              <li>Print in PLA, PETG or ASA. PETG/ASA tolerate heat and sunlight better for a unit left running.</li>
+              <li>Walls of 2–3&nbsp;mm (3–4 perimeters) are plenty; the box carries little load. 15–20% infill is fine.</li>
+              <li>Large parts are auto-split into bed-sized chunks. Keep <a href="#chunkLabels">chunk labels</a> on so the matching codes print on each piece.</li>
+              <li>Orient for strength across the layer lines at the joints; the exporter auto-orients chunks to minimise supports.</li>
+            </ul>
+            <p><strong>Alignment pins &amp; gluing</strong></p>
+            <ul>
+              <li>Split faces meet on printed <strong>alignment pins</strong> and matching holes — dry-fit them to confirm the chunks seat flush before glue.</li>
+              <li>Glue chunk seams with cyanoacrylate (CA/super glue) for PLA/PETG, or a plastic solvent/epoxy for ASA. The pins hold registration while the glue sets.</li>
+              <li>Match the <a href="#chunkLabels">chunk codes</a> so adjacent pieces are the pair they were generated as.</li>
+              <li>Test-fit the filter and fans before final gluing; leave the filter-access face removable.</li>
+            </ul>
+            <div class="photo"><span>Photo placeholder — 3D-printed chunks showing alignment pins and matching codes, and the assembled housing. (Drop a real photograph here.)</span></div>
+
+            <h3>Mounting the fans (both methods)</h3>
+            <ul>
+              <li>Fit fans so they pull air <em>through</em> the filter and exhaust out the fan openings (check the arrow on the fan hub).</li>
+              <li>Use the four <a href="#screwHoleDiameter">fan screw</a> holes per fan; self-tapping fan screws bite directly into plywood or plastic.</li>
+              <li>Wire PWM fans to a 12&nbsp;V supply or fan hub sized for the total current; route the cable through the <a href="#cordHoleDiameter">cord pass-through</a>.</li>
+              <li>Add the optional <a href="#hexSize">honeycomb grill</a> or a snap-on finger guard on any exposed fan.</li>
+            </ul>
+            <div class="photo"><span>Photo placeholder — fans mounted to the back plate / walls with the cord routed through the pass-through. (Drop a screenshot of the 3D preview or a real photo here.)</span></div>
+          </section>
+
+          <section class="card" id="filtration">
+            <p class="eyebrow">Why this works</p>
+            <h2>Why MERV&nbsp;13 and PC fans</h2>
+            <p class="lede">
+              A box of MERV&nbsp;13 filter media driven by several quiet PC fans — sometimes called a "filter cube" or
+              PC-fan filter box — is a cost-effective, high-throughput indoor air cleaner. Here is the reasoning, with
+              sources.
+            </p>
+
+            <h3>What MERV&nbsp;13 means</h3>
+            <p>
+              <strong>MERV</strong> (Minimum Efficiency Reporting Value) comes from the
+              <a href="https://www.ashrae.org/technical-resources/bookstore/standard-52-2" target="_blank" rel="noopener">ANSI/ASHRAE&nbsp;Standard&nbsp;52.2</a>
+              test, which measures how well a filter removes particles across twelve size bins from 0.3&nbsp;to
+              10&nbsp;µm and reports a single 1–16 rating
+              [<a href="#ref-ashrae">1</a>]. A MERV&nbsp;13 filter captures a large share of the fine
+              (PM<sub>2.5</sub>) particles that matter for smoke, allergens and respiratory aerosols — independent
+              testing shows roughly 50% capture at the hardest ~0.35&nbsp;µm size, rising to ~85–90% by 1&nbsp;µm
+              [<a href="#ref-diy">2</a>].
+            </p>
+
+            <h3>Throughput beats peak efficiency: why MERV&nbsp;13 can out-clean HEPA</h3>
+            <p>
+              A room's cleanup speed is its <strong>Clean Air Delivery Rate (CADR)</strong> — the volume of fully
+              filtered air delivered per minute — defined by the
+              <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">ANSI/AHAM&nbsp;AC-1</a>
+              standard [<a href="#ref-aham">3</a>]. CADR is efficiency&nbsp;×&nbsp;airflow, so airflow matters as much
+              as the percentage captured.
+            </p>
+            <p>
+              True <strong>HEPA</strong> media is ≥99.97% efficient at 0.3&nbsp;µm but is dense, so it has a high
+              pressure drop and chokes airflow [<a href="#ref-hepa">4</a>]. A MERV&nbsp;13 filter passes far more air for
+              the same fan, and research shows that increasing filter efficiency past a point does <em>not</em> raise
+              CADR because the pressure penalty cancels the gain [<a href="#ref-aaqr">5</a>]. By spreading MERV&nbsp;13
+              media over a large area (multiple filters) and pushing modest airflow through all of it, a filter box
+              delivers a very high CADR cheaply: a five-filter DIY box-fan unit was measured at roughly
+              1,000–1,440&nbsp;m³/h (≈600–850&nbsp;CFM) — several times a typical portable HEPA purifier
+              [<a href="#ref-diy">2</a>]. The U.S.&nbsp;EPA studied these DIY cleaners and found a MERV&nbsp;13 box fan
+              filter is an effective, low-cost way to reduce indoor wildfire smoke [<a href="#ref-epa">6</a>,
+              <a href="#ref-ncceh">7</a>], and recommends MERV&nbsp;13 as the minimum for smoke and airborne pathogens
+              [<a href="#ref-epa">6</a>].
+            </p>
+            <div class="tip">
+              <strong>Rule of thumb:</strong> a lot of air through "good enough" media usually cleans a room faster than
+              a little air through "perfect" media. Large filter area + several fans = high CADR at low noise.
+            </div>
+
+            <h3>Why PC fans: low noise, control and maintainability</h3>
+            <p>
+              Because the box uses a large filter area, each fan only has to overcome a low pressure drop — exactly the
+              regime where <strong>PC case fans</strong> shine. Quality 120/140&nbsp;mm PWM fans move 45–70&nbsp;CFM at
+              roughly 12–25&nbsp;dBA [<a href="#ref-fans">8</a>], far quieter than a box fan at full tilt, and
+              <strong>140&nbsp;mm</strong> fans hit a given airflow at lower RPM, so they are quieter still for the same
+              output. Other advantages:
+            </p>
+            <ul>
+              <li><strong>Speed control:</strong> 4-pin PWM lets you trade noise for airflow, or run quietly overnight.</li>
+              <li><strong>Low, safe voltage:</strong> 12&nbsp;V DC fans are simple to wire and have no mains heat risk in an always-on unit.</li>
+              <li><strong>Maintainable &amp; cheap:</strong> fans are standardised, inexpensive and individually replaceable; filters are commodity furnace filters you swap on a schedule.</li>
+              <li><strong>Redundancy:</strong> several small fans keep working (at reduced output) if one fails.</li>
+            </ul>
+            <p class="note">
+              Replace filters when airflow noticeably drops or per the filter maker's guidance — heavy smoke can load a
+              MERV&nbsp;13 in weeks. A clogged filter raises pressure drop and lowers CADR, so timely changes keep the
+              box performing.
+            </p>
+          </section>
+
+          <section class="card refs" id="references">
+            <p class="eyebrow">Sources</p>
+            <h2>References</h2>
+            <ol>
+              <li id="ref-ashrae">
+                ANSI/ASHRAE Standard 52.2 — <em>Method of Testing General Ventilation Air-Cleaning Devices for Removal
+                Efficiency by Particle Size</em> (the MERV test).
+                <a href="https://www.ashrae.org/technical-resources/bookstore/standard-52-2" target="_blank" rel="noopener">ashrae.org</a>.
+                Plain-language overview: NAFA,
+                <a href="https://downingfiltration.com/pdf/NAFAMERVGuide.pdf" target="_blank" rel="noopener">Understanding MERV (PDF)</a>.
+              </li>
+              <li id="ref-diy">
+                Dal Porto, R., Kumar, A., et al. (2022). <em>Characterizing the performance of a do-it-yourself (DIY)
+                box fan air filter.</em> Aerosol Science and Technology, 56(6), 564–572.
+                <a href="https://doi.org/10.1080/02786826.2022.2054674" target="_blank" rel="noopener">doi.org/10.1080/02786826.2022.2054674</a>.
+              </li>
+              <li id="ref-aham">
+                ANSI/AHAM AC-1 — <em>Method for Measuring Performance of Portable Household Electric Room Air Cleaners</em>
+                (Clean Air Delivery Rate).
+                <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">ahamverifide.org</a>.
+              </li>
+              <li id="ref-hepa">
+                Engineers Edge, <em>HEPA Filter Pressure Drop Considerations.</em>
+                <a href="https://www.engineersedge.com/filtration/hepa_filter_pressure_drop_considerations.htm" target="_blank" rel="noopener">engineersedge.com</a>.
+              </li>
+              <li id="ref-aaqr">
+                <em>Experimental Study on Optimal Clean Air Delivery Rate &amp; Filter Thickness of Indoor Air Purifiers.</em>
+                Aerosol and Air Quality Research.
+                <a href="https://aaqr.org/articles/aaqr-24-06-oa-0149" target="_blank" rel="noopener">aaqr.org</a>.
+              </li>
+              <li id="ref-epa">
+                U.S. EPA, <em>Research on DIY Air Cleaners to Reduce Wildfire Smoke Indoors</em> and <em>Guide to Air
+                Cleaners in the Home</em> (recommends MERV&nbsp;13).
+                <a href="https://www.epa.gov/air-research/research-diy-air-cleaners-reduce-wildfire-smoke-indoors" target="_blank" rel="noopener">epa.gov</a>
+                · <a href="https://www.epa.gov/system/files/documents/2021-09/diy-air-purifier-infographic_final.pdf" target="_blank" rel="noopener">DIY air cleaner infographic (PDF)</a>.
+              </li>
+              <li id="ref-ncceh">
+                National Collaborating Centre for Environmental Health, <em>Do-it-yourself (DIY) air cleaners: Evidence
+                on effectiveness and considerations for safe operation.</em>
+                <a href="https://ncceh.ca/resources/evidence-reviews/do-it-yourself-diy-air-cleaners-evidence-effectiveness-and" target="_blank" rel="noopener">ncceh.ca</a>.
+              </li>
+              <li id="ref-fans">
+                Manufacturer datasheets for 120/140&nbsp;mm PWM case fans report typical airflow and noise figures
+                (e.g. Noctua NF-A14: ~82&nbsp;m³/h at ~24.6&nbsp;dBA, quieter low-noise variants ≤~12&nbsp;dBA).
+                <a href="https://noctua.at/en/products/fan" target="_blank" rel="noopener">noctua.at</a>.
+              </li>
+            </ol>
+            <p class="note">
+              External links are provided for reference; standards bodies (ASHRAE, AHAM) and the cited journals are the
+              authoritative sources.
+            </p>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

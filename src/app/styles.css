@@ -1569,6 +1569,18 @@ hover/focus-within alone never shows the tooltip there. */
 .info-tip.is-open p {
   display: block;
 }
+.info-tip-more {
+  display: inline-block;
+  margin-left: 4px;
+  white-space: nowrap;
+  font-weight: 800;
+  text-decoration: underline;
+  color: var(--accent-strong);
+}
+.info-tip-more::after {
+  content: " →";
+  text-decoration: none;
+}
 
 .segmented-field div {
   display: grid;

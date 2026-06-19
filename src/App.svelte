@@ -751,6 +751,13 @@
     }
   }
 
+  // The "More" link in each tooltip points at the matching section of the help
+  // page. Section anchors mirror the tooltip id with the "info-"/"laser-" prefixes
+  // stripped (so info-laser-boxDepth -> #boxDepth).
+  function helpAnchor(tipId: string): string {
+    return tipId.replace(/^info-/, "").replace(/^laser-/, "");
+  }
+
   // ##############################
   // Workbench Navigation
   // ##############################
@@ -1360,7 +1367,7 @@
                 onblur={() => closeInfoTip(id)}
                 onkeydown={(event) => handleInfoTipKeydown(id, event)}
               >i</button>
-              <p {id} role="tooltip">{text}</p>
+              <p {id} role="tooltip">{text} <a class="info-tip-more" href={`help.html#${helpAnchor(id)}`} target="_blank" rel="noopener">More</a></p>
             </span>
           {/snippet}
           {#snippet fanSizeSegment()}
