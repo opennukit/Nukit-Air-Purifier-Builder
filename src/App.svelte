@@ -1844,6 +1844,21 @@
                     </div>
                   </fieldset>
 
+                  <fieldset class="fan-placement-field" data-nukit-hex-grill>
+                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore — it looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced.")}</legend>
+                    <div class="fan-placement-checks">
+                      <label class="toggle-field">
+                        <input
+                          type="checkbox"
+                          name="hexGrill"
+                          checked={settings.hexGrill}
+                          onchange={(event) => updateBooleanSetting("hexGrill", event)}
+                        />
+                        <span>On</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
                   {#if laserBackFansSelected && noWallFansSelected}
                     <label class="field">
                       <span>Box depth {@render infoTip("info-laser-boxDepth", "How deep the box is — the chamber between the filter and the back plate. Used instead of the fan-diameter chamber when Back fans are on.")}</span>
@@ -2249,6 +2264,28 @@
                       </span>
                     </label>
                   </div>
+                  {#if settings.hexGrill}
+                    <div class="advanced-group">
+                      <p class="eyebrow advanced-group-label">Honeycomb grill</p>
+                      {#each tempestHexGrillControls as control}
+                        <label class="field">
+                          <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
+                          <span class="input-shell">
+                            <input
+                              type="number"
+                              name={control.name}
+                              min="0"
+                              step={control.step}
+                              inputmode="decimal"
+                              value={settings[control.name]}
+                              onchange={(event) => updateNumberSetting(control.name, event)}
+                            />
+                            <small>{control.suffix}</small>
+                          </span>
+                        </label>
+                      {/each}
+                    </div>
+                  {/if}
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Finger joints</p>
                     {#each laserFingerJointControls as control}

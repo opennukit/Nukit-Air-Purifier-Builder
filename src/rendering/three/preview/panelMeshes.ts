@@ -16,6 +16,7 @@ import {
 } from "three";
 import type { FanAppearance } from "@/domain/purifier/fans";
 import type { AssemblyPanelPart } from "@/fabrication/assemblyModel";
+import { hexGrillHoles } from "@/fabrication/laser/cutGeometry";
 import type { CutFeature, CutPanel, RectCut } from "@/fabrication/laser/cutGeometry";
 import type { PrintableMesh } from "@/fabrication/printing/printableKit";
 import {
@@ -208,8 +209,7 @@ function createPanelGeometry(panel: CutPanel, materialThickness: number, explode
     });
     shape.closePath();
     for (const cut of panel.cuts) {
-      const hole = createHolePath(cut, panel);
-      if (hole !== null) {
+      for (const hole of createCutHolePaths(cut, panel)) {
         shape.holes.push(hole);
       }
     }
@@ -231,8 +231,7 @@ function createPanelGeometry(panel: CutPanel, materialThickness: number, explode
       if (cut.role === "finger-hole") {
         continue;
       }
-      const hole = createHolePath(cut, panel);
-      if (hole !== null) {
+      for (const hole of createCutHolePaths(cut, panel)) {
         shape.holes.push(hole);
       }
     }
@@ -268,6 +267,31 @@ function createPanelCutMarkGroup(
   }
 
   return group;
+}
+
+// A fan bore with a honeycomb grill becomes many hex holes; everything else is a
+// single hole. Returning an array keeps the two callers uniform.
+function createCutHolePaths(cut: CutFeature, panel: CutPanel): Path[] {
+  if (cut.type === "circle" && cut.grill !== undefined) {
+    return hexGrillHoles(cut.cx, cut.cy, cut.radius, cut.grill).map((points) => hexHolePath(points, panel));
+  }
+  const hole = createHolePath(cut, panel);
+  return hole === null ? [] : [hole];
+}
+
+function hexHolePath(points: readonly { x: number; y: number }[], panel: CutPanel): Path {
+  const path = new Path();
+  points.forEach((point, index) => {
+    const x = (point.x - panel.assemblyCenter.x) * sceneScale;
+    const y = (point.y - panel.assemblyCenter.y) * sceneScale;
+    if (index === 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  });
+  path.closePath();
+  return path;
 }
 
 function createHolePath(cut: CutFeature, panel: CutPanel): Path | null {

@@ -475,11 +475,13 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(assembly.filterFrames).toHaveLength(8);
     expect(assembly.filterMedia).toHaveLength(2);
     expect(assembly.seams).toHaveLength(12);
-    expect(assembly.dimensions.map((dimension) => dimension.label)).toEqual(["W", "H", "D"]);
+    // The preview tilts the laser model -90° about X, so chamberHeight reads as
+    // depth and workingDepth reads as height — the guides are labelled to match.
+    expect(assembly.dimensions.map((dimension) => dimension.label)).toEqual(["W", "D", "H"]);
     expect(assembly.dimensions.map((dimension) => dimension.measurement.description)).toEqual([
       "outside width",
-      "outside height",
       "outside depth",
+      "outside height",
     ]);
     expect(assembly.dimensions[0]?.measurement.value).toBe(layout.rawSettings.filterWidth);
     expect(assembly.dimensions[1]?.measurement.value).toBe(layout.summary.chamberHeight);

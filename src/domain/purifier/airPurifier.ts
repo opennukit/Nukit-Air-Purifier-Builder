@@ -265,6 +265,9 @@ export function serializePurifierDraft(
       cordHoleWall: draft.design.cordHoleWall,
       cordHoleSide: draft.design.cordHoleSide,
       cordHoleCornerOffset: draft.design.cordHoleCornerOffset,
+      hexGrill: draft.design.hexGrill,
+      hexSize: draft.design.hexSize,
+      hexSpacing: draft.design.hexSpacing,
       backPlateFans: draft.design.backPlateFans,
       boxDepth: draft.design.boxDepth,
     });
@@ -431,6 +434,9 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       cordHoleWall: input.design.cordHoleWall,
       cordHoleSide: input.design.cordHoleSide,
       cordHoleCornerOffset: input.design.cordHoleCornerOffset,
+      hexGrill: input.design.hexGrill,
+      hexSize: input.design.hexSize,
+      hexSpacing: input.design.hexSpacing,
       backPlateFans: input.design.backPlateFans,
       boxDepth: input.design.boxDepth,
     };
@@ -526,6 +532,9 @@ function createConfiguredPrintDesign(input: {
       cordHoleWall: input.raw.cordHoleWall,
       cordHoleSide: input.raw.cordHoleSide,
       cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.raw.cordHoleCornerOffset),
+      hexGrill: input.raw.hexGrill,
+      hexSize: normalizeHexSize(input.raw.hexSize),
+      hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
     };
@@ -643,6 +652,9 @@ function createPurifierDesignDraft(
       cordHoleWall: configuration.design.cordHoleWall,
       cordHoleSide: configuration.design.cordHoleSide,
       cordHoleCornerOffset: configuration.design.cordHoleCornerOffset,
+      hexGrill: configuration.design.hexGrill,
+      hexSize: configuration.design.hexSize,
+      hexSpacing: configuration.design.hexSpacing,
       backPlateFans: configuration.design.backPlateFans,
       boxDepth: configuration.design.boxDepth,
     };

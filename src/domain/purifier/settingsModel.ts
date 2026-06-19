@@ -323,6 +323,12 @@ export type LaserCutDesignDraft = {
   readonly cordHoleWall: CordHoleWall;
   readonly cordHoleSide: CordHoleSide;
   readonly cordHoleCornerOffset: Millimeters;
+  // Honeycomb fan grill: off = plain circular bore; on = a field of hexes cut into
+  // each fan opening. hexSize is the hex flat-to-flat, hexSpacing the rib between
+  // cells. Mirrors the 3D-Print honeycomb grill.
+  readonly hexGrill: boolean;
+  readonly hexSize: Millimeters;
+  readonly hexSpacing: Millimeters;
   // One-side "Back" fan grid on the closed back panel: 0 = off, -1 = automatic
   // (fill), >0 = exact count. Mirrors the 3D-Print Back fan toggle.
   readonly backPlateFans: number;
@@ -408,6 +414,9 @@ export type ConfiguredPrintDesign =
       readonly cordHoleWall: CordHoleWall;
       readonly cordHoleSide: CordHoleSide;
       readonly cordHoleCornerOffset: Millimeters;
+      readonly hexGrill: boolean;
+      readonly hexSize: Millimeters;
+      readonly hexSpacing: Millimeters;
       readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
     }

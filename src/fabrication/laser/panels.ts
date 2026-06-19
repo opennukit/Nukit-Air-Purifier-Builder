@@ -14,6 +14,7 @@ import {
   type CutFeature,
   type EdgeSection,
   type FilterRailKey,
+  type GrillSpec,
   type LaidOutCutPanel,
 } from "@/fabrication/laser/cutGeometry";
 import type { BoxesDocument } from "@/ports/boxes/cutDocument";
@@ -385,10 +386,11 @@ function createBackPlateFanGrid(width: number, height: number, requested: number
   }
 
   const kerfFit = settings.cutting.kerfFit;
+  const grill = fanGrillSpec(settings);
   const screwOffset = settings.fan.spec.screwSpacing / 2;
   const cuts: CutFeature[] = [];
   for (const { cx, cy } of centers) {
-    cuts.push({ type: "circle", cx, cy, radius: kerfCorrectedRadius(Math.max(4, (fanDiameter - 4) / 2), kerfFit), role: "fan" });
+    cuts.push({ type: "circle", cx, cy, radius: kerfCorrectedRadius(Math.max(4, (fanDiameter - 4) / 2), kerfFit), role: "fan", grill });
     for (const dx of [-screwOffset, screwOffset]) {
       for (const dy of [-screwOffset, screwOffset]) {
         cuts.push({ type: "circle", cx: cx + dx, cy: cy + dy, radius: kerfCorrectedRadius(settings.cutting.screwHoleDiameter / 2, kerfFit), role: "screw" });
@@ -396,6 +398,21 @@ function createBackPlateFanGrid(width: number, height: number, requested: number
     }
   }
   return cuts;
+}
+
+// The honeycomb fan grill spec for the current design, or undefined when the
+// grill is off (plain circular bore). Kerf is folded in by shrinking each hex
+// and widening the rib by the same amount, so the cell pitch — and thus the cell
+// positions — stay put while the cut holes come out at nominal size.
+function fanGrillSpec(settings: PurifierSettings): GrillSpec | undefined {
+  if (settings.design.type !== "laser-cut" || !settings.design.hexGrill) {
+    return undefined;
+  }
+  const kerfFit = settings.cutting.kerfFit;
+  return {
+    hexFlatToFlat: Math.max(0.5, settings.design.hexSize - 2 * kerfFit),
+    ribThickness: settings.design.hexSpacing + 2 * kerfFit,
+  };
 }
 
 function backFansPerSide(length: number, minEdge: number, pitch: number): number {
@@ -718,6 +735,7 @@ function createFanCuts(
   }
 
   const cuts: CutFeature[] = [];
+  const grill = fanGrillSpec(settings);
   const screwOffset = settings.fan.spec.screwSpacing / 2;
   const minCenter = fanDiameter / 2 + 4;
   const maxCenter = height - fanDiameter / 2 - 4;
@@ -735,6 +753,7 @@ function createFanCuts(
       cy: center,
       radius: kerfCorrectedRadius(Math.max(4, (fanDiameter - 4) / 2), kerfFit),
       role: "fan",
+      grill,
     });
     for (const dx of [-screwOffset, screwOffset]) {
       for (const dy of [-screwOffset, screwOffset]) {

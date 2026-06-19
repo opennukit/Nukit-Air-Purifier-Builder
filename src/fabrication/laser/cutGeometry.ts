@@ -21,12 +21,24 @@ export type SheetPlacement = {
   y: number;
 };
 
+// A honeycomb fan grill: the bore is cut as a field of hexagonal holes (clipped
+// inside the bore) instead of one plain circle. hexFlatToFlat is the hex width
+// across the flats; ribThickness is the solid web left between adjacent cells.
+export type GrillSpec = {
+  hexFlatToFlat: number;
+  ribThickness: number;
+};
+
 export type CircleCut = {
   type: "circle";
   cx: number;
   cy: number;
   radius: number;
   role: "fan" | "screw" | "reference" | "cord";
+  // Only set on fan bores. When present, the opening is rendered as a honeycomb
+  // of hexes filling this circle rather than as the circle itself. The circle is
+  // still the marker used for fan counting and 3D fan placement.
+  grill?: GrillSpec;
 };
 
 export type RectCut = {
@@ -233,6 +245,18 @@ export function cutPanelsToDocument(
     });
 
     for (const cut of panel.cuts) {
+      if (cut.type === "circle" && cut.grill !== undefined) {
+        // A honeycomb fan grill: cut the hex field, not the bore circle.
+        for (const hole of hexGrillHoles(cut.cx, cut.cy, cut.radius, cut.grill)) {
+          shapes.push({
+            type: "path",
+            points: translatePoints(hole, offset.x, offset.y),
+            closed: true,
+            color: "inner-cut",
+          });
+        }
+        continue;
+      }
       shapes.push({
         type: "path",
         points: translatePoints(cutFeaturePath(cut), offset.x, offset.y),
@@ -730,6 +754,44 @@ function cutFeaturePath(cut: CutFeature): CutPoint[] {
     return roundedRectPath(cut.x, cut.y, cut.width, cut.height, cut.radius);
   }
   return rectPath(cut.x, cut.y, cut.width, cut.height);
+}
+
+// A honeycomb of hex holes filling the fan bore — the laser equivalent of the
+// 3D-print hexGrill2d. Only whole hexes that fit entirely inside the bore are
+// kept (no slivers at the rim), with `ribThickness` of solid web between cells.
+export function hexGrillHoles(cx: number, cy: number, boreRadius: number, spec: GrillSpec): CutPoint[][] {
+  const hexFlatToFlat = Math.max(0.5, spec.hexFlatToFlat);
+  const rib = Math.max(0.1, spec.ribThickness);
+  const hexRadius = hexFlatToFlat / Math.sqrt(3); // centre-to-vertex
+  const pitchX = hexFlatToFlat + rib;
+  const pitchY = (pitchX * Math.sqrt(3)) / 2;
+  // Largest centre distance whose whole hex (centre + vertex) stays in the bore.
+  const keepRadius = boreRadius - hexRadius;
+  if (keepRadius <= 0) {
+    return [];
+  }
+  const columnCount = Math.ceil((boreRadius * 2) / pitchX) + 2;
+  const rowCount = Math.ceil((boreRadius * 2) / pitchY) + 2;
+  const holes: CutPoint[][] = [];
+  for (let row = -rowCount; row <= rowCount; row += 1) {
+    const rowOffset = row % 2 === 0 ? 0 : pitchX / 2;
+    for (let column = -columnCount; column <= columnCount; column += 1) {
+      const x = column * pitchX + rowOffset;
+      const y = row * pitchY;
+      if (Math.hypot(x, y) > keepRadius) {
+        continue;
+      }
+      holes.push(hexPolygon(cx + x, cy + y, hexRadius));
+    }
+  }
+  return holes;
+}
+
+function hexPolygon(cx: number, cy: number, radius: number): CutPoint[] {
+  return Array.from({ length: 6 }, (_, index) => {
+    const angle = (Math.PI / 180) * (60 * index + 30);
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+  });
 }
 
 function circlePath(cx: number, cy: number, radius: number): CutPoint[] {
