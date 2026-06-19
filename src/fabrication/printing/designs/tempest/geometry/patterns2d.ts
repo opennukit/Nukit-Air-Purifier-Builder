@@ -54,16 +54,23 @@ export function hexGrill2d<Solid, Region>(
     for (let column = -columnCount; column <= columnCount; column += 1) {
       const x = column * pitchX + rowOffset;
       const y = row * pitchY;
-      if (Math.hypot(x, y) - hexRadius > clipRadius) {
+      // Full-cells mode keeps only hexes wholly inside the clip circle; the
+      // default keeps any that overlap it and trims them with the intersect below.
+      const reach = opening.fullCellsOnly ? hexRadius : -hexRadius;
+      if (Math.hypot(x, y) + reach > clipRadius) {
         continue;
       }
       holes.push(transforms2d.translate([x, y], hex2d(ctx, opening.hexFlatToFlat)));
     }
   }
 
+  const union = unionAll2d(ctx, holes);
+  if (opening.fullCellsOnly) {
+    return union;
+  }
   return booleans2d.intersect(
     primitives.circle({ radius: Math.max(0.001, (outerDiameter - 2 * opening.ribThickness) / 2), segments: CSG_SEGMENTS }),
-    unionAll2d(ctx, holes),
+    union,
   );
 }
 
@@ -99,6 +106,7 @@ export function fanPatternCacheKey(model: TempestModel): string {
         opening.type,
         opening.hexFlatToFlat,
         opening.ribThickness,
+        opening.fullCellsOnly,
         CSG_SEGMENTS,
       ].join(":")
     : [model.settings.fan.diameter, model.settings.fan.screwHoleDiameter, opening.type, CSG_SEGMENTS].join(":");

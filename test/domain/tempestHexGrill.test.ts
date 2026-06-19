@@ -8,7 +8,16 @@ describe("tempest hex grill settings", () => {
     const settings = createTempestSettingsFromLayout(
       createLayout(decodeSettings("printDesign=nukit-tempest&hexGrill=true&hexSize=12&hexSpacing=2")),
     );
-    expect(settings.fan.opening).toEqual({ type: "honeycomb", hexFlatToFlat: 12, ribThickness: 2 });
+    expect(settings.fan.opening).toEqual({ type: "honeycomb", hexFlatToFlat: 12, ribThickness: 2, fullCellsOnly: false });
+  });
+
+  test("hexFullCellsOnly flows into the fan opening and round-trips", () => {
+    const settings = createTempestSettingsFromLayout(
+      createLayout(decodeSettings("printDesign=nukit-tempest&hexGrill=true&hexFullCellsOnly=true")),
+    );
+    expect(settings.fan.opening).toEqual({ type: "honeycomb", hexFlatToFlat: 10, ribThickness: 1.6, fullCellsOnly: true });
+    const params = new URLSearchParams(encodeSettings(decodeSettings("printDesign=nukit-tempest&hexFullCellsOnly=true")));
+    expect(params.get("hexFullCellsOnly")).toBe("true");
   });
 
   test("turning the grill off gives a plain circular opening", () => {
@@ -29,6 +38,6 @@ describe("tempest hex grill settings", () => {
 
   test("defaults match tempest-builder.html (grill on, 10 / 1.6)", () => {
     const settings = createTempestSettingsFromLayout(createLayout(decodeSettings("printDesign=nukit-tempest")));
-    expect(settings.fan.opening).toEqual({ type: "honeycomb", hexFlatToFlat: 10, ribThickness: 1.6 });
+    expect(settings.fan.opening).toEqual({ type: "honeycomb", hexFlatToFlat: 10, ribThickness: 1.6, fullCellsOnly: false });
   });
 });

@@ -412,6 +412,7 @@ function fanGrillSpec(settings: PurifierSettings): GrillSpec | undefined {
   return {
     hexFlatToFlat: Math.max(0.5, settings.design.hexSize - 2 * kerfFit),
     ribThickness: settings.design.hexSpacing + 2 * kerfFit,
+    fullCellsOnly: settings.design.hexFullCellsOnly,
   };
 }
 

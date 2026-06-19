@@ -36,7 +36,7 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       diameter: configuration.fan.spec.diameter,
       screwHoleDiameter: configuration.cutting.screwHoleDiameter,
       opening: design.hexGrill
-        ? { type: "honeycomb", hexFlatToFlat: design.hexSize, ribThickness: design.hexSpacing }
+        ? { type: "honeycomb", hexFlatToFlat: design.hexSize, ribThickness: design.hexSpacing, fullCellsOnly: design.hexFullCellsOnly }
         : { type: "plain" },
       wallRequests:
         design.arrangement === "four-side-filter-tower"

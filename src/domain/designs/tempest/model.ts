@@ -334,6 +334,7 @@ export const defaultTempestSettings: TempestSettings = {
       type: "honeycomb",
       hexFlatToFlat: defaultTempestHoneycombHexFlatToFlat,
       ribThickness: defaultTempestHoneycombRibThickness,
+      fullCellsOnly: false,
     },
     boxExhaust: {
       fanHoleSize: 0,
@@ -536,6 +537,7 @@ function normalizeTempestFanSettings(fan: TempestFanSettings): TempestFanSetting
             type: "honeycomb",
             hexFlatToFlat: finitePositive(fan.opening.hexFlatToFlat, defaultTempestHoneycombHexFlatToFlat),
             ribThickness: finitePositive(fan.opening.ribThickness, defaultTempestHoneycombRibThickness),
+            fullCellsOnly: fan.opening.fullCellsOnly,
           }
         : { type: "plain" },
   };

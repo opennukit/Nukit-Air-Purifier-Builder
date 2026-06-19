@@ -2165,6 +2165,15 @@
                           </span>
                         </label>
                       {/each}
+                      <label class="toggle-field">
+                        <input
+                          type="checkbox"
+                          name="hexFullCellsOnly"
+                          checked={settings.hexFullCellsOnly}
+                          onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
+                        />
+                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.")}</span>
+                      </label>
                     {/if}
                     <!-- Chunk-label deboss is parked for now: control hidden and the
                          setting defaults off. Flip SHOW_CHUNK_LABELS_CONTROL to bring it
@@ -2284,6 +2293,15 @@
                           </span>
                         </label>
                       {/each}
+                      <label class="toggle-field">
+                        <input
+                          type="checkbox"
+                          name="hexFullCellsOnly"
+                          checked={settings.hexFullCellsOnly}
+                          onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
+                        />
+                        <span>Full cells only {@render infoTip("info-laser-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore.")}</span>
+                      </label>
                     </div>
                   {/if}
                   <div class="advanced-group">

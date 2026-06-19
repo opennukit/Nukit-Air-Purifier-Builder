@@ -15,6 +15,7 @@ describe("Tempest OpenSCAD model port", () => {
       type: "honeycomb",
       hexFlatToFlat: 10,
       ribThickness: 1.6,
+      fullCellsOnly: false,
     });
     // 495 measured footprint + 2*1 fit clearance + 2*5 walls.
     expect(model.box).toEqual({

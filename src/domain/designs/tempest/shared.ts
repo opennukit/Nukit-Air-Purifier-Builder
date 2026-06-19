@@ -79,6 +79,8 @@ export type TempestFanOpening =
       readonly type: "honeycomb";
       readonly hexFlatToFlat: Millimeters;
       readonly ribThickness: Millimeters;
+      // false: clip partial hexes to the bore; true: keep only whole cells.
+      readonly fullCellsOnly: boolean;
     };
 
 // The 4-filter tower's top exhaust style: the default N×N grid of PC-fan cutouts,

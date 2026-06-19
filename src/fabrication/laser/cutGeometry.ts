@@ -27,6 +27,8 @@ export type SheetPlacement = {
 export type GrillSpec = {
   hexFlatToFlat: number;
   ribThickness: number;
+  // false: clip partial hexes to the bore circle; true: keep only whole cells.
+  fullCellsOnly: boolean;
 };
 
 export type CircleCut = {
@@ -757,17 +759,16 @@ function cutFeaturePath(cut: CutFeature): CutPoint[] {
 }
 
 // A honeycomb of hex holes filling the fan bore — the laser equivalent of the
-// 3D-print hexGrill2d. Only whole hexes that fit entirely inside the bore are
-// kept (no slivers at the rim), with `ribThickness` of solid web between cells.
+// 3D-print hexGrill2d. With fullCellsOnly the bore keeps only whole hexes (no
+// rim slivers); otherwise straddling hexes are clipped to the bore circle so the
+// honeycomb reaches the edge, matching the 3D-print grill.
 export function hexGrillHoles(cx: number, cy: number, boreRadius: number, spec: GrillSpec): CutPoint[][] {
   const hexFlatToFlat = Math.max(0.5, spec.hexFlatToFlat);
   const rib = Math.max(0.1, spec.ribThickness);
   const hexRadius = hexFlatToFlat / Math.sqrt(3); // centre-to-vertex
   const pitchX = hexFlatToFlat + rib;
   const pitchY = (pitchX * Math.sqrt(3)) / 2;
-  // Largest centre distance whose whole hex (centre + vertex) stays in the bore.
-  const keepRadius = boreRadius - hexRadius;
-  if (keepRadius <= 0) {
+  if (boreRadius <= 0) {
     return [];
   }
   const columnCount = Math.ceil((boreRadius * 2) / pitchX) + 2;
@@ -778,10 +779,19 @@ export function hexGrillHoles(cx: number, cy: number, boreRadius: number, spec: 
     for (let column = -columnCount; column <= columnCount; column += 1) {
       const x = column * pitchX + rowOffset;
       const y = row * pitchY;
-      if (Math.hypot(x, y) > keepRadius) {
+      const distance = Math.hypot(x, y);
+      const hex = hexPolygon(cx + x, cy + y, hexRadius);
+      if (distance + hexRadius <= boreRadius) {
+        holes.push(hex); // wholly inside
         continue;
       }
-      holes.push(hexPolygon(cx + x, cy + y, hexRadius));
+      if (spec.fullCellsOnly || distance - hexRadius >= boreRadius) {
+        continue; // full-cells mode drops straddlers; either mode drops outside
+      }
+      const clipped = clipPolygonToCircle(hex, cx, cy, boreRadius);
+      if (clipped.length >= 3) {
+        holes.push(clipped);
+      }
     }
   }
   return holes;
@@ -792,6 +802,52 @@ function hexPolygon(cx: number, cy: number, radius: number): CutPoint[] {
     const angle = (Math.PI / 180) * (60 * index + 30);
     return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
   });
+}
+
+// Sutherland–Hodgman clip of a convex polygon against a circle, approximating the
+// circle as a 48-gon (the same order the SVG uses for round bores). Used to trim
+// hexes that straddle the bore edge into partial cells.
+function clipPolygonToCircle(poly: CutPoint[], cx: number, cy: number, radius: number): CutPoint[] {
+  const segments = 48;
+  let output = poly;
+  for (let index = 0; index < segments && output.length > 0; index += 1) {
+    const a0 = (index / segments) * Math.PI * 2;
+    const a1 = ((index + 1) / segments) * Math.PI * 2;
+    const x0 = cx + Math.cos(a0) * radius;
+    const y0 = cy + Math.sin(a0) * radius;
+    const x1 = cx + Math.cos(a1) * radius;
+    const y1 = cy + Math.sin(a1) * radius;
+    output = clipAgainstEdge(output, x0, y0, x1, y1);
+  }
+  return output;
+}
+
+// Keep the part of `poly` on the inside (left) of the directed edge (x0,y0)->(x1,y1).
+function clipAgainstEdge(poly: CutPoint[], x0: number, y0: number, x1: number, y1: number): CutPoint[] {
+  const inside = (p: CutPoint) => (x1 - x0) * (p.y - y0) - (y1 - y0) * (p.x - x0) >= 0;
+  const intersect = (a: CutPoint, b: CutPoint): CutPoint => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const denom = (x1 - x0) * dy - (y1 - y0) * dx;
+    const t = denom === 0 ? 0 : ((x1 - x0) * (a.y - y0) - (y1 - y0) * (a.x - x0)) / -denom;
+    return { x: a.x + t * dx, y: a.y + t * dy };
+  };
+  const out: CutPoint[] = [];
+  for (let i = 0; i < poly.length; i += 1) {
+    const current = poly[i];
+    const previous = poly[(i + poly.length - 1) % poly.length];
+    const currentIn = inside(current);
+    const previousIn = inside(previous);
+    if (currentIn) {
+      if (!previousIn) {
+        out.push(intersect(previous, current));
+      }
+      out.push(current);
+    } else if (previousIn) {
+      out.push(intersect(previous, current));
+    }
+  }
+  return out;
 }
 
 function circlePath(cx: number, cy: number, radius: number): CutPoint[] {

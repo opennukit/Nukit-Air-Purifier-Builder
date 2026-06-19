@@ -160,6 +160,7 @@ export function normalizeRawSettings(
     hexGrill: input.hexGrill,
     hexSize: normalizeHexSize(input.hexSize),
     hexSpacing: normalizeHexSpacing(input.hexSpacing),
+    hexFullCellsOnly: input.hexFullCellsOnly,
     // Preserved like hexGrill: toRawSettings re-emits the default, so restore the
     // user's "Back" fan toggle from the raw input here.
     backPlateFans: normalizeBackFanCount(input.backPlateFans),
@@ -268,6 +269,7 @@ export function serializePurifierDraft(
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
+      hexFullCellsOnly: draft.design.hexFullCellsOnly,
       backPlateFans: draft.design.backPlateFans,
       boxDepth: draft.design.boxDepth,
     });
@@ -311,6 +313,7 @@ export function serializePurifierDraft(
       hexGrill: draft.design.hexGrill,
       hexSize: draft.design.hexSize,
       hexSpacing: draft.design.hexSpacing,
+      hexFullCellsOnly: draft.design.hexFullCellsOnly,
       backPlateFans: draft.design.backPlateFans,
       boxDepth: draft.design.boxDepth,
       ...copyTempestExhaustFields(draft.design),
@@ -383,6 +386,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     hexGrill: defaultSettings.hexGrill,
     hexSize: defaultSettings.hexSize,
     hexSpacing: defaultSettings.hexSpacing,
+    hexFullCellsOnly: defaultSettings.hexFullCellsOnly,
     backPlateFans: defaultSettings.backPlateFans,
     boxDepth: defaultSettings.boxDepth,
     ...copyTempestExhaustFields(defaultSettings),
@@ -437,6 +441,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       hexGrill: input.design.hexGrill,
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
+      hexFullCellsOnly: input.design.hexFullCellsOnly,
       backPlateFans: input.design.backPlateFans,
       boxDepth: input.design.boxDepth,
     };
@@ -480,6 +485,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       hexGrill: input.design.hexGrill,
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
+      hexFullCellsOnly: input.design.hexFullCellsOnly,
       ...copyTempestExhaustFields(input.design),
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
@@ -535,6 +541,7 @@ function createConfiguredPrintDesign(input: {
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
+      hexFullCellsOnly: input.raw.hexFullCellsOnly,
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
     };
@@ -571,6 +578,7 @@ function createConfiguredPrintDesign(input: {
       hexGrill: input.raw.hexGrill,
       hexSize: normalizeHexSize(input.raw.hexSize),
       hexSpacing: normalizeHexSpacing(input.raw.hexSpacing),
+      hexFullCellsOnly: input.raw.hexFullCellsOnly,
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
       ...normalizeTempestExhaustFields(input.raw),
@@ -655,6 +663,7 @@ function createPurifierDesignDraft(
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
+      hexFullCellsOnly: configuration.design.hexFullCellsOnly,
       backPlateFans: configuration.design.backPlateFans,
       boxDepth: configuration.design.boxDepth,
     };
@@ -690,6 +699,7 @@ function createPurifierDesignDraft(
       hexGrill: configuration.design.hexGrill,
       hexSize: configuration.design.hexSize,
       hexSpacing: configuration.design.hexSpacing,
+      hexFullCellsOnly: configuration.design.hexFullCellsOnly,
       backPlateFans: configuration.design.backPlateFans,
       boxDepth: configuration.design.boxDepth,
       ...copyTempestExhaustFields(configuration.design),

@@ -54,6 +54,12 @@ describe("laser honeycomb grill", () => {
     expect(innerCutCount({ hexGrill: true })).toBeGreaterThan(innerCutCount({ hexGrill: false }));
   });
 
+  test("partial cells (default) yield at least as many bore cuts as full-cells-only", () => {
+    expect(innerCutCount({ hexGrill: true, hexFullCellsOnly: false })).toBeGreaterThanOrEqual(
+      innerCutCount({ hexGrill: true, hexFullCellsOnly: true }),
+    );
+  });
+
   test("turning the grill on/off keeps the same part set (only the bore changes)", () => {
     expect(planFor({ hexGrill: true }).cutPanels.map((p) => p.id)).toEqual(
       planFor({ hexGrill: false }).cutPanels.map((p) => p.id),
@@ -63,24 +69,33 @@ describe("laser honeycomb grill", () => {
 
 describe("hexGrillHoles", () => {
   const bore = 60;
-  const holes = hexGrillHoles(0, 0, bore, { hexFlatToFlat: 10, ribThickness: 1.6 });
+  const partial = hexGrillHoles(0, 0, bore, { hexFlatToFlat: 10, ribThickness: 1.6, fullCellsOnly: false });
+  const full = hexGrillHoles(0, 0, bore, { hexFlatToFlat: 10, ribThickness: 1.6, fullCellsOnly: true });
 
-  test("fills the bore with whole hexes", () => {
-    expect(holes.length).toBeGreaterThan(10);
-    for (const hole of holes) {
-      expect(hole.length).toBe(6);
-    }
+  test("fills the bore with hexes", () => {
+    expect(partial.length).toBeGreaterThan(10);
+    expect(full.length).toBeGreaterThan(10);
   });
 
-  test("every hex vertex stays inside the bore (no slivers crossing the rim)", () => {
-    for (const hole of holes) {
+  test("full-cells keeps only whole 6-point hexes; partial includes clipped cells", () => {
+    for (const hole of full) {
+      expect(hole.length).toBe(6);
+    }
+    // Partial mode clips straddling hexes, so some cells have != 6 points.
+    expect(partial.some((hole) => hole.length !== 6)).toBe(true);
+    // ...and it therefore yields at least as many cells as full-cells-only.
+    expect(partial.length).toBeGreaterThanOrEqual(full.length);
+  });
+
+  test("no cell crosses the bore in either mode", () => {
+    for (const hole of [...partial, ...full]) {
       for (const point of hole) {
         expect(Math.hypot(point.x, point.y)).toBeLessThanOrEqual(bore + 1e-6);
       }
     }
   });
 
-  test("a bore smaller than one cell produces no holes", () => {
-    expect(hexGrillHoles(0, 0, 3, { hexFlatToFlat: 10, ribThickness: 1.6 })).toEqual([]);
+  test("a bore smaller than one cell produces no full cells", () => {
+    expect(hexGrillHoles(0, 0, 3, { hexFlatToFlat: 10, ribThickness: 1.6, fullCellsOnly: true })).toEqual([]);
   });
 });

@@ -249,6 +249,9 @@ export type RawPurifierSettings = {
   hexGrill: boolean;
   hexSize: Millimeters;
   hexSpacing: Millimeters;
+  // Grill cells at the bore edge: false (default) clips partial hexes to the
+  // circle; true keeps only whole cells. Applies to both 3D-print and laser.
+  hexFullCellsOnly: boolean;
   // Tempest one-side (single-horizontal-top-filter) only: the "Back" fan grid on
   // the solid plate opposite the filter, as a fan count: -1 = automatic (fill the
   // grid), 0 = none, N = that many fans. (Legacy URLs used true/false; the codec
@@ -329,6 +332,7 @@ export type LaserCutDesignDraft = {
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
+  readonly hexFullCellsOnly: boolean;
   // One-side "Back" fan grid on the closed back panel: 0 = off, -1 = automatic
   // (fill), >0 = exact count. Mirrors the 3D-Print Back fan toggle.
   readonly backPlateFans: number;
@@ -366,6 +370,7 @@ export type TempestPrintDesignDraft = {
   readonly hexGrill: boolean;
   readonly hexSize: Millimeters;
   readonly hexSpacing: Millimeters;
+  readonly hexFullCellsOnly: boolean;
   readonly backPlateFans: number;
   readonly boxDepth: Millimeters;
   readonly topExhaust: TopExhaust;
@@ -417,6 +422,7 @@ export type ConfiguredPrintDesign =
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
+      readonly hexFullCellsOnly: boolean;
       readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
     }
@@ -443,6 +449,7 @@ export type ConfiguredPrintDesign =
       readonly hexGrill: boolean;
       readonly hexSize: Millimeters;
       readonly hexSpacing: Millimeters;
+      readonly hexFullCellsOnly: boolean;
       readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
       readonly topExhaust: TopExhaust;
@@ -537,6 +544,7 @@ export const defaultSettings: RawPurifierSettings = {
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
+  hexFullCellsOnly: false,
   backPlateFans: 0,
   boxDepth: 70,
   topExhaust: "fan-grid",
@@ -653,6 +661,7 @@ export const nukitTempestEuroDesignOverrides = {
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
+  hexFullCellsOnly: false,
   topExhaust: "fan-grid",
   screwHoleDiameter: 5,
   materialThickness: 5,
@@ -695,6 +704,7 @@ export const nukitTempestOriginalDesignOverrides = {
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
+  hexFullCellsOnly: false,
   topExhaust: "fan-grid",
   screwHoleDiameter: 5,
   materialThickness: 5,
