@@ -2225,6 +2225,22 @@
                       </fieldset>
                     {/if}
                     <label class="field">
+                      <span>Alignment pin size {@render infoTip("info-alignmentPinDiameter", "Diameter of the printed alignment-pin holes along each seam, for short lengths of 1.75 mm filament that key glued chunks together. Set to 0 for no pins. Maximum 2.5 mm.")}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="alignmentPinDiameter"
+                          min="0"
+                          max="2.5"
+                          step="0.1"
+                          inputmode="decimal"
+                          value={settings.alignmentPinDiameter}
+                          onchange={(event) => updateNumberSetting("alignmentPinDiameter", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
+                    <label class="field">
                       <span>Download format {@render infoTip("info-print-downloadFormat", "File downloaded by the export button. A 3MF ZIP (default) keeps part colors and units; an STL ZIP is the plainer mesh format every slicer reads. Both bundle one file per print chunk.")}</span>
                       <select name="printDownloadFormat" bind:value={printDownloadFormat}>
                         <option value="3mf">3MF (zip)</option>

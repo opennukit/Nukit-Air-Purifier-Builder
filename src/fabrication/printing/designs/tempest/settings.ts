@@ -15,6 +15,13 @@ export function createTempestSettingsFromLayout(layout: LayoutResult): TempestSe
 
 export function createTempestSettingsFromConfiguration(configuration: PurifierSettings): TempestSettings {
   const design = requireTempestDesign(configuration);
+  // Hole depth and spacing keep their built-in defaults; only the pin diameter is
+  // user-adjustable (0 disables the pins). Fall back to fixed values if the
+  // default ever ships disabled.
+  const defaultAlignmentPins =
+    defaultTempestSettings.alignmentPins.type === "enabled"
+      ? defaultTempestSettings.alignmentPins
+      : { holeDepth: 10, spacing: 30 };
   return {
     ...defaultTempestSettings,
     // PARKED: force the chunk-label deboss off in the app regardless of any saved
@@ -23,6 +30,17 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
     // when the feature is brought back. The deboss code itself still runs in tests
     // that build TempestSettings with chunkLabels:true directly.
     chunkLabels: false,
+    // Alignment-pin hole size comes from the design setting: 0 disables the pins,
+    // any positive diameter keeps the default hole depth and spacing.
+    alignmentPins:
+      design.alignmentPinDiameter > 0
+        ? {
+            type: "enabled",
+            diameter: design.alignmentPinDiameter,
+            holeDepth: defaultAlignmentPins.holeDepth,
+            spacing: defaultAlignmentPins.spacing,
+          }
+        : { type: "disabled" },
     arrangement: tempestArrangementFromConfiguration(configuration),
     // The one-side "panel" depth applies only when this is a single-filter layout
     // with the Back fan grid on AND no side-wall fans (a flat panel). With any

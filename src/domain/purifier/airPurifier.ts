@@ -165,6 +165,7 @@ export function normalizeRawSettings(
     // user's "Back" fan toggle from the raw input here.
     backPlateFans: normalizeBackFanCount(input.backPlateFans),
     boxDepth: normalizeBoxDepth(input.boxDepth),
+    alignmentPinDiameter: normalizeAlignmentPinDiameter(input.alignmentPinDiameter),
     ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
@@ -316,6 +317,7 @@ export function serializePurifierDraft(
       hexFullCellsOnly: draft.design.hexFullCellsOnly,
       backPlateFans: draft.design.backPlateFans,
       boxDepth: draft.design.boxDepth,
+      alignmentPinDiameter: draft.design.alignmentPinDiameter,
       ...copyTempestExhaustFields(draft.design),
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
@@ -389,6 +391,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     hexFullCellsOnly: defaultSettings.hexFullCellsOnly,
     backPlateFans: defaultSettings.backPlateFans,
     boxDepth: defaultSettings.boxDepth,
+    alignmentPinDiameter: defaultSettings.alignmentPinDiameter,
     ...copyTempestExhaustFields(defaultSettings),
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -581,6 +584,7 @@ function createConfiguredPrintDesign(input: {
       hexFullCellsOnly: input.raw.hexFullCellsOnly,
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
+      alignmentPinDiameter: normalizeAlignmentPinDiameter(input.raw.alignmentPinDiameter),
       ...normalizeTempestExhaustFields(input.raw),
     };
   }
@@ -702,6 +706,7 @@ function createPurifierDesignDraft(
       hexFullCellsOnly: configuration.design.hexFullCellsOnly,
       backPlateFans: configuration.design.backPlateFans,
       boxDepth: configuration.design.boxDepth,
+      alignmentPinDiameter: configuration.design.alignmentPinDiameter,
       ...copyTempestExhaustFields(configuration.design),
     };
   }
@@ -852,6 +857,16 @@ function normalizeHexSpacing(value: Millimeters): Millimeters {
 
 function normalizeBoxDepth(value: Millimeters): Millimeters {
   return Number.isFinite(value) && value > 0 ? clamp(value, 1, 1000) : defaultSettings.boxDepth;
+}
+
+// Alignment-pin hole diameter, in mm. 0 disables the pins entirely; positive
+// values are clamped to a 2.5 mm ceiling. A non-finite or negative value falls
+// back to the default diameter.
+function normalizeAlignmentPinDiameter(value: Millimeters): Millimeters {
+  if (!Number.isFinite(value) || value < 0) {
+    return defaultSettings.alignmentPinDiameter;
+  }
+  return clamp(value, 0, 2.5);
 }
 
 // The "Back" fan count: -1 = automatic, 0 = none, N = that many. Any other value

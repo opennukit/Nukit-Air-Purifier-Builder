@@ -260,6 +260,9 @@ export type RawPurifierSettings = {
   // Tempest one-side "panel" (Back on) only: the chamber depth between the inside
   // filter flange and the inside back wall, in mm.
   boxDepth: Millimeters;
+  // Tempest-only: diameter of the printed alignment-pin holes along each seam, in
+  // mm. 0 disables the pins entirely; values above 0 (up to 2.5) size the holes.
+  alignmentPinDiameter: Millimeters;
   // Tempest 4-filter tower only: top exhaust style and box/exhaust geometry. A
   // value of 0 for a size/radius means "auto" (derived from the filter width).
   topExhaust: TopExhaust;
@@ -373,6 +376,7 @@ export type TempestPrintDesignDraft = {
   readonly hexFullCellsOnly: boolean;
   readonly backPlateFans: number;
   readonly boxDepth: Millimeters;
+  readonly alignmentPinDiameter: Millimeters;
   readonly topExhaust: TopExhaust;
   readonly boxFanHoleSize: Millimeters;
   readonly boxRingOneScrewHoles: number;
@@ -452,6 +456,7 @@ export type ConfiguredPrintDesign =
       readonly hexFullCellsOnly: boolean;
       readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
+      readonly alignmentPinDiameter: Millimeters;
       readonly topExhaust: TopExhaust;
       readonly boxFanHoleSize: Millimeters;
       readonly boxRingOneScrewHoles: number;
@@ -547,6 +552,7 @@ export const defaultSettings: RawPurifierSettings = {
   hexFullCellsOnly: false,
   backPlateFans: 0,
   boxDepth: 70,
+  alignmentPinDiameter: 1.8,
   topExhaust: "fan-grid",
   // Box/exhaust sizes are concrete diameters, auto-populated from the filter
   // width (fan hole 70%, ring 1 80%, ring 2 90%) — here for the default width.
