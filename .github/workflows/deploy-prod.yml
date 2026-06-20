@@ -27,6 +27,11 @@ on:
   workflow_dispatch:
 
 env:
+  # FUTURE CLEANUP: this bucket is still named "...-maintenance" from when it
+  # served the holding page; it is now the production origin. Renaming means
+  # creating a new bucket (S3 names are immutable), syncing, pointing the
+  # CloudFront origin at it, then deleting the old one. Cosmetic only — works
+  # fine as-is.
   S3_BUCKET: filterboxbuilder-maintenance
   CLOUDFRONT_DISTRIBUTION_ID: E16DP3X1Q12QP4
 
