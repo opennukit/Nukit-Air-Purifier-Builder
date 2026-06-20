@@ -96,10 +96,9 @@
       .photo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
       .photo-row .photo { margin: 0; }
       .product {
-        display: grid; grid-template-columns: 1fr 1.4fr; gap: 20px; align-items: start;
         margin: 18px 0; padding: 18px; background: var(--accent-wash); border: 1px solid var(--accent-line, rgb(31 111 86 / 34%)); border-radius: 2px;
       }
-      .product .photo { min-height: 220px; margin: 0; height: 100%; }
+      .product .photo { margin: 0 0 16px; min-height: 0; aspect-ratio: 16 / 9; }
       .cta {
         display: inline-block; margin-top: 12px; padding: 10px 18px; border-radius: 2px;
         background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem;
@@ -111,7 +110,7 @@
       @media (max-width: 820px) {
         .layout { grid-template-columns: 1fr; }
         nav.toc { position: static; max-height: none; }
-        .product, .photo-row { grid-template-columns: 1fr; }
+        .photo-row { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -249,7 +248,7 @@
                 MERV&nbsp;13 principle, engineered into a finished, all-metal unit.
               </p>
               <div class="product">
-                <div class="photo"><span>PHOTO PLACEHOLDER: the Nukit Tempest Pro (all-metal PC-fan air purifier), front and wall-mounted.</span></div>
+                <div class="photo"><span>PHOTO PLACEHOLDER: landscape product shot of the Nukit Tempest Pro (all-metal PC-fan air purifier).</span></div>
                 <div>
                   <p><span class="price">$385.95 USD</span> · ships free · tax and tariffs included · black or white.</p>
                   <p>Here is what you get over a DIY box:</p>
