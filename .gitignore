@@ -1,19 +1,11 @@
 # Dependencies and build output
 node_modules/
 dist/
+dist-standalone/
 
-# Local browser automation output
-.playwright-cli/
-.playwright-mcp/
-output/
-
-# Local helper environments and agent artifacts
+# Local environments and tooling output
 .venv-boxes/
-.codex/
-.upToSpeed/
-.claude/
-.agents/
-skills-lock.json
+output/
 
 # Local machine files
 .DS_Store
@@ -27,5 +19,3 @@ skills-lock.json
 
 # Large upstream reference downloads kept out of the published source tree
 references/external-models/
-
-dist-standalone/
