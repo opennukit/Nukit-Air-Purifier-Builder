@@ -2,13 +2,18 @@ name: Deploy Production
 
 # Publishes dist/ to filterboxbuilder.com (apex + www), which is served by the
 # production CloudFront distribution E16DP3X1Q12QP4 → S3 bucket
-# filterboxbuilder-maintenance. This is deliberately MANUAL (workflow_dispatch
-# only) so the live site changes only when you choose to publish — it is fully
-# independent of pushes to main / the beta site.
+# filterboxbuilder-maintenance.
 #
-# To publish: Actions tab → "Deploy Production" → Run workflow → pick the branch
-# you want live (e.g. port-tempest-features) → Run. Or:
-#   gh workflow run deploy-prod.yml --ref <branch>
+# The live site = the `production` branch. To publish a new version, move the
+# `production` branch to the commit you want live and push it; that triggers this
+# workflow. This is fully independent of `main` and of the beta site, so the
+# apex only changes when you deliberately update `production`.
+#
+#   git branch -f production <your-branch>   # point production at what you want live
+#   git push origin production               # publishes to filterboxbuilder.com
+#
+# (workflow_dispatch is also enabled as a manual fallback once this file is on
+# the default branch.)
 #
 # Requires the same repository secrets as the beta Deploy workflow
 # (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION) and the repository
@@ -17,6 +22,8 @@ name: Deploy Production
 # E16DP3X1Q12QP4 (see the one-time IAM update in the launch notes).
 
 on:
+  push:
+    branches: [production]
   workflow_dispatch:
 
 env:
