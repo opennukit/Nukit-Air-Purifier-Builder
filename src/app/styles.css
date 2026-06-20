@@ -2035,7 +2035,15 @@ Tablet Stack
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  /* Keep the Help / Contact / source links reachable on narrow and mobile
+     widths; only the Copy URL button is hidden here because the fixed bottom
+     action bar already carries it. */
   .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .topbar-actions .topbar-copy {
     display: none;
   }
 
@@ -2127,6 +2135,10 @@ Mobile Layout
   .topbar {
     grid-template-columns: 1fr;
     margin-bottom: 10px;
+  }
+
+  .topbar-actions {
+    justify-content: flex-start;
   }
 
   .method-workbench {

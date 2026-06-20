@@ -1210,7 +1210,7 @@
       </a>
       <a class="ghost-button" href="help.html" target="_blank" rel="noopener">Help</a>
       <a class="ghost-button" href="contact.html">Contact</a>
-      <button class="ghost-button" type="button" onclick={() => void copyUrl("copy-top")}>
+      <button class="ghost-button topbar-copy" type="button" onclick={() => void copyUrl("copy-top")}>
         {copyTopButtonText}
       </button>
     </div>
