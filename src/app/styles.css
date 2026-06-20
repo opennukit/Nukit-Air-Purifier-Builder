@@ -29,6 +29,13 @@ Design Tokens and Base Elements
   --shadow: 0 20px 70px rgb(51 42 27 / 12%);
 }
 
+/* Lock the rem base to 16px so the UI renders at a consistent density across
+   browsers (a browser set to a larger default font, e.g. Chrome "Large" = 20px,
+   would otherwise inflate the whole rem-based UI). */
+html {
+  font-size: 16px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -135,7 +142,7 @@ Header Bar
 }
 
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: var(--accent-strong);
   font-size: 0.75rem;
   font-weight: 800;
@@ -292,12 +299,12 @@ Workbench Container
 .method-workbench {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 6px;
   width: 100%;
   max-width: 1440px;
   min-height: 0;
   margin: 0 auto;
-  padding: 10px;
+  padding: 8px;
   border-top: 1px solid rgb(217 208 191 / 70%);
   background: rgb(248 245 236 / 46%);
   box-shadow: none;
@@ -877,7 +884,7 @@ Panel Grids
 .controls-sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
+  gap: 2px 18px;
   align-items: start;
 }
 
@@ -932,7 +939,7 @@ Panel Grids
 
 .advanced-group {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   align-content: start;
 }
 
@@ -1005,7 +1012,7 @@ Panel Grids
 
 .fan-placement-field legend {
   padding: 0;
-  margin: 0 0 6px;
+  margin: 0 0 3px;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 600;
@@ -1061,7 +1068,7 @@ Section Headings
 ############################## */
 
 .section-heading {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 .section-heading h2 {
@@ -1079,17 +1086,18 @@ Fields
 .field,
 .toggle-field {
   display: grid;
-  gap: 6px;
-  margin: 9px 0;
+  gap: 2px;
+  margin: 1px 0;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .field input,
 .field select {
   width: 100%;
-  min-height: 36px;
+  min-height: 26px;
   border: 1px solid var(--line);
   border-radius: 0;
   background: var(--surface-strong);
@@ -1526,13 +1534,13 @@ Segmented Controls
 
 .segmented-field {
   /* Matches .field's rhythm so side-by-side controls align on one baseline. */
-  margin: 9px 0;
+  margin: 1px 0;
   padding: 0;
   border: 0;
 }
 
 .segmented-field legend {
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 700;
@@ -1702,13 +1710,13 @@ Layout Grids
 .fan-column {
   grid-column: 1 / -1;
   display: grid;
-  gap: 12px;
+  gap: 4px;
 }
 
 .fan-selection {
   display: grid;
-  gap: 8px;
-  margin: 9px 0 12px;
+  gap: 4px;
+  margin: 1px 0 4px;
 }
 
 .fan-column .fan-selection {
