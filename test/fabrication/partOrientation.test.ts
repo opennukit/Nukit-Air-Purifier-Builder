@@ -45,23 +45,23 @@ function makeBox(width: number, depth: number, height: number): {
   return { vertices, triangles };
 }
 
-const zExtent = (vs: readonly MeshVertex[]): number =>
-  Math.max(...vs.map((v) => v.z)) - Math.min(...vs.map((v) => v.z));
-const xExtent = (vs: readonly MeshVertex[]): number =>
-  Math.max(...vs.map((v) => v.x)) - Math.min(...vs.map((v) => v.x));
+const extent = (vs: readonly MeshVertex[], axis: "x" | "y" | "z"): number =>
+  Math.max(...vs.map((v) => v[axis])) - Math.min(...vs.map((v) => v[axis]));
+const zExtent = (vs: readonly MeshVertex[]): number => extent(vs, "z");
+// The two bed-plane extents, sorted, so we can assert which face rests on the
+// plate without depending on which way the part spun about the vertical axis.
+const footprint = (vs: readonly MeshVertex[]): readonly number[] =>
+  [extent(vs, "x"), extent(vs, "y")].sort((a, b) => a - b);
 
 describe("orientChunkVerticesForPrinting", () => {
-  test("lays a tall thin part down so its largest face rests on the bed", () => {
+  test("rests a tall thin part on its largest face (thinnest dimension becomes the height)", () => {
     const { vertices, triangles } = makeBox(4, 6, 40);
 
     const oriented = orientChunkVerticesForPrinting(vertices, triangles);
 
-    // Rotated a quarter turn about the depth (Y) axis: height drops from 40 to 4
-    // (the former width), the long 40 mm dimension now lies along the bed.
+    // The 4 mm dimension becomes the height; the large 6 x 40 face lies on the bed.
     expect(zExtent(oriented)).toBeCloseTo(4, 6);
-    expect(xExtent(oriented)).toBeCloseTo(40, 6);
-    // Depth axis is untouched by the rotation.
-    expect(Math.max(...oriented.map((v) => v.y)) - Math.min(...oriented.map((v) => v.y))).toBeCloseTo(6, 6);
+    expect(footprint(oriented)).toEqual([6, 40]);
   });
 
   test("leaves an already-flat part on its large face (identity wins ties)", () => {
@@ -73,11 +73,15 @@ describe("orientChunkVerticesForPrinting", () => {
     expect(zExtent(oriented)).toBeCloseTo(4, 6);
   });
 
-  test("only spins about the depth axis — the Y span never changes", () => {
-    const { vertices, triangles } = makeBox(8, 23, 30);
+  test("lays a plate that is thin along the depth axis flat instead of on edge", () => {
+    // A panel only 4 mm deep (Y) but tall in Z. The previous depth-axis-only
+    // orienter could not tip this down, so it printed standing on edge. It must
+    // now rest on its large 40 x 30 face with the 4 mm dimension as the height.
+    const { vertices, triangles } = makeBox(40, 4, 30);
+
     const oriented = orientChunkVerticesForPrinting(vertices, triangles);
-    const ySpan = (vs: readonly MeshVertex[]) =>
-      Math.max(...vs.map((v) => v.y)) - Math.min(...vs.map((v) => v.y));
-    expect(ySpan(oriented)).toBeCloseTo(ySpan(vertices), 6);
+
+    expect(zExtent(oriented)).toBeCloseTo(4, 6);
+    expect(footprint(oriented)).toEqual([30, 40]);
   });
 });
