@@ -1,0 +1,46 @@
+name: Deploy Production
+
+# Publishes dist/ to filterboxbuilder.com (apex + www), which is served by the
+# production CloudFront distribution E16DP3X1Q12QP4 → S3 bucket
+# filterboxbuilder-maintenance. This is deliberately MANUAL (workflow_dispatch
+# only) so the live site changes only when you choose to publish — it is fully
+# independent of pushes to main / the beta site.
+#
+# To publish: Actions tab → "Deploy Production" → Run workflow → pick the branch
+# you want live (e.g. port-tempest-features) → Run. Or:
+#   gh workflow run deploy-prod.yml --ref <branch>
+#
+# Requires the same repository secrets as the beta Deploy workflow
+# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION) and the repository
+# variable DEPLOY_ENABLED=true. The deploy IAM user's policy must also allow
+# s3 write to filterboxbuilder-maintenance and cloudfront:CreateInvalidation on
+# E16DP3X1Q12QP4 (see the one-time IAM update in the launch notes).
+
+on:
+  workflow_dispatch:
+
+env:
+  S3_BUCKET: filterboxbuilder-maintenance
+  CLOUDFRONT_DISTRIBUTION_ID: E16DP3X1Q12QP4
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun test
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      # Hashed assets are immutable; index.html and the static pages revalidate.
+      # --delete removes any leftover maintenance-page files from the bucket.
+      - run: |
+          aws s3 sync dist/assets "s3://${{ env.S3_BUCKET }}/assets" --delete --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync dist "s3://${{ env.S3_BUCKET }}" --delete --exclude "assets/*" --cache-control "public, max-age=0, must-revalidate"
+      - run: aws cloudfront create-invalidation --distribution-id "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" --paths "/*"
