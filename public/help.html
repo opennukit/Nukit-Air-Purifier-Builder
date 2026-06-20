@@ -96,6 +96,12 @@
       .photo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
       .photo-row-3 { grid-template-columns: 1fr 1fr 1fr; }
       .photo-row .photo { margin: 0; }
+      .shot { display: block; margin: 16px 0; cursor: zoom-in; }
+      .photo-row .shot { margin: 0; }
+      .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
+      .lightbox { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 24px; background: rgb(17 32 28 / 88%); cursor: zoom-out; }
+      .lightbox.is-open { display: flex; }
+      .lightbox img { max-width: 100%; max-height: 100%; border-radius: 2px; box-shadow: var(--shadow); }
       .product {
         margin: 18px 0; padding: 18px; background: var(--accent-wash); border: 1px solid var(--accent-line, rgb(31 111 86 / 34%)); border-radius: 2px;
       }
@@ -559,5 +565,29 @@
         </main>
       </div>
     </div>
+
+    <!-- Click any .shot thumbnail to view the full-size image; click anywhere or press Esc to close. -->
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer"><img alt="" /></div>
+    <script>
+      (function () {
+        var box = document.getElementById("lightbox");
+        var full = box.querySelector("img");
+        document.addEventListener("click", function (event) {
+          var shot = event.target.closest("a.shot");
+          if (shot) {
+            event.preventDefault();
+            var thumb = shot.querySelector("img");
+            full.src = shot.getAttribute("href");
+            full.alt = thumb ? thumb.alt : "";
+            box.classList.add("is-open");
+          } else if (box.classList.contains("is-open")) {
+            box.classList.remove("is-open");
+          }
+        });
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape") box.classList.remove("is-open");
+        });
+      })();
+    </script>
   </body>
 </html>
