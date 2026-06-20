@@ -6,7 +6,7 @@
     <title>Help &amp; documentation: Nukit FilterBoxBuilder</title>
     <meta
       name="description"
-      content="Why a MERV 13 PC-fan filter box works, why Nukit gives this builder away free, how each setting works, and how to build it from laser-cut plywood or a 3D printer."
+      content="Why a MERV 13 PC-fan filter box works, why Nukit gives this builder away free, how each setting works, and how to build it with a laser cutter or 3D printer."
     />
     <style>
       :root {
@@ -112,8 +112,6 @@
         background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem;
       }
       .price { font-weight: 700; color: var(--accent-strong); }
-      .refs { font-size: 0.9rem; }
-      .refs li { margin: 8px 0; }
       .note { font-size: 0.82rem; color: var(--muted); }
       .cc-badge { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); font-weight: 600; }
       .cc-badge img { display: block; height: 31px; width: auto; }
@@ -136,10 +134,7 @@
         <p class="eyebrow">Nukit FilterBoxBuilder</p>
         <h1>Help &amp; documentation</h1>
         <p>
-          This page is here to help you get started with DIY air purifiers. We explain what this kind of air cleaner
-          is and why it works, how to use each setting in the parametric builder, and how to build your box with a
-          laser cutter or 3D printer. Tooltips next to the controls in the builder link directly to the matching
-          section here.
+          Interested in DIY air purifiers? Want to make your own? In this section, we explain how and why they work, how to use the parametric builder to customise your design, and how to construct your purifier using a laser cutter or 3D printer.
         </p>
         <a class="home-link" href="./">← Back to the builder</a>
         <a class="home-link" href="contact.html" style="margin-left: 8px; background: transparent; color: var(--accent-strong); border: 1px solid var(--line);">Contact us</a>
@@ -168,8 +163,7 @@
           <a href="#referenceScale">Reference scale</a>
           <strong>Build it</strong>
           <a href="#fabrication">Fabrication &amp; assembly</a>
-          <strong>Reference</strong>
-          <a href="#references">References</a>
+          <strong>Legal</strong>
           <a href="#license">License</a>
         </nav>
 
@@ -178,7 +172,7 @@
             <p class="eyebrow">Start here</p>
             <h2>Why a PC-fan filter box</h2>
             <p class="lede">
-              Extensive testing has shown that the combination of MERV&nbsp;13 furnace filters and PC fans can make one of
+               <a href="https://housefresh.com/air-purifier-comparison-tool/">Extensive testing</a> has shown that the combination of MERV&nbsp;13 furnace filters and PC fans can make one of
               the cheapest, quietest, highest-performance air cleaners you can build or buy.
             </p>
             <a class="shot" href="help/PC-Fan-Purifier.jpg"><img src="help/PC-Fan-Purifier.jpg" alt="A finished black PC-fan air purifier with three fans on the side and a large filter face, standing on the floor with its cord plugged in." /></a>
@@ -186,11 +180,7 @@
             <div class="var">
               <h3>The idea</h3>
               <p>
-                Standard furnace or HVAC filters are inexpensive, easy to find, and surprisingly effective. Mount several
-                of them in a box. Pull air through all of them at once with a bank of computer fans. The result is a large,
-                low-cost, very powerful, and very quiet air cleaner. Because the filter area is large, air passes through
-                the media easily, eliminating the need for a very large, powerful fan. That keeps the capture rate high and
-                the noise low, while the total airflow stays high.
+                Standard furnace or HVAC filters are inexpensive, easy to find, and surprisingly effective. In countries where they are not standard, you can use whatever locally available filters offer the best value. Mount several of them in a box. Pull air through them all at once using a bank of computer fans. The result is a low-cost air cleaner that is extremely powerful yet very quiet. As the filter area is large, air passes easily through the media, eliminating the need for a large, powerful fan. This maintains a high capture rate and low noise level while ensuring a high total airflow.
               </p>
             </div>
 
@@ -199,11 +189,13 @@
               <p>
                 How quickly a room is cleaned is its <strong>Clean Air Delivery Rate</strong>, or CADR. It is defined by
                 the <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">AHAM&nbsp;AC-1</a>
-                standard [<a href="#ref-aham">1</a>]. CADR is the capture rate multiplied by the airflow. So airflow
+                standard. CADR is the capture rate multiplied by the airflow. So airflow
                 matters just as much as the percentage the filter traps. True HEPA media captures 99.97% at 0.3&nbsp;µm.
-                But it is dense, so it restricts airflow and the fan moves less air [<a href="#ref-hepa">2</a>]. A
+                But it is dense, so it restricts airflow and the fan moves less air. A
                 MERV&nbsp;13 filter lets far more air through for the same fan. In fact, denser, higher-rated filters do not
-                always raise CADR, because the lost airflow can cancel the gain [<a href="#ref-aaqr">3</a>].
+                always raise CADR, because the lost airflow can cancel the gain.
+                <br>
+                So, while a HEPA filter may capture more particles in a single pass, a MERV 13 filter driven by the same power fans can make many more passes in the same amount of time and therefore often achieve a cleaner result.
               </p>
               <a class="shot" href="help/CADR-Testing.jpg"><img src="help/CADR-Testing.jpg" alt="A filter unit being measured in a test chamber, with a power meter on a nearby stand recording its airflow and draw." /></a>
             </div>
@@ -213,7 +205,7 @@
               <p>
                 The box has a large filter area, so each fan only has to overcome a little resistance. That is exactly
                 where <strong>PC case fans</strong> excel. Good 120 or 140&nbsp;mm PWM fans move 45 to 70&nbsp;CFM at
-                roughly 12 to 25&nbsp;dBA [<a href="#ref-fans">4</a>]. That is far quieter than a box fan at full speed, so
+                roughly 12 to 25&nbsp;dBA. That is far quieter than a box fan at full speed, so
                 more tolerable and less likely to be turned off or down by those sensitive to noise. 140&nbsp;mm fans
                 deliver a given airflow at a lower speed, so they are even quieter. Other advantages:
               </p>
@@ -235,14 +227,14 @@
             <p class="eyebrow">Free &amp; open</p>
             <h2>Why this builder is free</h2>
             <p class="lede">
-              Nukit designs and sells air purifiers. But clean air should not depend on being able to buy one. That is why
+              Nukit designs and sells <a href="https://cybernightmarket.com/products/the-nukit-tempest-pro-complete-air-purifier-kit-usa">air purifiers</a> and <a href="https://www.nukit222.com/">Far-UVC</a>. But clean air should not depend on income. That is why
               we provide this open source builder for free.
             </p>
 
             <div class="var">
               <h3>Free, open, and yours to make</h3>
               <p>
-                The FilterBoxBuilder lets anyone with a laser cutter or 3D printer make several different types of DIY air
+                The FilterBoxBuilder lets anyone, or any group with access to a laser cutter or 3D printer make several different types of DIY air
                 cleaners to suit nearly every situation. You use cheap, common parts. No account, purchase, or sign-up is
                 required. We believe clean indoor air is a public good. The more people who can make a good purifier from
                 local materials, the better. There is no catch: the builder produces complete, ready-to-make files for
@@ -270,7 +262,7 @@
                   <ul>
                     <li><strong>All-metal, buy-it-for-life construction.</strong> It will not warp, sag, yellow, or off-gas over years of use, the way wood or plastic eventually can.</li>
                     <li><strong>Everything included:</strong> custom high-pressure 140&nbsp;mm fans, fan and filter grills, a 12&nbsp;V power supply with a 5&nbsp;m cable, a PWM speed controller, wiring, and cable management. You simply add two standard 20×25×1 MERV&nbsp;13 filters.</li>
-                    <li><strong>Independently lab-measured performance:</strong> 222&nbsp;CFM CADR at a quiet 37&nbsp;dBA (about 39&nbsp;dBA at full speed). That is one of the best noise-to-airflow ratios available, easily equipped with more powerful (so louder) fans for higher CADR if you want it.</li>
+                    <li><strong>Independently lab-measured performance:</strong> 222&nbsp;CFM CADR at a whisper quiet 39&nbsp;dBA on full power. That is one of the best noise-to-airflow ratios available, and it can easily be equipped with more powerful (so louder) fans for higher CADR if you want it.</li>
                     <li><strong>No fit-and-tune step.</strong> It assembles like a PC case with a screwdriver and has no sharp edges. There are no kerf tests, print fitting, or parts hunting.</li>
                     <li><strong>Low profile and easy to mount.</strong> It looks like a tower PC. It includes a wall and ceiling mount, anchors, and VESA holes, and the filters still swap in place.</li>
                     <li><strong>Repairable and standard:</strong> no app, no cloud, and no "smart" parts. Nearly every component is an ordinary PC part, and you can paint it any color.</li>
@@ -280,10 +272,7 @@
                   <p class="note">The USA store is shown here. Canada and other countries have their own pages on the same store.</p>
                 </div>
               </div>
-              <p class="note">
-                Either way you get clean air. Make it yourself with this builder, or buy a finished unit that lasts longer
-                and support our work.
-              </p>
+            
             </div>
           </section>
 
@@ -291,7 +280,7 @@
             <p class="eyebrow">Overview</p>
             <h2>How the builder works</h2>
             <p class="lede">
-              FilterBoxBuilder turns a few measurements into a complete air-cleaner box. It is built around standard
+              FilterBoxBuilder turns a few measurements into a complete high performance air-cleaner. It is built around standard
               furnace filters and off-the-shelf PC fans.
             </p>
             <a class="shot" href="help/filterboxbuilder-interface.png"><img src="help/filterboxbuilder-interface.png" alt="FilterBoxBuilder interface: the 3D preview on the left, the controls on the right." /></a>
@@ -327,8 +316,8 @@
               <p>
                 <strong>One side</strong> places a single filter on one face of the box, ideal for wall or ceiling
                 mounting. <strong>Both sides</strong> puts a filter on two faces, for roughly twice the filter area and
-                airflow in the same footprint. 3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter
-                on each wall and fans on top.
+                airflow in the same footprint. If you leave one side without fans or filters, you can put it against the wall to safe space. 3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter
+                on each wall and fans on top. This design should have at least 150mm clearance from walls and furniture on all sides.
               </p>
               <p class="note">More filter area slows the air through the media. That raises the capture rate and lowers
                 noise (see <a href="#about">Why a PC-fan filter box</a>).</p>
@@ -346,7 +335,7 @@
                 <a class="shot" href="help/panel-back.png"><img src="help/panel-back.png" alt="Back fan view of a panel-style purifier: a grid of grilled fans across the back plate." /></a>
               </div>
               <p>
-                This design can offer the most portable CADR, but may be a little louder than other designs due to its
+                This design is the most portable and offers the most CADR for size, but may be a little louder than other designs due to its
                 single filter and large number of fans. An open backed portable
                 <a href="https://www.amazon.com/folding-music-stand/s?k=folding+music+stand" target="_blank" rel="noopener">folding music stand</a>
                 is an ideal way to mount and use this style.
@@ -402,9 +391,8 @@
               <h3>Box/Exhaust</h3>
               <p>
                 On the four-side filter tower, <strong>Box/Exhaust</strong> (under <em>Advanced</em>) swaps the top
-                panel's grid of PC-fan openings for a single central exhaust hole ringed with mounting screw holes. This is
-                the classic single-fan "filter cube" arrangement: instead of many case fans, you fit one larger exhaust or
-                blower fan over the opening, drawing air in through all four filter walls and out the top.
+                panel's grid of PC-fan openings for a single central fan hole ringed with mounting screw holes. This is
+                the classic single-fan "filter cube" arrangement: instead of many case fans, you fit one larger box or exhaust fan over the opening.
               </p>
               <div class="photo-row photo-row-4">
                 <a class="shot" href="help/box-exhaust-1.png"><img src="help/box-exhaust-1.png" alt="Box/Exhaust four-side tower with the exhaust opening on the top panel." /></a>
@@ -413,15 +401,19 @@
                 <a class="shot" href="help/box-exhaust-4.png"><img src="help/box-exhaust-4.png" alt="The completed Box/Exhaust tower." /></a>
               </div>
               <p>
-                The hole diameter and up to two rings of screw holes are adjustable, so you can match a specific fan,
-                blower, or duct flange. Leave a size at <code>0</code> to let the builder pick a sensible default from the
-                filter width.
+                The fan hole diameter and up to two rings of screw holes are adjustable, so you can match a specific fan,
+                blower, or duct flange. 
+                <br>
+                When using a box fan, the fan hole diameter should be the same as the fan blade to form a shroud. Leave the fan hole diameter at <code>0</code> to let the builder automatically pick a sensible default from the filter width.
               </p>
               <div class="photo-row photo-row-3">
                 <a class="shot" href="help/box-fan-settings.png"><img src="help/box-fan-settings.png" alt="The Advanced fan-tuning settings for a Box/Exhaust fan: fan hole diameter and two screw rings." /></a>
                 <a class="shot" href="help/box-fan-dimensions.png"><img src="help/box-fan-dimensions.png" alt="Top view of the Box/Exhaust panel showing the central hole diameter and the two screw rings." /></a>
                 <a class="shot" href="help/box-fan-zip-ties.png"><img src="help/box-fan-zip-ties.png" alt="A box fan secured to the top panel with zip ties through the fan grill and around the frame." /></a>
               </div>
+              <p>
+              Place two holes in each corner using the first and second <strong>Ring</strong> settings, then pull nylon zip ties through the fan grill to secure a box fan to the top of the filter cube.
+              </p>
             </div>
           </section>
 
@@ -500,7 +492,7 @@
               <h3>A. Laser-cut plywood (or acrylic)</h3>
               <p><strong>Cutting</strong></p>
               <ul>
-                <li>Use flat, void-free plywood. Baltic birch 3&nbsp;mm or 6&nbsp;mm is ideal, because warped stock fights the joints. There are purpose-made materials (laserply, MDF) made specifically for laser cutting that should be used whenever possible.</li>
+                <li>Use flat, void-free plywood or cast acrylic. 3&nbsp;mm is ideal, because thinner stock may warp and fight the joints. There are purpose-made materials (laserply, MDF) made specifically for laser cutting that should be used whenever possible.</li>
                 <li>Measure the thickness with calipers and set the material thickness to the real value.</li>
                 <li>Cut one test finger joint first. Tune the kerf / fit allowance until it taps together snugly without forcing.</li>
                 <li>Keep Engrave labels on for your first build. Sand off any scorch with a light pass of fine sandpaper.</li>
@@ -509,9 +501,9 @@
               <ul>
                 <li>Assemble the whole box without glue first, to confirm every joint and the filter slot work.</li>
                 <li>Glue plywood with wood PVA (such as Titebond), or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
-                <li>Leave the filter-slot wall unglued, or make it a removable panel, so you can change filters.</li>
+                
                 <li>Square the box against a flat surface, and clamp or tape it lightly. Wipe off any squeeze-out before it cures.</li>
-                <li>Seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
+                <li>If there is room, you can seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
                 <li>If you choose to paint or seal the box, use low- or no-VOC products and allow substantial curing time.</li>
               </ul>
               <a class="shot" href="help/Box-Finger-Joints.jpg"><img src="help/Box-Finger-Joints.jpg" alt="Close-up of a laser-cut plywood box corner, where the finger joints on each panel interlock at the seam." /></a>
@@ -528,52 +520,22 @@
               </ul>
               <p><strong>Alignment pins &amp; gluing</strong></p>
               <ul>
-                <li>Split faces meet on printed alignment pins and matching holes. Dry-fit them to confirm the chunks seat flush before gluing.</li>
-                <li>Glue chunk seams with cyanoacrylate (super glue) for PLA and PETG, or a plastic solvent or epoxy for ASA. The pins hold registration while the glue sets.</li>
-                <li>Test-fit the filter and fans before final gluing. Leave the filter face removable.</li>
-                <li>Glue two pieces at a time, wait for that to cure, then glue those assemblies two at a time. Three or more seams in a row can be difficult to clamp without the whole thing buckling.</li>
+                <li>Split faces meet on printed alignment pins and matching holes. Dry-fit them with pins inserted to confirm the chunks seat flush before gluing.</li>
+                <li>Glue chunk seams with cyanoacrylate (super glue) for PLA and PETG. The pins hold registration while the glue sets.</li>
+                <li>Test-fit the filter and fans before final gluing.</li>
+                <li>Hint: Glue two pieces at a time, wait for that to cure, then glue those assemblies two at a time. Three or more seams in a row can be difficult to clamp without the whole thing buckling.</li>
               </ul>
               <a class="shot" href="help/pins.png"><img src="help/pins.png" alt="3D-printed chunks meeting at a seam, with alignment pins registering the pieces together." /></a>
             </div>
 
             <div class="var">
-              <h3>Mounting the fans (both methods)</h3>
+              <h3>Mounting the fans</h3>
               <ul>
-                <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub.</li>
-                <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into the plastic body of the fan, or you can use bolts or pull-through rubber fasteners.</li>
+                <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub or hold a small piece of tissue paper in front of the fan to see which way it it blowing</li>
+                <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into the plastic body of the fan. Alternatively, you can use bolts, or pull-through rubber fasteners.</li>
                 <li>Wire PWM fans to a 12&nbsp;V supply or hub sized for the total current. Route the cable through the cord pass-through.</li>
                 <li>Add grills to any exposed fan if you did not include the optional honeycomb feature.</li>
               </ul>            </div>
-          </section>
-
-          <section class="card refs" id="references">
-            <p class="eyebrow">Reference</p>
-            <h2>References</h2>
-            <ol>
-              <li id="ref-aham">
-                ANSI/AHAM AC-1: <em>Method for Measuring Performance of Portable Household Electric Room Air Cleaners</em>
-                (Clean Air Delivery Rate).
-                <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">ahamverifide.org</a>.
-              </li>
-              <li id="ref-hepa">
-                Engineers Edge, <em>HEPA Filter Pressure Drop Considerations.</em>
-                <a href="https://www.engineersedge.com/filtration/hepa_filter_pressure_drop_considerations.htm" target="_blank" rel="noopener">engineersedge.com</a>.
-              </li>
-              <li id="ref-aaqr">
-                <em>Experimental Study on Optimal Clean Air Delivery Rate &amp; Filter Thickness of Indoor Air Purifiers.</em>
-                Aerosol and Air Quality Research.
-                <a href="https://aaqr.org/articles/aaqr-24-06-oa-0149" target="_blank" rel="noopener">aaqr.org</a>.
-              </li>
-              <li id="ref-fans">
-                Manufacturer datasheets for 120/140&nbsp;mm PWM case fans list typical airflow and noise (for example,
-                Noctua NF-A14: about 82&nbsp;m³/h at ~24.6&nbsp;dBA, with low-noise versions ≤~12&nbsp;dBA).
-                <a href="https://noctua.at/en/products/fan" target="_blank" rel="noopener">noctua.at</a>.
-              </li>
-            </ol>
-            <p class="note">
-              These links are provided for reference; the standards bodies (ASHRAE, AHAM) and the cited journals are the
-              authoritative sources.
-            </p>
           </section>
 
           <section class="card" id="license">
