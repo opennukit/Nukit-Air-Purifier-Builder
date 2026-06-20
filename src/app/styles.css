@@ -72,6 +72,60 @@ Shell Container
 }
 
 /* ##############################
+Footer / license
+############################## */
+
+.app-footer {
+  width: 100%;
+  max-width: 1440px;
+  margin: 28px auto 0;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.app-footer p {
+  margin: 12px 0 0;
+  max-width: 80ch;
+}
+
+.cc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.cc-badge .glyphs {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.cc-badge .glyphs span {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cc-badge .cc-text {
+  font-size: 0.9rem;
+}
+
+.cc-badge:hover .cc-text {
+  text-decoration: underline;
+}
+
+/* ##############################
 Header Bar
 ############################## */
 

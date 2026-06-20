@@ -2551,4 +2551,26 @@
       {exportMobileButtonText}
     </button>
   </nav>
+
+  <!-- #######################################
+  Footer
+  ####################################### -->
+
+  <footer class="app-footer">
+    <a
+      class="cc-badge"
+      href="https://creativecommons.org/licenses/by-sa/4.0/"
+      target="_blank"
+      rel="license noopener"
+    >
+      <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
+      <span class="cc-text">CC BY-SA 4.0</span>
+    </a>
+    <p>
+      The Nukit FilterBoxBuilder and its output are licensed under
+      <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">CC BY-SA 4.0</a>.
+      Use, share, and adapt freely, including commercially, with credit to Nukit and the same license on derivatives.
+      <a href="help.html#license" target="_blank" rel="noopener">More.</a>
+    </p>
+  </footer>
 </main>

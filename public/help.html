@@ -115,6 +115,19 @@
       .refs { font-size: 0.9rem; }
       .refs li { margin: 8px 0; }
       .note { font-size: 0.82rem; color: var(--muted); }
+      .cc-badge { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); font-weight: 600; }
+      .cc-badge .glyphs { display: inline-flex; gap: 4px; }
+      .cc-badge .glyphs span {
+        display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+        border: 1px solid var(--line); background: var(--surface-strong); font-size: 0.6rem; font-weight: 700; color: var(--ink);
+      }
+      .cc-badge .cc-text { font-size: 0.9rem; }
+      .cc-badge:hover .cc-text { text-decoration: underline; }
+      footer.site-footer {
+        max-width: 1120px; margin: 8px auto 0; padding: 20px 24px 0; color: var(--muted); font-size: 0.82rem;
+        border-top: 1px solid var(--line-soft);
+      }
+      footer.site-footer p { margin: 12px 0 0; max-width: 75ch; }
       @media (max-width: 820px) {
         .layout { grid-template-columns: 1fr; }
         nav.toc { position: static; max-height: none; }
@@ -162,6 +175,7 @@
           <a href="#fabrication">Fabrication &amp; assembly</a>
           <strong>Reference</strong>
           <a href="#references">References</a>
+          <a href="#license">License</a>
         </nav>
 
         <main>
@@ -566,8 +580,72 @@
               authoritative sources.
             </p>
           </section>
+
+          <section class="card" id="license">
+            <p class="eyebrow">License</p>
+            <h2>License: free to use, share, and adapt</h2>
+            <p class="lede">
+              The FilterBoxBuilder and everything it produces are released under a Creative Commons
+              Attribution-ShareAlike 4.0 International license (CC BY-SA 4.0).
+            </p>
+
+            <p>
+              <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
+                <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
+                <span class="cc-text">CC BY-SA 4.0</span>
+              </a>
+            </p>
+
+            <div class="var">
+              <h3>What the license covers</h3>
+              <p>
+                This applies to the builder itself, the documentation on this page, and the output you generate with it:
+                the cut sheets, DXF and SVG files, 3D models, and the boxes you make from them. You are free to use all of
+                it, including for commercial purposes, with no account, fee, or permission needed.
+              </p>
+            </div>
+
+            <div class="var">
+              <h3>What you can do</h3>
+              <p>
+                You can build boxes for yourself or for others, sell what you make, share the files, and remix or adapt
+                the designs into something new. We encourage it. The whole point is to put clean air within reach of as
+                many people as possible.
+              </p>
+            </div>
+
+            <div class="var">
+              <h3>The two conditions</h3>
+              <p>
+                <strong>Attribution.</strong> Give credit to Nukit, link back to this builder, and note if you changed
+                anything. A simple line such as "Based on the Nukit FilterBoxBuilder, licensed CC BY-SA 4.0" is enough.
+              </p>
+              <p>
+                <strong>ShareAlike.</strong> If you remix or build on the designs and share the result, release your
+                version under the same CC BY-SA 4.0 license so others keep the same freedoms.
+              </p>
+            </div>
+
+            <p class="note">
+              This is a plain-language summary, not the license itself. The full legal text is at
+              <a href="https://creativecommons.org/licenses/by-sa/4.0/legalcode" target="_blank" rel="noopener">creativecommons.org/licenses/by-sa/4.0/legalcode</a>.
+            </p>
+          </section>
         </main>
       </div>
+
+      <footer class="site-footer">
+        <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
+          <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
+          <span class="cc-text">CC BY-SA 4.0</span>
+        </a>
+        <p>
+          The Nukit FilterBoxBuilder and its output are licensed under
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">CC BY-SA 4.0</a>.
+          You may use, share, and adapt them, including commercially, as long as you credit Nukit and share any
+          derivatives under the same license. <a href="help.html#license">More about the license.</a>
+        </p>
+      </footer>
     </div>
 
     <!-- Click any .shot thumbnail to view the full-size image; click anywhere or press Esc to close. -->
