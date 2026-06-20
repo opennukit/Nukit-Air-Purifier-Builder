@@ -116,13 +116,8 @@
       .refs li { margin: 8px 0; }
       .note { font-size: 0.82rem; color: var(--muted); }
       .cc-badge { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); font-weight: 600; }
-      .cc-badge .glyphs { display: inline-flex; gap: 4px; }
-      .cc-badge .glyphs span {
-        display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
-        border: 1px solid var(--line); background: var(--surface-strong); font-size: 0.6rem; font-weight: 700; color: var(--ink);
-      }
-      .cc-badge .cc-text { font-size: 0.9rem; }
-      .cc-badge:hover .cc-text { text-decoration: underline; }
+      .cc-badge img { display: block; height: 31px; width: auto; }
+      .cc-badge:hover { opacity: 0.85; }
       footer.site-footer {
         max-width: 1120px; margin: 8px auto 0; padding: 20px 24px 0; color: var(--muted); font-size: 0.82rem;
         border-top: 1px solid var(--line-soft);
@@ -591,8 +586,7 @@
 
             <p>
               <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
-                <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
-                <span class="cc-text">CC BY-SA 4.0</span>
+                <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
               </a>
             </p>
 
@@ -636,8 +630,7 @@
 
       <footer class="site-footer">
         <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
-          <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
-          <span class="cc-text">CC BY-SA 4.0</span>
+          <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
         </a>
         <p>
           The Nukit FilterBoxBuilder and its output are licensed under

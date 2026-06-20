@@ -2563,8 +2563,7 @@
       target="_blank"
       rel="license noopener"
     >
-      <span class="glyphs" aria-hidden="true"><span>CC</span><span>BY</span><span>SA</span></span>
-      <span class="cc-text">CC BY-SA 4.0</span>
+      <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
     </a>
     <p>
       The Nukit FilterBoxBuilder and its output are licensed under

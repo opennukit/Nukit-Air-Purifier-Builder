@@ -99,30 +99,14 @@ Footer / license
   font-weight: 600;
 }
 
-.cc-badge .glyphs {
-  display: inline-flex;
-  gap: 4px;
+.cc-badge img {
+  display: block;
+  height: 31px;
+  width: auto;
 }
 
-.cc-badge .glyphs span {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--surface-strong);
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.cc-badge .cc-text {
-  font-size: 0.9rem;
-}
-
-.cc-badge:hover .cc-text {
-  text-decoration: underline;
+.cc-badge:hover {
+  opacity: 0.85;
 }
 
 /* ##############################
