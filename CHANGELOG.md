@@ -103,10 +103,20 @@ tests) pass.
   auto-sized rings, per-wall fan controls, Filter slot placement.
 - Two-column Advanced accordion with tooltips; millimetres everywhere (no mm/in
   toggle); whole-mm filter dimensions; width/length swap button.
+- Adjustable alignment-pin size in Advanced (default 1.8 mm; 0 disables the pins;
+  clamped to a 2.5 mm maximum).
 
 ## Print kit / 3MF
 - Export the print kit as one 3MF per chunk in a ZIP; auto-orient chunks on the
   bed; tower alignment pins fixed; chunk/seam matching codes (currently parked).
+- Auto-orientation now considers all 24 axis-aligned orientations instead of only
+  quarter-turns about the depth axis, so a thin plate chunk (e.g. a top/back panel
+  only a few mm deep) lays flat on its large face instead of printing on edge.
+  Identity stays first and wins ties, so box-shaped chunks keep their orientation.
+- Chunk seams now avoid the thin inside filter flanges as well as fan grills. A
+  depth seam could land inside a ~5 mm flange (pushed there by grill avoidance)
+  and split it into a weak sliver; the flange's thin extent is now a seam keep-out
+  so the cut clears it.
 
 ---
 
