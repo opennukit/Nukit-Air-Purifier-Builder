@@ -122,7 +122,7 @@
     type PrintableSheetPlan,
     type PrintVolumePresetId,
   } from "@/fabrication/printing/printableKit";
-  import { createPrintDesignStlZipFromKit, createPrintDesignThreeMfZipFromKit, printKitCacheKey } from "@/fabrication/printing/printDesignKit";
+  import { createPrintDesignStlZipFromKit, createPrintDesignThreeMfZipFromKit, printKitCacheKey, DOWNLOAD_BASE_NAME } from "@/fabrication/printing/printDesignKit";
   import type { PrintSheetThreePreviewPlan } from "@/rendering/three/printSheetThreePreview";
   import PurifierPreview from "@/app/svelte/PurifierPreview.svelte";
   import PrintSheetPreview from "@/app/svelte/PrintSheetPreview.svelte";
@@ -944,11 +944,11 @@
     }
 
     if (laserDownloadFormat === "dxf") {
-      exportLaserDrawing(createLaserDxf(layout), "nukit-open-air-purifier.dxf", "application/dxf");
+      exportLaserDrawing(createLaserDxf(layout), `${DOWNLOAD_BASE_NAME}.dxf`, "application/dxf");
       showTransientButtonLabel(buttonKey, "Exported DXF", 1400);
       return;
     }
-    exportLaserDrawing(createLaserSvg(layout), "nukit-open-air-purifier.svg", "image/svg+xml;charset=utf-8");
+    exportLaserDrawing(createLaserSvg(layout), `${DOWNLOAD_BASE_NAME}.svg`, "image/svg+xml;charset=utf-8");
     showTransientButtonLabel(buttonKey, "Exported SVG", 1400);
   }
 

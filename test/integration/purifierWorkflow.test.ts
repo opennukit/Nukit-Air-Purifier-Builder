@@ -682,7 +682,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(towerModel.box.height).toBe(305);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
     expect(towerModel.chunkGrid.totalCount).toBe(8);
-    expect(printExport.filename).toBe("nukit-tempest-print-kit.3mf");
+    expect(printExport.filename).toBe("nukit-filterboxbuilder.3mf");
     expect(printExport.mimeType).toBe("model/3mf");
   }, 10000);
 
@@ -746,7 +746,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     ]);
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.parts.every((part) => partFitsPrintBed(part, kit.preset.bed))).toBe(true);
-    expect(printExport.filename).toBe("donut-hepa-adapter-print-kit.3mf");
+    expect(printExport.filename).toBe("nukit-filterboxbuilder.3mf");
     expect(printExport.mimeType).toBe("model/3mf");
     expect(content).toContain("Donut HEPA fan adaptor print kit");
     expect(content).toContain("Donut filter fan adaptor");
@@ -823,7 +823,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
     }));
     const expectedPlacements = expectedPlates.flatMap((plate) => plate.instances);
 
-    expect(printExport.filename).toBe("nukit-tempest-print-kit.3mf");
+    expect(printExport.filename).toBe("nukit-filterboxbuilder.3mf");
     expect(printExport.mimeType).toBe("model/3mf");
     expect(printExport.sheetPlan.sheets.length).toBeGreaterThan(1);
     expect(printExport.bytes[0]).toBe(0x50);
@@ -884,7 +884,7 @@ describe("FilterBoxBuilder purifier workflow", () => {
       throw new Error("expected a bounded bed for the bed-256 preset");
     }
 
-    expect(zip.filename).toBe("nukit-tempest-print-kit.zip");
+    expect(zip.filename).toBe("nukit-filterboxbuilder.zip");
     expect(zip.mimeType).toBe("application/zip");
     // ZIP local-file-header signature "PK\x03\x04".
     expect(zip.bytes[0]).toBe(0x50);

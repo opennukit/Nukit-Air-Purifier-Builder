@@ -13,6 +13,11 @@ import {
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
 
+// Base name for every downloaded file/zip (print kit ZIP, per-chunk entries, and
+// the laser SVG/DXF). Kept generic rather than per-design so downloads are easy
+// to find regardless of which design or fabrication method produced them.
+export const DOWNLOAD_BASE_NAME = "nukit-filterboxbuilder";
+
 // The fingerprint a built kit is cached and deduplicated under: the print
 // volume preset plus every setting that can shape kit geometry. Built by
 // construction — spread ALL raw settings and strip only the fields known NOT
@@ -75,7 +80,7 @@ export function createPrintDesignThreeMfExportFromKit(
   return createPrintableThreeMfExportFromKit(
     kit,
     `${layout.configuration.printDesign.label} print kit`,
-    `${layout.configuration.printDesign.id}-print-kit.3mf`,
+    `${DOWNLOAD_BASE_NAME}.3mf`,
     enclosureDisplayColor(layout),
   );
 }
@@ -91,10 +96,10 @@ export function createPrintDesignThreeMfZip(
 }
 
 export function createPrintDesignStlZipFromKit(
-  layout: LayoutResult,
+  _layout: LayoutResult,
   kit: PrintableKit,
 ): PrintableStlZip {
-  return createPrintableStlZipFromKit(kit, `${layout.configuration.printDesign.id}-print-kit`);
+  return createPrintableStlZipFromKit(kit, DOWNLOAD_BASE_NAME);
 }
 
 export function createPrintDesignThreeMfZipFromKit(
@@ -104,7 +109,7 @@ export function createPrintDesignThreeMfZipFromKit(
   return createPrintableThreeMfZipFromKit(
     kit,
     `${layout.configuration.printDesign.label} print kit`,
-    `${layout.configuration.printDesign.id}-print-kit`,
+    DOWNLOAD_BASE_NAME,
     enclosureDisplayColor(layout),
   );
 }

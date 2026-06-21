@@ -287,7 +287,7 @@ describe("Tempest CSG printable kit", () => {
     expect(layout.configuration.design.type).toBe("tempest");
     expect(kit.parts).toHaveLength(8);
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
-    expect(exported.filename).toBe("nukit-tempest-print-kit.3mf");
+    expect(exported.filename).toBe("nukit-filterboxbuilder.3mf");
     expect(exported.bytes.length).toBeGreaterThan(1000);
   }, 15000);
 });
