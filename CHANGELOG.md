@@ -117,6 +117,9 @@ tests) pass.
   depth seam could land inside a ~5 mm flange (pushed there by grill avoidance)
   and split it into a weak sliver; the flange's thin extent is now a seam keep-out
   so the cut clears it.
+- Every download now uses a single generic base name, `nukit-filterboxbuilder`
+  (print-kit ZIP and its per-chunk 3MF entries, the STL ZIP, and the laser
+  SVG/DXF), instead of per-design names like `nukit-tempest-print-kit`.
 
 ---
 
