@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { createTempestModel, defaultTempestSettings, type TempestModel, type TempestPrintablePose } from "@/domain/designs/tempest/model";
 import { createTempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
 import { featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import { decodeSettings } from "@/domain/purifier/settingsCodec";
+import { createLayout } from "@/fabrication/purifierLayout";
+import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
 
 const bed = { width: 256, depth: 256, height: 256 };
 
@@ -54,5 +57,35 @@ describe("feature-aware chunk slicing", () => {
     const uniformDepthSeam = pose.envelope.depth / 2;
     const hitsGrill = centres.some((centre) => Math.abs(uniformDepthSeam - centre[1]) < radius);
     expect(hitsGrill).toBe(true);
+  });
+
+  test("no chunk seam splits an inside filter flange (two-filter sandwich, 44 mm filter)", () => {
+    // Reproduces the reported design: the depth seam previously landed inside the
+    // below-filter flange, splitting that 5 mm wall into a weak sliver.
+    const url =
+      "printDesign=nukit-tempest&filterWidth=495&filterDepth=495&filterThickness=44" +
+      "&tempestArrangement=dual-horizontal-sandwich&fanDiameter=140&fansLeft=-1&fansRight=0" +
+      "&fansTop=-1&fansBottom=0&hexGrill=true&materialThickness=5&printVolume=bed-256&fabricationMethod=print-3mf";
+    const flangeModel = createTempestModel(createTempestSettingsFromLayout(createLayout(decodeSettings(url))));
+    const flangePose = flangeModel.printablePose;
+    const grid = featureAwarePrintableChunkGrid(flangeModel, flangePose, bed);
+    const filterLayout = flangeModel.filterLayout;
+
+    expect(filterLayout.topology).toBe("sandwich");
+    expect(flangePose.type).toBe("upright-dual-filter");
+    if (filterLayout.topology !== "sandwich" || flangePose.type !== "upright-dual-filter") {
+      return;
+    }
+
+    const interiorDepthSeams = grid.boundariesY.slice(1, -1);
+    expect(interiorDepthSeams.length).toBeGreaterThan(0);
+    for (const flange of filterLayout.flanges) {
+      // Source Z maps to pose Y as (envelope.depth - z); the range flips.
+      const low = flangePose.envelope.depth - flange.zTop;
+      const high = flangePose.envelope.depth - flange.zBottom;
+      for (const seam of interiorDepthSeams) {
+        expect(seam > low && seam < high).toBe(false);
+      }
+    }
   });
 });

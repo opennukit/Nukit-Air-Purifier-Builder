@@ -6,9 +6,11 @@ import { matchTopology } from "@/domain/designs/tempest/topology";
 // #######################################
 
 // Splits the posed model into bed-sized print chunks whose seams avoid slicing
-// through fan grills. Grills are the fragile, hard-to-glue features; a seam
-// through one ruins the part. Following Naomi's OpenSCAD/JSCAD builder, each
-// candidate seam is snapped out of the "bands" the grills occupy.
+// through fragile features: fan grills, and thin internal walls such as the
+// inside filter flanges. A seam through a grill ruins the part; a seam through a
+// thin flange splits it into weak slivers. Following Naomi's OpenSCAD/JSCAD
+// builder, each candidate seam is snapped out of the "bands" those features
+// occupy (grill keep-outs below; thin-wall keep-outs in internalWallBandsInPose).
 //
 // Band model: every grill is treated as a sphere of radius R around its centre,
 // so a seam on axis A is blocked whenever it falls within R of a grill centre on
@@ -23,6 +25,9 @@ type AxisBands = { readonly x: Band[]; readonly y: Band[]; readonly z: Band[] };
 
 const SEAM_GAP_MM = 0.5; // a seam must clear the previous one (and the bed edge) by at least this
 const GRILL_MARGIN_MM = 2; // grill keep-out band radius padding beyond the fan radius
+// A seam must clear a thin internal wall (e.g. the inside filter flanges) by at
+// least this on the wall's thin axis, so it is never split into weak slivers.
+const WALL_SEAM_CLEARANCE_MM = 2;
 
 export function featureAwarePrintableChunkGrid(
   model: TempestModel,
@@ -30,7 +35,7 @@ export function featureAwarePrintableChunkGrid(
   bed: { readonly width: number; readonly depth: number; readonly height: number },
 ): TempestChunkGrid {
   const radius = model.settings.fan.diameter / 2 + GRILL_MARGIN_MM;
-  const bands = grillBandsInPose(model, pose, radius);
+  const bands = mergeAxisBands(grillBandsInPose(model, pose, radius), internalWallBandsInPose(model, pose));
   return chunkGridFromBoundaries(
     axisCuts(pose.envelope.width, bed.width, bands.x),
     axisCuts(pose.envelope.depth, bed.depth, bands.y),
@@ -127,6 +132,40 @@ function toPose([x, y, z]: GrillCentre, pose: TempestPrintablePose): GrillCentre
     return [x, pose.envelope.depth - z, y];
   }
   return [x, y, z];
+}
+
+// #######################################
+// Internal-Wall Bands
+// #######################################
+
+// Keep-out bands for thin internal walls whose thin dimension runs along a seam
+// axis. The sandwich's inside filter flanges are thin horizontal slabs (thin in
+// source Z); a seam perpendicular to that axis bisects them into weak slivers,
+// so we block the seam across each slab's extent (plus a clearance) on whichever
+// pose axis source Z maps to. A seam on the other axes only crosses the slab's
+// large face, which is fine, so no band is needed there.
+function internalWallBandsInPose(model: TempestModel, pose: TempestPrintablePose): AxisBands {
+  const bands: AxisBands = { x: [], y: [], z: [] };
+  const thinZSlabs = matchTopology(model, {
+    sandwich: ({ filterLayout }): Band[] =>
+      filterLayout.flanges.map((flange) => [flange.zBottom, flange.zTop]),
+    quad: (): Band[] => [],
+  });
+  for (const [zBottom, zTop] of thinZSlabs) {
+    const low = zBottom - WALL_SEAM_CLEARANCE_MM;
+    const high = zTop + WALL_SEAM_CLEARANCE_MM;
+    if (pose.type === "upright-dual-filter") {
+      // Source Z maps to pose Y as (envelope.depth - z), which flips the range.
+      bands.y.push([pose.envelope.depth - high, pose.envelope.depth - low]);
+    } else {
+      bands.z.push([low, high]);
+    }
+  }
+  return bands;
+}
+
+function mergeAxisBands(a: AxisBands, b: AxisBands): AxisBands {
+  return { x: [...a.x, ...b.x], y: [...a.y, ...b.y], z: [...a.z, ...b.z] };
 }
 
 // #######################################
