@@ -2107,6 +2107,10 @@ Narrow Control Stack
     grid-template-columns: 1fr;
   }
 
+  /* The Laser Cut controls flow as CSS multi-columns rather than a grid, so the
+     grid-template-columns:1fr above doesn't reach them. Collapse them (and the
+     Advanced flow) to a single column to match the 3D Print mobile layout. */
+  .controls-sections.laser-columns,
   .advanced-columns-flow {
     column-count: 1;
   }
