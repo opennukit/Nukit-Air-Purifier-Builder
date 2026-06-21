@@ -120,6 +120,8 @@ tests) pass.
 - Every download now uses a single generic base name, `nukit-filterboxbuilder`
   (print-kit ZIP and its per-chunk 3MF entries, the STL ZIP, and the laser
   SVG/DXF), instead of per-design names like `nukit-tempest-print-kit`.
+- Added two print-volume presets: 250 x 220 x 270 mm and 300 x 300 x 330 mm
+  (labelled by dimensions only).
 
 ---
 

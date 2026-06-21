@@ -27,8 +27,10 @@ export const printVolumePresetIds = [
   "bed-220",
   "bed-225",
   "bed-prusa-mk",
+  "bed-250-220-270",
   "bed-256",
   "bed-300",
+  "bed-300-300-330",
   "bed-h2-safe",
   "bed-350",
   "bed-prusa-xl",
@@ -254,6 +256,11 @@ export const printVolumePresets: readonly PrintVolumePreset[] = [
     bed: { type: "bounded", width: 250, depth: 210, height: 220 },
   },
   {
+    id: "bed-250-220-270",
+    label: "250 x 220 x 270 mm",
+    bed: { type: "bounded", width: 250, depth: 220, height: 270 },
+  },
+  {
     id: "bed-256",
     label: "256 x 256 x 256 mm",
     bed: { type: "bounded", width: 256, depth: 256, height: 256 },
@@ -262,6 +269,11 @@ export const printVolumePresets: readonly PrintVolumePreset[] = [
     id: "bed-300",
     label: "300 x 300 x 300 mm",
     bed: { type: "bounded", width: 300, depth: 300, height: 300 },
+  },
+  {
+    id: "bed-300-300-330",
+    label: "300 x 300 x 330 mm",
+    bed: { type: "bounded", width: 300, depth: 300, height: 330 },
   },
   {
     id: "bed-h2-safe",
