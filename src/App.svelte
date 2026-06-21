@@ -2588,5 +2588,10 @@
       Use, share, and adapt freely, including commercially, with credit to Nukit and the same license on derivatives.
       <a href="help.html#license" target="_blank" rel="noopener">More.</a>
     </p>
+    <p>
+      The laser-cut box geometry is adapted from
+      <a href="https://github.com/florianfesti/boxes" target="_blank" rel="noopener">Boxes.py</a>
+      by Florian Festi, used under the GPL-3.0 license.
+    </p>
   </footer>
 </main>
