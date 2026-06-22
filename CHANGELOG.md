@@ -122,6 +122,13 @@ tests) pass.
   SVG/DXF), instead of per-design names like `nukit-tempest-print-kit`.
 - Added two print-volume presets: 250 x 220 x 270 mm and 300 x 300 x 330 mm
   (labelled by dimensions only).
+- Back-plate ("Back") fan grid: when fewer than the maximum fans are requested,
+  they are now distributed evenly (each fan at the centre of an equal division of
+  the plate, balanced margins and gaps) for uniform airflow, instead of clustering
+  at minimum spacing in the centre. The rows x cols split also follows the plate
+  shape now, so a deep plate gets more rows than columns (e.g. 6 -> 2 cols x 3
+  rows, not 3 x 2). Designs that also use side-wall fans fall back to the centred
+  grid that keeps clear of them.
 
 ---
 

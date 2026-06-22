@@ -209,9 +209,9 @@ type Aabb = {
 // spaced by fanSpacing, kept a fan-radius-plus-wall in from each edge so the
 // bodies clear the corner posts. A fan body that would hit a wall fan is dropped.
 //
-// "automatic" fills the whole grid; a fixed count places that many SYMMETRICALLY:
-// a near-square block (e.g. 4 -> 2x2), and odd counts centred (e.g. 3 -> a centred
-// row), never bunched into one corner or an L.
+// "automatic" fills the whole grid; a fixed count places that many SYMMETRICALLY
+// in a near-square arrangement (e.g. 4 -> 2x2, 3 -> a row), spread evenly across
+// the whole plate rather than bunched at minimum spacing in the centre.
 function createBottomPlateFanLayout(
   settings: TempestSettings,
   box: TempestBoxEnvelope,
@@ -259,9 +259,25 @@ function createBottomPlateFanLayout(
     return { positions: fullGrid, fanCount: maximumCount, maximumCount };
   }
 
-  // Fewer than the full grid: lay the count out as a centred, near-square block.
-  const { rows } = chooseBackGrid(target, maxCols, maxRows);
+  // Fewer than the full grid: distribute the fans evenly so each one sits at the
+  // centre of an equal division of the plate (balanced margins and gaps), for
+  // uniform airflow through the filter. Not clustered at the centre, not jammed to
+  // the edges.
+  const { rows } = chooseBackGrid(target, maxCols, maxRows, box.width, box.depth);
   const rowCounts = distributeBackRows(target, rows);
+  const evenYs = evenlyDistribute(rows, box.depth, minimumCenterFromEdge);
+  const evenPositions = rowCounts
+    .flatMap((rowCount, rowIndex) =>
+      evenlyDistribute(rowCount, box.width, minimumCenterFromEdge).map((x) => ({ x, y: evenYs[rowIndex] })),
+    )
+    .filter(clearsWalls);
+  if (evenPositions.length === target) {
+    return { positions: evenPositions, fanCount: target, maximumCount };
+  }
+
+  // Some evenly-spread fans would land on a side-wall fan and get dropped (designs
+  // that combine the Back grid with wall fans). Fall back to the centred,
+  // minimum-spacing grid, which keeps clear of the wall fans.
   const ys = plateFanPositions(rows, box.depth, diameter);
   const positions = rowCounts
     .flatMap((rowCount, rowIndex) => plateFanPositions(rowCount, box.width, diameter).map((x) => ({ x, y: ys[rowIndex] })))
@@ -269,17 +285,25 @@ function createBottomPlateFanLayout(
   return { positions, fanCount: positions.length, maximumCount };
 }
 
-// Pick the rows x cols block for `count` fans: the squarest rectangle that holds
-// it with the least waste (so 4 -> 2x2, 6 -> 3x2, 3 -> 3x1), preferring more
-// columns than rows on a tie.
-function chooseBackGrid(count: number, maxCols: number, maxRows: number): { readonly cols: number; readonly rows: number } {
+// Pick the cols x rows block for `count` fans: the rectangle that holds it with
+// the least waste and then the most even fan SPACING for the plate's shape, so a
+// deep plate gets more rows than columns (e.g. 6 on a 507x761 plate -> 2 cols x 3
+// rows, not 3 x 2). Even spacing means square cells: width/cols ~= depth/rows.
+function chooseBackGrid(
+  count: number,
+  maxCols: number,
+  maxRows: number,
+  width: Millimeters,
+  depth: Millimeters,
+): { readonly cols: number; readonly rows: number } {
   let best: { cols: number; rows: number; score: readonly number[] } | null = null;
   for (let cols = 1; cols <= maxCols; cols += 1) {
     for (let rows = 1; rows <= maxRows; rows += 1) {
       if (cols * rows < count) {
         continue;
       }
-      const score = [cols * rows - count, Math.abs(cols - rows), -cols, -rows];
+      const cellAspectDiff = Math.abs(width / cols - depth / rows);
+      const score = [cols * rows - count, cellAspectDiff, -cols, -rows];
       if (best === null || lexicographicLess(score, best.score)) {
         best = { cols, rows, score };
       }
@@ -386,6 +410,22 @@ function plateFanPositions(fanCount: number, length: Millimeters, fanDiameter: M
   const total = fanCount <= 1 ? 0 : (fanCount - 1) * fanSpacing(fanDiameter);
   const first = fanCount === 1 ? length / 2 : (length - total) / 2;
   return Array.from({ length: fanCount }, (_, index) => first + index * fanSpacing(fanDiameter));
+}
+
+// Evenly distribute `count` fans along `length`: each fan sits at the centre of
+// an equal 1/count division of the plate, so the spacing between fans and the
+// margins to the edges are balanced and airflow is uniform. Positions are clamped
+// to keep the outermost fans a `minimumCenterFromEdge` clear of the plate edge.
+function evenlyDistribute(count: number, length: Millimeters, minimumCenterFromEdge: Millimeters): readonly Millimeters[] {
+  if (count <= 0) {
+    return [];
+  }
+  const low = minimumCenterFromEdge;
+  const high = length - minimumCenterFromEdge;
+  return Array.from({ length: count }, (_, index) => {
+    const position = (length * (index + 0.5)) / count;
+    return Math.min(high, Math.max(low, position));
+  });
 }
 
 function createWallFanLayout(
