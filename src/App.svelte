@@ -316,7 +316,7 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
-  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
+  $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId, generatedPrintSheetPlan);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
