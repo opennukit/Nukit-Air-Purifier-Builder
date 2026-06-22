@@ -1,4 +1,4 @@
-import type { MeshTriangle, MeshVertex } from "@/fabrication/printing/threeMf";
+import { meshVolumeMm3, type MeshTriangle, type MeshVertex } from "@/fabrication/printing/threeMf";
 
 // #######################################
 // Mesh Manifoldness Checks
@@ -75,16 +75,9 @@ export function totalGenus(mesh: Mesh): number {
 
 // Signed enclosed volume of a watertight mesh via the divergence theorem.
 // Lets a test assert a region is solid (or open) by intersecting and comparing.
+// Shares the production divergence-theorem sum (threeMf.meshVolumeMm3).
 export function meshVolume(mesh: Mesh): number {
-  let volume = 0;
-  for (const t of mesh.triangles) {
-    const a = mesh.vertices[t.v1];
-    const b = mesh.vertices[t.v2];
-    const c = mesh.vertices[t.v3];
-    volume +=
-      (a.x * (b.y * c.z - c.y * b.z) - a.y * (b.x * c.z - c.x * b.z) + a.z * (b.x * c.y - c.x * b.y)) / 6;
-  }
-  return volume;
+  return meshVolumeMm3(mesh);
 }
 
 // Number of connected shells. A part meant to print as one body must report 1 —
