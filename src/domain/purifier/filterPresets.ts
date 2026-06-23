@@ -13,6 +13,8 @@ export type FilterSizePreset = {
 
 export const filterSizePresets: readonly FilterSizePreset[] = [
   { id: "starkvind", label: "STARKVIND (365 x 285 x 35 mm)", width: 365, depth: 285, thickness: 35 },
+  { id: "starkvind-1x2", label: "STARKVIND 1x2 (730 x 285 x 35 mm)", width: 730, depth: 285, thickness: 35 },
+  { id: "starkvind-2x1", label: "STARKVIND 2x1 (365 x 570 x 35 mm)", width: 365, depth: 570, thickness: 35 },
   { id: "filter-10x10x1", label: '10" x 10" x 1" (241 x 241 x 19 mm)', width: 241, depth: 241, thickness: 19 },
   { id: "filter-16x24x1", label: '16" x 24" x 1" (394 x 597 x 19 mm)', width: 394, depth: 597, thickness: 19 },
   { id: "filter-16x25x1", label: '16" x 25" x 1" (394 x 622 x 19 mm)', width: 394, depth: 622, thickness: 19 },
