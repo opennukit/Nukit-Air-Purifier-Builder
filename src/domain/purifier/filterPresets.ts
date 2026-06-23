@@ -1,5 +1,38 @@
 import type { Millimeters } from "@/domain/units";
 
+// A single STARKVIND filter's face. The STARKVIND 1x2 / 2x1 presets are exact
+// grids of this unit, so the preview can draw the seams between the filters.
+export const starkvindFilterUnit = { width: 365, depth: 285 } as const;
+
+// If a filter footprint is an exact grid of STARKVIND units (in either
+// orientation), report how many units span its width and depth so the preview
+// can split the media into that many tiles. Returns null for a plain single
+// filter or any non-STARKVIND size.
+export function starkvindFilterTiling(
+  width: Millimeters,
+  depth: Millimeters,
+): { readonly across: number; readonly down: number } | null {
+  const tolerance = 1;
+  const grid = (unitWidth: number, unitDepth: number): { across: number; down: number } | null => {
+    const across = Math.round(width / unitWidth);
+    const down = Math.round(depth / unitDepth);
+    if (across < 1 || down < 1) {
+      return null;
+    }
+    if (Math.abs(across * unitWidth - width) > tolerance || Math.abs(down * unitDepth - depth) > tolerance) {
+      return null;
+    }
+    return { across, down };
+  };
+  const tiling =
+    grid(starkvindFilterUnit.width, starkvindFilterUnit.depth) ??
+    grid(starkvindFilterUnit.depth, starkvindFilterUnit.width);
+  if (tiling === null || (tiling.across <= 1 && tiling.down <= 1)) {
+    return null;
+  }
+  return tiling;
+}
+
 // Stock filters offered by the "Filter size" selector. "Custom" is represented
 // by the absence of a match. A preset matches in either orientation so swapping
 // width/length keeps it selected.

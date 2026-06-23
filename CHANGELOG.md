@@ -94,6 +94,10 @@ tests) pass.
   dimensions of every layout design that uses STARKVIND (including the Nukit
   Tempest Euro default).
 - Added a 10" x 10" x 1" (241 x 241 x 19 mm) filter preset.
+- Added STARKVIND 1x2 (730 x 285 x 35 mm) and STARKVIND 2x1 (365 x 570 x 35 mm)
+  presets, each two STARKVIND filters side by side. The 3D preview splits the
+  filter media into separate tiles with a seam between them so it reads as two
+  filters (works in either orientation; only triggers for STARKVIND multiples).
 
 ## 3D Print (Tempest) design presets
 - Added design presets: Nukit Tempest Euro, Euro Cube, Original, Original Cube,
