@@ -93,6 +93,7 @@ tests) pass.
 - Updated STARKVIND to 365 × 285 × 35 mm and removed FORNUFTIG; updated the real
   dimensions of every layout design that uses STARKVIND (including the Nukit
   Tempest Euro default).
+- Added a 10" x 10" x 1" (241 x 241 x 19 mm) filter preset.
 
 ## 3D Print (Tempest) design presets
 - Added design presets: Nukit Tempest Euro, Euro Cube, Original, Original Cube,
