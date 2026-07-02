@@ -146,6 +146,14 @@
     | { readonly type: "building"; readonly key: string }
     | { readonly type: "failed"; readonly key: string; readonly message: string };
 
+  // The result of asking for the current settings' plan. "superseded" is a
+  // normal outcome (the settings changed mid-build), distinct from a real
+  // "failed" — the Download path must not show an error for it.
+  type PlanRequestOutcome =
+    | { readonly type: "ready"; readonly plan: PrintableSheetPlan }
+    | { readonly type: "failed" }
+    | { readonly type: "superseded" };
+
   // #######################################
   // Svelte State
   // #######################################
@@ -205,8 +213,17 @@
   const generatedPrintSheetPlanCache = new LruMap<string, PrintableSheetPlan>(4);
   const printSheetKitChannel = createPrintKitChannel();
   let printSheetKitBuild: PrintKitBuildState = { type: "idle" };
+  // In-flight split-plan builds keyed by cacheKey, so a second caller for the
+  // same key (e.g. a Download click during a background build) awaits the same
+  // build instead of starting a redundant one. Cleared when the build settles.
+  const inFlightPlanByCacheKey = new Map<string, Promise<PlanRequestOutcome>>();
   // Reported up by PurifierPreview about its assembled tempest kit build.
-  let assembledPreviewBuildPhase: "idle" | "building" | "failed" = "idle";
+  type AssembledBuildPhase = "idle" | "building" | "failed";
+  let assembledPreviewBuildPhase: AssembledBuildPhase = "idle";
+  // Flips true the first time the assembled preview reports a rendered model
+  // ("idle"). The split plan only background-builds after this, so it never
+  // competes with the initial unsplit build for the worker.
+  let assembledFirstRenderDone = false;
   let purifierPreview: PurifierPreview | undefined;
   // First load shows a centered "Building model…" state until the first build
   // SUCCEEDS; after that, rebuilds only show the corner pill over the old
@@ -288,7 +305,7 @@
   $: fabricationMethod = workbenchView.fabricationMethod;
   $: printVolumePresetId = workbenchView.printVolumePresetId;
   $: layout = createLayout(draft);
-  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
+  $: generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode, assembledFirstRenderDone);
   // The sheet-plan half only counts for 3D printing: the laser path renders
   // synchronously, so no pill or overlay belongs there even if a print build
   // is still settling in the background.
@@ -987,7 +1004,7 @@
       // The plan resolves lazily, so nothing may be building yet (e.g.
       // exporting straight from the assembled view): start the build now and
       // ask the user to retry shortly.
-      requestGeneratedPrintSheetPlan(currentLayout, printVolumePresetId, printKitCacheKey(currentLayout.rawSettings, printVolumePresetId));
+      void ensurePlanForCurrentSettings();
       return "Still updating…";
     }
     const printExport =
@@ -1101,18 +1118,31 @@
   // Print Sheet Plans
   // ##############################
 
+  // The assembled preview reports "idle" only once a model is actually on
+  // screen (cache hit or finished build), "building" while it waits, "failed"
+  // on error. The first "idle" therefore marks the first assembled render as
+  // done — the gate that lets the split plan background-build without racing
+  // the initial unsplit build for the worker.
+  function handleAssembledBuildPhaseChange(phase: AssembledBuildPhase): void {
+    assembledPreviewBuildPhase = phase;
+    if (phase === "idle") {
+      assembledFirstRenderDone = true;
+    }
+  }
+
   // Resolves the plan synchronously from the cache when possible. On a cache
-  // miss a worker build only starts when a view actually shows the plan —
-  // posting the visible assembled tempest request first in the worker's FIFO
-  // queue — and the previous plan stays on screen until the new one lands
-  // (the "Updating…" indicator covers the gap). While nothing shows the plan,
-  // the summaries render their pending placeholders and the export button
-  // starts a build on demand.
+  // miss a worker build starts once a view shows the plan (print-sheets mode)
+  // or the assembled view has rendered its own model (so the split build never
+  // races the initial unsplit build), and the previous plan stays on screen
+  // until the new one lands (the "Updating…" indicator covers the gap). The
+  // summaries render their pending placeholders until the background build
+  // populates them.
   function resolveGeneratedPrintSheetPlan(
     currentLayout: LayoutResult,
     currentFabricationMethod: FabricationMethod,
     currentPrintVolumePresetId: PrintVolumePresetId,
     currentPreviewMode: PreviewMode,
+    firstAssembledRenderDone: boolean,
   ): PrintableSheetPlan | null {
     if (currentFabricationMethod !== "print-3mf" || isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {
       return null;
@@ -1128,32 +1158,54 @@
       }
       return cachedPlan;
     }
-    if (currentPreviewMode !== "print-sheets") {
+    // The print-sheets view shows the plan and so always drives its build; the
+    // assembled view drives it too, but only after its own model is on screen,
+    // so the split build never competes with the initial unsplit build. Either
+    // way the request is deduped per key by ensurePlanForCurrentSettings.
+    if (currentPreviewMode !== "print-sheets" && !firstAssembledRenderDone) {
       return null;
     }
-    const keyAlreadyHandled = printSheetKitBuild.type !== "idle" && printSheetKitBuild.key === cacheKey;
-    if (!keyAlreadyHandled) {
-      requestGeneratedPrintSheetPlan(currentLayout, currentPrintVolumePresetId, cacheKey);
-    }
+    void ensurePlanForCurrentSettings();
     return generatedPrintSheetPlan;
   }
 
-  function requestGeneratedPrintSheetPlan(
-    currentLayout: LayoutResult,
-    currentPrintVolumePresetId: PrintVolumePresetId,
-    cacheKey: string,
-  ): void {
+  // The one path that turns the current settings into a plan: serve a warm
+  // cache hit, otherwise build through the channel exactly once per key and
+  // reuse that in-flight build for any concurrent caller (background resolve
+  // and a Download click share it). Warms the cache and, when the key still
+  // answers the current settings, puts the plan on screen.
+  function ensurePlanForCurrentSettings(): Promise<PlanRequestOutcome> {
+    const currentLayout = layout;
+    const currentPrintVolumePresetId = printVolumePresetId;
+    const cacheKey = printKitCacheKey(currentLayout.rawSettings, currentPrintVolumePresetId);
+    const cachedPlan = generatedPrintSheetPlanCache.get(cacheKey);
+    if (cachedPlan !== undefined) {
+      if (printSheetKitBuild.type === "failed") {
+        printSheetKitBuild = { type: "idle" };
+      }
+      return Promise.resolve({ type: "ready", plan: cachedPlan });
+    }
+    const inFlight = inFlightPlanByCacheKey.get(cacheKey);
+    if (inFlight !== undefined) {
+      return inFlight;
+    }
+    // A recorded failure for this key blocks rebuilds until the user retries
+    // (retryFailedPreviewBuild) or the settings change; honor that here too.
+    if (printSheetKitBuild.type === "failed" && printSheetKitBuild.key === cacheKey) {
+      return Promise.resolve({ type: "failed" });
+    }
     printSheetKitBuild = { type: "building", key: cacheKey };
-    void printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome) => {
+    const build = printSheetKitChannel.request(currentLayout.rawSettings, currentPrintVolumePresetId).then((outcome): PlanRequestOutcome => {
+      inFlightPlanByCacheKey.delete(cacheKey);
       // A superseded request was replaced by a newer one that now owns the
       // build state, so it changes nothing here.
       if (outcome.type === "superseded") {
-        return;
+        return { type: "superseded" };
       }
       if (outcome.type === "failed") {
-        console.error(`requestGeneratedPrintSheetPlan: print kit build failed: ${outcome.message}`);
+        console.error(`ensurePlanForCurrentSettings: print kit build failed: ${outcome.message}`);
         printSheetKitBuild = { type: "failed", key: cacheKey, message: outcome.message };
-        return;
+        return { type: "failed" };
       }
       const plan = createPrintableSheetPlanFromKit(outcome.kit);
       generatedPrintSheetPlanCache.set(cacheKey, plan);
@@ -1164,19 +1216,21 @@
       if (fabricationMethod === "print-3mf" && printKitCacheKey(layout.rawSettings, printVolumePresetId) === cacheKey) {
         generatedPrintSheetPlan = plan;
       }
+      return { type: "ready", plan };
     });
+    inFlightPlanByCacheKey.set(cacheKey, build);
+    return build;
   }
 
   // "Try again" on the failure pill. A failed key is otherwise never retried
   // until the settings change, leaving the pill a dead end. The sheet-plan
-  // side resets its build state and re-resolves through the same path the
-  // reactive statement uses (which re-requests the build, since the failed
-  // key no longer blocks it); the assembled preview retries through its own
-  // component, which owns the failed-key memory.
+  // side clears its build state and drives a fresh build through the shared
+  // plan path (the failed key no longer blocks it); the assembled preview
+  // retries through its own component, which owns the failed-key memory.
   function retryFailedPreviewBuild(): void {
     if (printSheetKitBuild.type === "failed") {
       printSheetKitBuild = { type: "idle" };
-      generatedPrintSheetPlan = resolveGeneratedPrintSheetPlan(layout, fabricationMethod, printVolumePresetId, previewMode);
+      void ensurePlanForCurrentSettings();
     }
     purifierPreview?.retryFailedAssembledKitBuild();
   }
@@ -1442,7 +1496,7 @@
               bind:this={purifierPreview}
               {layout}
               {printVolumePresetId}
-              onAssembledBuildPhaseChange={(phase) => (assembledPreviewBuildPhase = phase)}
+              onAssembledBuildPhaseChange={handleAssembledBuildPhaseChange}
             />
           {:else if previewMode === "print-sheets"}
             {#if activePrintSheetPlan !== null}
