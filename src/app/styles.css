@@ -498,6 +498,35 @@ screen; this small pill is the only cue that a refresh is on the way. */
   pointer-events: none;
 }
 
+/* On touch screens one finger is reserved for page scrolling, so a deliberate
+sideways one-finger drag on the canvas does nothing at all and reads as
+broken. This pill surfaces the two-finger gesture the moment that happens
+(shown by orbitTouchScroll.ts). */
+.touch-orbit-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  z-index: 3;
+  padding: 7px 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 253 246 / 92%);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 28px rgb(51 42 27 / 10%);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 220ms ease;
+}
+
+.touch-orbit-hint-visible {
+  opacity: 1;
+}
+
 /* Error tone of the same pill: the model on screen no longer matches the
 settings because the last geometry build failed. Unlike the passive updating
 pill it carries a retry button, so it accepts pointer events. */
