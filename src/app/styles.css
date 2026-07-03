@@ -75,30 +75,36 @@ Shell Container
 
 .app-shell {
   min-height: 100svh;
-  padding: 24px clamp(28px, 3vw, 44px);
+  padding: 14px clamp(28px, 3vw, 44px) 18px;
 }
 
 /* ##############################
 Footer / license
 ############################## */
 
+/* One compact row: badge beside the text instead of stacked above it, so the
+license note costs as little page height as possible. */
 .app-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   width: 100%;
   max-width: 1440px;
-  margin: 28px auto 0;
-  padding: 20px 0 0;
+  margin: 14px auto 0;
+  padding: 10px 0 0;
   border-top: 1px solid var(--line-soft);
   color: var(--muted);
   font-size: 0.82rem;
 }
 
 .app-footer p {
-  margin: 12px 0 0;
+  margin: 0;
   max-width: 80ch;
 }
 
 .cc-badge {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 9px;
   text-decoration: none;
@@ -108,7 +114,7 @@ Footer / license
 
 .cc-badge img {
   display: block;
-  height: 31px;
+  height: 22px;
   width: auto;
 }
 
@@ -426,7 +432,7 @@ Preview Stage
 
 .preview-stage.is-three-preview,
 .preview-stage.is-print-sheet-three-preview {
-  min-height: clamp(420px, 54svh, 720px);
+  min-height: clamp(440px, 62svh, 820px);
   background:
     radial-gradient(circle at 50% 34%, rgb(31 111 86 / 18%), transparent 38%),
     linear-gradient(135deg, #f9f5ea 0%, #e1dbcb 100%);
@@ -435,7 +441,7 @@ Preview Stage
 .three-preview-host,
 .print-sheet-three-host {
   width: 100%;
-  height: clamp(420px, 54svh, 720px);
+  height: clamp(440px, 62svh, 820px);
   animation: settle-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
