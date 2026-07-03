@@ -20,9 +20,8 @@ export function reserveSingleFingerForPageScroll(controls: OrbitControls): void 
   }
 }
 
-// A deliberate sideways one-finger drag is an orbit attempt, not a scroll:
-// vertical drags scroll the page (so the finger visibly did something), but a
-// horizontal drag does nothing at all and reads as broken. Surface the
+// A one-finger drag on the canvas never touches the model (a single finger is
+// reserved for page scrolling), so any deliberate drag over it surfaces the
 // two-finger gesture instead of leaving the user guessing.
 const orbitAttemptMinimumDragPx = 16;
 const hintVisibleMs = 2200;
@@ -59,7 +58,7 @@ function showHintOnSingleFingerOrbitAttempt(canvas: HTMLElement): void {
       }
       const dx = event.touches[0].clientX - start.x;
       const dy = event.touches[0].clientY - start.y;
-      if (Math.abs(dx) < orbitAttemptMinimumDragPx || Math.abs(dx) <= Math.abs(dy)) {
+      if (Math.hypot(dx, dy) < orbitAttemptMinimumDragPx) {
         return;
       }
       hint.classList.add("touch-orbit-hint-visible");
