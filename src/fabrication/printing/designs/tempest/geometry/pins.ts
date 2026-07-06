@@ -229,21 +229,52 @@ export function tempestCoveragePins<Solid, Region>(
     return []; // single chunk: nothing to pin together
   }
   const { modeling } = ctx;
-  const COVERAGE_MARGIN_MM = 1.5;
   const SEAM_TOL_MM = 0.1;
-  const probeReach = Math.min(pin.holeDepth * 0.5, 4);
+  // How far out (in the seam plane) to require material around the socket, so a
+  // coverage pin never grazes out through the side of a piece: the pin radius plus
+  // a small margin.
+  const lateralReach = pin.diameter / 2 + 0.5;
+  // Target in-plane spacing between coverage pins on a seam face, so a large stray
+  // face gets a row of pins (like the walls) instead of one at its centre.
+  const MIN_PIN_GAP_MM = pin.spacing * 0.6;
   const axisName = (index: 0 | 1 | 2): TempestExtrudeAxis => (index === 0 ? "x" : index === 1 ? "y" : "z");
   const placed: TempestAlignmentPinPlacement[] = basePlacements.map((p) => ({ position: p.position, axis: p.axis }));
   const coverage: TempestAlignmentPinPlacement[] = [];
 
   const hasMaterial = (point: readonly [number, number, number]): boolean => probeHasMaterial(modeling, assembledSolid, point);
 
-  // Does some existing pin already cross `seam` (a cut perpendicular to
-  // `axisIndex`) within this piece's footprint? If so the piece is already
-  // fastened to its neighbour across that seam and needs no coverage pin there.
-  const seamAlreadyPinned = (
-    min: readonly [number, number, number],
-    max: readonly [number, number, number],
+  // Is the whole pin socket embedded in material — not just at its centre? Samples
+  // the socket's cylindrical surface (a pin-radius out, at several stations along
+  // its full length into both chunks) plus its two far ends. Any sample in open
+  // space means the socket would graze out through a face, so the pin is rejected.
+  // This is what keeps the denser coverage grid from placing a pin that breaks out
+  // on a thin or curved piece (e.g. the top exhaust ring).
+  const socketEmbedded = (position: readonly [number, number, number], axisIndex: 0 | 1 | 2): boolean => {
+    const [u, v] = ([0, 1, 2] as const).filter((k) => k !== axisIndex) as [0 | 1 | 2, 0 | 1 | 2];
+    for (const t of [-0.9, -0.5, 0, 0.5, 0.9]) {
+      const axial = position[axisIndex] + t * pin.holeDepth;
+      for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        const probe: [number, number, number] = [position[0], position[1], position[2]];
+        probe[axisIndex] = axial;
+        probe[u] = position[u] + lateralReach * Math.cos(angle);
+        probe[v] = position[v] + lateralReach * Math.sin(angle);
+        if (!hasMaterial(probe)) {
+          return false;
+        }
+      }
+    }
+    const lo: [number, number, number] = [position[0], position[1], position[2]];
+    const hi: [number, number, number] = [position[0], position[1], position[2]];
+    lo[axisIndex] = position[axisIndex] - pin.holeDepth * 0.95;
+    hi[axisIndex] = position[axisIndex] + pin.holeDepth * 0.95;
+    return hasMaterial(lo) && hasMaterial(hi);
+  };
+
+  // Is there already a pin (base or coverage) crossing `seam` within MIN_PIN_GAP of
+  // this spot, in the seam's plane? Used to fill a face to the target spacing
+  // without duplicating pins a base band already placed there.
+  const pinnedNearOnSeam = (
+    point: readonly [number, number, number],
     axisIndex: 0 | 1 | 2,
     seam: number,
   ): boolean =>
@@ -251,9 +282,13 @@ export function tempestCoveragePins<Solid, Region>(
       if (p.axis !== axisName(axisIndex) || Math.abs(p.position[axisIndex] - seam) > SEAM_TOL_MM) {
         return false;
       }
-      return ([0, 1, 2] as const).every(
-        (k) => k === axisIndex || (p.position[k] >= min[k] - COVERAGE_MARGIN_MM && p.position[k] <= max[k] + COVERAGE_MARGIN_MM),
-      );
+      let sq = 0;
+      for (const k of [0, 1, 2] as const) {
+        if (k !== axisIndex) {
+          sq += (p.position[k] - point[k]) ** 2;
+        }
+      }
+      return sq < MIN_PIN_GAP_MM * MIN_PIN_GAP_MM;
     });
 
   for (let ix = 0; ix < bx.length - 1; ix += 1) {
@@ -267,29 +302,45 @@ export function tempestCoveragePins<Solid, Region>(
         }
         for (const piece of modeling.analysis.decompose(cellSolid)) {
           const { min, max } = modeling.analysis.boundingBox(piece);
-          const pieceCenter: [number, number, number] = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
-          // Pin the piece on EVERY interior seam it spans (with material on both
-          // sides), so a stray piece bridging two neighbours is fastened on both
-          // ends, not just one. Seams a base pin already covers are skipped, so
-          // well-pinned pieces gain nothing.
+          // Coverage only fills DISCONNECTED stray pieces that no base pin reaches;
+          // connected pieces (walls, plates) already get their density from the
+          // base seam bands. Skipping the pinned pieces keeps this pass fast (it
+          // otherwise re-probes every well-covered face).
+          const pinnedByBase = basePlacements.some(
+            (p) =>
+              p.position[0] >= min[0] - MIN_PIN_GAP_MM && p.position[0] <= max[0] + MIN_PIN_GAP_MM &&
+              p.position[1] >= min[1] - MIN_PIN_GAP_MM && p.position[1] <= max[1] + MIN_PIN_GAP_MM &&
+              p.position[2] >= min[2] - MIN_PIN_GAP_MM && p.position[2] <= max[2] + MIN_PIN_GAP_MM,
+          );
+          if (pinnedByBase) {
+            continue;
+          }
+          // FILL each seam the stray spans to the normal spacing (not a single pin
+          // at its centre): step a grid across the face's two in-plane axes and add
+          // a pin wherever the socket is fully embedded and no pin sits within
+          // MIN_PIN_GAP. So a stray bridging two neighbours is fastened on both
+          // ends and a large stray face gets a full row.
           for (const axisIndex of [0, 1, 2] as const) {
             for (const seam of interior[axisIndex]) {
               if (seam < min[axisIndex] - 0.6 || seam > max[axisIndex] + 0.6) {
                 continue;
               }
-              if (seamAlreadyPinned(min, max, axisIndex, seam)) {
-                continue;
-              }
-              const position: [number, number, number] = [...pieceCenter];
-              position[axisIndex] = seam;
-              const low: [number, number, number] = [...position];
-              const high: [number, number, number] = [...position];
-              low[axisIndex] = seam - probeReach;
-              high[axisIndex] = seam + probeReach;
-              if (hasMaterial(low) && hasMaterial(high)) {
-                const placement: TempestAlignmentPinPlacement = { position, axis: axisName(axisIndex) };
-                coverage.push(placement);
-                placed.push(placement);
+              const [u, v] = ([0, 1, 2] as const).filter((k) => k !== axisIndex) as [0 | 1 | 2, 0 | 1 | 2];
+              for (const gu of rimPositions(min[u], max[u], pin.spacing)) {
+                for (const gv of rimPositions(min[v], max[v], pin.spacing)) {
+                  const position: [number, number, number] = [0, 0, 0];
+                  position[axisIndex] = seam;
+                  position[u] = gu;
+                  position[v] = gv;
+                  if (pinnedNearOnSeam(position, axisIndex, seam)) {
+                    continue;
+                  }
+                  if (socketEmbedded(position, axisIndex)) {
+                    const placement: TempestAlignmentPinPlacement = { position, axis: axisName(axisIndex) };
+                    coverage.push(placement);
+                    placed.push(placement);
+                  }
+                }
               }
             }
           }
@@ -479,6 +530,13 @@ function pinPlacementsQuad(
   const wallZLow = filterLayout.bottomPlateThickness;
   const wallZHigh = model.box.height - filterLayout.topPlateThickness;
   const topPlateMidZ = model.box.height - filterLayout.topPlateThickness / 2;
+  // The outer flange is a continuous exterior skirt that runs the FULL height of
+  // the box, including down over the base and feet. Pin it across that whole span
+  // at the normal spacing (not just the wall region above the bottom plate) so the
+  // large exterior glue faces of the base chunks carry a full row of pins like the
+  // walls above them, instead of the lone pin left below the filter window.
+  // pinCutsMaterial drops any that land in the window opening or open air.
+  const outerFlangeZLow = model.frame.outsideFlangeThickness;
   // Holes a top-plate pin must not pierce (fan-grid grills + their screw holes).
   const topHoles = quadTopPlateHoles(model, fanLayout);
   // A central top-plate pin this close to a perpendicular seam would collide with
@@ -507,7 +565,7 @@ function pinPlacementsQuad(
     for (let index = 1; index < chunkGrid.countX; index += 1) {
       const seamX = chunkGrid.boundariesX[index];
       for (const wallY of [model.frame.outsideFlangeThickness / 2, model.box.depth - model.frame.outsideFlangeThickness / 2]) {
-        for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
+        for (const gridZ of rimPositions(outerFlangeZLow, wallZHigh, pin.spacing)) {
           placements.push({ position: [seamX, wallY, gridZ], axis: "x" });
         }
       }
@@ -561,7 +619,7 @@ function pinPlacementsQuad(
     for (let index = 1; index < chunkGrid.countY; index += 1) {
       const seamY = chunkGrid.boundariesY[index];
       for (const wallX of [model.frame.outsideFlangeThickness / 2, model.box.width - model.frame.outsideFlangeThickness / 2]) {
-        for (const gridZ of rimPositions(wallZLow, wallZHigh, pin.spacing)) {
+        for (const gridZ of rimPositions(outerFlangeZLow, wallZHigh, pin.spacing)) {
           placements.push({ position: [wallX, seamY, gridZ], axis: "y" });
         }
       }

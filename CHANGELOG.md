@@ -5,6 +5,27 @@ commit-by-commit list is in the Appendix at the bottom. Every change is
 committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
+## Fill stray-piece seam faces at the normal pin spacing (v10, in progress, local only)
+- A disconnected stray piece got a single coverage pin at each seam's centre, even
+  when the face had room for a row. Coverage now steps a grid across each spanned
+  seam face at the standard pin spacing and places a pin at every station whose
+  socket is fully embedded (a new `socketEmbedded` check samples the socket's
+  surface along its whole length, so a denser pin never grazes out of a thin or
+  curved piece like the top exhaust ring). Gated to stray pieces only (those no
+  base pin reaches) so the pass stays fast; connected faces keep getting their
+  density from the base bands. Chunk G's floating plate went from 1 pin per seam
+  face to a full row (3 at 30 mm), no break-throughs, and the suite still passes.
+
+## Denser alignment pins on the base/skirt glue faces (v10, in progress, local only)
+- The outer flange is a continuous exterior skirt running the full box height, but
+  its seam pin band started at the bottom-plate top, so the large exterior glue
+  faces of the base chunks got a single pin below the filter window. Ran the outer
+  flange seam band down the full height (`outerFlangeZLow`), so those faces now
+  carry a full column of pins at the normal spacing; `pinCutsMaterial` drops any
+  that fall in the window opening or the open feet region. Bottom vertical seams
+  went from 2 pins to ~4 at ~30 mm spacing, no break-throughs; the box-exhaust
+  tower is unaffected.
+
 ## Air-only pin removal + preview diagram matches drilled holes (v10, in progress, local only)
 - Drop "air-only" seam pins whose socket falls entirely in open space (e.g. a
   base-plate pin landing in the bottom-filter pocket): they drilled nothing and
