@@ -10,6 +10,7 @@
     applyTempestArrangement,
     applyTempestDesign,
     reconcileTempestDesign,
+    defaultSettings,
     boxExhaustDiametersForWidth,
     cordHoleSides,
     cordHoleWalls,
@@ -42,6 +43,8 @@
     fixedFanCountOptions,
     type FanColor,
   } from "@/domain/purifier/fans";
+  import { BOX_FAN_MODELS, CUSTOM_FAN_ID, pcFanModelsForGroup, type FanGroup, type CadrEstimate } from "@/domain/purifier/cadr";
+  import { resolveFanModelId, type CadrFanMode } from "@/domain/purifier/buildCadr";
   import { filterSizePresets, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
   import {
     advancedJointControls,
@@ -117,6 +120,7 @@
     createPrintableSheetPlanFromKit,
     exportFormats as fabricationMethods,
     findPrintVolumePreset,
+    isCutSheetExportFormat,
     printVolumePresets,
     type ExportFormat,
     type PrintableSheetPlan,
@@ -154,18 +158,13 @@
   // Initial Session
   // ##############################
 
-  // The site loads with the Nukit Tempest Euro build by default (a print-3mf
-  // tempest sandwich around a 370x290x40 filter). A shared link with its own
-  // params always wins; only a bare URL falls back to this.
-  const DEFAULT_SESSION_QUERY =
-    "printDesign=nukit-tempest&filterWidth=370&filterDepth=290&filterThickness=40&rim=30&fanColor=black&fanDiameter=140" +
-    "&fansLeft=0&fansRight=0&fansTop=-1&fansBottom=0&tempestArrangement=dual-horizontal-sandwich" +
-    "&tempestDesign=nukit-tempest-euro&filterSlotWall=back&filterFitClearance=1&cordHoleDiameter=8&cordHoleWall=right" +
-    "&cordHoleSide=center&cordHoleCornerOffset=17&outsideFlangeThickness=10&chunkLabels=false&hexGrill=true&hexSize=10" +
-    "&hexSpacing=1.6&topExhaust=fan-grid&boxFanHoleSize=278&boxRingOneScrewHoles=4&boxRingOneScrewDiameter=6" +
-    "&boxRingOneDiameter=370&boxRingTwoScrewHoles=4&boxRingTwoScrewDiameter=6&boxRingTwoDiameter=444&screwHoleDiameter=5" +
-    "&materialThickness=5&showFilterMedia=false&showFans=true&showFilterFrame=true&previewMaterialColor=matte-gray" +
-    "&autoRotate=true&cameraPreset=official&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256";
+  // The site loads with the current Nukit Tempest Euro build by default (a print-3mf
+  // tempest sandwich). It is generated from the Euro preset so it always tracks the
+  // preset (fan model, fan banks, colour, etc.) rather than a stale hard-coded copy.
+  // A shared link with its own params always wins; only a bare URL falls back here.
+  const DEFAULT_SESSION_QUERY = `${encodeSettings(
+    applyTempestDesign({ ...defaultSettings, printDesign: "nukit-tempest" }, "nukit-tempest-original"),
+  )}&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256`;
   const initialSearch =
     window.location.search.replace(/^\?/, "").length > 0 ? window.location.search : `?${DEFAULT_SESSION_QUERY}`;
   const initialUrlParams = new URLSearchParams(initialSearch.startsWith("?") ? initialSearch.slice(1) : initialSearch);
@@ -221,6 +220,9 @@
 
   let previewMode: PreviewMode = workbenchView.previewMode;
   let fabricationMethod: FabricationMethod = workbenchView.fabricationMethod;
+  // The Performance view is a UI-only overlay (not a 3D preview mode): it replaces
+  // the canvas + toolbar + summary tiles with the estimated-results panel.
+  let performanceView = false;
   let printVolumePresetId: PrintVolumePresetId = workbenchView.printVolumePresetId;
   let layout: LayoutResult = createLayout(draft);
   let exportDiagnostics: readonly BuildDiagnostic[] = [];
@@ -257,7 +259,7 @@
   const laserMaterialControls = generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter");
   const laserPanelFitControls = nukitPanelFitControls.filter((control) => control.name !== "rim");
   // Chunk-label deboss is parked: hide its control until the placement is reworked.
-  const SHOW_CHUNK_LABELS_CONTROL = false;
+  const SHOW_CHUNK_LABELS_CONTROL = true;
   let showBoxExhaustOption = false;
   let selectedFanSizeChoice: FanSizeChoice = fanSizeChoiceForSettings(settings.fanDiameter, settings.topExhaust);
   let isStaticReferenceControlsActive = false;
@@ -316,12 +318,27 @@
   $: exportDiagnostics = evaluateActiveExportDiagnostics(layout, fabricationMethod, generatedPrintSheetPlan);
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
+  $: cadr = layout.summary.cadr;
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activeDesignContext = workbenchView.design;
   $: activeFabricationPreview = workbenchView.fabricationPreview;
   $: activeControlPanels = workbenchView.controlPanels;
   $: isFourFilterTower = isTempestControlsActive && settings.tempestArrangement === "four-side-filter-tower";
+  // The bottom (fifth) filter is only offered for a square tower filter, since its
+  // footprint is the filter face laid flat.
+  $: isSquareTowerFilter = Math.abs(settings.filterWidth - settings.filterDepth) <= 1;
+
+  // CADR "Fan model" control: PC fans (by size) or a 20" box fan when the tower
+  // exhausts through Box/Exhaust. The list + the resolved selection drive both the
+  // dropdown and the performance estimate.
+  $: cadrFanMode = (isFourFilterTower && settings.topExhaust === "box-exhaust" ? "box" : "pc") as CadrFanMode;
+  $: cadrFanGroup = (settings.fanDiameter >= 135 ? "140" : "120") as FanGroup;
+  $: cadrFanOptions =
+    cadrFanMode === "box"
+      ? BOX_FAN_MODELS.map((model) => ({ id: model.id, name: model.name }))
+      : pcFanModelsForGroup(cadrFanGroup).map((model) => ({ id: model.id, name: model.name }));
+  $: cadrFanModelId = resolveFanModelId(settings.fanModel, cadrFanMode, cadrFanGroup, settings.filterWidth);
   // One-side ("1-filter wall mount") has a solid plate opposite its filter, which
   // can carry the extra "Back" fan grid.
   $: isOneSideFilter = isTempestControlsActive && settings.tempestArrangement === "single-horizontal-top-filter";
@@ -364,10 +381,9 @@
   $: showPrintSheetsPreviewMode = activeFabricationPreview.type === "print-sheets";
   $: isDonutControlsActive = activeDesignContext.type === "donut-filter-adapter";
   $: isTempestControlsActive = activeDesignContext.type === "tempest";
-  // Box/exhaust is an advanced option: show the segment button when Advanced is
-  // open, or whenever it is already the active choice (so the segment is never
-  // left with no selection highlighted).
-  $: showBoxExhaustOption = isFourFilterTower && (showTempestAdvanced || selectedFanSizeChoice === "box-exhaust");
+  // Box/exhaust applies only to the four-side tower; show it alongside 120/140 mm
+  // whenever that layout is selected (no need to open Advanced).
+  $: showBoxExhaustOption = isFourFilterTower;
   // Fan-placement checkboxes: all four walls for the horizontal layouts; only
   // "Top" for the four-side tower (its other faces are filters), where it
   // toggles the top-panel fan grid.
@@ -450,7 +466,7 @@
     const nextState = withFabricationMethod(workbenchState, nextMethod);
     let nextDraft = draft;
     let nextMemory = printDesignSettingsMemory;
-    if (nextMethod === "laser-svg" && printDesignIdForPurifierDraft(draft) !== "nukit-open-air") {
+    if (isCutSheetExportFormat(nextMethod) && printDesignIdForPurifierDraft(draft) !== "nukit-open-air") {
       const switched = switchPrintDesignSettings(printDesignSettingsMemory, draft, "nukit-open-air");
       nextDraft = normalizePurifierDraft(switched.settings);
       nextMemory = switched.memory;
@@ -462,8 +478,19 @@
       nextDraft = normalizePurifierDraft(switched.settings);
       nextMemory = switched.memory;
     }
+    let nextSettings = serializePurifierDraft(nextDraft);
+    // The cut-sheet mode picks the construction style: Hand cut = foamcore (plain
+    // taped edges), Laser cut = finger-jointed. 3D print leaves it untouched.
+    // Entering Hand cut defaults the material to 5 mm foamcore.
+    if (isCutSheetExportFormat(nextMethod)) {
+      nextSettings = { ...nextSettings, cutStyle: nextMethod === "hand-svg" ? "hand" : "laser" };
+      if (nextMethod === "hand-svg") {
+        nextSettings = { ...nextSettings, materialThickness: 5 };
+      }
+      nextDraft = normalizePurifierDraft(nextSettings);
+    }
     draft = nextDraft;
-    settings = serializePurifierDraft(nextDraft);
+    settings = nextSettings;
     printDesignSettingsMemory = nextMemory;
     workbenchState = normalizeWorkbenchStateForSettings(nextState, nextDraft);
     syncDerivedWorkbenchState();
@@ -680,6 +707,110 @@
     commitSettings(nextSettings);
   }
 
+  function updateFanModel(event: Event): void {
+    commitSettings({ ...settings, fanModel: (event.target as HTMLSelectElement).value });
+  }
+
+  function updateCurrencySymbol(event: Event): void {
+    commitSettings({ ...settings, currencySymbol: (event.target as HTMLSelectElement).value });
+  }
+
+  // Currency symbols offered for the operating-cost estimate (symbol only; no
+  // conversion — the price is entered in whatever currency the symbol denotes).
+  const currencySymbolOptions = ["$", "€", "£", "¥", "₹", "₩", "R$", "A$", "C$", "kr", "Fr"];
+
+  // ##############################
+  // Performance view helpers
+  // ##############################
+
+  function achVerdictText(ach: number): string {
+    if (ach >= 5) return "excellent (≥5 ACH)";
+    if (ach >= 3) return "good (3–5 ACH)";
+    if (ach >= 1) return "marginal (1–3 ACH)";
+    return "very low (<1 ACH)";
+  }
+
+  // Room volume backed out of CADR ÷ ACH, shown in the room's chosen units.
+  function roomVolumeText(estimate: CadrEstimate): string {
+    if (estimate.ach === null || estimate.ach <= 0 || estimate.cadrM3h <= 0) {
+      return "";
+    }
+    const volumeM3 = estimate.cadrM3h / estimate.ach;
+    if (estimate.roomLabel.endsWith("ft")) {
+      return `${Math.round(volumeM3 / 0.0283168).toLocaleString()} ft³`;
+    }
+    return `${volumeM3.toFixed(1)} m³`;
+  }
+
+  // Current/power line: PC fans run on 12 V (current headline), the box fan on
+  // 120 V mains (wattage headline), matching the calculator.
+  function powerHeadline(estimate: CadrEstimate): string {
+    if (estimate.currentA === null || estimate.powerW === null) return "—";
+    return estimate.voltage === 12 ? `${estimate.currentA.toFixed(2)} A` : `${Math.round(estimate.powerW)} W`;
+  }
+  function powerDetailLine(estimate: CadrEstimate): string {
+    if (estimate.currentA === null || estimate.powerW === null) return "";
+    return estimate.voltage === 12
+      ? `≈ ${estimate.powerW.toFixed(1)} W max at 12 V`
+      : `≈ ${estimate.currentA.toFixed(2)} A at 120 V`;
+  }
+
+  // Cost to run the build continuously (24/7) at its max-power draw, in the chosen
+  // currency. 30.44 days/month, 365.25 days/year (matching common usage calculators).
+  function operatingCost(estimate: CadrEstimate, span: "month" | "year"): string {
+    if (estimate.powerW === null || estimate.powerW <= 0) return "—";
+    const kwh = (estimate.powerW / 1000) * 24 * (span === "month" ? 30.44 : 365.25);
+    return `${settings.currencySymbol}${(kwh * settings.electricityPrice).toFixed(2)}`;
+  }
+
+  // Approximate reduction in long-range airborne infection risk from adding the
+  // purifier. The unit delivers its CADR as equivalent clean air; in a well-mixed
+  // room the steady-state airborne dose is inversely proportional to the total
+  // clean-air rate, so risk drops by CADR / (baseline ventilation + CADR). Working
+  // in ACH (purifier ACH ÷ (baselineAch + purifier ACH)) cancels the room volume.
+  // Relative estimate only; ignores close-range exposure.
+  function infectionRiskReductionPct(estimate: CadrEstimate): number | null {
+    if (estimate.ach === null) return null;
+    const total = settings.baselineAch + estimate.ach;
+    return total > 0 ? (estimate.ach / total) * 100 : null;
+  }
+
+  // Room unit toggle: convert the stored width/length/height between feet and
+  // metres so the same physical room is preserved when the unit changes.
+  function updateRoomUnit(event: Event): void {
+    const nextUnit = (event.target as HTMLSelectElement).value === "m" ? "m" : "ft";
+    if (nextUnit === settings.roomUnit) {
+      return;
+    }
+    const M_PER_FT = 0.3048;
+    const convert = (value: number): number => {
+      if (!(value > 0)) {
+        return value;
+      }
+      const metres = settings.roomUnit === "ft" ? value * M_PER_FT : value;
+      return Math.round((nextUnit === "ft" ? metres / M_PER_FT : metres) * 100) / 100;
+    };
+    commitSettings({
+      ...settings,
+      roomUnit: nextUnit,
+      roomWidth: convert(settings.roomWidth),
+      roomLength: convert(settings.roomLength),
+      roomHeight: convert(settings.roomHeight),
+    });
+  }
+
+  // Feet only matter for the bottom filter, so toggling it sets a sensible foot
+  // length: 100 mm when turned on, 0 when turned off (the user can then tune it).
+  // The bottom filter only builds on a SQUARE filter face, so only auto-raise the
+  // feet when it will actually be built; on a non-square face the toggle has no
+  // geometric effect and must not silently add feet the user then has to remove.
+  function updateBottomFilter(event: Event): void {
+    const enabled = readCheckboxInput(event);
+    const squareFace = Math.abs(settings.filterWidth - settings.filterDepth) <= 1;
+    const feetLength = enabled && squareFace ? 100 : 0;
+    commitSettings({ ...settings, bottomFilter: enabled, feetLength });
+  }
+
   function updatePreviewMaterialColor(color: PreviewMaterialColorId): void {
     commitSettings({
       ...settings,
@@ -769,6 +900,8 @@
   // anchor in help.html.
   const tipsWithHelpLink = new Set<string>([
     "info-backPlateFansCount",
+    "info-bottomFilter",
+    "info-boxFanHoleSize",
     "info-fanSize",
     "info-filterLayout",
     "info-filterSize",
@@ -915,6 +1048,7 @@
   // ##############################
 
   function setPreviewMode(nextMode: PreviewMode): void {
+    performanceView = false;
     setWorkbenchState(withPreviewMode(workbenchState, nextMode));
   }
 
@@ -1239,6 +1373,67 @@
       </div>
     </fieldset>
 
+    {#snippet performancePanel()}
+      <div class="performance-panel" aria-label="Estimated results">
+        <p class="performance-eyebrow">Estimated results</p>
+        <div class="performance-grid">
+          <a class="perf-tile perf-tile--hero" href="methodology.html#cadr" target="_blank" rel="noopener">
+            <span class="perf-k">Estimated CADR</span>
+            <span class="perf-v">{cadr.cadrM3h > 0 ? Math.round(cadr.cadrM3h) : "—"}<small> m³/h</small>{#if cadr.cadrCfm > 0} · {Math.round(cadr.cadrCfm)}<small> CFM</small>{/if}</span>
+          </a>
+          <a class="perf-tile perf-tile--hero" href="methodology.html#infection-risk" target="_blank" rel="noopener">
+            <span class="perf-k">Infection-risk reduction <span class="perf-badge">est.</span></span>
+            {#if infectionRiskReductionPct(cadr) === null}
+              <span class="perf-v">—</span>
+            {:else}
+              <span class="perf-v">{Math.round(infectionRiskReductionPct(cadr) ?? 0)}<small> %</small></span>
+              <span class="perf-sub">long-range airborne, vs a {settings.baselineAch} ACH room</span>
+            {/if}
+          </a>
+          <a class="perf-tile" href="methodology.html#airflow" target="_blank" rel="noopener">
+            <span class="perf-k">Total airflow</span>
+            <span class="perf-v">{Math.round(cadr.flowM3h)}<small> m³/h</small> · {Math.round(cadr.flowM3h * 0.588578)}<small> CFM</small></span>
+            <span class="perf-sub">through the build</span>
+          </a>
+          <a class="perf-tile" href="methodology.html#face-velocity" target="_blank" rel="noopener">
+            <span class="perf-k">Face velocity</span>
+            <span class="perf-v">{cadr.faceVelocityMs.toFixed(2)}<small> m/s</small> · {Math.round(cadr.faceVelocityMs / 0.00508)}<small> FPM</small></span>
+            <span class="perf-sub">across filter media</span>
+          </a>
+          <a class="perf-tile" href="methodology.html#pressure-drop" target="_blank" rel="noopener">
+            <span class="perf-k">System pressure drop</span>
+            <span class="perf-v">{cadr.pressureDropPa.toFixed(1)}<small> Pa</small></span>
+            <span class="perf-sub">at operating point</span>
+          </a>
+          <a class="perf-tile" href="methodology.html#filter-efficiency" target="_blank" rel="noopener">
+            <span class="perf-k">Filter efficiency <span class="perf-badge">MERV-13</span></span>
+            <span class="perf-v">{Math.round(cadr.filterEfficiency * 100)}<small> %</small></span>
+            <span class="perf-sub">single-pass capture</span>
+          </a>
+          <a class="perf-tile" href="methodology.html#power" target="_blank" rel="noopener">
+            <span class="perf-k">Total current draw</span>
+            <span class="perf-v">{powerHeadline(cadr)}</span>
+            {#if powerDetailLine(cadr) !== ""}<span class="perf-sub">{powerDetailLine(cadr)}</span>{/if}
+          </a>
+          <a class="perf-tile" href="methodology.html#cost" target="_blank" rel="noopener">
+            <span class="perf-k">Cost to run (24/7)</span>
+            <span class="perf-v">{operatingCost(cadr, "month")}<small> / month</small></span>
+            <span class="perf-sub">{operatingCost(cadr, "year")}/yr at {settings.currencySymbol}{settings.electricityPrice}/kWh</span>
+          </a>
+          <a class="perf-tile perf-tile--accent" href="methodology.html#ach" target="_blank" rel="noopener">
+            <span class="perf-k">Air changes per hour in this room</span>
+            <span class="perf-v">{cadr.ach === null ? "—" : cadr.ach.toFixed(1)}<small> ACH</small></span>
+            {#if cadr.ach !== null}<span class="perf-sub">{achVerdictText(cadr.ach)} · {roomVolumeText(cadr)} · target 6</span>{/if}
+          </a>
+          <a class="perf-tile" href="methodology.html#noise" target="_blank" rel="noopener">
+            <span class="perf-k">Combined noise · est.</span>
+            <span class="perf-v">{cadr.noiseDbA === null ? "—" : cadr.noiseDbA.toFixed(1)}<small> dBA @ 1 m</small></span>
+            {#if cadr.noiseRawDbA !== null}<span class="perf-sub">raw spec ≈ {cadr.noiseRawDbA.toFixed(1)} dBA</span>{/if}
+          </a>
+        </div>
+      </div>
+    {/snippet}
+
     <section class="workspace" aria-label="Open air purifier builder">
       <!-- ##############################
       Preview Pane
@@ -1248,7 +1443,7 @@
         <div class="preview-toolbar" aria-label="Preview mode">
           <div class="preview-mode-group">
             <button
-              class:is-active={previewMode === "enclosure"}
+              class:is-active={!performanceView && previewMode === "enclosure"}
               class="mode-button"
               type="button"
               onclick={() => setPreviewMode("enclosure")}
@@ -1257,17 +1452,17 @@
             </button>
             {#if showCutSheetPreviewMode}
               <button
-                class:is-active={previewMode === "cut-sheet"}
+                class:is-active={!performanceView && previewMode === "cut-sheet"}
                 class="mode-button"
                 type="button"
                 onclick={() => setPreviewMode("cut-sheet")}
               >
-                Laser drawing
+                {fabricationMethod === "hand-svg" ? "Dimensioned drawing" : "Laser drawing"}
               </button>
             {/if}
             {#if showPrintSheetsPreviewMode}
               <button
-                class:is-active={previewMode === "print-sheets"}
+                class:is-active={!performanceView && previewMode === "print-sheets"}
                 class="mode-button"
                 type="button"
                 onclick={() => setPreviewMode("print-sheets")}
@@ -1275,29 +1470,43 @@
                 Print plates
               </button>
             {/if}
-          </div>
-          <span class="preview-toolbar-action-slot">
             <button
-              class="ghost-button preview-large-view-button"
+              class:is-active={performanceView}
+              class="mode-button"
               type="button"
-              disabled={previewMode === "enclosure"}
-              aria-hidden={previewMode === "enclosure"}
-              tabindex={previewMode === "enclosure" ? -1 : 0}
-              onclick={openSheetDialog}
+              onclick={() => (performanceView = true)}
             >
-              Open large view
+              Performance
             </button>
-          </span>
+          </div>
+          {#if !performanceView}
+            <span class="preview-toolbar-action-slot">
+              <button
+                class="ghost-button preview-large-view-button"
+                type="button"
+                disabled={previewMode === "enclosure"}
+                aria-hidden={previewMode === "enclosure"}
+                tabindex={previewMode === "enclosure" ? -1 : 0}
+                onclick={openSheetDialog}
+              >
+                Open large view
+              </button>
+            </span>
+          {/if}
         </div>
 
         <div
-          class:is-three-preview={previewMode === "enclosure"}
-          class:is-print-sheet-three-preview={previewMode === "print-sheets"}
-          class:is-sheet-preview={previewMode === "cut-sheet"}
+          class:is-three-preview={!performanceView && previewMode === "enclosure"}
+          class:is-print-sheet-three-preview={!performanceView && previewMode === "print-sheets"}
+          class:is-sheet-preview={!performanceView && previewMode === "cut-sheet"}
+          class:is-performance={performanceView}
           class="preview-stage"
           id="previewStage"
         >
           <span class="sr-only" role="status">{previewStatusText}</span>
+          {#if performanceView}
+            {@render performancePanel()}
+          {:else}
           {#if isPreviewUpdating && firstPreviewBuild !== "done"}
             <div class="preview-loading-overlay" aria-hidden="true">
               <span class="preview-loading-spinner"></span>
@@ -1400,7 +1609,7 @@
                   </span>
                   <span class="preview-control-label">Scale reference</span>
                 </label>
-                {#if fabricationMethod === "print-3mf" && !isStaticReferenceControlsActive}
+                {#if (fabricationMethod === "print-3mf" || fabricationMethod === "hand-svg") && !isStaticReferenceControlsActive}
                   <div class="preview-color-field" aria-label="Preview color">
                     {#each previewMaterialColorPresets as color}
                       <button
@@ -1448,19 +1657,25 @@
             {#if activePrintSheetPlan !== null}
               <PrintSheetPreview plan={activePrintSheetPlan} />
             {/if}
-          {:else if previewMode === "cut-sheet" && fabricationMethod === "laser-svg"}
+          {:else if previewMode === "cut-sheet" && isCutSheetExportFormat(fabricationMethod)}
             <div class="sheet-preview laser-sheet-preview">{@html createLaserSvg(layout)}</div>
+          {/if}
           {/if}
         </div>
 
-        <div class="summary-grid" id="summaryGrid">
-          {#each previewSummaryItems as item}
-            <div>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-          {/each}
-        </div>
+        {#if !performanceView}
+          <div class="summary-grid" id="summaryGrid">
+            {#each previewSummaryItems as item}
+              <div>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                {#if item.detail}
+                  <small class="summary-detail">{item.detail}</small>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
       </section>
 
       <!-- ##############################
@@ -1492,7 +1707,7 @@
               {#each exportDiagnostics as diagnostic (diagnostic.id)}
                 <li class={`diagnostic-item ${diagnostic.severity}`}>
                   <strong>{diagnostic.title}</strong>
-                  <span>{diagnostic.detail}</span>
+                  <span>{diagnostic.detail}{#if diagnostic.moreUrl} <a class="info-tip-more" href={diagnostic.moreUrl} target="_blank" rel="noopener">More</a>{/if}</span>
                 </li>
               {/each}
             </ul>
@@ -1517,6 +1732,98 @@
               </span>
             </label>
           {/snippet}
+          {#snippet customFanField(name: NumericSettingName, label: string, value: number, step: number, unit: string)}
+            <label class="field">
+              <span>{label}</span>
+              <span class="input-shell">
+                <input
+                  type="number"
+                  name={name}
+                  min="0"
+                  step={step}
+                  inputmode="decimal"
+                  value={value}
+                  onchange={(event) => updateNumberSetting(name, event)}
+                />
+                <small>{unit}</small>
+              </span>
+            </label>
+          {/snippet}
+          {#snippet fanModelControls()}
+            <label class="field">
+              <span>Fan model {@render infoTip("info-fanModel", "The specific fan used for the CADR, noise and power estimate. The list matches your fan size (or Box/Exhaust for the four-side tower); choose 'Custom (enter specs)' to enter your own fan's numbers.")}</span>
+              <select name="fanModel" onchange={updateFanModel}>
+                {#each cadrFanOptions as option}
+                  <option value={option.id} selected={cadrFanModelId === option.id}>{option.name}</option>
+                {/each}
+                <option value={CUSTOM_FAN_ID} selected={cadrFanModelId === CUSTOM_FAN_ID}>Custom (enter specs)</option>
+              </select>
+            </label>
+            {#if cadrFanModelId === CUSTOM_FAN_ID}
+              {@render customFanField("customFanAirflow", "Airflow Q₀ (free-air)", settings.customFanAirflow, 1, "m³/h")}
+              {@render customFanField("customFanPressure", "Static pressure P₀", settings.customFanPressure, 0.1, "mmH₂O")}
+              {@render customFanField("customFanNoise", "Noise (optional)", settings.customFanNoise, 0.1, "dBA")}
+              {#if cadrFanMode === "box"}
+                {@render customFanField("customFanWatts", "Power (optional)", settings.customFanWatts, 1, "W")}
+              {:else}
+                {@render customFanField("customFanCurrent", "Current (optional)", settings.customFanCurrent, 0.01, "A")}
+              {/if}
+            {/if}
+          {/snippet}
+          {#snippet roomControls()}
+            <label class="field">
+              <span>Room dimension units {@render infoTip("info-roomUnit", "Units for the room width, length and ceiling height used to estimate air changes per hour (ACH).")}</span>
+              <select name="roomUnit" onchange={updateRoomUnit}>
+                <option value="ft" selected={settings.roomUnit !== "m"}>Feet (ft)</option>
+                <option value="m" selected={settings.roomUnit === "m"}>Meters (m)</option>
+              </select>
+            </label>
+            <div class="room-dim-grid">
+              {@render customFanField("roomWidth", "Width", settings.roomWidth, 0.1, settings.roomUnit === "m" ? "m" : "ft")}
+              {@render customFanField("roomLength", "Length", settings.roomLength, 0.1, settings.roomUnit === "m" ? "m" : "ft")}
+              {@render customFanField("roomHeight", "Height", settings.roomHeight, 0.1, settings.roomUnit === "m" ? "m" : "ft")}
+            </div>
+            <label class="field">
+              <span>Room ventilation {@render infoTip("info-baselineAch", "The room's own ventilation in air changes per hour from windows, HVAC and leakage: roughly 0.3 for a sealed room, 1 for a typical home, 3 or more if well ventilated. Used only to estimate how much the purifier lowers long-range airborne infection risk.")}</span>
+              <span class="input-shell">
+                <input
+                  type="number"
+                  name="baselineAch"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  value={settings.baselineAch}
+                  onchange={(event) => updateNumberSetting("baselineAch", event)}
+                />
+                <small>ACH</small>
+              </span>
+            </label>
+          {/snippet}
+          {#snippet costControls()}
+            <label class="field">
+              <span>Currency {@render infoTip("info-currencySymbol", "Currency symbol for the operating-cost estimate. Symbol only — enter the price in that currency; no conversion is applied.")}</span>
+              <select name="currencySymbol" onchange={updateCurrencySymbol}>
+                {#each currencySymbolOptions as sym}
+                  <option value={sym} selected={settings.currencySymbol === sym}>{sym}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="field">
+              <span>Electricity price {@render infoTip("info-electricityPrice", "Your electricity rate per kWh, used to estimate the cost to run the build 24/7. The value shown is the approximate US average residential rate; check a recent utility bill for your own.")}</span>
+              <span class="input-shell">
+                <input
+                  type="number"
+                  name="electricityPrice"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  value={settings.electricityPrice}
+                  onchange={(event) => updateNumberSetting("electricityPrice", event)}
+                />
+                <small>{settings.currencySymbol}/kWh</small>
+              </span>
+            </label>
+          {/snippet}
           {#snippet infoTip(id: string, text: string)}
             <span class="info-tip" class:is-open={openInfoTipId === id}>
               <button
@@ -1533,7 +1840,7 @@
           {/snippet}
           {#snippet fanSizeSegment()}
             <fieldset class="segmented-field" class:segmented-field-three={showBoxExhaustOption}>
-              <legend>Fan size {@render infoTip("info-fanSize", "The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them. For a traditional single-fan filter cube design, select Filter layout-> Four sides-> Advanced-> Box/Exhaust")}</legend>
+              <legend>Fan size {@render infoTip("info-fanSize", "The nominal diameter of the PC fans you'll mount. This sets the fan openings and sizes the housing around them. For a traditional single-fan filter cube design, select Filter layout-> Four sides-> Box/Exhaust")}</legend>
               <div>
                 {#each recommendedFanDiameterOptions as diameter}
                   <label>
@@ -1653,6 +1960,22 @@
                         {/each}
                       </div>
                     </fieldset>
+                    {#if isFourFilterTower && isSquareTowerFilter}
+                      <fieldset class="fan-placement-field" data-tempest-bottom-filter>
+                        <legend>Bottom filter {@render infoTip("info-bottomFilter", "Adds a fifth filter on the underside of the tower for extra airflow. Available for square filters only. Raise the box on feet so air can reach it.")}</legend>
+                        <div class="fan-placement-checks">
+                          <label class="toggle-field">
+                            <input
+                              type="checkbox"
+                              name="bottomFilter"
+                              checked={settings.bottomFilter}
+                              onchange={(event) => updateBottomFilter(event)}
+                            />
+                            <span>On</span>
+                          </label>
+                        </div>
+                      </fieldset>
+                    {/if}
                   </div>
                 {/if}
               </div>
@@ -1875,20 +2198,22 @@
                     </div>
                   </fieldset>
 
-                  <fieldset class="fan-placement-field" data-nukit-hex-grill>
-                    <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
-                    <div class="fan-placement-checks">
-                      <label class="toggle-field">
-                        <input
-                          type="checkbox"
-                          name="hexGrill"
-                          checked={settings.hexGrill}
-                          onchange={(event) => updateBooleanSetting("hexGrill", event)}
-                        />
-                        <span>On</span>
-                      </label>
-                    </div>
-                  </fieldset>
+                  {#if fabricationMethod !== "hand-svg"}
+                    <fieldset class="fan-placement-field" data-nukit-hex-grill>
+                      <legend>Honeycomb grill {@render infoTip("info-laser-hexGrill", "Cut a honeycomb of hexagons into each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
+                      <div class="fan-placement-checks">
+                        <label class="toggle-field">
+                          <input
+                            type="checkbox"
+                            name="hexGrill"
+                            checked={settings.hexGrill}
+                            onchange={(event) => updateBooleanSetting("hexGrill", event)}
+                          />
+                          <span>On</span>
+                        </label>
+                      </div>
+                    </fieldset>
+                  {/if}
 
                   {#if laserBackFansSelected && noWallFansSelected}
                     <label class="field">
@@ -1956,6 +2281,21 @@
                       </span>
                     </label>
                   {/each}
+                  <label class="field">
+                    <span>Cord hole diameter {@render infoTip("info-laser-cordHoleDiameter", "Diameter of the hole the power jack is inserted into or the power cable exits through. The 4-side tower routes it through the top-plate. Set the diameter to 0 for no cord hole.")}</span>
+                    <span class="input-shell">
+                      <input
+                        type="number"
+                        name="cordHoleDiameter"
+                        min="0"
+                        step="1"
+                        inputmode="decimal"
+                        value={settings.cordHoleDiameter}
+                        onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
+                      />
+                      <small>mm</small>
+                    </span>
+                  </label>
                 </div>
               {/if}
               {#if isTempestControlsActive}
@@ -1963,33 +2303,37 @@
                   <div class="fan-selection">
                     {@render fanSizeSegment()}
 
-                    <fieldset class="fan-placement-field" data-tempest-fan-auto>
-                      <legend>Fan placement {@render infoTip("info-fanPlacement", "Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.")}</legend>
-                      <div class="fan-placement-checks">
-                        {#each fanPlacementCheckboxControls as control}
-                          <label class="toggle-field">
-                            <input
-                              type="checkbox"
-                              name={`auto-${control.name}`}
-                              checked={settings[control.name] === automaticFanCount}
-                              onchange={(event) => updateFanAuto(control.name, event)}
-                            />
-                            <span>{control.label}</span>
-                          </label>
-                        {/each}
-                        {#if isOneSideFilter}
-                          <label class="toggle-field">
-                            <input
-                              type="checkbox"
-                              name="backPlateFans"
-                              checked={settings.backPlateFans !== 0}
-                              onchange={(event) => updateBackFanAuto(event)}
-                            />
-                            <span>Back</span>
-                          </label>
-                        {/if}
-                      </div>
-                    </fieldset>
+                    <!-- The four-side tower exhausts only through the top, so there
+                         is nothing to choose: hide Fan placement entirely. -->
+                    {#if !isFourFilterTower}
+                      <fieldset class="fan-placement-field" data-tempest-fan-auto>
+                        <legend>Fan placement {@render infoTip("info-fanPlacement", "Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.")}</legend>
+                        <div class="fan-placement-checks">
+                          {#each fanPlacementCheckboxControls as control}
+                            <label class="toggle-field">
+                              <input
+                                type="checkbox"
+                                name={`auto-${control.name}`}
+                                checked={settings[control.name] === automaticFanCount}
+                                onchange={(event) => updateFanAuto(control.name, event)}
+                              />
+                              <span>{control.label}</span>
+                            </label>
+                          {/each}
+                          {#if isOneSideFilter}
+                            <label class="toggle-field">
+                              <input
+                                type="checkbox"
+                                name="backPlateFans"
+                                checked={settings.backPlateFans !== 0}
+                                onchange={(event) => updateBackFanAuto(event)}
+                              />
+                              <span>Back</span>
+                            </label>
+                          {/if}
+                        </div>
+                      </fieldset>
+                    {/if}
 
                     {#if backFansSelected && noWallFansSelected}
                       <label class="field">
@@ -2074,9 +2418,9 @@
                 <svg class="advanced-accordion-chevron" class:is-open={showTempestAdvanced} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5z" /></svg>
               </button>
               {#if showTempestAdvanced}
-                <div class="advanced-columns" data-tempest-advanced-controls>
-                  <div class="advanced-group">
-                    <p class="eyebrow advanced-group-label">Fan tuning</p>
+                <div class="advanced-columns advanced-columns-flow" data-tempest-advanced-controls>
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">Fan counts</p>
                     {#if showTempestWallFanControls}
                       {#each fanPlacementControls as control}
                         <label class="field compact-field">
@@ -2117,10 +2461,28 @@
                         </span>
                       </label>
                     {/each}
+                    {#if isFourFilterTower}
+                      <label class="field">
+                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Set to 0 for no feet. Turning on the bottom filter raises this to 100 mm so air can reach it.")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="feetLength"
+                            min="0"
+                            max="500"
+                            step="1"
+                            inputmode="decimal"
+                            value={settings.feetLength}
+                            onchange={(event) => updateNumberSetting("feetLength", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    {/if}
                     {#if selectedFanSizeChoice === "box-exhaust"}
                       {#each tempestBoxExhaustControls as control}
                         <label class="field">
-                          <span>{control.label}</span>
+                          <span>{control.label}{#if control.name === "boxFanHoleSize"} {@render infoTip("info-boxFanHoleSize", "Set this to the same diameter as your box fan's blade so the top panel forms a shroud around the fan. The shroud seals the gap between the fan and the filters, stops air recirculating around the blade tips, and raises clean-air delivery. Leave at 0 to auto-size it from the filter width.")}{/if}</span>
                           <span class="input-shell">
                             <input
                               type="number"
@@ -2137,8 +2499,51 @@
                       {/each}
                     {/if}
                   </div>
+                  <div class="advanced-group" data-fan-model-group>
+                    <p class="eyebrow advanced-group-label">Performance</p>
+                    {@render fanModelControls()}
+                  </div>
                   <div class="advanced-group">
-                    <p class="eyebrow advanced-group-label">Cord &amp; grill</p>
+                    <p class="eyebrow advanced-group-label">Room (ACH)</p>
+                    {@render roomControls()}
+                  </div>
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">Operating cost</p>
+                    {@render costControls()}
+                  </div>
+                  {#if showHexGrillControls && settings.hexGrill}
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">Honeycomb grill</p>
+                    {#each tempestHexGrillControls as control}
+                      <label class="field">
+                        <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name={control.name}
+                            min="0"
+                            step={control.step}
+                            inputmode="decimal"
+                            value={settings[control.name]}
+                            onchange={(event) => updateNumberSetting(control.name, event)}
+                          />
+                          <small>{control.suffix}</small>
+                        </span>
+                      </label>
+                    {/each}
+                    <label class="toggle-field">
+                      <input
+                        type="checkbox"
+                        name="hexFullCellsOnly"
+                        checked={settings.hexFullCellsOnly}
+                        onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
+                      />
+                      <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
+                    </label>
+                  </div>
+                  {/if}
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">Cord</p>
                     {#if settings.cordHoleDiameter > 0}
                       <label class="field">
                         <span>Power cord wall {@render infoTip("info-cordHoleWall", "Diameter of the hole the fan power cables exit through. The 4-side tower routes it through the top-plate corner instead.")}</span>
@@ -2178,34 +2583,6 @@
                         </span>
                       </label>
                     {/if}
-                    {#if showHexGrillControls && settings.hexGrill}
-                      {#each tempestHexGrillControls as control}
-                        <label class="field">
-                          <span>{control.label} {@render infoTip(`info-${control.name}`, advancedControlInfo[control.name] ?? "")}</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name={control.name}
-                              min="0"
-                              step={control.step}
-                              inputmode="decimal"
-                              value={settings[control.name]}
-                              onchange={(event) => updateNumberSetting(control.name, event)}
-                            />
-                            <small>{control.suffix}</small>
-                          </span>
-                        </label>
-                      {/each}
-                      <label class="toggle-field">
-                        <input
-                          type="checkbox"
-                          name="hexFullCellsOnly"
-                          checked={settings.hexFullCellsOnly}
-                          onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
-                        />
-                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
-                      </label>
-                    {/if}
                     <!-- Chunk-label deboss is parked for now: control hidden and the
                          setting defaults off. Flip SHOW_CHUNK_LABELS_CONTROL to bring it
                          back; the geometry code in printableKit/chunkLabelDeboss stays. -->
@@ -2225,6 +2602,9 @@
                         </div>
                       </fieldset>
                     {/if}
+                  </div>
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">3D Print</p>
                     <label class="field">
                       <span>Alignment pin size {@render infoTip("info-alignmentPinDiameter", "Diameter of the printed alignment-pin holes along each seam, for short lengths of 1.75 mm filament that key glued chunks together. Set to 0 for no pins. Maximum 2.5 mm.")}</span>
                       <span class="input-shell">
@@ -2268,7 +2648,7 @@
               </button>
               {#if showLaserAdvanced}
                 <div class="advanced-columns advanced-columns-flow">
-                  <div class="advanced-group">
+                  <div class="advanced-group is-two-col">
                     <p class="eyebrow advanced-group-label">Fan counts</p>
                     {#each fanPlacementControls as control}
                       <label class="field compact-field">
@@ -2282,7 +2662,20 @@
                       </label>
                     {/each}
                   </div>
+                  <div class="advanced-group" data-fan-model-group>
+                    <p class="eyebrow advanced-group-label">Performance</p>
+                    {@render fanModelControls()}
+                  </div>
                   <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Room (ACH)</p>
+                    {@render roomControls()}
+                  </div>
+                  <div class="advanced-group is-two-col">
+                    <p class="eyebrow advanced-group-label">Operating cost</p>
+                    {@render costControls()}
+                  </div>
+                  {#if fabricationMethod !== "hand-svg"}
+                  <div class="advanced-group is-two-col">
                     <p class="eyebrow advanced-group-label">Frame</p>
                     {#each laserAdvancedFrameControls as control}
                       <label class="field">
@@ -2301,34 +2694,9 @@
                       </label>
                     {/each}
                   </div>
-                  <div class="advanced-group">
-                    <p class="eyebrow advanced-group-label">Drawing output</p>
-                    <label class="toggle-field">
-                      <input
-                        type="checkbox"
-                        name="labels"
-                        checked={settings.labels}
-                        onchange={(event) => updateBooleanSetting("labels", event)}
-                      />
-                      <span>Engrave part labels {@render infoTip("info-labels", "Etches each part's name onto the cut sheet so you can tell the pieces apart when assembling.")}</span>
-                    </label>
-                    <label class="field">
-                      <span>Reference scale {@render infoTip("info-referenceScale", "Length of a reference ruler drawn on the sheet so you can confirm your cut/export is at 1:1 scale.")}</span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name="referenceScale"
-                          step="1"
-                          inputmode="decimal"
-                          value={settings.referenceScale}
-                          onchange={(event) => updateNumberSetting("referenceScale", event)}
-                        />
-                        <small>mm</small>
-                      </span>
-                    </label>
-                  </div>
-                  {#if settings.hexGrill}
-                    <div class="advanced-group">
+                  {/if}
+                  {#if settings.hexGrill && fabricationMethod !== "hand-svg"}
+                    <div class="advanced-group is-two-col">
                       <p class="eyebrow advanced-group-label">Honeycomb grill</p>
                       {#each tempestHexGrillControls as control}
                         <label class="field">
@@ -2358,7 +2726,8 @@
                       </label>
                     </div>
                   {/if}
-                  <div class="advanced-group">
+                  {#if fabricationMethod !== "hand-svg"}
+                  <div class="advanced-group is-two-col">
                     <p class="eyebrow advanced-group-label">Finger joints</p>
                     {#each laserFingerJointControls as control}
                       <label class="field">
@@ -2377,7 +2746,7 @@
                       </label>
                     {/each}
                   </div>
-                  <div class="advanced-group">
+                  <div class="advanced-group is-two-col">
                     <p class="eyebrow advanced-group-label">Dovetails</p>
                     {#each laserDovetailControls as control}
                       <label class="field">
@@ -2396,24 +2765,10 @@
                       </label>
                     {/each}
                   </div>
-                  <div class="advanced-group">
+                  {/if}
+                  {#if settings.cordHoleDiameter > 0}
+                  <div class="advanced-group is-two-col">
                     <p class="eyebrow advanced-group-label">Cord pass-through</p>
-                    <label class="field">
-                      <span>Cord hole diameter {@render infoTip("info-laser-cordHoleDiameter", "Diameter of the hole the power jack is inserted into or the power cable exits through. The 4-side tower routes it through the top-plate. Set the diameter to 0 for no cord hole.")}</span>
-                      <span class="input-shell">
-                        <input
-                          type="number"
-                          name="cordHoleDiameter"
-                          min="0"
-                          step="1"
-                          inputmode="decimal"
-                          value={settings.cordHoleDiameter}
-                          onchange={(event) => updateNumberSetting("cordHoleDiameter", event)}
-                        />
-                        <small>mm</small>
-                      </span>
-                    </label>
-                    {#if settings.cordHoleDiameter > 0}
                       <label class="field">
                         <span>Power cord wall {@render infoTip("info-laser-cordHoleWall", "Selects which wall the hole the power jack or power cable is set. The 4-side tower routes it through the top-plate.")}</span>
                         <select name="cordHoleWall" onchange={updateCordHoleWall}>
@@ -2445,7 +2800,33 @@
                           <small>mm</small>
                         </span>
                       </label>
-                    {/if}
+                  </div>
+                  {/if}
+                  <div class="advanced-group">
+                    <p class="eyebrow advanced-group-label">Drawing output</p>
+                    <label class="toggle-field">
+                      <input
+                        type="checkbox"
+                        name="labels"
+                        checked={settings.labels}
+                        onchange={(event) => updateBooleanSetting("labels", event)}
+                      />
+                      <span>Engrave part labels {@render infoTip("info-labels", "Etches each part's name onto the cut sheet so you can tell the pieces apart when assembling.")}</span>
+                    </label>
+                    <label class="field">
+                      <span>Reference scale {@render infoTip("info-referenceScale", "Length of a reference ruler drawn on the sheet so you can confirm your cut/export is at 1:1 scale.")}</span>
+                      <span class="input-shell">
+                        <input
+                          type="number"
+                          name="referenceScale"
+                          step="1"
+                          inputmode="decimal"
+                          value={settings.referenceScale}
+                          onchange={(event) => updateNumberSetting("referenceScale", event)}
+                        />
+                        <small>mm</small>
+                      </span>
+                    </label>
                   </div>
                   <div class="advanced-group">
                     <p class="eyebrow advanced-group-label">Download</p>
@@ -2535,8 +2916,8 @@
     <div class="sheet-dialog-surface">
       <header class="sheet-dialog-bar">
         <div>
-          <p class="eyebrow" id="sheetDialogEyebrow">{previewMode === "print-sheets" ? "3D printing" : "Laser cutting"}</p>
-          <h2 id="sheetDialogTitle">{previewMode === "print-sheets" ? "Print plates" : "Laser drawing"}</h2>
+          <p class="eyebrow" id="sheetDialogEyebrow">{previewMode === "print-sheets" ? "3D printing" : fabricationMethod === "hand-svg" ? "Hand cutting" : "Laser cutting"}</p>
+          <h2 id="sheetDialogTitle">{previewMode === "print-sheets" ? "Print plates" : fabricationMethod === "hand-svg" ? "Dimensioned drawing" : "Laser drawing"}</h2>
         </div>
         <button class="ghost-button" type="button" onclick={closeSheetDialog}>Close</button>
       </header>
@@ -2592,6 +2973,10 @@
       The laser-cut box geometry is adapted from
       <a href="https://github.com/florianfesti/boxes" target="_blank" rel="noopener">Boxes.py</a>
       by Florian Festi.
+    </p>
+    <p>
+      The CADR, noise, and power estimates are calibrated against in-room measurements published by
+      <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a>.
     </p>
   </footer>
 </main>

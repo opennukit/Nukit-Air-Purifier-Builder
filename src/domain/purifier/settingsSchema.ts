@@ -105,6 +105,20 @@ export type PurifierSettingsFieldFallbacks = {
   readonly backPlateFans: number;
   readonly boxDepth: number;
   readonly alignmentPinDiameter: number;
+  // Tempest 4-filter tower only: add a fifth (bottom) filter when the filter is
+  // square, and the length of the corner feet that lift the box, in mm.
+  readonly bottomFilter: boolean;
+  readonly feetLength: number;
+  readonly customFanAirflow: number;
+  readonly customFanPressure: number;
+  readonly customFanNoise: number;
+  readonly customFanCurrent: number;
+  readonly customFanWatts: number;
+  readonly roomWidth: number;
+  readonly roomLength: number;
+  readonly roomHeight: number;
+  readonly baselineAch: number;
+  readonly electricityPrice: number;
   readonly boxFanHoleSize: number;
   readonly boxRingOneScrewHoles: number;
   readonly boxRingOneScrewDiameter: number;
@@ -171,6 +185,18 @@ export const createPurifierSettingsFieldsSchema = (
     backPlateFans: zBackFanCountField(fallbacks.backPlateFans),
     boxDepth: zNumberField(fallbacks.boxDepth),
     alignmentPinDiameter: zNumberField(fallbacks.alignmentPinDiameter),
+    bottomFilter: zBooleanField(fallbacks.bottomFilter),
+    feetLength: zNumberField(fallbacks.feetLength),
+    customFanAirflow: zNumberField(fallbacks.customFanAirflow),
+    customFanPressure: zNumberField(fallbacks.customFanPressure),
+    customFanNoise: zNumberField(fallbacks.customFanNoise),
+    customFanCurrent: zNumberField(fallbacks.customFanCurrent),
+    customFanWatts: zNumberField(fallbacks.customFanWatts),
+    roomWidth: zNumberField(fallbacks.roomWidth),
+    roomLength: zNumberField(fallbacks.roomLength),
+    roomHeight: zNumberField(fallbacks.roomHeight),
+    baselineAch: zNumberField(fallbacks.baselineAch),
+    electricityPrice: zNumberField(fallbacks.electricityPrice),
     boxFanHoleSize: zNumberField(fallbacks.boxFanHoleSize),
     boxRingOneScrewHoles: zIntegerField(fallbacks.boxRingOneScrewHoles),
     boxRingOneScrewDiameter: zNumberField(fallbacks.boxRingOneScrewDiameter),

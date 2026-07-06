@@ -23,6 +23,11 @@ export type PrintableMeshShading =
 export type PrintableMeshPlacement = {
   readonly scale: number;
   readonly offset: readonly [number, number, number];
+  // Map build->scene with a PROPER rotation instead of the legacy y<->z reflection,
+  // so chiral detail (engraved chunk codes) reads correctly rather than mirrored.
+  // The assembled-housing preview leaves this off (it has no chiral content and the
+  // reflection is consistent across its parts); the print-plate preview turns it on.
+  readonly mirrorFree?: boolean;
 };
 
 export function printableMeshToBufferGeometry(
@@ -33,19 +38,34 @@ export function printableMeshToBufferGeometry(
   const { scale } = placement;
   const [offsetX, offsetUp, offsetZ] = placement.offset;
 
-  // Build space is Z-up; the scene is Y-up, so y and z swap. That swap is a
-  // reflection (determinant −1) and reverses triangle winding — see the index
-  // loop, which swaps v2/v3 back to keep the shell CCW-outward.
   const positions: number[] = [];
-  for (const vertex of mesh.vertices) {
-    positions.push(scale * vertex.x + offsetX, scale * vertex.z + offsetUp, scale * vertex.y + offsetZ);
-  }
-
-  // Undo the reflection's winding flip; otherwise FrontSide culling renders the
-  // part inside-out (you see through near walls — phantom holes at corners/grills).
   const indices: number[] = [];
-  for (const triangle of mesh.triangles) {
-    indices.push(triangle.v1, triangle.v3, triangle.v2);
+  if (placement.mirrorFree === true) {
+    // Proper rotation (−90° about X): build (x, y, z) -> scene (x, z, -y), with the
+    // part's y-extent added so it occupies the same bed footprint as the reflected
+    // map. determinant +1, so winding is preserved (no v2/v3 swap) and engraved text
+    // reads the right way round.
+    let yMax = -Infinity;
+    for (const vertex of mesh.vertices) {
+      yMax = Math.max(yMax, vertex.y);
+    }
+    for (const vertex of mesh.vertices) {
+      positions.push(scale * vertex.x + offsetX, scale * vertex.z + offsetUp, scale * (yMax - vertex.y) + offsetZ);
+    }
+    for (const triangle of mesh.triangles) {
+      indices.push(triangle.v1, triangle.v2, triangle.v3);
+    }
+  } else {
+    // Legacy: build space is Z-up; the scene is Y-up, so y and z swap. That swap is a
+    // reflection (determinant −1) and reverses triangle winding — the index loop
+    // swaps v2/v3 back to keep the shell CCW-outward. It mirrors chiral detail, so it
+    // is only used where there is none (the assembled-housing preview).
+    for (const vertex of mesh.vertices) {
+      positions.push(scale * vertex.x + offsetX, scale * vertex.z + offsetUp, scale * vertex.y + offsetZ);
+    }
+    for (const triangle of mesh.triangles) {
+      indices.push(triangle.v1, triangle.v3, triangle.v2);
+    }
   }
 
   const geometry = new BufferGeometry();

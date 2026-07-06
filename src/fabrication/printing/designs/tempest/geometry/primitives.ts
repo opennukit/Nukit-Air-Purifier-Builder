@@ -98,22 +98,43 @@ export function topBottomEdgeChamferSolid<Solid, Region>(
   height: number,
   chamfer: number,
 ): Solid {
+  return edgeChamferSolid(ctx, footprint, height, chamfer, { bottom: true, top: true });
+}
+
+// Like topBottomEdgeChamferSolid, but each of the top and bottom edge bevels can be
+// turned off independently. A face with its bevel off stays square (full footprint
+// flush to that plane). Used so the tower body meets its feet with a square join —
+// the box keeps its top bevel, the feet keep their bottom bevel, and the shared
+// face between them carries no chamfer.
+export function edgeChamferSolid<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  footprint: Region,
+  height: number,
+  chamfer: number,
+  edges: { readonly bottom: boolean; readonly top: boolean },
+): Solid {
   const { transforms, extrusions, hulls, expansions } = ctx.modeling;
   const safeHeight = Math.max(0.001, height);
-  const safeChamfer = Math.max(0, Math.min(chamfer, safeHeight / 2 - 0.01));
-  if (safeChamfer <= 0) {
+  const maxChamfer = (edges.bottom && edges.top ? safeHeight / 2 : safeHeight) - 0.01;
+  const safeChamfer = Math.max(0, Math.min(chamfer, maxChamfer));
+  if (safeChamfer <= 0 || (!edges.bottom && !edges.top)) {
     return extrusions.extrudeLinear({ height: safeHeight }, footprint);
   }
   const inset = expansions.offset({ delta: -safeChamfer, corners: "edge", segments: CSG_SEGMENTS }, footprint);
+  const straightStart = edges.bottom ? safeChamfer : 0;
+  const straightEnd = edges.top ? safeHeight - safeChamfer : safeHeight;
+  const parts: Solid[] = [];
+  if (edges.bottom) {
+    parts.push(hulls.hull(thinExtrude(ctx, inset, 0), thinExtrude(ctx, footprint, safeChamfer)));
+  }
+  parts.push(transforms.translate([0, 0, straightStart], extrusions.extrudeLinear({ height: Math.max(0.001, straightEnd - straightStart) }, footprint)));
   // thinExtrude lays a 0.01 mm slab UP from its z, so the top hull's slabs start
   // 0.01 below their target planes — that keeps the box top exactly at safeHeight
-  // and the upper bevel's straight-face edge exactly at safeHeight - safeChamfer
-  // (no 0.01 overshoot past the plates).
-  return unionAll(ctx, [
-    hulls.hull(thinExtrude(ctx, inset, 0), thinExtrude(ctx, footprint, safeChamfer)),
-    transforms.translate([0, 0, safeChamfer], extrusions.extrudeLinear({ height: safeHeight - 2 * safeChamfer }, footprint)),
-    hulls.hull(thinExtrude(ctx, footprint, safeHeight - safeChamfer - 0.01), thinExtrude(ctx, inset, safeHeight - 0.01)),
-  ]);
+  // and the upper bevel's straight-face edge exactly at safeHeight - safeChamfer.
+  if (edges.top) {
+    parts.push(hulls.hull(thinExtrude(ctx, footprint, safeHeight - safeChamfer - 0.01), thinExtrude(ctx, inset, safeHeight - 0.01)));
+  }
+  return unionAll(ctx, parts);
 }
 
 export function rectangle2d<Solid, Region>(

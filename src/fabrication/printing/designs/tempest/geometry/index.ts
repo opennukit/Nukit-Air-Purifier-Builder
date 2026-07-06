@@ -3,4 +3,4 @@
 export { buildTempestGeometry } from "./buildTempest";
 export { towerCornerChamfer } from "./quadAssembly";
 export { clipPrintChunk, posePrintableAssembly, type ChunkBounds } from "./chunking";
-export { tempestPinPlacementsClearOfFans, type TempestAlignmentPinPlacement } from "./pins";
+export { tempestPinPlacementsClearOfFans, tempestFinalPinPlacements, type TempestAlignmentPinPlacement } from "./pins";

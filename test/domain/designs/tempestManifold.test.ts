@@ -123,7 +123,7 @@ describe("Tempest meshes are 2-manifold", () => {
 
   test("four-filter tower exports a watertight single body", () => {
     const kit = createTempestPrintableKit(
-      { ...defaultTempestSettings, arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter } },
+      { ...defaultTempestSettings, arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter, bottomFilter: false, feetLength: 0 } },
       "unsplit",
     );
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
@@ -160,7 +160,7 @@ describe("Tempest meshes are 2-manifold", () => {
         {
           ...defaultTempestSettings,
           fan: { ...defaultTempestSettings.fan, opening: { type: "plain" } },
-          arrangement: { type: "four-side-filter-tower", filter: { ...defaultTempestTowerFilter, thickness } },
+          arrangement: { type: "four-side-filter-tower", filter: { ...defaultTempestTowerFilter, thickness }, bottomFilter: false, feetLength: 0 },
         },
         "unsplit",
       ).parts[0].mesh;
@@ -173,7 +173,7 @@ describe("Tempest meshes are 2-manifold", () => {
   });
 
   test("four-filter tower with box exhaust stays manifold and differs from the fan grid", () => {
-    const tower = { type: "four-side-filter-tower" as const, filter: defaultTempestTowerFilter };
+    const tower = { type: "four-side-filter-tower" as const, filter: defaultTempestTowerFilter, bottomFilter: false, feetLength: 0 };
     const grid = createTempestPrintableKit({ ...defaultTempestSettings, arrangement: tower }, "unsplit");
     const boxExhaust = createTempestPrintableKit(
       {

@@ -62,4 +62,12 @@ export interface ModelingApi<Solid, Region> {
     union(first: Region, ...rest: Region[]): Region;
     intersect(first: Region, ...rest: Region[]): Region;
   };
+  // Read-only inspectors used by post-build coverage checks: which separate
+  // printed pieces a clipped chunk splits into, and where each piece sits. Kept
+  // apart from the constructive ops because they create no new geometry.
+  readonly analysis: {
+    isEmpty(solid: Solid): boolean;
+    decompose(solid: Solid): Solid[];
+    boundingBox(solid: Solid): { readonly min: Vec3; readonly max: Vec3 };
+  };
 }

@@ -4,6 +4,7 @@
 // a tempest arrangement or print design preset.
 
 
+import type { CadrEstimate } from "@/domain/purifier/cadr";
 import {
   defaultFanDiameterForPrintDesign,
   defaultFilterDimensionsByTempestArrangement,
@@ -176,6 +177,12 @@ export type CutSheetPreviewOptions = {
 export const topExhausts = ["fan-grid", "box-exhaust"] as const;
 export type TopExhaust = (typeof topExhausts)[number];
 
+// Cut-sheet construction style for the cut-panel (laser-cut design) family:
+// "laser" is the finger-jointed, flanged laser box; "hand" is the foamcore
+// hand-cut box (plain taped edges, no flanges, box depth = fan + filter).
+export const cutStyles = ["laser", "hand"] as const;
+export type CutStyle = (typeof cutStyles)[number];
+
 // Tempest preset designs. "custom" is the fully user-driven build; named designs
 // (e.g. Nukit Tempest Euro) apply a complete tempest configuration when chosen.
 export const tempestDesigns = [
@@ -191,7 +198,7 @@ export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
   "nukit-tempest-euro": "Nukit Tempest Euro",
   "nukit-tempest-euro-cube": "Nukit Tempest Euro Cube",
   "nukit-tempest-original": "Nukit Tempest Original",
-  "nukit-tempest-original-cube": "Nukit Tempest Original Cube",
+  "nukit-tempest-original-cube": "Nukit Tempest Original Cube (Big John)",
   "nukit-tempest-pro": "Nukit Tempest Pro",
   custom: "Custom",
 };
@@ -217,8 +224,33 @@ export type RawPurifierSettings = {
   rim: Millimeters;
   fanColor: FanColor;
   fanDiameter: FanDiameter;
+  // CADR estimation: the chosen fan model id (a PC fan id for 120/140, a box-fan id
+  // for Box/Exhaust, or "custom"); empty resolves to the size default. The custom*
+  // fields supply specs when "custom" is selected. Display-only (no geometry).
+  fanModel: string;
+  customFanAirflow: number; // free-air Q0, m³/h
+  customFanPressure: number; // static pressure P0, mmH₂O
+  customFanNoise: number; // dBA (0 = unknown)
+  customFanCurrent: number; // A @ 12 V (PC custom)
+  customFanWatts: number; // W (box/exhaust custom)
+  // Room sizing for the ACH (air-changes-per-hour) estimate. Display-only (no
+  // geometry). Dimensions are stored in the selected roomUnit ("ft" or "m").
+  roomUnit: string;
+  roomWidth: number;
+  roomLength: number;
+  roomHeight: number;
+  // The room's baseline ventilation in air changes per hour (windows, HVAC, leakage),
+  // used only to estimate how much the purifier reduces long-range airborne infection
+  // risk. Display-only.
+  baselineAch: number;
+  // Electricity cost estimate (display-only): price per kWh in the chosen currency,
+  // and the currency symbol to prefix it with.
+  electricityPrice: number;
+  currencySymbol: string;
   filters: FilterCount;
   splitFrames: boolean;
+  // Cut-sheet construction style (laser-cut design family): "laser" or "hand".
+  cutStyle: CutStyle;
   fansLeft: number;
   fansRight: number;
   fansTop: number;
@@ -263,6 +295,10 @@ export type RawPurifierSettings = {
   // Tempest-only: diameter of the printed alignment-pin holes along each seam, in
   // mm. 0 disables the pins entirely; values above 0 (up to 2.5) size the holes.
   alignmentPinDiameter: Millimeters;
+  // Tempest 4-filter tower only: add a fifth filter on the bottom (square filters
+  // only) and the length of the corner feet that lift the box for bottom airflow.
+  bottomFilter: boolean;
+  feetLength: Millimeters;
   // Tempest 4-filter tower only: top exhaust style and box/exhaust geometry. A
   // value of 0 for a size/radius means "auto" (derived from the filter width).
   topExhaust: TopExhaust;
@@ -307,6 +343,13 @@ export type RawPurifierSettings = {
 export type PurifierFanDraft = {
   readonly diameter: FanDiameter;
   readonly color: FanColor;
+  // CADR fan-model selection (display-only); see RawPurifierSettings.fanModel.
+  readonly model: string;
+  readonly customAirflow: number;
+  readonly customPressure: number;
+  readonly customNoise: number;
+  readonly customCurrent: number;
+  readonly customWatts: number;
 };
 
 export type PurifierCuttingDraft = {
@@ -325,6 +368,8 @@ export type LaserCutDesignDraft = {
   readonly filterCount: FilterCount;
   readonly fanBanks: FanBanks<FanCountRequest>;
   readonly frameConstruction: FilterFrameConstruction;
+  // "laser" (finger-jointed, flanged) or "hand" (foamcore, plain taped edges).
+  readonly cutStyle: CutStyle;
   readonly cordHoleDiameter: Millimeters;
   readonly cordHoleWall: CordHoleWall;
   readonly cordHoleSide: CordHoleSide;
@@ -377,6 +422,8 @@ export type TempestPrintDesignDraft = {
   readonly backPlateFans: number;
   readonly boxDepth: Millimeters;
   readonly alignmentPinDiameter: Millimeters;
+  readonly bottomFilter: boolean;
+  readonly feetLength: Millimeters;
   readonly topExhaust: TopExhaust;
   readonly boxFanHoleSize: Millimeters;
   readonly boxRingOneScrewHoles: number;
@@ -404,11 +451,30 @@ export type PurifierDesignDraft =
   | TempestPrintDesignDraft
   | StaticReferencePrintDesignDraft;
 
+// Room dimensions for the ACH estimate (display-only). unit is "ft" or "m";
+// width/length/height are expressed in that unit.
+export type PurifierRoomDraft = {
+  readonly unit: string;
+  readonly width: number;
+  readonly length: number;
+  readonly height: number;
+  // Baseline room ventilation (ACH) used for the infection-risk estimate.
+  readonly baselineAch: number;
+};
+
+// Electricity cost inputs for the operating-cost estimate (display-only).
+export type PurifierCostDraft = {
+  readonly electricityPrice: number;
+  readonly currencySymbol: string;
+};
+
 export type PurifierDraft = {
   readonly design: PurifierDesignDraft;
   readonly fan: PurifierFanDraft;
   readonly cutting: PurifierCuttingDraft;
   readonly preview: PreviewSettings;
+  readonly room: PurifierRoomDraft;
+  readonly cost: PurifierCostDraft;
 };
 
 export type ConfiguredPrintDesign =
@@ -419,6 +485,7 @@ export type ConfiguredPrintDesign =
       readonly filterCount: FilterCount;
       readonly fanBanks: FanBanks<FanCountRequest>;
       readonly frameConstruction: FilterFrameConstruction;
+      readonly cutStyle: CutStyle;
       readonly cordHoleDiameter: Millimeters;
       readonly cordHoleWall: CordHoleWall;
       readonly cordHoleSide: CordHoleSide;
@@ -457,6 +524,8 @@ export type ConfiguredPrintDesign =
       readonly backPlateFans: number;
       readonly boxDepth: Millimeters;
       readonly alignmentPinDiameter: Millimeters;
+      readonly bottomFilter: boolean;
+      readonly feetLength: Millimeters;
       readonly topExhaust: TopExhaust;
       readonly boxFanHoleSize: Millimeters;
       readonly boxRingOneScrewHoles: number;
@@ -509,6 +578,7 @@ export type BuildSummary = {
   workingDepth: number;
   fans: BuildFanSummary;
   fabrication: BuildFabricationSummary;
+  cadr: CadrEstimate;
 };
 
 export type PurifierInput =
@@ -532,6 +602,20 @@ export const defaultSettings: RawPurifierSettings = {
   fanDiameter: 140,
   filters: 2,
   splitFrames: true,
+  cutStyle: "laser",
+  fanModel: "",
+  customFanAirflow: 0,
+  customFanPressure: 0,
+  customFanNoise: 0,
+  customFanCurrent: 0,
+  customFanWatts: 0,
+  roomUnit: "ft",
+  roomWidth: 12,
+  roomLength: 12,
+  roomHeight: 8,
+  baselineAch: 1,
+  electricityPrice: 0.1765,
+  currencySymbol: "$",
   fansLeft: 0,
   fansRight: 0,
   fansTop: automaticFanCount,
@@ -545,14 +629,16 @@ export const defaultSettings: RawPurifierSettings = {
   cordHoleSide: defaultTempestCordPassThrough.side,
   cordHoleCornerOffset: defaultTempestCordPassThrough.cornerOffset,
   outsideFlangeThickness: 10,
-  chunkLabels: false,
+  chunkLabels: true,
   hexGrill: true,
   hexSize: 10,
   hexSpacing: 1.6,
   hexFullCellsOnly: false,
   backPlateFans: 0,
   boxDepth: 70,
-  alignmentPinDiameter: 1.8,
+  alignmentPinDiameter: 2,
+  bottomFilter: false,
+  feetLength: 0,
   topExhaust: "fan-grid",
   // Box/exhaust sizes are concrete diameters, auto-populated from the filter
   // width (fan hole 70%, ring 1 80%, ring 2 90%) — here for the default width.
@@ -640,10 +726,10 @@ export function applyTempestArrangement(
   };
 }
 
-// The "Nukit Tempest Euro" preset: a 2-filter sandwich tower around a 365x285x35
-// STARKVIND filter, fans on the top (back) wall, honeycomb grill, right-wall
-// cord. These are the tempest-defining fields the design sets; preview/
-// fabrication choices are left to the user (and seeded by the default load).
+// The "Nukit Tempest Euro" preset: a 2-filter sandwich around a 365x285x35
+// STARKVIND filter, fans on the left/right/back walls (Arctic P14 Max), honeycomb
+// grill, right-wall cord, forest-green preview. These are the design's defining
+// fields; the fabrication mode (3D print / laser / hand) is chosen by the user.
 export const nukitTempestEuroDesignOverrides = {
   filterWidth: 365,
   filterDepth: 285,
@@ -651,11 +737,14 @@ export const nukitTempestEuroDesignOverrides = {
   rim: 30,
   fanColor: "black",
   fanDiameter: 140,
+  fanModel: "arctic-p14-max",
   filters: 2,
-  fansLeft: 0,
-  fansRight: 0,
+  fansLeft: automaticFanCount,
+  fansRight: automaticFanCount,
   fansTop: automaticFanCount,
   fansBottom: 0,
+  backPlateFans: automaticFanCount,
+  boxDepth: 50,
   tempestArrangement: "dual-horizontal-sandwich",
   filterSlotWall: "back",
   filterFitClearance: 1,
@@ -669,20 +758,25 @@ export const nukitTempestEuroDesignOverrides = {
   hexSpacing: 1.6,
   hexFullCellsOnly: false,
   topExhaust: "fan-grid",
+  alignmentPinDiameter: 2,
   screwHoleDiameter: 5,
   materialThickness: 5,
+  // No previewMaterialColor here: applyTempestDesign forces the gray preview for
+  // the 3D-print euro, so listing a color as a defining field made the design
+  // reconcile straight back to Custom.
   ...boxExhaustDiametersForWidth(365),
 } satisfies Partial<RawPurifierSettings>;
 
-// The "Nukit Tempest Euro Cube": the Euro preset rebuilt as a 4-side-filter
-// tower around a 285x365x35 filter (the Euro STARKVIND filter on its side), so
-// the box exhaust resizes to the 285 mm width.
+// The "Nukit Tempest Euro Cube": the Euro preset (same 365x285x35 STARKVIND
+// filter, fan model, grill, colour) rebuilt as a 4-side-filter tower. The tower
+// exhausts through the top only, so the side fan banks are off.
 export const nukitTempestEuroCubeDesignOverrides = {
   ...nukitTempestEuroDesignOverrides,
-  filterWidth: 285,
-  filterDepth: 365,
   tempestArrangement: "four-side-filter-tower",
-  ...boxExhaustDiametersForWidth(285),
+  fansLeft: 0,
+  fansRight: 0,
+  fansTop: automaticFanCount,
+  fansBottom: 0,
 } satisfies Partial<RawPurifierSettings>;
 
 // The "Nukit Tempest Original": a 2-filter sandwich around a 495x495x44 filter
@@ -694,6 +788,7 @@ export const nukitTempestOriginalDesignOverrides = {
   rim: 30,
   fanColor: "black",
   fanDiameter: 140,
+  fanModel: "arctic-p14-pwm-pst",
   filters: 2,
   fansLeft: automaticFanCount,
   fansRight: 0,
@@ -712,6 +807,7 @@ export const nukitTempestOriginalDesignOverrides = {
   hexSpacing: 1.6,
   hexFullCellsOnly: false,
   topExhaust: "fan-grid",
+  alignmentPinDiameter: 2,
   screwHoleDiameter: 5,
   materialThickness: 5,
   ...boxExhaustDiametersForWidth(495),
@@ -725,6 +821,11 @@ export const nukitTempestOriginalCubeDesignOverrides = {
   fansRight: 0,
   fansTop: automaticFanCount,
   tempestArrangement: "four-side-filter-tower",
+  // Plain circular fan opening (no honeycomb grill), and a bottom filter lifted
+  // on 100 mm feet so air can reach its underside.
+  hexGrill: false,
+  bottomFilter: true,
+  feetLength: 100,
 } satisfies Partial<RawPurifierSettings>;
 
 // The "Nukit Tempest Pro": a 2-filter sandwich around a 500x622x19 filter with
@@ -746,10 +847,11 @@ export const nukitTempestProDesignOverrides = {
 // applies its full configuration so the build matches the preset.
 export function applyTempestDesign(settings: RawPurifierSettings, design: TempestDesign): RawPurifierSettings {
   if (design === "nukit-tempest-euro") {
-    return { ...settings, ...nukitTempestEuroDesignOverrides, tempestDesign: "nukit-tempest-euro" };
+    // 3D print uses the grey preview; the green preview is the laser-cut look.
+    return { ...settings, ...nukitTempestEuroDesignOverrides, previewMaterialColor: "matte-gray", tempestDesign: "nukit-tempest-euro" };
   }
   if (design === "nukit-tempest-euro-cube") {
-    return { ...settings, ...nukitTempestEuroCubeDesignOverrides, tempestDesign: "nukit-tempest-euro-cube" };
+    return { ...settings, ...nukitTempestEuroCubeDesignOverrides, previewMaterialColor: "matte-gray", tempestDesign: "nukit-tempest-euro-cube" };
   }
   if (design === "nukit-tempest-original") {
     return { ...settings, ...nukitTempestOriginalDesignOverrides, tempestDesign: "nukit-tempest-original" };
@@ -806,8 +908,8 @@ export const nukitLaserDesignLabels: Readonly<Record<NukitLaserDesign, string>> 
 };
 
 const nukitLaserDesignFields = {
-  // STARKVIND, top fans.
-  "nukit-tempest-euro": { filterWidth: 365, filterDepth: 285, filterThickness: 35, fansLeft: 0, fansRight: 0, fansTop: automaticFanCount, fansBottom: 0 },
+  // STARKVIND, left/right/back fans (match fields; the full preset is applied below).
+  "nukit-tempest-euro": { filterWidth: 365, filterDepth: 285, filterThickness: 35, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: automaticFanCount, fansBottom: 0 },
   // Original 495 cube, right + top fans.
   "nukit-tempest-original": { filterWidth: 495, filterDepth: 495, filterThickness: 44, fansLeft: 0, fansRight: automaticFanCount, fansTop: automaticFanCount, fansBottom: 0 },
   // Pro 500x622, side fans.
@@ -818,7 +920,21 @@ export function applyNukitLaserDesign(settings: RawPurifierSettings, design: Nuk
   if (design === "custom") {
     return settings;
   }
-  return { ...settings, ...nukitLaserDesignFields[design] };
+  // The Euro shares its full spec (fan model, preview colour, rim, cord, flange,
+  // grill, material) with the 3D-print Euro, so laser/hand match it exactly; the
+  // tower-only fields it carries are inert here. The print design (nukit-open-air)
+  // and cut style are left untouched.
+  if (design === "nukit-tempest-euro") {
+    // Laser cut keeps the green preview; hand cut (foamcore) uses grey.
+    return {
+      ...settings,
+      ...nukitTempestEuroDesignOverrides,
+      previewMaterialColor: settings.cutStyle === "hand" ? "matte-gray" : "forest-green",
+    };
+  }
+  // Original / Pro: their geometry plus the standard ARCTIC P14 PWM PST fan model
+  // (the fan model is not a match field, so changing it won't drop the preset).
+  return { ...settings, ...nukitLaserDesignFields[design], fanModel: "arctic-p14-pwm-pst" };
 }
 
 // The design whose filter size and fan placement match the current settings, or

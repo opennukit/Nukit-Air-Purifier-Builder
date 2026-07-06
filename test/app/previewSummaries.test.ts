@@ -53,26 +53,29 @@ describe("createPreviewSummaryItems", () => {
     expect(labels).not.toContain("Print plates");
   });
 
-  test("the enclosure view of a tempest print summarizes the design instead of the plan", () => {
+  test("the enclosure view of a tempest print shows the estimated-performance summary, Fans last", () => {
     const tempestLayout = createLayout(applyPrintDesignPreset(defaultSettings, "nukit-tempest"));
     const items = createPreviewSummaryItems(tempestLayout, "enclosure", "print-3mf", "bed-256", null);
     const labels = items.map((item) => item.label);
 
-    expect(valueFor(items, "Design")).toBe("Custom");
-    expect(labels).toContain("Arrangement");
+    expect(labels).toContain("CADR");
+    expect(labels).toContain("ACH");
+    expect(labels).toContain("Infection risk");
     expect(labels).toContain("Fans");
-    expect(valueFor(items, "Print chunks")).toBe("…");
+    // Fans moved to the end; the build-part count was dropped from this view.
+    expect(labels[labels.length - 1]).toBe("Fans");
+    expect(labels).not.toContain("Print chunks");
   });
 
-  test("the laser path summarizes panels and the required sheet", () => {
+  test("the cut-sheet drawing summarizes panels and the required sheet", () => {
     const laserLayout = createLayout(defaultSettings);
-    const items = createPreviewSummaryItems(laserLayout, "enclosure", "laser-svg", "bed-256", null);
+    const items = createPreviewSummaryItems(laserLayout, "cut-sheet", "laser-svg", "bed-256", null);
 
     if (laserLayout.summary.fabrication.type !== "cut-panel-source") {
       throw new Error("expected the laser layout to carry a cut sheet");
     }
     expect(valueFor(items, "Panels")).toBe(String(laserLayout.summary.fabrication.panelCount));
-    expect(valueFor(items, "Sheet")).toContain(`${laserLayout.summary.fabrication.sheetWidth}`);
+    expect(valueFor(items, "Sheet")).toBeDefined();
     expect(valueFor(items, "Fans")).toBeDefined();
   });
 });

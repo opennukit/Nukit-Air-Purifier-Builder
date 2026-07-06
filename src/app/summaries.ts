@@ -3,7 +3,6 @@
 // current layout, fabrication method, and settings snapshot.
 
 import { createDonutFilterModel } from "@/domain/designs/donut-filter/model";
-import { createTempestModel } from "@/domain/designs/tempest/model";
 import { alignmentPinPieceLength } from "@/domain/designs/tempest/shared";
 import {
   isDonutFilterPrintDesignId,
@@ -17,7 +16,6 @@ import type {
   StaticReferencePrintDesignDefaults,
 } from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
-import { tempestDesignLabels } from "@/domain/purifier/settingsModel";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
@@ -25,10 +23,12 @@ import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
 import {
   findPrintVolumePreset,
+  isCutSheetExportFormat,
   type ExportFormat,
   type PrintableSheetPlan,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
+import type { CadrEstimate } from "@/domain/purifier/cadr";
 import { createTempestChunkPlan, createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import type {
   StaticPrintEstimate,
@@ -38,6 +38,9 @@ import type {
 export type SummaryItem = {
   readonly label: string;
   readonly value: string;
+  // Optional secondary value shown smaller, on its own line under the main value
+  // (e.g. the metric CADR, the "@ 1 m" noise distance, the wattage/voltage).
+  readonly detail?: string;
 };
 // Describes what this design needs as neutral quantities and measured
 // dimensions; urls appear only on source-file and license attribution rows.
@@ -111,39 +114,73 @@ export function createPreviewSummaryItems(
   }
 
   if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
-    const model = createTempestModel(createTempestSettingsFromLayout(currentLayout));
-    const design = currentLayout.configuration.design;
-    return [
-      {
-        label: "Design",
-        value:
-          design.type === "tempest"
-            ? tempestDesignLabels[design.design]
-            : currentLayout.configuration.printDesign.label,
-      },
-      {
-        label: "Arrangement",
-        value: tempestArrangementLabel(model.settings.arrangement.type, model.settings.oneSidePanelDepth !== undefined),
-      },
-      { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
-      { label: "Print chunks", value: planValue(currentGeneratedPlan, (plan) => String(plan.kit.summary.partCount)) },
-      { label: "Bed", value: planValue(currentGeneratedPlan, (plan) => plan.kit.preset.label) },
-    ];
+    // Assembled-box (enclosure) view: estimated performance only.
+    return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch);
   }
 
   const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
+  // The cut-sheet drawing view keeps the panel/sheet dimensions; the assembled-box
+  // (enclosure) view shows estimated performance + the panel count.
+  if (currentPreviewMode === "cut-sheet") {
+    return [
+      { label: "Panels", value: String(cutPanelSummary.panelCount) },
+      // Labelled to match the 3D dimension guides: the preview tilts the model so
+      // workingDepth reads as the outside height and chamberHeight as the outside depth.
+      { label: "Outside height", value: formatMillimeters(currentLayout.summary.workingDepth) },
+      { label: "Outside depth", value: formatMillimeters(currentLayout.summary.chamberHeight) },
+      { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
+      {
+        label: "Sheet",
+        value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
+      },
+    ];
+  }
+  return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch);
+}
+
+// The performance tiles shown under the assembled-box (enclosure) preview.
+function cadrSummaryItems(cadr: CadrEstimate, baselineAch: number): readonly SummaryItem[] {
   return [
-    { label: "Panels", value: String(cutPanelSummary.panelCount) },
-    // Labelled to match the 3D dimension guides: the preview tilts the model so
-    // workingDepth reads as the outside height and chamberHeight as the outside depth.
-    { label: "Outside height", value: formatMillimeters(currentLayout.summary.workingDepth) },
-    { label: "Outside depth", value: formatMillimeters(currentLayout.summary.chamberHeight) },
-    { label: "Fans", value: String(totalConfiguredFans(currentLayout.summary.fans)) },
-    {
-      label: "Sheet",
-      value: `${formatMillimeters(cutPanelSummary.sheetWidth)} x ${formatMillimeters(cutPanelSummary.sheetHeight)}`,
-    },
+    cadr.cadrCfm > 0
+      ? { label: "CADR", value: `${Math.round(cadr.cadrCfm)} CFM`, detail: `${Math.round(cadr.cadrM3h)} m³/h` }
+      : { label: "CADR", value: "—" },
+    cadr.ach === null
+      ? { label: "ACH", value: "—" }
+      : { label: "ACH", value: cadr.ach.toFixed(1), detail: cadr.roomLabel },
+    cadr.noiseDbA === null
+      ? { label: "Noise", value: "—" }
+      : { label: "Noise", value: `${cadr.noiseDbA.toFixed(1)} dBA`, detail: "@ 1 m" },
+    cadrPowerItem(cadr),
+    riskReductionItem(cadr, baselineAch),
+    { label: "Fans", value: String(cadr.fanCount) },
   ];
+}
+
+// Approximate reduction in long-range airborne infection risk from the build's
+// clean-air delivery: ach / (baselineAch + ach). Relative estimate.
+function riskReductionItem(cadr: CadrEstimate, baselineAch: number): SummaryItem {
+  const total = (cadr.ach ?? 0) + baselineAch;
+  if (cadr.ach === null || total <= 0) {
+    return { label: "Infection risk", value: "—" };
+  }
+  return {
+    label: "Infection risk",
+    value: `−${Math.round((cadr.ach / total) * 100)}%`,
+    detail: `vs ${baselineAch} ACH room`,
+  };
+}
+
+// Power tile: PC fans show the current large with the wattage/voltage smaller; the
+// box fan shows the wattage large with the amperage/voltage smaller (matching the
+// diy-cadr-calculator).
+function cadrPowerItem(cadr: CadrEstimate): SummaryItem {
+  if (cadr.powerW === null || cadr.currentA === null) {
+    return { label: "Power", value: "—" };
+  }
+  if (cadr.voltage === 12) {
+    return { label: "Power", value: `${cadr.currentA.toFixed(2)} A`, detail: `≈ ${cadr.powerW.toFixed(1)} W @ 12 V` };
+  }
+  return { label: "Power", value: `${Math.round(cadr.powerW)} W`, detail: `≈ ${cadr.currentA.toFixed(2)} A @ 120 V` };
 }
 
 // The print kit builds asynchronously in the kit worker, so a null plan means
@@ -181,6 +218,29 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 // states the electrical requirement rather than a product.
 const FAN_POWER_NOTE = "4-pin PWM, 12 V";
 
+// Power-supply parts row sized from the estimated draw. PC fans run on a 12 V
+// PWM supply / fan hub; we round the calculated current UP to the next whole amp
+// so the suggested rating always has headroom (1.5 A draw -> "≥ 2 A"). The box
+// fan plugs into a 120 V mains outlet, so it states that instead of a 12 V supply.
+function fanPowerSupplyItem(cadr: CadrEstimate): PartsListItem {
+  if (cadr.voltage === 120) {
+    const detail =
+      cadr.currentA !== null && cadr.currentA > 0
+        ? `120 V mains outlet (fan draws ≈ ${cadr.currentA.toFixed(2)} A)`
+        : "120 V mains outlet for the box fan";
+    return { category: "Power", label: "Mains power", detail };
+  }
+  if (cadr.currentA === null || cadr.currentA <= 0) {
+    return { category: "Power", label: "12 V fan power", detail: "PWM power supply or fan hub sized for the fan current" };
+  }
+  const suggestedAmps = Math.max(1, Math.ceil(cadr.currentA));
+  return {
+    category: "Power",
+    label: "12 V fan power",
+    detail: `PWM power supply or fan hub, ≥ ${suggestedAmps} A at 12 V (fans draw ≈ ${cadr.currentA.toFixed(2)} A)`,
+  };
+}
+
 export function createPartsListItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
@@ -216,11 +276,7 @@ export function createPartsListItems(
         label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
         detail: FAN_POWER_NOTE,
       },
-      {
-        category: "Power",
-        label: "12 V fan power",
-        detail: `PWM power supply or fan hub sized for ${fanCount} fans`,
-      },
+      fanPowerSupplyItem(currentLayout.summary.cadr),
       {
         category: "License",
         label: currentLayout.configuration.printDesign.license,
@@ -237,11 +293,7 @@ export function createPartsListItems(
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
       detail: FAN_POWER_NOTE,
     },
-    {
-      category: "Power",
-      label: "12 V fan power",
-      detail: "PWM power supply or fan hub sized for the fan current",
-    },
+    fanPowerSupplyItem(currentLayout.summary.cadr),
   ];
 
   if (currentFabricationMethod === "print-3mf" && isDonutFilterPrintDesignId(currentLayout.configuration.printDesign.id)) {
@@ -332,7 +384,7 @@ function laserSheetPartsItems(
   currentLayout: LayoutResult,
   currentFabricationMethod: ExportFormat,
 ): readonly PartsListItem[] {
-  if (currentFabricationMethod !== "laser-svg" || currentLayout.summary.fabrication.type !== "cut-panel-source") {
+  if (!isCutSheetExportFormat(currentFabricationMethod) || currentLayout.summary.fabrication.type !== "cut-panel-source") {
     return [];
   }
   const { sheetWidth, sheetHeight } = currentLayout.summary.fabrication;
@@ -403,16 +455,6 @@ function staticPrintSpoolBudgetUsd(estimate: StaticPrintEstimate): number {
 // ##############################
 // Layout Readings and Formatting
 // ##############################
-
-function tempestArrangementLabel(arrangement: string, isPanel = false): string {
-  if (arrangement === "single-horizontal-top-filter") {
-    return isPanel ? "1-filter panel" : "1-filter wall mount";
-  }
-  if (arrangement === "four-side-filter-tower") {
-    return "Four-filter tower";
-  }
-  return "Dual horizontal filters";
-}
 
 function configuredFanCountFor(currentLayout: LayoutResult, currentFabricationMethod: ExportFormat): number {
   if (currentFabricationMethod === "print-3mf" && isStaticReferencePrintDesignId(currentLayout.configuration.printDesign.id)) {

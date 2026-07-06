@@ -178,7 +178,7 @@ Fabrication Method Toggle
 
 .fabrication-method-field div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--line-medium);
@@ -312,7 +312,7 @@ Workbench Container
 
 .method-workbench > .fabrication-method-field {
   justify-self: start;
-  min-width: min(420px, 100%);
+  min-width: min(540px, 100%);
 }
 
 /* ##############################
@@ -830,13 +830,146 @@ Sheet Preview
 Summary Metrics
 ############################## */
 
+/* Performance view: fills the preview stage with the estimated-results tiles,
+   sized to fit without scrolling (the grid rows share the available height). */
+.preview-stage.is-performance {
+  padding: 0;
+  /* Fills the stage when there's room; scrolls instead of clipping on short windows. */
+  overflow: auto;
+  min-height: clamp(420px, 54svh, 720px);
+}
+
+.performance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 100%;
+  padding: 12px;
+}
+
+.performance-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.performance-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* Rows are at least tall enough for their content (so nothing clips) and grow to
+     share the height when the stage is tall enough. */
+  grid-auto-rows: minmax(min-content, 1fr);
+  gap: 6px;
+}
+
+.perf-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+}
+
+/* Tiles link to the methodology page; keep them looking like tiles, not links. */
+a.perf-tile {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+a.perf-tile:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgb(31 111 86 / 14%);
+}
+
+a.perf-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.perf-tile--hero {
+  background: var(--accent-wash);
+}
+
+.perf-tile--wide {
+  grid-column: 1 / -1;
+}
+
+.perf-tile--accent {
+  background: var(--accent-wash);
+}
+
+.perf-k {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.perf-v {
+  color: var(--ink);
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.perf-tile--hero .perf-v {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.perf-v small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.perf-sub {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.perf-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
 .summary-grid {
   display: grid;
   /* Reflow to fewer, wider columns as the preview pane narrows so values like
      "Dual horizontal filters" wrap at spaces instead of breaking mid-word or
      spilling out. The 1px gap over a line-coloured background draws the cell
      separators, which works for any column count and any number of rows. */
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
   gap: 1px;
   border: 1px solid var(--line);
   border-top: 0;
@@ -860,6 +993,17 @@ Summary Metrics
   display: block;
   overflow-wrap: anywhere;
   font-size: 0.92rem;
+}
+
+/* Secondary value (metric CADR, "@ 1 m", wattage/voltage): smaller, its own line,
+   kept to a single line so the units don't break mid-figure. */
+.summary-grid .summary-detail {
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 /* #######################################
@@ -965,6 +1109,38 @@ Panel Grids
   margin: 0 0 2px;
 }
 
+/* Advanced groups hold many tuning fields, so use a tighter control size than
+   the roomy primary inputs (these selectors out-specify the desktop .field
+   rule that otherwise forces a 38px min-height). */
+.advanced-group .field,
+.advanced-group .toggle-field {
+  margin: 2px 0;
+  gap: 2px;
+}
+
+.advanced-group .field input,
+.advanced-group .field select {
+  min-height: 26px;
+  padding: 0 8px;
+}
+
+.advanced-group .input-shell small {
+  padding-right: 8px;
+}
+
+/* Multi-field groups (fan counts, frame, finger joints, dovetails, grill, cord)
+   flow their fields into two columns when the group is wide enough (~one full
+   advanced column), and collapse back to one when it isn't, so they never get
+   cramped inside a narrow newspaper column. The label always spans the row. */
+.advanced-group.is-two-col {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  column-gap: 10px;
+}
+
+.advanced-group.is-two-col > .advanced-group-label {
+  grid-column: 1 / -1;
+}
+
 .parts-list-section {
   grid-column: 1 / -1;
 }
@@ -973,6 +1149,13 @@ Panel Grids
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 12px;
+}
+
+/* Room W/L/H share one tight row of three so the section stays compact. */
+.room-dim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 8px;
 }
 
 .advanced-accordion-toggle {
@@ -1991,6 +2174,13 @@ Desktop Fixed View
   .preview-pane {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  /* In the height-constrained desktop view the Performance panel fills the stage
+     row and scrolls internally if the window is too short, rather than forcing a
+     420px floor that overflows the pane and clips the bottom tiles. */
+  .preview-stage.is-performance {
     min-height: 0;
   }
 

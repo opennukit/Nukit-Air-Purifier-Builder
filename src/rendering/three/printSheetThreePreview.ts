@@ -471,6 +471,9 @@ function createPrintablePartGeometry(placement: PrintSheetPlacement): BufferGeom
     {
       scale: printPreviewScale,
       offset: [placement.x * printPreviewScale, printPreviewPartY(0), placement.y * printPreviewScale],
+      // Print chunks carry engraved codes; use the mirror-free mapping so they read
+      // correctly in the plate preview (matching the exported STL/3MF).
+      mirrorFree: true,
     },
     { type: "creased", creaseAngleRadians: printPartCreaseAngleRadians },
   );

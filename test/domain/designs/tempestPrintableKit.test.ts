@@ -110,6 +110,8 @@ describe("Tempest CSG printable kit", () => {
         arrangement: {
           type: "four-side-filter-tower",
           filter: defaultTempestTowerFilter,
+          bottomFilter: false,
+          feetLength: 0,
         },
       },
       "bed-256",
@@ -131,6 +133,8 @@ describe("Tempest CSG printable kit", () => {
       arrangement: {
         type: "four-side-filter-tower" as const,
         filter: defaultTempestTowerFilter,
+        bottomFilter: false,
+        feetLength: 0,
       },
     };
     const kit = createTempestPrintableKit(towerSettings, "unsplit");

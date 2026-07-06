@@ -116,6 +116,9 @@ import {
   toScenePosition,
 } from "@/rendering/three/preview/sceneMath";
 import { collectFanRotors, createFan } from "@/rendering/three/preview/fanModels";
+import { createBoxFanPreview } from "@/rendering/three/preview/boxFanModel";
+import { isBoxExhaustBuild } from "@/domain/purifier/buildCadr";
+import { findBoxFanModel } from "@/domain/purifier/cadr";
 import {
   createPanelGroup,
   createPreviewEdges,
@@ -460,7 +463,17 @@ export class PurifierThreePreview {
     const assembly = createAssemblyModel(layout);
     const settings = layout.configuration;
 
-    const wood = createWoodMaterial();
+    // Hand cut is foamcore, not plywood: its panels take the chosen preview colour
+    // (the same palette as 3D print) and a flat matte finish, instead of the laser
+    // box's wood grain.
+    const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
+    const wood = handCut
+      ? new MeshStandardMaterial({
+          color: findPreviewMaterialColorPreset(settings.preview.enclosure.materialColor).color,
+          roughness: 0.96,
+          metalness: 0,
+        })
+      : createWoodMaterial();
     const railWood = createWoodMaterial();
     const darkEdge = new LineBasicMaterial({ color: edgeColor });
     const seamMaterial = new LineBasicMaterial({ color: burnColor, transparent: true, opacity: 0.78 });
@@ -1181,6 +1194,42 @@ export class PurifierThreePreview {
       }
     }
 
+    // The box fan (filter cube) sits on top, centred over the exhaust hole, only
+    // for a box/exhaust build running a known box-fan model (not custom) on a
+    // box at least 495 mm wide.
+    if (
+      isBoxExhaustBuild(settings) &&
+      findBoxFanModel(layout.summary.cadr.fanModelId) !== undefined &&
+      settings.filter.width >= 495
+    ) {
+      // Anchor on the CURRENT enclosure top: this runs after the exploded chunk
+      // offsets, so the fan rides 50 mm above the exploded top plate, or sits flush
+      // on the assembled top. updateMatrixWorld first — the chunk matrices are stale
+      // from the previous build's settle and the just-applied explode offsets.
+      this.modelGroup.updateMatrixWorld(true);
+      const enclosureBounds = new Box3();
+      for (const chunkGroup of chunkGroups) {
+        enclosureBounds.expandByObject(chunkGroup);
+      }
+      if (!enclosureBounds.isEmpty()) {
+        const boxFanMount = createBoxFanPreview({
+          bottomCenter: new Vector3(
+            (enclosureBounds.min.x + enclosureBounds.max.x) / 2,
+            enclosureBounds.max.y,
+            (enclosureBounds.min.z + enclosureBounds.max.z) / 2,
+          ),
+          explodedUpOffset: settings.preview.enclosure.explodedView ? 50 * sceneScale : 0,
+          onRotorReady: (rotor) => {
+            if (boxFanMount.userData["disposedPreviewObject"] !== true) {
+              this.fanRotors.push(rotor);
+            }
+          },
+        });
+        boxFanMount.userData["tempestPreviewFan"] = true;
+        this.modelGroup.add(boxFanMount);
+      }
+    }
+
     const outline = this.settleModelOnGround();
     this.addScaleReference(layout, outline);
     if (layout.configuration.preview.enclosure.showDimensions) {
@@ -1216,22 +1265,22 @@ export class PurifierThreePreview {
         continue;
       }
       const lowOffset = chunkOffsets[lowIndex];
-      const highOffset = chunkOffsets[highIndex];
-      const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
-      const seamGap = Math.max(0, highOffset[axisIndex] - lowOffset[axisIndex]);
-      // The pin's midpoint sits halfway between the two displaced chunk faces;
-      // the cylinder grows by the opened gap so it bridges the seam.
-      const midpoint = {
-        x: placement.position.x + (lowOffset[0] + highOffset[0]) / 2,
-        y: placement.position.y + (lowOffset[1] + highOffset[1]) / 2,
-        z: placement.position.z + (lowOffset[2] + highOffset[2]) / 2,
+      // Seat the pin in the low chunk's seam hole — it rides with that chunk's
+      // explosion offset and shows at its true physical length. (An earlier version
+      // grew the cylinder to span the whole opened gap; on a four-side tower the
+      // gap is large, so those rods stretched right across the exploded view and
+      // looked scattered. A fixed-length pin sitting in its hole reads cleanly.)
+      const seatedCenter = {
+        x: placement.position.x + lowOffset[0],
+        y: placement.position.y + lowOffset[1],
+        z: placement.position.z + lowOffset[2],
       };
       const pinMesh = new Mesh(
-        new CylinderGeometry(radius, radius, (placement.length + seamGap) * sceneScale, filamentPinSegments),
+        new CylinderGeometry(radius, radius, placement.length * sceneScale, filamentPinSegments),
         material,
       );
       pinMesh.name = "tempest-seam-pin";
-      pinMesh.position.copy(tempestPosedPointToScene(midpoint));
+      pinMesh.position.copy(tempestPosedPointToScene(seatedCenter));
       // CylinderGeometry runs along scene Y; tempestPosedPointToScene maps
       // posed z to scene Y, posed x to scene X, and posed y to scene Z.
       if (placement.axis === "x") {

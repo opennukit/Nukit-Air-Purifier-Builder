@@ -100,6 +100,8 @@
       .shot { display: block; margin: 16px 0; cursor: zoom-in; }
       .photo-row .shot { margin: 0; }
       .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
+      .credit { margin: -8px 0 16px; text-align: center; font-size: 0.78rem; color: var(--muted); }
+      .credit a { color: var(--muted); }
       .lightbox { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 24px; background: rgb(17 32 28 / 88%); cursor: zoom-out; }
       .lightbox.is-open { display: flex; }
       .lightbox img { max-width: 100%; max-height: 100%; border-radius: 2px; box-shadow: var(--shadow); }
@@ -150,10 +152,12 @@
           <a href="#filterLayout">Filter layout</a>
           <a href="#backPlateFansCount">Back fans</a>
           <a href="#boxDepth">Box depth</a>
+          <a href="#performance">Performance</a>
           <strong>Filter</strong>
           <a href="#filterSize">Filter size</a>
           <strong>Fans</strong>
           <a href="#fanSize">Fan size</a>
+          <a href="#noise">Noise</a>
           <strong>Cord pass-through</strong>
           <a href="#cordHoleDiameter">Cord hole</a>
           <strong>Printing</strong>
@@ -161,8 +165,12 @@
           <strong>Drawing &amp; output</strong>
           <a href="#labels">Engrave labels</a>
           <a href="#referenceScale">Reference scale</a>
+          <strong>Hand cutting</strong>
+          <a href="#handcutting">Cutting panels by hand</a>
           <strong>Build it</strong>
           <a href="#fabrication">Fabrication &amp; assembly</a>
+          <strong>Community</strong>
+          <a href="#community">Acknowledgments</a>
           <strong>Legal</strong>
           <a href="#license">License</a>
         </nav>
@@ -172,7 +180,7 @@
             <p class="eyebrow">Start here</p>
             <h2>Why a PC-fan filter box</h2>
             <p class="lede">
-               <a href="https://housefresh.com/air-purifier-comparison-tool/">Extensive testing</a> has shown that the combination of MERV&nbsp;13 furnace filters and PC fans can make one of
+               <a href="https://housefresh.com/air-purifier-comparison-tool/">Extensive testing</a> has shown that the combination of <a href="https://en.wikipedia.org/wiki/Minimum_efficiency_reporting_value" target="_blank" rel="noopener">MERV&nbsp;13</a> furnace filters and PC fans can make one of
               the cheapest, quietest, highest-performance air cleaners you can build or buy.
             </p>
             <a class="shot" href="help/PC-Fan-Purifier.jpg"><img src="help/PC-Fan-Purifier.jpg" alt="A finished black PC-fan air purifier with three fans on the side and a large filter face, standing on the floor with its cord plugged in." /></a>
@@ -210,7 +218,7 @@
                 deliver a given airflow at a lower speed, so they are even quieter. Other advantages:
               </p>
               <ul>
-                <li><strong>Speed control:</strong> a 4-pin PWM fan lets you trade noise for airflow, or run it quietly overnight.</li>
+                <li><strong>Speed control:</strong> a 4-pin <a href="https://en.wikipedia.org/wiki/Computer_fan_control#PWM-FAN" target="_blank" rel="noopener">PWM fan</a> lets you trade noise for airflow, or run it quietly overnight.</li>
                 <li><strong>Safe, low voltage:</strong> 12&nbsp;V DC fans are simple to wire and stay cool.</li>
                 <li><strong>Cheap and repairable:</strong> fans are standardized and easy to swap. The filters are common furnace filters you replace on a schedule.</li>
                 <li><strong>Redundancy:</strong> if one fan fails, the rest keep running until you can replace it.</li>
@@ -227,21 +235,21 @@
             <p class="eyebrow">Free &amp; open</p>
             <h2>Why this builder is free</h2>
             <p class="lede">
-              Nukit designs and sells <a href="https://cybernightmarket.com/products/the-nukit-tempest-pro-complete-air-purifier-kit-usa">air purifiers</a> and <a href="https://www.nukit222.com/">Far-UVC</a>. But clean air should not depend on income. That is why
+              Nukit designs and sells <a href="https://cybernightmarket.com/products/the-nukit-tempest-pro-complete-air-purifier-kit-usa">air purifiers</a> and <a href="https://www.nukit222.com/">Far-UVC</a>. But access to clean air should not depend on income. That is why
               we provide this open source builder for free.
             </p>
 
             <div class="var">
               <h3>Free, open, and yours to make</h3>
               <p>
-                The FilterBoxBuilder lets anyone, or any group with access to a laser cutter or 3D printer make several different types of DIY air
+                The FilterBoxBuilder lets anyone, or any group with access to a laser cutter, 3D printer, or even just a box cutter, make several different types of DIY air
                 cleaners to suit nearly every situation. You use cheap, common parts. No account, purchase, or sign-up is
                 required. We believe clean indoor air is a public good. The more people who can make a good purifier from
                 local materials, the better. There is no catch: the builder produces complete, ready-to-make files for
                 free.
               </p>
               <p>
-                If the builder saves you money or helps you breathe easier, you can support our work. Tell others about our
+                If this builder saves you money or helps you breathe easier, you can support our work. Tell others about our
                 products, or buy our kit below.
               </p>
             </div>
@@ -283,10 +291,10 @@
               FilterBoxBuilder turns a few measurements into a complete high performance air-cleaner. It is built around standard
               furnace filters and off-the-shelf PC fans.
             </p>
-            <a class="shot" href="help/filterboxbuilder-interface.png"><img src="help/filterboxbuilder-interface.png" alt="FilterBoxBuilder interface: the 3D preview on the left, the controls on the right." /></a>
+            <a class="shot" href="help/filterboxbuilder-interface-updated.png"><img src="help/filterboxbuilder-interface-updated.png" alt="FilterBoxBuilder interface: the 3D preview on the left, the controls on the right." /></a>
             <div class="var">
               <p>
-                Choose a method at the top: 3D print or Laser cut. Then set your filter size, fan size, and fan placement.
+                Choose a method at the top: 3D print, Laser cut, or Hand cut. Then set your filter size, fan size, and fan placement.
                 The 3D view updates as you work. The export button produces the files for your method: a 3MF print kit, or
                 an SVG cut sheet.
               </p>
@@ -300,7 +308,7 @@
 
           <section class="card">
             <p class="eyebrow">Layout &amp; design</p>
-            <h2>Layout &amp; design</h2>
+            <h2>Customize for your needs</h2>
             <p class="lede">
               Choose the overall design and size of the box. Higher CADR is always better, but it requires more filter
               surface area, and so a larger box.
@@ -316,11 +324,27 @@
               <p>
                 <strong>One side</strong> places a single filter on one face of the box, ideal for wall or ceiling
                 mounting. <strong>Both sides</strong> puts a filter on two faces, for roughly twice the filter area and
-                airflow in the same footprint. If you leave one side without fans or filters, you can put it against the wall to safe space. 3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter
+                airflow in the same footprint. If you leave one side without fans or filters, you can put it against the wall to save space. 3D&nbsp;Print also offers <strong>Four sides</strong>: a tower with a filter
                 on each wall and fans on top. This design should have at least 150mm clearance from walls and furniture on all sides.
               </p>
               <p class="note">More filter area slows the air through the media. That raises the capture rate and lowers
                 noise (see <a href="#about">Why a PC-fan filter box</a>).</p>
+            </div>
+
+            <div class="var" id="bottomFilter">
+              <h3>Bottom filter</h3>
+              <p>
+                On the <strong>Four sides</strong> tower you can add an optional fifth filter lying flat across the
+                underside of the box, turning the bottom into another intake. More filter area means a lower face
+                velocity for the same airflow, which raises clean-air delivery and lowers noise. It is available for
+                square filters only, since the bottom opening matches the tower's square footprint.
+              </p>
+              <a class="shot" href="help/bottom-filter.png"><img src="help/bottom-filter.png" alt="A four-side filter tower with the optional fifth filter lying flat across the bottom, standing on corner feet so air can reach the underside intake." /></a>
+              <p>
+                With a bottom filter the tower has to stand on feet so air can actually reach the underside, so turning
+                the option on raises the corner feet automatically; tune their height under <strong>Foot length</strong>.
+                Set the purifier on a hard, flat surface, not on carpet or bedding that would block the bottom intake.
+              </p>
             </div>
 
             <div class="var" id="backPlateFansCount">
@@ -353,9 +377,31 @@
             </div>
           </section>
 
+          <section class="card" id="performance">
+            <p class="eyebrow">Performance</p>
+            <h2>Estimate and compare your build</h2>
+            <p class="lede">
+              The Performance tab estimates how well a build will clean the air, and updates live as you change the
+              design, so you can compare options at a glance.
+            </p>
+            <p>
+              It shows the figures that matter when you weigh tradeoffs: clean-air delivery (CADR), air changes per hour
+              for your room, an estimated reduction in long-range airborne infection risk, noise, power, and running
+              cost. Use it to decide things like whether more filter area is worth a bigger box, or whether a quieter
+              fan you will actually leave running beats a louder one you switch off.
+            </p>
+            <a class="shot" href="help/performance.png"><img src="help/performance.png" alt="The Performance tab showing estimated results for a build: CADR, air changes per hour, infection-risk reduction, noise, power, and more." /></a>
+            <p>
+              These are engineering estimates for comparing designs, not certified ratings. For the exact formulas,
+              assumptions, and citations behind every number, see the
+              <a href="methodology.html" target="_blank" rel="noopener">methodology page</a>. You can also click any
+              tile on the Performance tab to jump straight to its explanation there.
+            </p>
+          </section>
+
           <section class="card">
             <p class="eyebrow">Filter</p>
-            <h2>Filter</h2>
+            <h2>Measure your filter</h2>
             <p class="lede">The box is sized to your actual filter, so measure it rather than trusting the nominal size.</p>
             <a class="shot" href="help/MERV-13.jpg"><img src="help/MERV-13.jpg" alt="Three pleated MERV 13 panel filters with cardboard frames, standing in a row." /></a>
 
@@ -374,7 +420,7 @@
 
           <section class="card">
             <p class="eyebrow">Fans</p>
-            <h2>Fans</h2>
+            <h2>Choose your fans</h2>
             <p class="lede">Standard PC case fans: quiet, inexpensive, easy to control, and easy to replace.</p>
             <a class="shot" href="help/fans.png"><img src="help/fans.png" alt="PC fans mounted behind fan openings, each with a honeycomb grill across the bore." /></a>
 
@@ -388,7 +434,7 @@
               </p>
             </div>
 
-            <div class="var">
+            <div class="var" id="boxFanHoleSize">
               <h3>Box/Exhaust</h3>
               <p>
                 On the four-side filter tower, <strong>Box/Exhaust</strong> (under <em>Advanced</em>) swaps the top
@@ -420,9 +466,116 @@
             </div>
           </section>
 
+          <section class="card" id="noise">
+            <p class="eyebrow">Fans</p>
+            <h2>Noise</h2>
+            <p class="lede">More powerful- higher CADR, is not better if comes with excessive noise. A clean-air machine you never run because it is too loud does nothing for you.</p>
+            <p>
+              The Performance view estimates the combined noise of your build at <strong>1&nbsp;meter</strong>, on maximum
+              power. The figure is calibrated to real, measured builds, but it is still an estimate: the actual level
+              depends on your specific fans, how they are mounted, leakage, and the room.
+            </p>
+            <p>
+              <strong>Treat 45&nbsp;dBA @ 1&nbsp;m on maximum power as an absolute ceiling, not a target for daily use.</strong> The limit
+              applies even at full speed. Above roughly 45&nbsp;dBA a purifier becomes intrusive in a quiet room and evidence indicates that it is far more
+              likely to be turned down or switched off, which is the opposite of what you want for continuous clean air. Lower noise is
+              better, so aim as low as your ACH target allows. In practice the most capable builds land in the high 30s to
+              low 40s&nbsp;dBA at 1&nbsp;m, and anything approaching 45&nbsp;dBA is best saved for short emergency use. Running
+              quietly for long stretches almost always delivers more real-world clean air and better health outcomes than a loud machine used occasionally.
+            </p>
+            <p>
+              If you need short-term clean-air delivery for an emergency, such as wildfire smoke, a louder
+              configuration can make sense for a few days or weeks of supervised use. For everyday background filtering, prefer more or
+              larger fans, or larger filters, to reach your target clean-air delivery quietly. 140&nbsp;mm fans and a greater filter area both lower the face velocity, which lowers noise for the same airflow.
+            </p>
+
+            <h3>What the standards say</h3>
+            <p>
+              Published health and acoustics guidance puts the comfortable ceiling for indoor noise well below 45&nbsp;dBA, which is
+              why we treat 45 as a hard maximum rather than a goal for daily use:
+            </p>
+            <ul>
+              <li>
+                The United States EPA
+                <a href="https://www.nonoise.org/library/levels74/levels74.htm" target="_blank" rel="noopener">identifies an indoor level of 45&nbsp;dB</a>
+                as the most that still protects public health and normal speech inside the home.
+              </li>
+              <li>
+                The World Health Organization
+                <a href="https://www.who.int/europe/news-room/fact-sheets/item/noise" target="_blank" rel="noopener">recommends below 30&nbsp;dBA in bedrooms</a>
+                for good-quality sleep, and below 35&nbsp;dBA in classrooms for teaching and learning.
+              </li>
+              <li>
+                The WHO
+                <a href="https://docs.wind-watch.org/WHO-Communitynoise.pdf" target="_blank" rel="noopener">Guidelines for Community Noise</a>
+                set 30&nbsp;dBA for continuous background noise in bedrooms and flag single sound events above 45&nbsp;dBA as disruptive
+                to sleep, a threshold the WHO
+                <a href="https://www.polisnetwork.eu/wp-content/uploads/2019/06/who-night-noise-guidelines.pdf" target="_blank" rel="noopener">Night Noise Guidelines for Europe</a>
+                reaffirm.
+              </li>
+              <li>
+                For schools, the
+                <a href="https://blog.ansi.org/ansi/ansi-asa-s12-60-part-1-2010-r2020-school-acoustics/" target="_blank" rel="noopener">ANSI/ASA&nbsp;S12.60</a>
+                classroom standard caps background noise at 35&nbsp;dBA.
+              </li>
+            </ul>
+            <p>
+              Those figures are background levels for a whole room, not the output of a single appliance measured up close, so a
+              capable purifier reading in the high 30s to low 40s&nbsp;dBA at 1&nbsp;m still fits comfortably inside a quiet bedroom
+              or classroom. The practical takeaway is simple: keep maximum-power noise under 45&nbsp;dBA and as low as your target ACH allows.
+            </p>
+
+            <h3>Do not build loud "just in case"</h3>
+            <p>
+              A very common mistake is to build a powerful but loud box for the extra output you think you will occasionally
+              need, then run it on a very low setting almost all of the time. This is a poor trade. The build spends 99%
+              of its life moving far less clean air than it could, while you paid for, and live with, a machine designed
+              around capacity you rarely use.
+            </p>
+            <p>
+              Throttling a loud fan down does not turn it into a quiet fan. A fan rated around 55&nbsp;dBA at maximum,
+              turned down until it measures 40&nbsp;dBA, will typically move <em>less</em> air than a fan purpose-built to
+              run at 40&nbsp;dBA at maximum. Quiet-optimized fans are designed to move the most air per decibel and to
+              sound clean at low speed, whereas a high-output fan run far below its design point is less efficient there
+              and often carries motor, bearing, or PWM whine that a meter still counts and that ears find more annoying.
+              Buying headroom you intend to throttle away usually gains nothing, costs more, and can sound worse. Design around
+              the noise you will actually run at on maximum, not a setting you will rarely touch.
+            </p>
+            <p>
+              The reliable way to get more clean air quietly is to lower the face velocity through the media: add fans,
+              use larger (140&nbsp;mm) fans, or add filter area. That raises clean-air delivery without raising the speed,
+              and therefore the noise, of any single fan.
+            </p>
+
+            <h3>People unplug what bothers them</h3>
+            <p>
+              Most people who encounter an air purifier they did not set up do not go hunting for a speed control. If the
+              noise bothers them, they simply unplug it. This is why unplugged air purifiers are everywhere, sitting idle
+              in offices, waiting rooms, <a href="https://x.com/c_werth/status/1597742681567920131" target="_blank" rel="noopener">classrooms</a>, and spare bedrooms, more often than almost any other appliance.
+            </p>
+            <p>
+              This is not just intuition. Lawrence Berkeley National Laboratory notes that
+              <a href="https://iaqscience.lbl.gov/frequently-asked-questions" target="_blank" rel="noopener">people sometimes switch air cleaners off because they are too noisy</a>,
+              and classroom field studies report the same pattern: teachers
+              <a href="https://www.mdpi.com/2071-1050/16/5/2052" target="_blank" rel="noopener">turn portable air cleaners down or off to cut the noise</a>,
+              and in one long-running school deployment a HEPA unit judged
+              <a href="https://www.medrxiv.org/content/10.1101/2022.11.05.22281734.full.pdf" target="_blank" rel="noopener">too loud at maximum was simply run slower</a>.
+              DIY boxes have an edge here precisely because they can move the same air more quietly: in classroom testing their noise was
+              <a href="https://ncceh.ca/resources/evidence-reviews/do-it-yourself-diy-air-cleaners-evidence-effectiveness-and" target="_blank" rel="noopener">reported as tolerable at low speed</a>.
+            </p>
+            <a class="shot" href="help/unplugged.webp"><img src="help/unplugged.webp" alt="An air purifier sitting switched off and unplugged in a room, ignored because it was too loud to leave running." /></a>
+            <p class="credit"><a href="https://x.com/c_werth/status/1597742681567920131" target="_blank" rel="noopener">Photo: @c_werth</a></p>
+            <p>
+              A purifier that is quiet enough to fade into the background stays plugged in and keeps cleaning the air,
+              which is the entire point. A loud one gets switched off and protects no one. Designing for a noise level
+              people will tolerate continuously is not a compromise on performance; over the hours and days the machine
+              actually runs, it is how you deliver the most clean air.
+            </p>
+          </section>
+
           <section class="card">
             <p class="eyebrow">Cord pass-through</p>
-            <h2>Cord pass-through</h2>
+            <h2>Neatly route the power cable</h2>
             <p class="lede">An optional bore for a DC power jack or power cable.</p>
 
             <div class="var" id="cordHoleDiameter">
@@ -457,7 +610,7 @@
                 This is your 3D printer's usable bed size. Check the manufacturer's website to be sure. Pick the volume
                 that matches your machine. Any part that is too big for the bed is automatically split into chunks that
                 fit, so a large box still prints on a small printer. The chunks glue together using short lengths of 3D
-                printer filament as alignment pins.
+                printer filament as alignment pins. 
               </p>
               <a class="shot" href="help/print-plate.png"><img src="help/print-plate.png" alt="A box split into several bed-sized print chunks laid out on the print plate." /></a>
             </div>
@@ -486,6 +639,33 @@
             </div>
           </section>
 
+          <section class="card" id="handcutting">
+            <p class="eyebrow">Hand cutting</p>
+            <h2>No expensive tools needed</h2>
+            <p class="lede">No laser cutter or 3D printer needed: print the dimensioned drawing at 1:1 and cut the panels from sheet material by hand.</p>
+            <a class="shot" href="help/nukit-filterboxbuilder-hand-cut.png"><img src="help/nukit-filterboxbuilder-hand-cut.png" alt="A hand-cut Nukit FilterBoxBuilder air purifier built from sheet material, showing the panels cut by hand and assembled into the filter box." /></a>
+            <p>
+              Hand cut mode gives you a plain, fully dimensioned drawing instead of a finger-jointed laser sheet. Cut each
+              panel from a rigid, lightweight sheet such as <a href="https://en.wikipedia.org/wiki/Foamcore" target="_blank" rel="noopener">foamcore</a>,
+              <a href="https://en.wikipedia.org/wiki/Corrugated_plastic" target="_blank" rel="noopener">corrugated plastic</a>, or
+              similar. A sharp craft knife or box cutter and a straightedge are all you need: score and snap, or make a few passes for
+              thicker board. Using a <a href="https://www.amazon.com/circle-cutter/s?k=circle+cutter" target="_blank" rel="noopener">circle cutting tool</a> can make for a neater appearance.
+            </p>
+            <p>
+              There are no tabs or slots to interlock, so the box is held together with tape along the seams. Stand the
+              panels up into a box, run tape down each outside edge, and reinforce the inside corners. Use a <a href="https://www.amazon.com/s?k=gorilla+tape" target="_blank" rel="noopener">strong,
+              permanent adhesive tape</a> for the box edges (a good cloth or packing tape, or aluminum tape) so the structure
+              stays rigid and reasonably airtight. Any gap that lets air sneak around the filters instead of through them
+              lowers clean-air delivery.
+            </p>
+            <p>
+              Hold each filter against its opening and tape around the edges to seal it to the box. For the filters,
+              prefer <a href="https://www.amazon.com/s?k=gaffer%27s+tape" target="_blank" rel="noopener">gaffer's tape</a>: it grips well but peels off cleanly without tearing the board or leaving residue, so
+              it is easy to remove when it is time to change the filters. Keep the high-strength tape for the box edges,
+              where you want a permanent bond, and the easy-release gaffer's tape on the parts you will open again.
+            </p>
+          </section>
+
           <section class="card" id="fabrication">
             <p class="eyebrow">Build it</p>
             <h2>Fabrication, gluing &amp; assembly</h2>
@@ -496,14 +676,14 @@
               <p><strong>Cutting</strong></p>
               <ul>
                 <li>Use flat, void-free plywood or cast acrylic. 3&nbsp;mm is ideal, because thinner stock may warp and fight the joints. There are purpose-made materials (laserply, MDF) made specifically for laser cutting that should be used whenever possible.</li>
-                <li>Measure the thickness with calipers and set the material thickness to the real value.</li>
+                <li>Measure the thickness with <a href="https://en.wikipedia.org/wiki/Calipers" target="_blank" rel="noopener">calipers</a> and set the material thickness to the real value.</li>
                 <li>Cut one test finger joint first. Tune the kerf / fit allowance until it taps together snugly without forcing.</li>
                 <li>Keep Engrave labels on for your first build. Sand off any scorch with a light pass of fine sandpaper.</li>
               </ul>
               <p><strong>Dry-fit, then glue</strong></p>
               <ul>
                 <li>Assemble the whole box without glue first, to confirm every joint and the filter slot work.</li>
-                <li>Glue plywood with wood PVA (such as Titebond), or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
+                <li>Glue plywood with wood PVA, or acrylic with acrylic cement. Apply a thin bead inside the slots, not on the faces.</li>
                 
                 <li>Square the box against a flat surface, and clamp or tape it lightly. Wipe off any squeeze-out before it cures.</li>
                 <li>If there is room, you can seal small gaps around the filter with self-adhesive foam weatherstrip. Then all the air passes through the media, not around it.</li>
@@ -535,16 +715,36 @@
             <div class="var">
               <h3>Mounting the fans</h3>
               <ul>
-                <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub or hold a small piece of tissue paper in front of the fan to see which way it it blowing</li>
+                <li>Position fans to pull air through the filter and exhaust out the fan openings. Check the arrow on the fan hub or hold a small piece of tissue paper in front of the fan to see which way it is blowing</li>
                 <li>Use the four fan-screw holes per fan. Self-tapping fan screws bite directly into the plastic body of the fan. Alternatively, you can use bolts, or pull-through rubber fasteners.</li>
                 <li>Wire PWM fans to a 12&nbsp;V supply or hub sized for the total current. Route the cable through the cord pass-through.</li>
                 <li>Add grills to any exposed fan if you did not include the optional honeycomb feature.</li>
-              </ul>            </div>
+              </ul>
+              <a class="shot" href="help/daisy_chained_fans.webp"><img src="help/daisy_chained_fans.webp" alt="PC fans daisy-chained together with their PWM cables, wired in series to a single 12 V supply." /></a>
+            </div>
+          </section>
+
+          <section class="card" id="community">
+            <p class="eyebrow">Community</p>
+            <h2>PC-fan air purifiers are a community innovation</h2>
+            <p>
+              No company invented the PC-fan filter box. It grew out of years of open experimentation, measurement, and
+              sharing by hobbyists and independent researchers who tried things, wrote down what worked, and gave it away
+              for everyone to build on. FilterBoxBuilder stands entirely on that collective work.
+            </p>
+            <p>
+              We are especially grateful to <a href="https://x.com/robwiss" target="_blank" rel="noopener">Rob Wissmann</a>,
+              <a href="https://x.com/VentiloAngel" target="_blank" rel="noopener">Nathalie Ventilation</a>,
+              <a href="https://medium.com/@rocky_36693" target="_blank" rel="noopener">Bob Korman</a>,
+              <a href="https://x.com/Vailima1" target="_blank" rel="noopener">Zack Deis</a>, and
+              <a href="https://medium.com/@joeyfox.85" target="_blank" rel="noopener">Joey Fox</a>, whose contributions helped
+              shape this remarkable technology and make it accessible to all.
+            </p>
           </section>
 
           <section class="card" id="license">
             <p class="eyebrow">License</p>
-            <h2>License: free to use, share, and adapt</h2>
+            <h2>Free to use, share, and adapt</h2>
             <p class="lede">
               The FilterBoxBuilder and everything it produces are released under a Creative Commons
               Attribution-ShareAlike 4.0 International license (CC BY-SA 4.0).
@@ -608,6 +808,10 @@
           The laser-cut box geometry is adapted from
           <a href="https://github.com/florianfesti/boxes" target="_blank" rel="noopener">Boxes.py</a>
           by Florian Festi.
+        </p>
+        <p>
+          The CADR, noise, and power estimates are calibrated against in-room measurements published by
+          <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a>.
         </p>
       </footer>
     </div>

@@ -34,7 +34,17 @@ type FilterFingerHoleRow = {
 };
 
 export function createAirPurifierCutSheet(settings: PurifierSettings): AirPurifierCutSheet {
-  const panels = layoutCutPanelsInColumn(createAirPurifierCutPanels(settings), boxesPartSpacing(settings));
+  // Hand-cut sheets carry full reference dimensions on every panel, drawn OUTSIDE
+  // the outline (engineering style), so each panel gets clear margins on the left
+  // (height dimension) and above (width dimension + hole callout).
+  const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
+  const gap = handCut ? 104 : boxesPartSpacing(settings);
+  const panels = layoutCutPanelsInColumn(
+    createAirPurifierCutPanels(settings),
+    gap,
+    handCut ? 112 : 0,
+    handCut ? 104 : 0,
+  );
   return {
     panels,
     document: cutPanelsToDocument(
@@ -42,6 +52,7 @@ export function createAirPurifierCutSheet(settings: PurifierSettings): AirPurifi
       settings.cutting.referenceScale,
       settings.cutting.labels,
       settings.cutting.kerfFit,
+      handCut,
     ),
   };
 }
@@ -57,15 +68,28 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const chamberHeight = geometry.chamberHeight;
   const filterCount = settings.filterCount;
   const usesSplitRails = settings.frameConstruction.type === "split-rails";
+  // Hand-cut (foamcore) mode: every joint is a plain taped butt edge (no fingers
+  // or dovetails), there are no inner/outer filter flanges or rails, and the box
+  // is sized snugly to the filter (depth handled in geometry). The filter is held
+  // by the box and tape, so the rail/flange panels and filter-tab slots are gone.
+  const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
+  const structuralEdges = (spec: string): RectPanelEdges =>
+    handCut ? edgeSectionsFor("e".repeat(spec.length)) : edgeSectionsFor(spec);
   // One-side "Back" fans: the closed back panel gets a fan grid (the rest of the
   // box is unchanged). 0 = off, -1 = auto fill, >0 = exact count.
   const backPlateFans = settings.design.type === "laser-cut" ? settings.design.backPlateFans : 0;
   // When the one-side Back box sets a Box depth, the chamber (and so the rear wall
   // that covers it) is that deep instead of the fan diameter.
-  const rearWallHeight = oneSideBackFanBoxDepth(settings) ?? fanDiameter;
+  // The laser rear fan wall only covers the fan band; the hand-cut box is a plain
+  // rectangular prism, so its rear (top) panel is the full box face like the sides
+  // and bottom.
+  const rearWallHeight = handCut ? chamberHeight : (oneSideBackFanBoxDepth(settings) ?? fanDiameter);
   const panels: CutPanelDraft[] = [];
   const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
-  const fanWallFilterRows = createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
+  // Hand cut has no filter rails poking through the walls, so no filter-tab slots.
+  const fanWallFilterRows = handCut
+    ? []
+    : createFilterFingerHoleRows(geometry.filterFingerHoleYs, edgeSections("f"), edgeSections("f"));
   // The side walls carry the front fan wall's joint as FingerHoleEdge ("h")
   // slots set in from their edge by edge_width + thickness/2. So the front fan
   // wall seats that far inside the side walls' front edges, its teeth passing
@@ -83,12 +107,15 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.top,
       fanCenterY: rearWallHeight / 2,
       settings,
+      edges: structuralEdges("ffff"),
       cordHole: cordCut("back"),
       assembly: {
         type: "placed",
         role: "rear-fan-wall",
         placement: {
-          position: [0, rearFanWallY, workingDepth / 2],
+          // Hand cut: sit the rear wall flush inside the side walls' depth (butt
+          // joint) instead of centred on the face, so it doesn't protrude above.
+          position: [0, rearFanWallY, handCut ? workingDepth / 2 - thickness / 2 : workingDepth / 2],
           rotation: [0, 0, 0],
         },
       },
@@ -104,13 +131,16 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       requestedFans: settings.fan.banks.bottom,
       fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight),
       settings,
+      edges: structuralEdges("ffff"),
       cuts: createFilterFingerHoleCuts(width, settings, fanWallFilterRows),
       cordHole: cordCut("front"),
       assembly: {
         type: "placed",
         role: "front-fan-wall",
         placement: {
-          position: [0, 0, -workingDepth / 2 + fingerHoleInset],
+          // Hand cut has no finger-hole lap offset: sit the front wall flush at the
+          // bottom (butt joint) so it isn't raised off the floor.
+          position: [0, 0, handCut ? -workingDepth / 2 + thickness / 2 : -workingDepth / 2 + fingerHoleInset],
           rotation: [0, 0, 0],
         },
       },
@@ -143,9 +173,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.left,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
+      edgeSpec: handCut ? edgeSectionsFor("eeee") : [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
-      filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
+      filterFingerHoleRows: handCut ? [] : createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       // This panel is DISPLAYED as "Right side wall" (the id keeps the geometric
       // -x sense), so the user's "right" cord selection belongs here.
       cordHole: cordCut("right"),
@@ -173,9 +203,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: workingDepth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.right,
-      edgeSpec: [bottomEdge, edgeSections("h"), topEdge, leftEdge],
+      edgeSpec: handCut ? edgeSectionsFor("eeee") : [bottomEdge, edgeSections("h"), topEdge, leftEdge],
       settings,
-      filterFingerHoleRows: createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
+      filterFingerHoleRows: handCut ? [] : createFilterFingerHoleRows(geometry.filterFingerHoleYs, bottomEdge, topEdge),
       // This panel is DISPLAYED as "Left side wall", so the user's "left" cord
       // selection belongs here.
       cordHole: cordCut("left"),
@@ -190,7 +220,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     }),
   );
 
-  if (usesSplitRails) {
+  if (handCut) {
+    // No filter flanges or rails in hand-cut mode.
+  } else if (usesSplitRails) {
     const longEdge = compound("DeD", [rim, width - 2 * rim, rim]);
     for (let filterIndex = 0; filterIndex < filterCount; filterIndex += 1) {
       const labelPrefix = filterCount === 1 ? "Filter frame" : `Filter ${filterIndex + 1}`;
@@ -321,7 +353,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         name: backPlateFans !== 0 ? "Back plate (fans)" : "Closed back panel",
         width,
         height: workingDepth,
-        edges: edgeSectionsFor("hhhh"),
+        edges: structuralEdges("hhhh"),
         thickness,
         kerfFit: settings.cutting.kerfFit,
         jointSettings: settings.cutting.joints,
@@ -405,7 +437,9 @@ function createBackPlateFanGrid(width: number, height: number, requested: number
 // and widening the rib by the same amount, so the cell pitch — and thus the cell
 // positions — stay put while the cut holes come out at nominal size.
 function fanGrillSpec(settings: PurifierSettings): GrillSpec | undefined {
-  if (settings.design.type !== "laser-cut" || !settings.design.hexGrill) {
+  // Hand cut has no honeycomb grill (you can't hand-cut a hex field in foamcore):
+  // the fan bore is a plain circle.
+  if (settings.design.type !== "laser-cut" || !settings.design.hexGrill || settings.design.cutStyle === "hand") {
     return undefined;
   }
   const kerfFit = settings.cutting.kerfFit;
@@ -505,6 +539,7 @@ function createFanWallPanel(input: {
   requestedFans: FanCountRequest;
   fanCenterY: number;
   settings: PurifierSettings;
+  edges?: RectPanelEdges;
   cuts?: CutFeature[];
   cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
@@ -515,7 +550,7 @@ function createFanWallPanel(input: {
     name: input.name,
     width: input.width,
     height: input.height,
-    edges: edgeSectionsFor("ffff"),
+    edges: input.edges ?? edgeSectionsFor("ffff"),
     thickness: input.settings.cutting.materialThickness,
     kerfFit: input.settings.cutting.kerfFit,
     jointSettings: input.settings.cutting.joints,

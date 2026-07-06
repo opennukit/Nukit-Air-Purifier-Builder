@@ -14,9 +14,18 @@ import {
 // Print Volume Model
 // #######################################
 
-export const exportFormats = ["print-3mf", "laser-svg"] as const;
+// "hand-svg" is the hand-cut (foamcore) mode: the same cut-sheet output family as
+// the laser, so it routes through the cut-sheet preview, but the panels are built
+// plain (taped, no finger joints / flanges) and the box depth follows the
+// fan + filter rule. Its cut style lives in the design settings (cutStyle).
+export const exportFormats = ["print-3mf", "laser-svg", "hand-svg"] as const;
 
 export type ExportFormat = (typeof exportFormats)[number];
+
+// The cut-sheet export formats (everything that is not 3D printing).
+export function isCutSheetExportFormat(format: ExportFormat): boolean {
+  return format === "laser-svg" || format === "hand-svg";
+}
 
 // ##############################
 // Print Volume Identifiers
@@ -319,7 +328,10 @@ function requiredPrintVolumePreset(id: PrintVolumePresetId): PrintVolumePreset {
 }
 
 export function readExportFormat(value: string | null): ExportFormat {
-  return value === "print-3mf" ? "print-3mf" : "laser-svg";
+  if (value === "print-3mf" || value === "hand-svg") {
+    return value;
+  }
+  return "laser-svg";
 }
 
 // #######################################

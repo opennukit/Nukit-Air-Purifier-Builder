@@ -145,10 +145,9 @@ export const fanPreviewFrontDepth = 0.018;
 export const fanPreviewRearDepth = 0.047;
 export const fanPreviewRearDepthMillimeters = fanPreviewRearDepth / sceneScale;
 export const previewFanWallInset = 0.8 * sceneScale;
-// How far a tower's top fans sit below the top fan-grid, so they rest down inside
-// the air chamber (the walls stop below the grid) instead of poking up level with
-// the top. Tune this single number to taste.
-export const previewTopFanGrillGap = 25 * sceneScale;
+// How far a tower's top fans sit below the underside of the top plate. 0 seats the
+// fans flush against it (as they mount in a real build); raise it to recess them.
+export const previewTopFanGrillGap = 0;
 export const filterMediaPreviewClearanceMillimeters = 3;
 export const filterMediaPreviewSurfaceGapMillimeters = 2;
 export const bananaReferenceLength = 180 * sceneScale;

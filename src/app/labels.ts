@@ -6,7 +6,10 @@ import type { PreviewMaterialColorPreset } from "@/domain/purifier/settingsModel
 import type { ExportFormat } from "@/fabrication/printing/printableKit";
 
 export function fabricationMethodLabel(method: ExportFormat): string {
-  return method === "print-3mf" ? "3D print" : "Laser cut";
+  if (method === "print-3mf") {
+    return "3D print";
+  }
+  return method === "hand-svg" ? "Hand cut" : "Laser cut";
 }
 
 export function previewMaterialColorLabel(color: PreviewMaterialColorPreset): string {

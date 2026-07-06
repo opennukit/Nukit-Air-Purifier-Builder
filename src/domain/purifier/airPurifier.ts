@@ -166,6 +166,26 @@ export function normalizeRawSettings(
     backPlateFans: normalizeBackFanCount(input.backPlateFans),
     boxDepth: normalizeBoxDepth(input.boxDepth),
     alignmentPinDiameter: normalizeAlignmentPinDiameter(input.alignmentPinDiameter),
+    bottomFilter: input.bottomFilter,
+    feetLength: normalizeFeetLength(input.feetLength),
+    // CADR fan model + custom specs: display-only, dropped by toRawSettings, so
+    // restore them from the original input (non-negative).
+    fanModel: input.fanModel,
+    customFanAirflow: nonNegative(input.customFanAirflow),
+    customFanPressure: nonNegative(input.customFanPressure),
+    customFanNoise: nonNegative(input.customFanNoise),
+    customFanCurrent: nonNegative(input.customFanCurrent),
+    customFanWatts: nonNegative(input.customFanWatts),
+    // Room sizing for ACH: display-only, restored from the raw input.
+    roomUnit: input.roomUnit === "m" ? "m" : "ft",
+    roomWidth: nonNegative(input.roomWidth),
+    roomLength: nonNegative(input.roomLength),
+    roomHeight: nonNegative(input.roomHeight),
+    // Baseline room ventilation (ACH) for the infection-risk estimate; display-only.
+    baselineAch: nonNegative(input.baselineAch),
+    // Electricity cost: display-only, restored from the raw input.
+    electricityPrice: nonNegative(input.electricityPrice),
+    currencySymbol: typeof input.currencySymbol === "string" && input.currencySymbol !== "" ? input.currencySymbol : "$",
     ...normalizeTempestExhaustFields(input),
     donutFilterOuterDiameter: donutFilter.outerDiameter,
     donutFilterLength: donutFilter.length,
@@ -203,6 +223,25 @@ export function createPurifierDraft(
     fan: {
       diameter: configuration.fan.spec.diameter,
       color: configuration.fan.color,
+      // CADR fan-model selection rides on the raw settings (display-only, not part
+      // of the resolved fan configuration).
+      model: raw.fanModel,
+      customAirflow: raw.customFanAirflow,
+      customPressure: raw.customFanPressure,
+      customNoise: raw.customFanNoise,
+      customCurrent: raw.customFanCurrent,
+      customWatts: raw.customFanWatts,
+    },
+    room: {
+      unit: raw.roomUnit === "m" ? "m" : "ft",
+      width: raw.roomWidth,
+      length: raw.roomLength,
+      height: raw.roomHeight,
+      baselineAch: raw.baselineAch,
+    },
+    cost: {
+      electricityPrice: raw.electricityPrice,
+      currencySymbol: raw.currencySymbol === "" ? "$" : raw.currencySymbol,
     },
     cutting: {
       materialThickness: configuration.cutting.materialThickness,
@@ -223,6 +262,19 @@ export function serializePurifierDraft(
     printDesign: printDesignIdForPurifierDraft(draft),
     fanColor: draft.fan.color,
     fanDiameter: draft.fan.diameter,
+    fanModel: draft.fan.model,
+    customFanAirflow: draft.fan.customAirflow,
+    customFanPressure: draft.fan.customPressure,
+    customFanNoise: draft.fan.customNoise,
+    customFanCurrent: draft.fan.customCurrent,
+    customFanWatts: draft.fan.customWatts,
+    roomUnit: draft.room.unit === "m" ? "m" : "ft",
+    roomWidth: draft.room.width,
+    roomLength: draft.room.length,
+    roomHeight: draft.room.height,
+    baselineAch: draft.room.baselineAch,
+    electricityPrice: draft.cost.electricityPrice,
+    currencySymbol: draft.cost.currencySymbol === "" ? "$" : draft.cost.currencySymbol,
     rim: draft.cutting.rim,
     screwHoleDiameter: draft.cutting.screwHoleDiameter,
     materialThickness: draft.cutting.materialThickness,
@@ -259,6 +311,7 @@ export function serializePurifierDraft(
       ...serializedFilterFields(draft.design.filter),
       filters: draft.design.filterCount,
       splitFrames: draft.design.frameConstruction.type === "split-rails",
+      cutStyle: draft.design.cutStyle,
       fansLeft: fanCountRequestToRawSetting(draft.design.fanBanks.left),
       fansRight: fanCountRequestToRawSetting(draft.design.fanBanks.right),
       fansTop: fanCountRequestToRawSetting(draft.design.fanBanks.top),
@@ -318,6 +371,8 @@ export function serializePurifierDraft(
       backPlateFans: draft.design.backPlateFans,
       boxDepth: draft.design.boxDepth,
       alignmentPinDiameter: draft.design.alignmentPinDiameter,
+      bottomFilter: draft.design.bottomFilter,
+      feetLength: draft.design.feetLength,
       ...copyTempestExhaustFields(draft.design),
       filters:
         draft.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
@@ -371,6 +426,20 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     fanDiameter: input.fan.spec.diameter,
     filters: input.filterCount,
     splitFrames: input.frameConstruction.type === "split-rails",
+    cutStyle: defaultSettings.cutStyle,
+    fanModel: defaultSettings.fanModel,
+    customFanAirflow: defaultSettings.customFanAirflow,
+    customFanPressure: defaultSettings.customFanPressure,
+    customFanNoise: defaultSettings.customFanNoise,
+    customFanCurrent: defaultSettings.customFanCurrent,
+    customFanWatts: defaultSettings.customFanWatts,
+    roomUnit: defaultSettings.roomUnit,
+    roomWidth: defaultSettings.roomWidth,
+    roomLength: defaultSettings.roomLength,
+    roomHeight: defaultSettings.roomHeight,
+    baselineAch: defaultSettings.baselineAch,
+    electricityPrice: defaultSettings.electricityPrice,
+    currencySymbol: defaultSettings.currencySymbol,
     fansLeft: fanCountRequestToRawSetting(input.fan.banks.left),
     fansRight: fanCountRequestToRawSetting(input.fan.banks.right),
     fansTop: fanCountRequestToRawSetting(input.fan.banks.top),
@@ -392,6 +461,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     backPlateFans: defaultSettings.backPlateFans,
     boxDepth: defaultSettings.boxDepth,
     alignmentPinDiameter: defaultSettings.alignmentPinDiameter,
+    bottomFilter: defaultSettings.bottomFilter,
+    feetLength: defaultSettings.feetLength,
     ...copyTempestExhaustFields(defaultSettings),
     donutFilterOuterDiameter: defaultSettings.donutFilterOuterDiameter,
     donutFilterLength: defaultSettings.donutFilterLength,
@@ -433,6 +504,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       ...base,
       filters: input.design.filterCount,
       splitFrames: input.design.frameConstruction.type === "split-rails",
+      cutStyle: input.design.cutStyle,
       fansLeft: fanCountRequestToRawSetting(input.design.fanBanks.left),
       fansRight: fanCountRequestToRawSetting(input.design.fanBanks.right),
       fansTop: fanCountRequestToRawSetting(input.design.fanBanks.top),
@@ -489,6 +561,8 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
       hexSize: input.design.hexSize,
       hexSpacing: input.design.hexSpacing,
       hexFullCellsOnly: input.design.hexFullCellsOnly,
+      bottomFilter: input.design.bottomFilter,
+      feetLength: input.design.feetLength,
       ...copyTempestExhaustFields(input.design),
       filters:
         input.design.arrangement === "single-horizontal-top-filter" ? 1 : 2,
@@ -537,6 +611,7 @@ function createConfiguredPrintDesign(input: {
       filterCount: input.filterCount,
       fanBanks: input.fan.banks,
       frameConstruction: input.frameConstruction,
+      cutStyle: input.raw.cutStyle,
       cordHoleDiameter: normalizeCordHoleDiameter(input.raw.cordHoleDiameter),
       cordHoleWall: input.raw.cordHoleWall,
       cordHoleSide: input.raw.cordHoleSide,
@@ -585,6 +660,8 @@ function createConfiguredPrintDesign(input: {
       backPlateFans: normalizeBackFanCount(input.raw.backPlateFans),
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
       alignmentPinDiameter: normalizeAlignmentPinDiameter(input.raw.alignmentPinDiameter),
+      bottomFilter: input.raw.bottomFilter,
+      feetLength: normalizeFeetLength(input.raw.feetLength),
       ...normalizeTempestExhaustFields(input.raw),
     };
   }
@@ -660,6 +737,7 @@ function createPurifierDesignDraft(
       filterCount: configuration.design.filterCount,
       fanBanks: configuration.design.fanBanks,
       frameConstruction: configuration.design.frameConstruction,
+      cutStyle: configuration.design.cutStyle,
       cordHoleDiameter: configuration.design.cordHoleDiameter,
       cordHoleWall: configuration.design.cordHoleWall,
       cordHoleSide: configuration.design.cordHoleSide,
@@ -707,6 +785,8 @@ function createPurifierDesignDraft(
       backPlateFans: configuration.design.backPlateFans,
       boxDepth: configuration.design.boxDepth,
       alignmentPinDiameter: configuration.design.alignmentPinDiameter,
+      bottomFilter: configuration.design.bottomFilter,
+      feetLength: configuration.design.feetLength,
       ...copyTempestExhaustFields(configuration.design),
     };
   }
@@ -867,6 +947,20 @@ function normalizeAlignmentPinDiameter(value: Millimeters): Millimeters {
     return defaultSettings.alignmentPinDiameter;
   }
   return clamp(value, 0, 2.5);
+}
+
+// Tower foot length, in mm. 0 disables the feet; a non-finite or negative value
+// falls back to none. Clamped to a generous ceiling so the box stays printable.
+function normalizeFeetLength(value: Millimeters): Millimeters {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return clamp(value, 0, 500);
+}
+
+// Non-negative finite number (0 for blanks / negatives) — for the custom fan specs.
+function nonNegative(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 // The "Back" fan count: -1 = automatic, 0 = none, N = that many. Any other value

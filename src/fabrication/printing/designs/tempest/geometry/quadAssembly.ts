@@ -14,8 +14,12 @@ import {
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, CSG_SEGMENTS, EPSILON_LIP } from "./context";
 import {
+  chamferedOpeningCutAlongZ,
   cuboidFromMinSize,
   cylinderAlong,
+  edgeChamferSolid,
+  rectangle2d,
+  subtractAll,
   thinExtrude,
   unionAll,
 } from "./primitives";
@@ -264,4 +268,175 @@ export function towerFilterSlots<Solid, Region>(
     const rect = filterLayout.wallRects[wall];
     return cuboidFromMinSize(ctx, rect.xMin, rect.yMin, z, rect.xMax - rect.xMin, rect.yMax - rect.yMin, height);
   });
+}
+
+// #######################################
+// Box Feet
+// #######################################
+
+// Four corner legs that lift the body by `feetLength`. Built by extruding the
+// octagonal footprint down for the feet height and carving away a cross-shaped
+// void (a central x-band and y-band), which leaves exactly the four corner posts.
+// Each leg's in-plane size is one structural offset — the solid corner column the
+// air chamber and filter pockets never reach — so a leg always sits under solid
+// material. The footprint's corner bevel carries through to the legs, and the
+// shared top/bottom edge chamfer matches the rest of the box.
+export function towerFeet<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  footprint: Region,
+): Solid[] {
+  const feetLength = filterLayout.feetLength;
+  if (feetLength <= 0) {
+    return [];
+  }
+  const legSize = filterLayout.structuralOffset;
+  const width = model.box.width;
+  const depth = model.box.depth;
+  // Overlap into the body so the union welds without a coincident-face seam. The
+  // leg's TOP edge meets the body, so it stays square (no bevel); only the foot's
+  // bottom edge — a real exterior edge — carries the usual chamfer.
+  const slabHeight = feetLength + EPSILON_LIP;
+  const slab = edgeChamferSolid(ctx, footprint, slabHeight, model.frame.chamferSize, { bottom: true, top: false });
+  const carveX = cuboidFromMinSize(
+    ctx,
+    legSize,
+    -EPSILON_LIP,
+    -EPSILON_LIP,
+    width - 2 * legSize,
+    depth + 2 * EPSILON_LIP,
+    slabHeight + 2 * EPSILON_LIP,
+  );
+  const carveY = cuboidFromMinSize(
+    ctx,
+    -EPSILON_LIP,
+    legSize,
+    -EPSILON_LIP,
+    width + 2 * EPSILON_LIP,
+    depth - 2 * legSize,
+    slabHeight + 2 * EPSILON_LIP,
+  );
+  return [subtractAll(ctx, slab, [carveX, carveY])];
+}
+
+// #######################################
+// Bottom Intake Filter
+// #######################################
+
+// The fifth (bottom) filter holder, carved into the body's bottom stack which the
+// model has already grown by an outer flange + filter pocket beneath the bottom
+// (grid) plate. Cuts, bottom to top:
+//   1. A rimmed intake opening through the outer flange (air enters from below).
+//   2. The filter pocket the square filter sits in.
+//   3. A rimmed OUTLET opening through the bottom plate into the air chamber — an
+//      open frame, exactly like the side filters' chamber-side opening (NOT a fan
+//      grille; the only grille in the box is the top exhaust). Looking up through
+//      the open bottom you see straight to the underside of the top fan plate.
+//   4. A loading slot through the chosen wall so the filter can slide in.
+export function quadBottomFilterCuts<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+): Solid[] {
+  if (!filterLayout.bottomFilter) {
+    return [];
+  }
+  const { transforms } = ctx.modeling;
+  const filter = filterLayout.filter;
+  const frame = model.frame;
+  const width = model.box.width;
+  const depth = model.box.depth;
+  const centerX = width / 2;
+  const centerY = depth / 2;
+  const outsideFlange = frame.outsideFlangeThickness;
+  const pocketDepth = filter.thickness + frame.filterFitClearance;
+  const flangeZ0 = filterLayout.feetLength; // body bottom / outer flange outer face
+  const pocketZ0 = flangeZ0 + outsideFlange;
+  const gridZ0 = pocketZ0 + pocketDepth; // bottom plate underside = chamber floor - wallThickness
+  const cuts: Solid[] = [];
+
+  // 1. Rimmed intake opening through the outer flange (flares on the outer face).
+  const openSize = filter.faceWidth - 2 * frame.rim;
+  if (openSize > 0) {
+    cuts.push(
+      transforms.translate(
+        [0, 0, flangeZ0],
+        chamferedOpeningCutAlongZ(
+          ctx,
+          rectangle2d(ctx, centerX - openSize / 2, centerY - openSize / 2, openSize, openSize),
+          outsideFlange,
+          frame.chamferSize,
+        ),
+      ),
+    );
+  }
+
+  // 2. The filter pocket (one slide-in clearance per side, like the side pockets).
+  const pocketSize = filter.faceWidth + 2 * frame.filterFitClearance;
+  cuts.push(
+    cuboidFromMinSize(
+      ctx,
+      centerX - pocketSize / 2,
+      centerY - pocketSize / 2,
+      pocketZ0,
+      pocketSize,
+      pocketSize,
+      pocketDepth + EPSILON_LIP,
+    ),
+  );
+
+  // 3. Rimmed outlet opening through the bottom plate into the air chamber — an
+  //    open frame mirroring the side filters' chamber-side opening, beveled on both
+  //    faces. No grille: the bottom is open, so air passes straight through.
+  if (openSize > 0) {
+    cuts.push(
+      transforms.translate(
+        [0, 0, gridZ0],
+        chamferedOpeningCutAlongZ(
+          ctx,
+          rectangle2d(ctx, centerX - openSize / 2, centerY - openSize / 2, openSize, openSize),
+          frame.wallThickness,
+          frame.chamferSize,
+        ),
+      ),
+    );
+  }
+
+  // 4. Loading slot through one wall at the pocket's height, so the square filter
+  //    slides into the pocket (the tower loads the bottom filter from the same
+  //    wall as the side filters).
+  const slot = bottomFilterLoadSlot(ctx, model.settings.filterSlot.wall, width, depth, pocketSize, pocketZ0, pocketDepth);
+  cuts.push(slot);
+
+  return cuts;
+}
+
+// A horizontal slot from the pocket edge out through the loading wall, sized to
+// the pocket's in-plane span and the filter pocket depth.
+function bottomFilterLoadSlot<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  wall: TempestWall,
+  width: number,
+  depth: number,
+  pocketSize: number,
+  pocketZ0: number,
+  pocketDepth: number,
+): Solid {
+  const centerX = width / 2;
+  const centerY = depth / 2;
+  const lo = (center: number): number => center - pocketSize / 2;
+  const height = pocketDepth + EPSILON_LIP;
+  if (wall === "front") {
+    return cuboidFromMinSize(ctx, lo(centerX), -EPSILON_LIP, pocketZ0, pocketSize, centerY + pocketSize / 2 + EPSILON_LIP, height);
+  }
+  if (wall === "back") {
+    const yStart = centerY - pocketSize / 2;
+    return cuboidFromMinSize(ctx, lo(centerX), yStart, pocketZ0, pocketSize, depth - yStart + EPSILON_LIP, height);
+  }
+  if (wall === "left") {
+    return cuboidFromMinSize(ctx, -EPSILON_LIP, lo(centerY), pocketZ0, centerX + pocketSize / 2 + EPSILON_LIP, pocketSize, height);
+  }
+  const xStart = centerX - pocketSize / 2;
+  return cuboidFromMinSize(ctx, xStart, lo(centerY), pocketZ0, width - xStart + EPSILON_LIP, pocketSize, height);
 }

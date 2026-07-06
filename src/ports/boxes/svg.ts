@@ -44,7 +44,13 @@ ${layerShapes.map(renderShape).join("\n")}
 
 function renderShape(shape: Shape): string {
   if (shape.type === "path") {
-    return `    <path class="${shapeClass(shape.color)}" d="${renderPathData(shape.points, shape.closed)}" />`;
+    // Annotation paths (dimension/extension lines, arrowheads, leaders) must be
+    // stroked, not filled — the .annotation class fills (it is shared with text).
+    const annotationStroke =
+      shape.color === "annotation"
+        ? ' style="fill:none;stroke:#c32121;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round"'
+        : "";
+    return `    <path class="${shapeClass(shape.color)}"${annotationStroke} d="${renderPathData(shape.points, shape.closed)}" />`;
   }
   if (shape.type === "circle") {
     return `    <circle class="${shapeClass(shape.color)}" cx="${roundForSvg(shape.cx)}" cy="${roundForSvg(

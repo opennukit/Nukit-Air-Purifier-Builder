@@ -24,12 +24,10 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
       : { holeDepth: 10, spacing: 30 };
   return {
     ...defaultTempestSettings,
-    // PARKED: force the chunk-label deboss off in the app regardless of any saved
-    // value (it shipped default-on, so existing sessions have chunkLabels=true in
-    // their URL/draft and the control is now hidden). Restore `design.chunkLabels`
-    // when the feature is brought back. The deboss code itself still runs in tests
-    // that build TempestSettings with chunkLabels:true directly.
-    chunkLabels: false,
+    // v3: chunk-label deboss is being reworked. The setting flows through again so
+    // the (now visible) control toggles it; reworked placement puts one code per
+    // seam on the interior face beside it with an up-arrow.
+    chunkLabels: design.chunkLabels,
     // Alignment-pin hole size comes from the design setting: 0 disables the pins,
     // any positive diameter keeps the default hole depth and spacing.
     alignmentPins:
@@ -152,6 +150,9 @@ function tempestArrangementFromConfiguration(configuration: PurifierSettings): T
   const filter = design.filter;
   if (design.arrangement === "four-side-filter-tower") {
     const uprightFace = uprightTowerFilterFace(filter);
+    // The bottom filter is only offered for square filters (its footprint is the
+    // filter face laid flat, so width and height must match).
+    const bottomFilter = design.bottomFilter && isSquareTowerFace(uprightFace);
     return {
       type: "four-side-filter-tower",
       filter: {
@@ -159,6 +160,11 @@ function tempestArrangementFromConfiguration(configuration: PurifierSettings): T
         faceHeight: uprightFace.height,
         thickness: filter.thickness,
       },
+      bottomFilter,
+      // Feet are an independent four-side-tower control (the UI defaults them to
+      // 100 mm when the bottom filter is switched on, 0 otherwise), so the foot
+      // length flows straight through.
+      feetLength: design.feetLength,
     };
   }
   return {
@@ -181,6 +187,12 @@ function uprightTowerFilterFace(filter: FilterDimensions): { readonly width: num
     width: filter.width,
     height: filter.depth,
   };
+}
+
+// A tower face is "square" (so the bottom filter footprint fits) when its width
+// and height are within 1 mm of each other.
+function isSquareTowerFace(face: { readonly width: number; readonly height: number }): boolean {
+  return Math.abs(face.width - face.height) <= 1;
 }
 
 function tempestFanCountRequestFromPurifierRequest(request: PurifierFanCountRequest): TempestFanCountRequest {

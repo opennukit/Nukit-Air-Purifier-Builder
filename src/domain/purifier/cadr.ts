@@ -1,0 +1,451 @@
+// #######################################
+// CADR / Noise / Power Estimation
+// #######################################
+//
+// A direct TypeScript port of the standalone diy-cadr-calculator physics, used to
+// estimate the performance of the box the user is configuring. Two paths:
+//   - PC-fan builds (120/140 mm fans): a fan-curve x filter-resistance intersection
+//     solved by bisection (estimatePcCadr).
+//   - Box/Exhaust builds (20" box fan): an empirical cube model (estimateBoxCadr).
+// Trademark rule from the source: the box-fan build is a "filter cube"; never the
+// other name. Numbers are estimates (brand/leakage/assembly dependent).
+
+// ##############################
+// Units / constants
+// ##############################
+
+const CFM_PER_M3H = 0.588578;
+const M3H_PER_CFM = 1.699011;
+const MMH2O_PER_INH2O = 25.4;
+const MM_PER_IN = 25.4;
+const PA_PER_INH2O = 249.0889;
+const VOLTAGE_PC = 12;
+const VOLTAGE_MAINS = 120;
+
+// MERV-13 (3M MPR-1900) filter resistance: dP[inH2O] = A*V^2 + B*V (V = FPM).
+const FILTER = { A: 4.7302e-7, B: 3.3752e-4 };
+
+// MERV-13 particle-size efficiency (published @ ~2.5 m/s); weighted average is the
+// single-pass efficiency used for the low-velocity PC case.
+const PSE = { fine: 0.62, mid: 0.87, coarse: 0.95 };
+const MERV13_EFF = (PSE.fine + PSE.mid + PSE.coarse) / 3;
+const MERV13_BREAKDOWN: readonly { readonly label: string; readonly value: number }[] = [
+  { label: "0.3–1 µm", value: PSE.fine },
+  { label: "1–3 µm", value: PSE.mid },
+  { label: "3–10 µm", value: PSE.coarse },
+];
+
+const FPM_TO_MS = 0.00508; // 1 ft/min = 0.3048 m / 60 s
+
+// Normalised fan PQ-curve shapes [p/Pmax, q/Qmax], scaled to each fan's Q0/P0.
+const FAN_SHAPE: Record<"120" | "140", readonly (readonly [number, number])[]> = {
+  "120": [[0.0, 1.0], [0.0455, 0.9626], [0.0909, 0.922], [0.1364, 0.8869], [0.1818, 0.8505], [0.2273, 0.7916], [0.2727, 0.7416], [0.3182, 0.7024], [0.3636, 0.6658], [0.4091, 0.6164], [0.4545, 0.5916], [0.5, 0.5447], [0.5455, 0.5066], [0.5909, 0.4619], [0.6364, 0.4082], [0.6818, 0.3697], [0.7273, 0.3651], [0.7727, 0.3606], [0.8182, 0.3317], [0.8636, 0.2887], [0.9091, 0.2449], [0.9545, 0.2236], [1.0, 0.0]],
+  "140": [[0.0, 1.0], [0.0417, 0.988], [0.0833, 0.9625], [0.125, 0.9352], [0.1667, 0.8893], [0.2083, 0.8516], [0.25, 0.8046], [0.2917, 0.7808], [0.3333, 0.7495], [0.375, 0.6986], [0.4167, 0.659], [0.4583, 0.6391], [0.5, 0.5854], [0.5417, 0.5467], [0.5833, 0.505], [0.625, 0.4702], [0.6667, 0.4304], [0.7083, 0.4281], [0.75, 0.4091], [0.7917, 0.4066], [0.8333, 0.3942], [0.875, 0.3708], [0.9167, 0.3428], [0.9583, 0.2141], [1.0, 0.0]],
+};
+
+// Noise calibration (HouseFresh in-room measurements). Arctic specs are offset AND
+// compressed (linear fit); other brands read ~spec + enclosure offset. Reported @ 1 m.
+const ENCLOSURE_OFFSET = 3.4;
+const DIST_3FT_TO_1M = 20 * Math.log10(0.9144 / 1.0); // ≈ -0.78 dB
+const ARCTIC_SLOPE = 0.461;
+const ARCTIC_INTERCEPT = 26.4;
+const SHROUD_PENALTY = 0.92; // ~8% airflow loss without the cardboard shroud
+const DEFAULT_BUILD_EFFICIENCY = 0.85; // leakage / fan guards / fan interaction (PC mode)
+
+// ##############################
+// Fan databases
+// ##############################
+
+export type FanGroup = "120" | "140";
+
+export type PcFanModel = {
+  readonly id: string;
+  readonly name: string;
+  readonly group: FanGroup;
+  readonly q0: number; // free-air airflow, m³/h
+  readonly p0: number; // static pressure, mmH₂O
+  readonly db: number; // spec noise, dBA
+  readonly a: number; // current draw, A @ 12 V
+  readonly arctic: boolean; // uses the Arctic spec-scale noise calibration
+};
+
+const pc = (id: string, name: string, group: FanGroup, q0: number, p0: number, db: number, a: number): PcFanModel => ({
+  id,
+  name,
+  group,
+  q0,
+  p0,
+  db,
+  a,
+  arctic: /^arctic/i.test(name),
+});
+
+export const PC_FAN_MODELS: readonly PcFanModel[] = [
+  pc("arctic-p12-pwm-pst", "ARCTIC P12 PWM PST", "120", 95.7, 2.2, 16.5, 0.08),
+  pc("arctic-p12-max", "ARCTIC P12 Max", "120", 137.7, 2.2, 22.5, 0.29),
+  pc("noctua-nf-a12x25-pwm", "Noctua NF-A12x25 PWM", "120", 102.1, 2.34, 22.6, 0.14),
+  pc("noctua-nf-a12x25-g2", "Noctua NF-A12x25 G2", "120", 107.3, 2.79, 29.8, 0.15),
+  pc("bequiet-silent-wings-4-hs-120", "be quiet! Silent Wings 4 High Speed", "120", 130.3, 2.36, 31.2, 0.22),
+  pc("cm-sickleflow-120", "Cooler Master SickleFlow 120", "120", 105.3, 2.5, 27.0, 0.27),
+  pc("cm-masterfan-sf120m", "Cooler Master MasterFan SF120M (High)", "120", 105.3, 2.4, 22.0, 0.12),
+  pc("cm-masterfan-mf120-halo2", "Cooler Master MasterFan MF120 HALO²", "120", 88.1, 2.89, 27.0, 0.14),
+  pc("cm-sickleflow-edge-120", "Cooler Master SickleFlow Edge 120", "120", 120.1, 3.61, 27.2, 0.2),
+  pc("cm-mobius-120", "Cooler Master Mobius 120", "120", 122.3, 2.69, 22.6, 0.12),
+  pc("cm-mobius-120-oc", "Cooler Master Mobius 120 OC (Med)", "120", 127.4, 2.76, 31.1, 0.2),
+  pc("cm-mobius-120p-argb", "Cooler Master Mobius 120P ARGB 30th", "120", 127.8, 3.63, 30.0, 0.18),
+  pc("cm-mobius-120-slim", "Cooler Master Mobius 120 Slim", "120", 91.2, 2.53, 31.4, 0.2),
+  pc("arctic-p14-pwm-pst", "ARCTIC P14 PWM PST", "140", 123.7, 2.4, 16.5, 0.12),
+  pc("arctic-p14-max", "ARCTIC P14 Max", "140", 161.4, 2.5, 30.6, 0.35),
+  pc("noctua-nf-a14x25-g2", "Noctua NF-A14x25 G2", "140", 155.6, 2.56, 32.4, 0.19),
+  pc("bequiet-silent-wings-4-hs-140", "be quiet! Silent Wings 4 High Speed", "140", 133.2, 2.36, 29.3, 0.4),
+  pc("nzxt-f140p", "NZXT F140P", "140", 158.4, 4.45, 30.0, 0.23),
+  pc("corsair-rs140-max", "Corsair RS140 MAX", "140", 176.7, 3.0, 31.0, 0.35),
+  pc("cm-masterfan-mf140-halo2", "Cooler Master MasterFan MF140 HALO²", "140", 101.1, 2.53, 27.0, 0.13),
+  pc("cm-sickleflow-140-argb", "Cooler Master SickleFlow 140 ARGB", "140", 113.9, 2.2, 27.0, 0.2),
+];
+
+export const DEFAULT_PC_FAN_ID: Record<FanGroup, string> = {
+  "120": "arctic-p12-pwm-pst",
+  "140": "arctic-p14-pwm-pst",
+};
+
+export type BoxFanModel = {
+  readonly id: string;
+  readonly name: string;
+  readonly cfm1: readonly [number, number, number]; // 4× 20×20×1 cube airflow [low,med,high]
+  readonly cfm2: readonly [number, number, number]; // 4× 20×20×2 cube airflow
+  readonly shroud: readonly [number, number, number]; // no-filter airflow cap
+  readonly noise: readonly [number, number, number]; // dBA, whole unit @ ~3 ft
+  readonly watts: readonly [number, number, number];
+  readonly noiseSrc: string;
+};
+
+export const BOX_FAN_MODELS: readonly BoxFanModel[] = [
+  { id: "lasko-b20200", name: "Lasko B20200 / B20201 (Classic 20\")", cfm1: [264, 391, 518], cfm2: [335, 506, 676], shroud: [503, 683, 863], noise: [49, 55, 60], watts: [50, 70, 89], noiseSrc: "est." },
+  { id: "lasko-3723", name: "Lasko 3723 (Premium, Wind Ring)", cfm1: [358, 487, 616], cfm2: [448, 593, 737], shroud: [622, 771, 920], noise: [49, 55, 60], watts: [38, 58, 78], noiseSrc: "est." },
+  { id: "air-king-9723", name: "Air King 9723 / 4CH71G", cfm1: [395, 480, 564], cfm2: [560, 645, 730], shroud: [712, 836, 959], noise: [55.8, 59, 62.2], watts: [87, 117, 165], noiseSrc: "NIOSH" },
+  { id: "hurricane-hgc736501", name: "Hurricane HGC736501 (Classic)", cfm1: [314, 388, 462], cfm2: [412, 483, 553], shroud: [478, 564, 650], noise: [49, 55.1, 60.7], watts: [40.5, 44.5, 46.7], noiseSrc: "HouseFresh" },
+];
+
+export const DEFAULT_BOX_FAN_ID = "lasko-b20200";
+// The default box fan only fits over a filter at least this wide (a 20" face).
+export const BOX_FAN_MIN_FILTER_WIDTH_MM = 485;
+
+export const CUSTOM_FAN_ID = "custom";
+
+export function pcFanModelsForGroup(group: FanGroup): readonly PcFanModel[] {
+  return PC_FAN_MODELS.filter((model) => model.group === group);
+}
+
+export function findPcFanModel(id: string): PcFanModel | undefined {
+  return PC_FAN_MODELS.find((model) => model.id === id);
+}
+
+export function findBoxFanModel(id: string): BoxFanModel | undefined {
+  return BOX_FAN_MODELS.find((model) => model.id === id);
+}
+
+// ##############################
+// Filter / fan physics
+// ##############################
+
+type FilterDims = { readonly w: number; readonly l: number; readonly t: number };
+
+// Effective MERV-13 furnace media area (ft²) from outer dimensions (mm). Deeper
+// media pleats more, so resistance eases up to a 1.8× depth factor.
+function effAreaFt2(f: FilterDims): number {
+  const wIn = f.w / MM_PER_IN;
+  const lIn = f.l / MM_PER_IN;
+  const a = (Math.max(0, wIn - 2.3) * Math.max(0, lIn - 1.15)) / 144;
+  const depthFactor = Math.min(1.8, f.t / 19);
+  return a * depthFactor;
+}
+
+function faceVelFPM(dpIn: number, res = 1): number {
+  const { A, B } = FILTER;
+  const x = dpIn / res;
+  if (x <= 0) {
+    return 0;
+  }
+  return (-B + Math.sqrt(B * B + 4 * A * x)) / (2 * A);
+}
+
+function filterCFM(dpIn: number, totalAreaFt2: number, res = 1): number {
+  return faceVelFPM(dpIn, res) * totalAreaFt2;
+}
+
+function fanCFMperFan(dpIn: number, q0cfm: number, p0mm: number, shape: readonly (readonly [number, number])[]): number {
+  const pn = (dpIn * MMH2O_PER_INH2O) / p0mm;
+  if (pn >= 1) {
+    return 0;
+  }
+  if (pn <= 0) {
+    return q0cfm;
+  }
+  for (let i = 0; i < shape.length - 1; i += 1) {
+    const [p1, q1] = shape[i];
+    const [p2, q2] = shape[i + 1];
+    if (pn >= p1 && pn <= p2) {
+      const f = (pn - p1) / (p2 - p1);
+      return (q1 + f * (q2 - q1)) * q0cfm;
+    }
+  }
+  return 0;
+}
+
+// Honeycomb fan grill, a flow restriction in series with each fan. openFraction is
+// the open-area ratio of the bore; boreAreaFt2 is one fan's opening area. The data
+// behind the fan/CADR model was gathered with NO grill, so this is added on top.
+export type GrillLoss = {
+  readonly openFraction: number;
+  readonly boreAreaFt2: number;
+};
+
+// Pressure drop (inH2O) across the grill for one fan's flow. Idel'chik thin
+// perforated-plate loss referenced to the bore approach velocity — the most
+// conservative case (a real, thick printed grill flows easier, so this never
+// over-states CADR). Velocity pressure: VP[inH2O] = (V_fpm / 4005)^2.
+function grillPressureDropInH2O(qPerFanCfm: number, grill: GrillLoss): number {
+  const beta = Math.min(0.98, Math.max(0.05, grill.openFraction));
+  if (!(qPerFanCfm > 0) || !(grill.boreAreaFt2 > 0)) {
+    return 0;
+  }
+  const vBoreFpm = qPerFanCfm / grill.boreAreaFt2;
+  const oneMinusBeta = 1 - beta;
+  const k = Math.pow(0.707 * Math.pow(oneMinusBeta, 0.375) + oneMinusBeta, 2) / (beta * beta);
+  return k * Math.pow(vBoreFpm / 4005, 2);
+}
+
+type SolveParams = {
+  readonly q0cfm: number;
+  readonly p0mm: number;
+  readonly shape: readonly (readonly [number, number])[];
+  readonly nFans: number;
+  readonly totalAreaFt2: number;
+  readonly res: number;
+  readonly grill?: GrillLoss;
+};
+
+// Operating point: the ΔP where N·fan(Q) = filter(Q), found by bisection. With a
+// grill the fan must overcome the filter ΔP plus the per-fan grill ΔP, so the fan
+// is evaluated at the higher pressure while the filter still sees only its own ΔP.
+function solve(params: SolveParams): { dpIn: number; cfm: number } {
+  const { q0cfm, p0mm, shape, nFans, totalAreaFt2, res, grill } = params;
+  const diff = (dp: number): number => {
+    const totalFlow = filterCFM(dp, totalAreaFt2, res);
+    const fanPressure = grill === undefined ? dp : dp + grillPressureDropInH2O(totalFlow / nFans, grill);
+    return nFans * fanCFMperFan(fanPressure, q0cfm, p0mm, shape) - totalFlow;
+  };
+  let lo = 1e-9;
+  let hi = p0mm / MMH2O_PER_INH2O;
+  if (diff(lo) <= 0) {
+    return { dpIn: 0, cfm: 0 };
+  }
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (diff(mid) > 0) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  const dpIn = (lo + hi) / 2;
+  return { dpIn, cfm: filterCFM(dpIn, totalAreaFt2, res) };
+}
+
+function realPerFanSPL(spec: number, isArctic: boolean): number {
+  return isArctic ? ARCTIC_SLOPE * spec + ARCTIC_INTERCEPT : spec + ENCLOSURE_OFFSET;
+}
+
+// ##############################
+// Filter-cube (box fan) model
+// ##############################
+
+// Reference 4-filter cubes the box-fan power-law is fit through.
+const CUBE_REF_1IN: FilterDims = { w: 501, l: 501, t: 19 };
+const CUBE_REF_2IN: FilterDims = { w: 495, l: 495, t: 44 };
+
+function cubeEff(f: FilterDims): number {
+  return f.t >= 30 ? 0.5 : 0.43;
+}
+
+function cubeArea(f: FilterDims, n: number): number {
+  return effAreaFt2(f) * n; // MERV-13 res = 1
+}
+
+function cubeAirflow(fan: BoxFanModel, speed: number, area: number, shroud: boolean): number {
+  const a1 = cubeArea(CUBE_REF_1IN, 4);
+  const a2 = cubeArea(CUBE_REF_2IN, 4);
+  const q1 = fan.cfm1[speed];
+  const q2 = fan.cfm2[speed];
+  const power = Math.log(q2 / q1) / Math.log(a2 / a1);
+  const c = q1 / Math.pow(a1, power);
+  let q = c * Math.pow(area, power);
+  q = Math.min(q, fan.shroud[speed]);
+  return q * (shroud ? 1 : SHROUD_PENALTY);
+}
+
+// ##############################
+// Public estimation API
+// ##############################
+
+export type CadrEstimate = {
+  readonly cadrCfm: number;
+  readonly cadrM3h: number;
+  readonly flowM3h: number;
+  readonly fanCount: number;
+  // null when there are no fans / no figure available (e.g. custom fan with no noise).
+  readonly noiseDbA: number | null;
+  readonly currentA: number | null;
+  readonly powerW: number | null;
+  readonly voltage: number;
+  // Air changes per hour for the configured room (null when there's no airflow or
+  // no valid room), and a short room-size label (e.g. "12 × 12 × 8 ft") for display.
+  readonly ach: number | null;
+  readonly roomLabel: string;
+  // The resolved fan-model id used for the estimate (a PC id, a box-fan id, or
+  // "custom"). Lets the preview decide whether to show the box-fan 3D model.
+  readonly fanModelId: string;
+  // Operating-point detail for the Performance view.
+  readonly faceVelocityMs: number; // air speed across the filter media, m/s
+  readonly pressureDropPa: number; // system pressure drop at the operating point, Pa
+  readonly filterEfficiency: number; // single-figure filter efficiency, 0-1
+  readonly efficiencyBreakdown: readonly { readonly label: string; readonly value: number }[];
+  readonly noiseRawDbA: number | null; // raw spec sum before real-world calibration
+};
+
+const EMPTY_PC: Omit<CadrEstimate, "fanCount"> = {
+  cadrCfm: 0,
+  cadrM3h: 0,
+  flowM3h: 0,
+  noiseDbA: null,
+  currentA: 0,
+  powerW: 0,
+  voltage: VOLTAGE_PC,
+  ach: null,
+  roomLabel: "",
+  fanModelId: "",
+  faceVelocityMs: 0,
+  pressureDropPa: 0,
+  filterEfficiency: MERV13_EFF,
+  efficiencyBreakdown: MERV13_BREAKDOWN,
+  noiseRawDbA: null,
+};
+
+export type PcCadrInput = {
+  readonly group: FanGroup;
+  readonly nFans: number;
+  readonly nFilters: number;
+  readonly filter: FilterDims;
+  readonly q0_m3h: number;
+  readonly p0_mm: number;
+  readonly noiseDb: number;
+  readonly currentA: number;
+  readonly arctic: boolean;
+  readonly buildEfficiency?: number;
+  readonly grill?: GrillLoss;
+};
+
+export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
+  const { group, nFans, nFilters, filter, q0_m3h, p0_mm, noiseDb, currentA, arctic } = input;
+  const buildEff = input.buildEfficiency ?? DEFAULT_BUILD_EFFICIENCY;
+  const totalAreaFt2 = effAreaFt2(filter) * nFilters;
+  const currentTotal = nFans * currentA;
+  const noiseDbA = nFans > 0 && Number.isFinite(noiseDb) ? realPerFanSPL(noiseDb, arctic) + 10 * Math.log10(nFans) + DIST_3FT_TO_1M : null;
+
+  const noiseRawDbA = nFans > 0 && Number.isFinite(noiseDb) ? noiseDb + 10 * Math.log10(nFans) : null;
+
+  if (nFans <= 0 || nFilters <= 0 || totalAreaFt2 <= 0 || !(q0_m3h > 0) || !(p0_mm > 0)) {
+    return { ...EMPTY_PC, fanCount: nFans, noiseDbA, currentA: currentTotal, powerW: currentTotal * VOLTAGE_PC, noiseRawDbA };
+  }
+
+  const q0cfm = q0_m3h * CFM_PER_M3H;
+  const op = solve({ q0cfm, p0mm: p0_mm, shape: FAN_SHAPE[group], nFans, totalAreaFt2, res: 1, grill: input.grill });
+  const flowCfm = op.cfm * buildEff;
+  const cadrCfm = flowCfm * MERV13_EFF;
+  return {
+    cadrCfm,
+    cadrM3h: cadrCfm * M3H_PER_CFM,
+    flowM3h: flowCfm * M3H_PER_CFM,
+    fanCount: nFans,
+    noiseDbA,
+    currentA: currentTotal,
+    powerW: currentTotal * VOLTAGE_PC,
+    voltage: VOLTAGE_PC,
+    ach: null,
+    roomLabel: "",
+    fanModelId: "",
+    faceVelocityMs: faceVelFPM(op.dpIn) * FPM_TO_MS,
+    pressureDropPa: op.dpIn * PA_PER_INH2O,
+    filterEfficiency: MERV13_EFF,
+    efficiencyBreakdown: MERV13_BREAKDOWN,
+    noiseRawDbA,
+  };
+}
+
+export type BoxCadrCustom = {
+  readonly q0_m3h: number;
+  readonly p0_mm: number;
+  readonly noiseDb: number; // 0 / non-finite => unknown
+  readonly watts: number; // 0 / non-finite => unknown
+};
+
+export type BoxCadrInput = {
+  readonly nFilters: number;
+  readonly filter: FilterDims;
+  readonly speed: 0 | 1 | 2;
+  readonly shroud: boolean;
+  // Exactly one of preset / custom is used.
+  readonly preset?: BoxFanModel;
+  readonly custom?: BoxCadrCustom;
+};
+
+export function estimateBoxCadr(input: BoxCadrInput): CadrEstimate {
+  const { nFilters, filter, speed, shroud, preset, custom } = input;
+  const effW = cubeEff(filter);
+  const area = effAreaFt2(filter) * nFilters;
+  let airflowCfm = 0;
+  let noiseDbA: number | null = null;
+  let noiseRawDbA: number | null = null;
+  let powerW: number | null = null;
+  let currentA: number | null = null;
+
+  if (preset !== undefined) {
+    airflowCfm = cubeAirflow(preset, speed, area, shroud);
+    noiseRawDbA = preset.noise[speed];
+    noiseDbA = preset.noise[speed] + DIST_3FT_TO_1M;
+    powerW = preset.watts[speed];
+    currentA = powerW / VOLTAGE_MAINS;
+  } else if (custom !== undefined && custom.q0_m3h > 0 && custom.p0_mm > 0) {
+    const op = solve({ q0cfm: custom.q0_m3h * CFM_PER_M3H, p0mm: custom.p0_mm, shape: FAN_SHAPE["140"], nFans: 1, totalAreaFt2: area, res: 1 });
+    airflowCfm = op.cfm;
+    const hasNoise = Number.isFinite(custom.noiseDb) && custom.noiseDb > 0;
+    noiseRawDbA = hasNoise ? custom.noiseDb : null;
+    noiseDbA = hasNoise ? custom.noiseDb + DIST_3FT_TO_1M : null;
+    powerW = Number.isFinite(custom.watts) && custom.watts > 0 ? custom.watts : null;
+    currentA = powerW === null ? null : powerW / VOLTAGE_MAINS;
+  }
+
+  const faceVelFpm = area > 0 ? airflowCfm / area : 0;
+  const cadrCfm = airflowCfm * effW;
+  return {
+    cadrCfm,
+    cadrM3h: cadrCfm * M3H_PER_CFM,
+    flowM3h: airflowCfm * M3H_PER_CFM,
+    fanCount: 1,
+    noiseDbA,
+    currentA,
+    powerW,
+    voltage: VOLTAGE_MAINS,
+    ach: null,
+    roomLabel: "",
+    fanModelId: "",
+    faceVelocityMs: faceVelFpm * FPM_TO_MS,
+    pressureDropPa: (FILTER.A * faceVelFpm * faceVelFpm + FILTER.B * faceVelFpm) * PA_PER_INH2O,
+    filterEfficiency: effW,
+    efficiencyBreakdown: [],
+    noiseRawDbA,
+  };
+}
+
+export const cadrInternals = { effAreaFt2, solve, cubeAirflow, MERV13_EFF, PA_PER_INH2O };

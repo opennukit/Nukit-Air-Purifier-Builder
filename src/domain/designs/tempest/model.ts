@@ -114,8 +114,15 @@ export type TempestFilterLayout =
       readonly filterCount: 4;
       readonly filter: TempestTowerFilterSize;
       readonly structuralOffset: Millimeters;
+      // The z of the air-chamber floor, i.e. the top of the bottom plate. Equals
+      // feetLength + (bottom-filter stack) + wallThickness; the chamber, the side
+      // filter pockets and the side openings are all measured up from here.
       readonly bottomPlateThickness: Millimeters;
       readonly topPlateThickness: Millimeters;
+      // Length of the corner feet below the body (0 = none), and whether a fifth
+      // bottom intake filter holder sits under the air chamber.
+      readonly feetLength: Millimeters;
+      readonly bottomFilter: boolean;
       readonly airChamber: TempestTowerAirChamber;
       readonly wallRects: TempestWallMap<TempestQuadWallRect>;
       readonly filterPockets: TempestWallMap<TempestTowerFilterPocket>;
@@ -507,6 +514,8 @@ function normalizeTempestArrangement(arrangement: TempestFilterArrangement): Tem
         faceHeight: finitePositive(arrangement.filter.faceHeight, defaultTempestTowerFilter.faceHeight),
         thickness: finitePositive(arrangement.filter.thickness, defaultTempestTowerFilter.thickness),
       },
+      bottomFilter: arrangement.bottomFilter === true,
+      feetLength: finiteNonNegative(arrangement.feetLength, 0),
     };
   }
 

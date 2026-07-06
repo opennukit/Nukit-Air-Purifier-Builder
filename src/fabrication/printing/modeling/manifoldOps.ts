@@ -202,6 +202,22 @@ export const booleans2d = {
 // the operation surface the shared geometry is written against. The geometry
 // module depends on that interface, never on this object — so swapping in a
 // different kernel later can't silently drift from what the model expects.
+// Read-only geometry inspectors. `decompose` splits a solid into its separate
+// connected bodies (each tracked for disposal); `boundingBox` and `isEmpty`
+// report a body's extent / presence. Used by the post-build pin-coverage check.
+const analysis = {
+  isEmpty(solid: Geom3): boolean {
+    return solid.isEmpty();
+  },
+  decompose(solid: Geom3): Geom3[] {
+    return solid.decompose().map((piece) => track(piece));
+  },
+  boundingBox(solid: Geom3): { readonly min: Vec3; readonly max: Vec3 } {
+    const box = solid.boundingBox();
+    return { min: box.min, max: box.max };
+  },
+};
+
 export const manifoldModeling = {
   primitives,
   transforms,
@@ -211,6 +227,7 @@ export const manifoldModeling = {
   hulls,
   booleans,
   booleans2d,
+  analysis,
 } satisfies ModelingApi<Geom3, Geom2>;
 
 // ##############################

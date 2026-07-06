@@ -59,17 +59,36 @@ function towerPocketDepth(arrangement: QuadArrangement, frame: TempestFrameSetti
   return arrangement.filter.thickness + frame.filterFitClearance;
 }
 
+// The corner feet length (>= 0).
+function towerFeetLength(arrangement: QuadArrangement): Millimeters {
+  return Math.max(0, arrangement.feetLength);
+}
+
+// Extra body height added below the air chamber when the bottom filter is on: an
+// outer retaining flange plus the filter pocket. The grid plate (wallThickness)
+// that separates that pocket from the chamber is counted as the normal bottom
+// plate, so it is NOT included here. Zero when there is no bottom filter.
+function towerBottomFilterStack(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
+  return arrangement.bottomFilter ? frame.outsideFlangeThickness + towerPocketDepth(arrangement, frame) : 0;
+}
+
+// The z of the air-chamber floor: feet + bottom-filter stack + the bottom plate.
+function towerChamberFloorZ(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
+  return towerFeetLength(arrangement) + towerBottomFilterStack(arrangement, frame) + frame.wallThickness;
+}
+
 export function createQuadBox(settings: TempestSettings, frame: TempestFrameModel): TempestBoxEnvelope {
   const arrangement = expectQuadArrangement(settings.arrangement);
   const offset = towerStructuralOffset(arrangement, frame);
-  const height = frame.wallThickness + arrangement.filter.faceHeight + frame.outsideFlangeThickness;
+  const chamberFloorZ = towerChamberFloorZ(arrangement, frame);
+  const height = chamberFloorZ + arrangement.filter.faceHeight + frame.outsideFlangeThickness;
   // In-plane the pocket spans the gap between the two structural offsets, so the
   // measured face width gets one slide-in clearance per side.
   return {
     width: arrangement.filter.faceWidth + 2 * frame.filterFitClearance + 2 * offset,
     depth: arrangement.filter.faceWidth + 2 * frame.filterFitClearance + 2 * offset,
     height,
-    wallHeight: height - frame.wallThickness - frame.outsideFlangeThickness,
+    wallHeight: arrangement.filter.faceHeight,
   };
 }
 
@@ -81,7 +100,7 @@ export function createQuadFilterLayout(
   const arrangement = expectQuadArrangement(settings.arrangement);
   const structuralOffset = towerStructuralOffset(arrangement, frame);
   const pocketDepth = towerPocketDepth(arrangement, frame);
-  const zMin = frame.wallThickness;
+  const zMin = towerChamberFloorZ(arrangement, frame);
   const zMax = box.height - frame.outsideFlangeThickness;
   // Width gets the per-side clearance; depth gets the single-sided clearance
   // (see towerStructuralOffset). Height stays measured: the filter loads from the
@@ -96,8 +115,10 @@ export function createQuadFilterLayout(
     filterCount: 4,
     filter: arrangement.filter,
     structuralOffset,
-    bottomPlateThickness: frame.wallThickness,
+    bottomPlateThickness: zMin,
     topPlateThickness: frame.outsideFlangeThickness,
+    feetLength: towerFeetLength(arrangement),
+    bottomFilter: arrangement.bottomFilter,
     airChamber: {
       xMin: structuralOffset,
       xMax: box.width - structuralOffset,

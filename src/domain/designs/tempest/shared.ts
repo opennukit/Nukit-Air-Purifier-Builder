@@ -42,6 +42,11 @@ export type TempestFilterArrangement =
   | {
       readonly type: "four-side-filter-tower";
       readonly filter: TempestTowerFilterSize;
+      // A fifth filter on the bottom face (square filters only): adds a downward
+      // intake filter holder under the air chamber, fed through the feet gap.
+      readonly bottomFilter: boolean;
+      // Length of the four corner feet that lift the box, in mm (0 = no feet).
+      readonly feetLength: Millimeters;
     };
 
 // ##############################

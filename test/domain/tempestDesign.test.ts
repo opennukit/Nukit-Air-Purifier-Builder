@@ -41,7 +41,7 @@ describe("editing a selected design drops it to Custom", () => {
   test("changing any defining variable switches to custom", () => {
     expect(reconcileTempestDesign({ ...euro, filterWidth: 371 }).tempestDesign).toBe("custom");
     expect(reconcileTempestDesign({ ...euro, hexSpacing: 2 }).tempestDesign).toBe("custom");
-    expect(reconcileTempestDesign({ ...euro, fansLeft: -1 }).tempestDesign).toBe("custom");
+    expect(reconcileTempestDesign({ ...euro, fansLeft: 0 }).tempestDesign).toBe("custom");
     expect(reconcileTempestDesign({ ...euro, cordHoleWall: "left" }).tempestDesign).toBe("custom");
   });
 

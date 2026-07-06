@@ -4,10 +4,12 @@ import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { ModelingApi } from "@/fabrication/printing/modeling/modelingApi";
 import type { GeometryContext } from "./context";
 import { EPSILON_LIP } from "./context";
-import { chamferedRectangle2d, subtractAll, topBottomEdgeChamferSolid, unionAll } from "./primitives";
+import { chamferedRectangle2d, edgeChamferSolid, subtractAll, unionAll } from "./primitives";
 import {
+  quadBottomFilterCuts,
   towerAirChamber,
   towerCornerChamfer,
+  towerFeet,
   quadTopExhaust,
   towerFilterPocket,
   towerFilterSlots,
@@ -53,9 +55,13 @@ function finalModel<Solid, Region>(
   model: TempestModel,
   options: TempestGeometryOptions,
 ): Solid {
-  return subtractAll(ctx, assembly(ctx, model), [
+  // Build the shell once and reuse it: the pin-coverage check needs the finished
+  // shell (windows, pockets, exhaust cuts included) to see how each chunk splits
+  // into separate printed pieces before the pin holes are drilled into it.
+  const shell = assembly(ctx, model);
+  return subtractAll(ctx, shell, [
     ...cordHoleCylinders(ctx, model),
-    ...pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid),
+    ...pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid, shell),
   ]);
 }
 
@@ -88,6 +94,7 @@ function assembleQuad<Solid, Region>(
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
   fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): Solid {
+  const { transforms } = ctx.modeling;
   // 1. The outer box. The octagonal footprint carries the vertical-corner bevel
   //    (towerCornerChamfer keeps it a full wall clear of the nearest filter
   //    pocket); extruding it through topBottomEdgeChamferSolid adds the same
@@ -99,9 +106,25 @@ function assembleQuad<Solid, Region>(
     model.box.depth,
     towerCornerChamfer(model.frame.towerCornerPostChamfer, filterLayout.structuralOffset, model.frame.outsideFlangeThickness),
   );
-  const outerBox = topBottomEdgeChamferSolid(ctx, outerFootprint, model.box.height, model.frame.chamferSize);
+  // The body sits on top of the corner feet (feetLength tall, or flush when zero):
+  // it is the full-footprint shell from feetLength up, with the four legs unioned
+  // below it. The model has folded feetLength + any bottom-filter stack into
+  // box.height, so the body still reaches box.height.
+  const feetLength = filterLayout.feetLength;
+  const body = transforms.translate(
+    [0, 0, feetLength],
+    // With feet, the body's bottom edge meets the legs, so leave it square (no
+    // bevel); the top edge keeps the usual chamfer. Without feet the bottom is the
+    // box base and keeps its chamfer as before.
+    edgeChamferSolid(ctx, outerFootprint, model.box.height - feetLength, model.frame.chamferSize, {
+      bottom: feetLength <= 0,
+      top: true,
+    }),
+  );
+  const feet = towerFeet(ctx, model, filterLayout, outerFootprint);
+  const outerBox = feet.length === 0 ? body : unionAll(ctx, [body, ...feet]);
 
-  // 2-6. Subtract every void from the box.
+  // 2-7. Subtract every void from the box.
   return subtractAll(ctx, outerBox, [
     towerAirChamber(ctx, model, filterLayout), // 2. central air chamber, vertical corners filleted for strength
     ...tempestWalls.map((wallName) => towerFilterPocket(ctx, model, filterLayout, filterLayout.wallRects[wallName])), // 3. four filter pockets
@@ -123,6 +146,7 @@ function assembleQuad<Solid, Region>(
     }),
     ...quadTopExhaust(ctx, model, filterLayout, fanLayout), // 5. top exhaust: fan grid or single box-fan opening
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
+    ...quadBottomFilterCuts(ctx, model, filterLayout), // 7. bottom intake filter holder (square filter only)
   ]);
 }
 

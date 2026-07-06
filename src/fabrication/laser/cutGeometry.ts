@@ -209,14 +209,21 @@ export function rectangularPanel(input: RectangularPanelInput): CutPanelDraft {
 // Sheet Layout
 // #######################################
 
-export function layoutCutPanelsInColumn(panels: readonly CutPanelDraft[], gap: number): LaidOutCutPanel[] {
-  let cursorY = sheetMargin;
+export function layoutCutPanelsInColumn(
+  panels: readonly CutPanelDraft[],
+  gap: number,
+  leftPad = 0,
+  topPad = 0,
+): LaidOutCutPanel[] {
+  // leftPad / topPad reserve clear space to the left of and above every panel so
+  // external (engineering-style) dimensions have room to sit outside the outline.
+  let cursorY = sheetMargin + topPad;
 
   return panels.map((panel) => {
     const laidOut = {
       ...panel,
       sheet: {
-        x: sheetMargin,
+        x: sheetMargin + leftPad,
         y: cursorY,
       },
     };
@@ -235,6 +242,7 @@ export function cutPanelsToDocument(
   referenceScale: ReferenceScale,
   labels: boolean,
   kerfFit = 0,
+  dimensioned = false,
 ): BoxesDocument {
   const shapes: Shape[] = [];
   for (const panel of panels) {
@@ -277,6 +285,10 @@ export function cutPanelsToDocument(
         fontSize: 6,
       });
     }
+
+    if (dimensioned) {
+      shapes.push(...panelDimensionShapes(panel, offset));
+    }
   }
 
   if (referenceScale.type === "enabled") {
@@ -302,6 +314,179 @@ export function cutPanelsToDocument(
   const width = roundToMicron(shapes.reduce((maxX, shape) => Math.max(maxX, shapeMaxX(shape)), 0) + sheetMargin);
   const height = roundToMicron(shapes.reduce((maxY, shape) => Math.max(maxY, shapeMaxY(shape)), 0) + sheetMargin);
   return { width, height, shapes };
+}
+
+// #######################################
+// Panel Dimensions (hand-cut annotations)
+// #######################################
+
+// Reference dimensions drawn OUTSIDE each panel in engineering-drawing style:
+// extension lines projecting off the part, an offset dimension line carrying
+// arrowheads that touch the extension lines, the value clear of the line, plus a
+// centre crosshair on every fan bore and one leadered Ø callout. All on the
+// annotation layer (printed/exported, never cut). The laid-out sheet reserves a
+// left + top margin per panel (layoutCutPanelsInColumn padding) for this.
+const DIM_OFFSET_MM = 16; // part edge -> dimension line
+const DIM_EXT_GAP_MM = 1.5; // part edge -> start of extension line
+const DIM_EXT_OVER_MM = 5; // extension line past the dimension line
+const DIM_ARROW_MM = 2.6;
+const DIM_TEXT_MM = 6;
+
+function annPath(points: CutPoint[]): Shape {
+  return { type: "path", points, closed: false, color: "annotation" };
+}
+
+function annText(x: number, y: number, text: string, fontSize = DIM_TEXT_MM): Shape {
+  return { type: "text", x, y, text, color: "annotation", fontSize };
+}
+
+const DIM_STEP_MM = 16; // spacing between stacked coordinate dimensions (room for "nnn mm")
+const DIM_COORD_TEXT_MM = 5;
+
+function panelDimensionShapes(panel: LaidOutCutPanel, offset: SheetPlacement): Shape[] {
+  const out: Shape[] = [];
+  const x0 = offset.x;
+  const y0 = offset.y;
+  const w = panel.width;
+  const h = panel.height;
+  const num = (value: number): string => `${Math.round(value)} mm`;
+  const circles = panel.cuts.filter((cut): cut is CircleCut => cut.type === "circle");
+  const fans = circles.filter((cut) => cut.role === "fan");
+  const screws = circles.filter((cut) => cut.role === "screw");
+  const cords = circles.filter((cut) => cut.role === "cord");
+
+  // Centre crosshair on every fan and cord bore.
+  for (const c of [...fans, ...cords]) {
+    const cx = x0 + c.cx;
+    const cy = y0 + c.cy;
+    const reach = c.radius + 4;
+    out.push(annPath([{ x: cx - reach, y: cy }, { x: cx + reach, y: cy }]));
+    out.push(annPath([{ x: cx, y: cy - reach }, { x: cx, y: cy + reach }]));
+  }
+
+  // Coordinate grid: locate fan/cord centres from the panel's top-left datum with
+  // stacked dimensions (shortest nearest the part), overall size outermost.
+  const located = [...fans, ...cords];
+  const xs = uniqueRounded(located.map((c) => c.cx));
+  const ys = uniqueRounded(located.map((c) => c.cy));
+  xs.forEach((vx, index) => coordDimAbove(out, x0, x0 + vx, y0, index + 1, num(vx), DIM_COORD_TEXT_MM));
+  coordDimAbove(out, x0, x0 + w, y0, xs.length + 1, num(w), DIM_TEXT_MM);
+  ys.forEach((vy, index) => coordDimLeft(out, y0, y0 + vy, x0, index + 1, num(vy), DIM_COORD_TEXT_MM));
+  coordDimLeft(out, y0, y0 + h, x0, ys.length + 1, num(h), DIM_TEXT_MM);
+
+  // Screw pattern: dimension one corner screw from its fan centre with arrowed
+  // offset dims (the grid repeats at every fan), placed at the fan's bottom-right
+  // corner. The diameter callouts are routed to the bottom margin (below), so the
+  // offset dims and the callouts never share space.
+  if (fans.length > 0 && screws.length > 0) {
+    const fan = fans[0];
+    const corner = screws
+      .filter((s) => Math.hypot(s.cx - fan.cx, s.cy - fan.cy) < fan.radius * 2.2 && s.cx >= fan.cx && s.cy >= fan.cy)
+      .at(0);
+    if (corner !== undefined) {
+      simpleDimH(out, x0 + fan.cx, x0 + corner.cx, y0 + corner.cy, num(Math.abs(corner.cx - fan.cx)));
+      simpleDimV(out, y0 + fan.cy, y0 + corner.cy, x0 + corner.cx, num(Math.abs(corner.cy - fan.cy)));
+    }
+  }
+
+  // Diameter callouts: a leader down from each bore type to a label in the bottom
+  // margin, spaced across the panel so they never overlap the position dims or
+  // each other.
+  const labelY = y0 + h + DIM_OFFSET_MM;
+  if (fans[0] !== undefined) {
+    diameterLeaderDown(out, x0 + fans[0].cx, y0 + fans[0].cy + fans[0].radius, labelY, `${countPrefix(fans.length)}Ø${num(fans[0].radius * 2)} fan`);
+  }
+  const screwBore = bottomLeftScrew(screws, fans[0]);
+  if (screwBore !== undefined) {
+    diameterLeaderDown(out, x0 + screwBore.cx, y0 + screwBore.cy + screwBore.radius, labelY, `${countPrefix(screws.length)}Ø${num(screwBore.radius * 2)} screw`);
+  }
+  if (cords[0] !== undefined) {
+    diameterLeaderDown(out, x0 + cords[0].cx, y0 + cords[0].cy + cords[0].radius, labelY, `Ø${num(cords[0].radius * 2)} cord`);
+  }
+  return out;
+}
+
+// The bottom-left screw of a fan (its leader drops clear of the bottom-right
+// offset dims); falls back to any screw.
+function bottomLeftScrew(screws: readonly CircleCut[], fan: CircleCut | undefined): CircleCut | undefined {
+  if (fan === undefined) {
+    return screws[0];
+  }
+  const near = screws.filter((s) => Math.hypot(s.cx - fan.cx, s.cy - fan.cy) < fan.radius * 2.2);
+  return near.find((s) => s.cx <= fan.cx && s.cy >= fan.cy) ?? near[0] ?? screws[0];
+}
+
+// A short interior horizontal dimension between two x positions at a given y.
+function simpleDimH(out: Shape[], xA: number, xB: number, y: number, label: string): void {
+  out.push(annPath([{ x: xA, y }, { x: xB, y }]));
+  arrowHead(out, xA, y, xB >= xA ? DIM_ARROW_MM : -DIM_ARROW_MM, 0);
+  arrowHead(out, xB, y, xB >= xA ? -DIM_ARROW_MM : DIM_ARROW_MM, 0);
+  out.push(annText((xA + xB) / 2, y - DIM_COORD_TEXT_MM * 0.7, label, DIM_COORD_TEXT_MM));
+}
+
+// A short interior vertical dimension between two y positions at a given x.
+function simpleDimV(out: Shape[], yA: number, yB: number, x: number, label: string): void {
+  out.push(annPath([{ x, y: yA }, { x, y: yB }]));
+  arrowHead(out, x, yA, 0, yB >= yA ? DIM_ARROW_MM : -DIM_ARROW_MM);
+  arrowHead(out, x, yB, 0, yB >= yA ? -DIM_ARROW_MM : DIM_ARROW_MM);
+  out.push(annText(x + DIM_COORD_TEXT_MM * 1.6, (yA + yB) / 2, label, DIM_COORD_TEXT_MM));
+}
+
+// A diameter callout: a vertical leader from the bore's bottom edge down to a label
+// in the bottom margin, with an arrowhead pointing back up to the bore.
+function diameterLeaderDown(out: Shape[], x: number, boreBottomY: number, labelY: number, label: string): void {
+  out.push(annPath([{ x, y: boreBottomY }, { x, y: labelY }]));
+  arrowHead(out, x, boreBottomY, 0, DIM_ARROW_MM);
+  out.push(annText(x, labelY + DIM_COORD_TEXT_MM, label, DIM_COORD_TEXT_MM));
+}
+
+function countPrefix(count: number): string {
+  return count > 1 ? `${count}× ` : "";
+}
+
+function uniqueRounded(values: readonly number[]): number[] {
+  const seen: number[] = [];
+  for (const value of values) {
+    const r = Math.round(value);
+    if (!seen.some((existing) => Math.abs(existing - r) <= 1)) {
+      seen.push(r);
+    }
+  }
+  return seen.sort((a, b) => a - b);
+}
+
+// A coordinate dimension above the panel: from the left datum (xDatum) to xTarget,
+// stacked at `level` (1 = nearest the part). Extension lines drop to the part.
+function coordDimAbove(out: Shape[], xDatum: number, xTarget: number, yTop: number, level: number, label: string, textSize: number): void {
+  const yd = yTop - DIM_OFFSET_MM - (level - 1) * DIM_STEP_MM;
+  out.push(annPath([{ x: xDatum, y: yTop - DIM_EXT_GAP_MM }, { x: xDatum, y: yd - DIM_EXT_OVER_MM }]));
+  out.push(annPath([{ x: xTarget, y: yTop - DIM_EXT_GAP_MM }, { x: xTarget, y: yd - DIM_EXT_OVER_MM }]));
+  out.push(annPath([{ x: xDatum, y: yd }, { x: xTarget, y: yd }]));
+  arrowHead(out, xDatum, yd, DIM_ARROW_MM, 0);
+  arrowHead(out, xTarget, yd, -DIM_ARROW_MM, 0);
+  out.push(annText((xDatum + xTarget) / 2, yd - textSize * 0.7, label, textSize));
+}
+
+// A coordinate dimension to the left of the panel: from the top datum (yDatum) to
+// yTarget, stacked at `level`. The value sits just left of the dimension line.
+function coordDimLeft(out: Shape[], yDatum: number, yTarget: number, xLeft: number, level: number, label: string, textSize: number): void {
+  const xd = xLeft - DIM_OFFSET_MM - (level - 1) * DIM_STEP_MM;
+  out.push(annPath([{ x: xLeft - DIM_EXT_GAP_MM, y: yDatum }, { x: xd - DIM_EXT_OVER_MM, y: yDatum }]));
+  out.push(annPath([{ x: xLeft - DIM_EXT_GAP_MM, y: yTarget }, { x: xd - DIM_EXT_OVER_MM, y: yTarget }]));
+  out.push(annPath([{ x: xd, y: yDatum }, { x: xd, y: yTarget }]));
+  arrowHead(out, xd, yDatum, 0, DIM_ARROW_MM);
+  arrowHead(out, xd, yTarget, 0, -DIM_ARROW_MM);
+  out.push(annText(xd - DIM_STEP_MM * 0.5, (yDatum + yTarget) / 2, label, textSize));
+}
+
+// An arrowhead whose tip is at (xTip, yTip); (bx, by) is the barb offset back from
+// the tip along the dimension line (one axis zero). Drawn as a small open V.
+function arrowHead(out: Shape[], xTip: number, yTip: number, bx: number, by: number): void {
+  if (bx !== 0) {
+    out.push(annPath([{ x: xTip + bx, y: yTip - DIM_ARROW_MM }, { x: xTip, y: yTip }, { x: xTip + bx, y: yTip + DIM_ARROW_MM }]));
+  } else {
+    out.push(annPath([{ x: xTip - DIM_ARROW_MM, y: yTip + by }, { x: xTip, y: yTip }, { x: xTip + DIM_ARROW_MM, y: yTip + by }]));
+  }
 }
 
 // #######################################

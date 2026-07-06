@@ -11,7 +11,13 @@ export type BuildDiagnostic = {
   severity: BuildDiagnosticSeverity;
   title: string;
   detail: string;
+  // Optional "More" link (e.g. to a help-page section) shown after the detail.
+  moreUrl?: string;
 };
+
+// Above this estimated noise level we advise against building (except for
+// emergency use); see the Noise section of the help page.
+const noiseAdvisoryDbA = 45;
 
 export function exportBlockingDiagnostics(diagnostics: readonly BuildDiagnostic[]): readonly BuildDiagnostic[] {
   return diagnostics.filter((diagnostic) => diagnostic.severity === "error");
@@ -33,6 +39,42 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
       severity: "warning",
       title: "Unusual filter dimensions",
       detail: "Measured dimensions are outside the normal range used by common HVAC and purifier filters.",
+    });
+  }
+
+  // Applies to every build (PC-fan grid or box fan), so it runs before the
+  // wall-banks-only checks below.
+  const noiseDbA = layout.summary.cadr.noiseDbA;
+  if (noiseDbA !== null && noiseDbA > noiseAdvisoryDbA) {
+    diagnostics.push({
+      id: "high-noise",
+      severity: "warning",
+      title: "High noise level",
+      detail: "We strongly advise against building air purifiers that exceed 45dBA @ 1 m on maximum power unless for emergency use.",
+      moreUrl: "help.html#noise",
+    });
+  }
+
+  // The bottom filter only works if the tower is lifted on feet so air can reach
+  // its underside. Removing the feet is allowed, but then it does nothing. The
+  // bottom filter itself only exists on a square tower filter, so skip the advisory
+  // otherwise (a stale bottomFilter flag on a non-square filter builds nothing).
+  const design = layout.configuration.design;
+  const filter = layout.configuration.filter;
+  const squareFilter = Math.abs(filter.width - filter.depth) <= 1;
+  if (
+    design.type === "tempest" &&
+    design.arrangement === "four-side-filter-tower" &&
+    design.bottomFilter &&
+    squareFilter &&
+    design.feetLength <= 0
+  ) {
+    diagnostics.push({
+      id: "bottom-filter-no-feet",
+      severity: "warning",
+      title: "Bottom filter is blocked",
+      detail: "The bottom filter needs feet to lift the tower so air can reach its underside. With the feet removed it sits flat on the surface and will not move air. Set a foot length, or turn the bottom filter off.",
+      moreUrl: "help.html#bottomFilter",
     });
   }
 

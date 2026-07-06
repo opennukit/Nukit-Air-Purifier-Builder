@@ -31,6 +31,8 @@
       return {
         type: "four-side-filter-tower",
         filter: { faceWidth: towerFaceWidth, faceHeight: towerFaceHeight, thickness: towerThickness },
+        bottomFilter: false,
+        feetLength: 0,
       };
     }
     return {

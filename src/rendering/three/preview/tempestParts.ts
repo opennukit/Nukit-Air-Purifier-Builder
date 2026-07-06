@@ -5,6 +5,7 @@ import type {
   TempestPrintablePose,
 } from "@/domain/designs/tempest/model";
 import type { TempestHorizontalFilterSize, TempestWall } from "@/domain/designs/tempest/shared";
+import { starkvindFilterTiling } from "@/domain/purifier/filterPresets";
 import { assertNever } from "@/domain/designs/tempest/topology";
 import { createPreviewEdges } from "@/rendering/three/preview/panelMeshes";
 import {
@@ -35,6 +36,46 @@ import {
 // Filter-media boxes and wall/top fan placement for the Tempest preview, in CSG
 // coordinates mapped through the printable pose into the scene.
 
+// Visual gap left between tiled filter media so a multi-filter footprint (the
+// STARKVIND 1x2 / 2x1 presets) reads as separate filters with a seam between
+// them, rather than one solid slab.
+const filterSeamGapMillimeters = 3;
+
+// Split a filter-media box into a grid of tiles (counts per axis, default 1),
+// leaving a small seam gap between them. Returns the box unchanged when there is
+// nothing to split.
+function tileFilterMediaBox(
+  box: TempestCsgBox,
+  counts: { readonly x?: number; readonly y?: number; readonly z?: number },
+): readonly TempestCsgBox[] {
+  const nx = counts.x ?? 1;
+  const ny = counts.y ?? 1;
+  const nz = counts.z ?? 1;
+  if (nx <= 1 && ny <= 1 && nz <= 1) {
+    return [box];
+  }
+  const gap = filterSeamGapMillimeters;
+  const sizeX = (box.size.x - (nx - 1) * gap) / nx;
+  const sizeY = (box.size.y - (ny - 1) * gap) / ny;
+  const sizeZ = (box.size.z - (nz - 1) * gap) / nz;
+  const tiles: TempestCsgBox[] = [];
+  for (let i = 0; i < nx; i += 1) {
+    for (let j = 0; j < ny; j += 1) {
+      for (let k = 0; k < nz; k += 1) {
+        tiles.push({
+          min: {
+            x: box.min.x + i * (sizeX + gap),
+            y: box.min.y + j * (sizeY + gap),
+            z: box.min.z + k * (sizeZ + gap),
+          },
+          size: { x: sizeX, y: sizeY, z: sizeZ },
+        });
+      }
+    }
+  }
+  return tiles;
+}
+
 export function tempestHorizontalFilterBoxes(
   model: TempestModel,
   filterLayout: Extract<TempestFilterLayout, { readonly topology: "sandwich" }>,
@@ -45,18 +86,27 @@ export function tempestHorizontalFilterBoxes(
   // The media keeps its MEASURED footprint; the fit clearance shifts it to the
   // center of the cavity that grew around it.
   const fitClearance = model.frame.filterFitClearance;
-  return filterLayout.filters.map((layer) => ({
-    min: {
-      x: model.frame.wallThickness + fitClearance + inset,
-      y: model.frame.wallThickness + fitClearance + inset,
-      z: layer.zBottom + surfaceGap,
-    },
-    size: {
-      x: visualFilterMediaDimension(filter.footprintWidth),
-      y: visualFilterMediaDimension(filter.footprintDepth),
-      z: recessedMillimeterFilterMediaThickness(filter.thickness),
-    },
-  }));
+  // STARKVIND 1x2 / 2x1 footprints are several filters; draw the seam(s) between
+  // them. The footprint width maps to the box x axis, depth to y.
+  const tiling = starkvindFilterTiling(filter.footprintWidth, filter.footprintDepth);
+  const counts = tiling ? { x: tiling.across, y: tiling.down } : {};
+  return filterLayout.filters.flatMap((layer) =>
+    tileFilterMediaBox(
+      {
+        min: {
+          x: model.frame.wallThickness + fitClearance + inset,
+          y: model.frame.wallThickness + fitClearance + inset,
+          z: layer.zBottom + surfaceGap,
+        },
+        size: {
+          x: visualFilterMediaDimension(filter.footprintWidth),
+          y: visualFilterMediaDimension(filter.footprintDepth),
+          z: recessedMillimeterFilterMediaThickness(filter.thickness),
+        },
+      },
+      counts,
+    ),
+  );
 }
 
 export function tempestTowerFilterBoxes(
@@ -74,31 +124,67 @@ export function tempestTowerFilterBoxes(
   const faceHeight = visualFilterMediaDimension(filter.faceHeight);
   const filterThickness = recessedMillimeterFilterMediaThickness(filter.thickness);
   const z = filterLayout.bottomPlateThickness + inset;
+  // STARKVIND 1x2 / 2x1 faces are several filters; draw the seam(s). The face
+  // width runs along x on the front/back walls and y on the left/right walls; the
+  // face height is always vertical (z).
+  const tiling = starkvindFilterTiling(filter.faceWidth, filter.faceHeight);
+  const across = tiling?.across ?? 1;
+  const down = tiling?.down ?? 1;
+  const frontBackCounts = { x: across, z: down };
+  const leftRightCounts = { y: across, z: down };
+  // Optional fifth filter laid flat across the bottom pocket (square filters only).
+  // It rests above the bottom retaining flange (feet + outer flange), media side up.
+  const bottomFilterBoxes: readonly TempestCsgBox[] = filterLayout.bottomFilter
+    ? [
+        {
+          min: {
+            x: filterLayout.structuralOffset + fitClearance + inset,
+            y: filterLayout.structuralOffset + fitClearance + inset,
+            z: filterLayout.feetLength + model.frame.outsideFlangeThickness + surfaceGap,
+          },
+          size: { x: faceWidth, y: faceWidth, z: filterThickness },
+        },
+      ]
+    : [];
+
   return [
-    {
-      min: { x: filterLayout.structuralOffset + fitClearance + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
-      size: { x: faceWidth, y: filterThickness, z: faceHeight },
-    },
-    {
-      min: {
-        x: filterLayout.structuralOffset + fitClearance + inset,
-        y: model.box.depth - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
-        z,
+    ...bottomFilterBoxes,
+    ...tileFilterMediaBox(
+      {
+        min: { x: filterLayout.structuralOffset + fitClearance + inset, y: model.frame.outsideFlangeThickness + surfaceGap, z },
+        size: { x: faceWidth, y: filterThickness, z: faceHeight },
       },
-      size: { x: faceWidth, y: filterThickness, z: faceHeight },
-    },
-    {
-      min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + fitClearance + inset, z },
-      size: { x: filterThickness, y: faceWidth, z: faceHeight },
-    },
-    {
-      min: {
-        x: model.box.width - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
-        y: filterLayout.structuralOffset + fitClearance + inset,
-        z,
+      frontBackCounts,
+    ),
+    ...tileFilterMediaBox(
+      {
+        min: {
+          x: filterLayout.structuralOffset + fitClearance + inset,
+          y: model.box.depth - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
+          z,
+        },
+        size: { x: faceWidth, y: filterThickness, z: faceHeight },
       },
-      size: { x: filterThickness, y: faceWidth, z: faceHeight },
-    },
+      frontBackCounts,
+    ),
+    ...tileFilterMediaBox(
+      {
+        min: { x: model.frame.outsideFlangeThickness + surfaceGap, y: filterLayout.structuralOffset + fitClearance + inset, z },
+        size: { x: filterThickness, y: faceWidth, z: faceHeight },
+      },
+      leftRightCounts,
+    ),
+    ...tileFilterMediaBox(
+      {
+        min: {
+          x: model.box.width - model.frame.outsideFlangeThickness - filter.thickness + surfaceGap,
+          y: filterLayout.structuralOffset + fitClearance + inset,
+          z,
+        },
+        size: { x: filterThickness, y: faceWidth, z: faceHeight },
+      },
+      leftRightCounts,
+    ),
   ];
 }
 

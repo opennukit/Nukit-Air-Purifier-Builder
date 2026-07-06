@@ -87,10 +87,19 @@ export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: 
       // landing on that wall within the slot footprint has no material to grip
       // and the CSG cuts no hole there — it would float in the exploded preview.
       const slots = sandwichLoadingSlots(m, m.filterLayout);
+      const pinSpec = m.settings.alignmentPins.type === "enabled" ? m.settings.alignmentPins : null;
+      const seamClearance = perpendicularSeamClearance(pinSpec);
+      // A pin whose hole reaches the round fan bore breaks out through its curved
+      // face. Its socket runs the full holeDepth along the pin axis, so even a pin
+      // centred outside the bore can sweep into it — test the socket segment, and
+      // drop anything within (bore radius + pin radius) of it.
+      const boreClearance = pinSpec === null ? 0 : pinSpec.diameter / 2 + 0.5;
+      const boreReach = pinSpec === null ? 0 : pinSpec.holeDepth;
       return placements.filter(
         (placement) =>
-          !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness)) &&
-          !slots.some((slot) => loadingSlotSwallowsPin(slot, placement)),
+          !bores.some((bore) => boreSwallowsPin(bore, placement, m.frame.wallThickness, boreClearance, boreReach)) &&
+          !slots.some((slot) => loadingSlotSwallowsPin(slot, placement, pinSpec)) &&
+          !pinBreachesPerpendicularSeam(placement, chunkGrid, seamClearance),
       );
     },
     quad: (m) => {
@@ -110,14 +119,185 @@ export function tempestPinPlacementsClearOfFans(model: TempestModel, chunkGrid: 
       // never grazes (breaks out of) the 45° chamfer face, only its centre.
       const pinReach = m.settings.alignmentPins.type === "enabled" ? m.settings.alignmentPins.diameter / 2 : 0;
       const bevelClearance = chamfer + pinReach * Math.SQRT2 + 0.5;
+      // Drop pins whose socket radius would graze into a side window even though
+      // their centre sits just outside the cut edge.
+      const windowClearance = pinReach + 0.5;
+      const seamClearance = perpendicularSeamClearance(
+        m.settings.alignmentPins.type === "enabled" ? m.settings.alignmentPins : null,
+      );
       return placements.filter(
         (placement) =>
-          !windows.some((window) => windowSwallowsPin(window, placement)) &&
+          !windows.some((window) => windowSwallowsPin(window, placement, windowClearance)) &&
           !pockets.some((pocket) => boxSwallowsPin(pocket, placement)) &&
-          !cornerBevelSwallowsPin(placement, m.box.width, m.box.depth, bevelClearance),
+          !cornerBevelSwallowsPin(placement, m.box.width, m.box.depth, bevelClearance) &&
+          !pinBreachesPerpendicularSeam(placement, chunkGrid, seamClearance),
       );
     },
   });
+}
+
+// #######################################
+// Solid-Aware Pin Set (air filter + coverage)
+// #######################################
+
+// True when solid material fills a tiny box at `point`. The single geometry query
+// the solid-aware pin passes share (air-only filtering and per-piece coverage).
+function probeHasMaterial<Solid, Region>(
+  modeling: GeometryContext<Solid, Region>["modeling"],
+  solid: Solid,
+  point: readonly [number, number, number],
+): boolean {
+  return !modeling.analysis.isEmpty(modeling.booleans.intersect(solid, modeling.primitives.cuboid({ center: point, size: [0.6, 0.6, 0.6] })));
+}
+
+// A pin whose socket lies entirely in open space (e.g. a base-plate seam pin that
+// falls in the bottom-filter pocket) drills nothing and just floats in the
+// exploded preview. Keep a pin only when its socket meets material somewhere
+// along its length.
+function pinCutsMaterial<Solid, Region>(
+  modeling: GeometryContext<Solid, Region>["modeling"],
+  solid: Solid,
+  placement: TempestAlignmentPinPlacement,
+  fullDepth: number,
+): boolean {
+  const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
+  const depth = placement.holeDepth ?? fullDepth;
+  for (const t of [-0.9, -0.45, 0, 0.45, 0.9]) {
+    const point: [number, number, number] = [...placement.position];
+    point[axisIndex] = placement.position[axisIndex] + t * depth;
+    if (probeHasMaterial(modeling, solid, point)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The pin set actually drilled into (and shown on) the assembled shell: the
+// seam-band placements minus any that float in open space, plus per-piece
+// coverage pins so no disconnected printed piece is left unpinned. Both the CSG
+// drilling (pinHoles) and the exploded-preview diagram derive from this ONE
+// computation, so the drawn pins and the drilled holes always agree.
+export function tempestFinalPinPlacements<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  assembledSolid: Solid,
+  model: TempestModel,
+  chunkGrid: TempestChunkGrid,
+): TempestAlignmentPinPlacement[] {
+  const pin = model.settings.alignmentPins;
+  if (pin.type !== "enabled") {
+    return [];
+  }
+  const base = tempestPinPlacementsClearOfFans(model, chunkGrid).filter((placement) =>
+    pinCutsMaterial(ctx.modeling, assembledSolid, placement, pin.holeDepth),
+  );
+  const coverage = tempestCoveragePins(ctx, assembledSolid, model, chunkGrid, base);
+  return [...base, ...coverage];
+}
+
+// #######################################
+// Per-Piece Pin Coverage
+// #######################################
+
+// A chunk can split into several disconnected printed pieces (e.g. a window cut
+// or the outer-flange skirt separates a plate from the body). The seam-band
+// placement above pins the chunk as a whole, but a stray piece can end up with
+// no pin, so it cannot be glued to anything. This closes that gap: it clips the
+// assembled solid to each chunk cell, decomposes it into its separate pieces,
+// and for any piece that no kept pin already reaches, adds one pin on an
+// interior seam the piece spans, verifying solid material on BOTH sides of that
+// seam (so the socket bites into the piece and its neighbour). Topology-agnostic
+// and self-verifying, so it holds for every design, not just the one that
+// surfaced it.
+export function tempestCoveragePins<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  assembledSolid: Solid,
+  model: TempestModel,
+  chunkGrid: TempestChunkGrid,
+  basePlacements: readonly TempestAlignmentPinPlacement[],
+): TempestAlignmentPinPlacement[] {
+  const pin = model.settings.alignmentPins;
+  if (pin.type !== "enabled") {
+    return [];
+  }
+  const { boundariesX: bx, boundariesY: by, boundariesZ: bz } = chunkGrid;
+  const interior: Readonly<Record<0 | 1 | 2, readonly number[]>> = {
+    0: bx.slice(1, -1),
+    1: by.slice(1, -1),
+    2: bz.slice(1, -1),
+  };
+  if (interior[0].length + interior[1].length + interior[2].length === 0) {
+    return []; // single chunk: nothing to pin together
+  }
+  const { modeling } = ctx;
+  const COVERAGE_MARGIN_MM = 1.5;
+  const SEAM_TOL_MM = 0.1;
+  const probeReach = Math.min(pin.holeDepth * 0.5, 4);
+  const axisName = (index: 0 | 1 | 2): TempestExtrudeAxis => (index === 0 ? "x" : index === 1 ? "y" : "z");
+  const placed: TempestAlignmentPinPlacement[] = basePlacements.map((p) => ({ position: p.position, axis: p.axis }));
+  const coverage: TempestAlignmentPinPlacement[] = [];
+
+  const hasMaterial = (point: readonly [number, number, number]): boolean => probeHasMaterial(modeling, assembledSolid, point);
+
+  // Does some existing pin already cross `seam` (a cut perpendicular to
+  // `axisIndex`) within this piece's footprint? If so the piece is already
+  // fastened to its neighbour across that seam and needs no coverage pin there.
+  const seamAlreadyPinned = (
+    min: readonly [number, number, number],
+    max: readonly [number, number, number],
+    axisIndex: 0 | 1 | 2,
+    seam: number,
+  ): boolean =>
+    placed.some((p) => {
+      if (p.axis !== axisName(axisIndex) || Math.abs(p.position[axisIndex] - seam) > SEAM_TOL_MM) {
+        return false;
+      }
+      return ([0, 1, 2] as const).every(
+        (k) => k === axisIndex || (p.position[k] >= min[k] - COVERAGE_MARGIN_MM && p.position[k] <= max[k] + COVERAGE_MARGIN_MM),
+      );
+    });
+
+  for (let ix = 0; ix < bx.length - 1; ix += 1) {
+    for (let iy = 0; iy < by.length - 1; iy += 1) {
+      for (let iz = 0; iz < bz.length - 1; iz += 1) {
+        const center: [number, number, number] = [(bx[ix] + bx[ix + 1]) / 2, (by[iy] + by[iy + 1]) / 2, (bz[iz] + bz[iz + 1]) / 2];
+        const size: [number, number, number] = [bx[ix + 1] - bx[ix] + 0.02, by[iy + 1] - by[iy] + 0.02, bz[iz + 1] - bz[iz] + 0.02];
+        const cellSolid = modeling.booleans.intersect(assembledSolid, modeling.primitives.cuboid({ center, size }));
+        if (modeling.analysis.isEmpty(cellSolid)) {
+          continue;
+        }
+        for (const piece of modeling.analysis.decompose(cellSolid)) {
+          const { min, max } = modeling.analysis.boundingBox(piece);
+          const pieceCenter: [number, number, number] = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+          // Pin the piece on EVERY interior seam it spans (with material on both
+          // sides), so a stray piece bridging two neighbours is fastened on both
+          // ends, not just one. Seams a base pin already covers are skipped, so
+          // well-pinned pieces gain nothing.
+          for (const axisIndex of [0, 1, 2] as const) {
+            for (const seam of interior[axisIndex]) {
+              if (seam < min[axisIndex] - 0.6 || seam > max[axisIndex] + 0.6) {
+                continue;
+              }
+              if (seamAlreadyPinned(min, max, axisIndex, seam)) {
+                continue;
+              }
+              const position: [number, number, number] = [...pieceCenter];
+              position[axisIndex] = seam;
+              const low: [number, number, number] = [...position];
+              const high: [number, number, number] = [...position];
+              low[axisIndex] = seam - probeReach;
+              high[axisIndex] = seam + probeReach;
+              if (hasMaterial(low) && hasMaterial(high)) {
+                const placement: TempestAlignmentPinPlacement = { position, axis: axisName(axisIndex) };
+                coverage.push(placement);
+                placed.push(placement);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return coverage;
 }
 
 // #######################################
@@ -128,16 +308,20 @@ export function pinHoles<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   chunkGrid: TempestChunkGrid,
+  assembledSolid?: Solid,
 ): Solid[] {
   if (model.settings.alignmentPins.type === "disabled") {
     return [];
   }
   const pin = model.settings.alignmentPins;
-  // Drill ONLY the placements that survive the same filter the exploded preview
-  // uses (clear of fan bores, side windows, filter pockets, and corner bevels).
-  // Drilling the raw candidates instead cut holes through those open/bevelled
-  // regions, which is what made pins appear to break through the walls.
-  const placements = tempestPinPlacementsClearOfFans(model, chunkGrid);
+  // With the assembled shell in hand, drill the solid-aware set: the seam-band
+  // placements minus any floating in open space, plus per-piece coverage pins.
+  // Without it (no shell passed), fall back to the seam-band filter alone — the
+  // same set the exploded preview used before, so behaviour never regresses.
+  const placements =
+    assembledSolid === undefined
+      ? tempestPinPlacementsClearOfFans(model, chunkGrid)
+      : tempestFinalPinPlacements(ctx, assembledSolid, model, chunkGrid);
   if (placements.length === 0) {
     return [];
   }
@@ -311,6 +495,13 @@ function pinPlacementsQuad(
   const innerWallMidlineLow = filterLayout.wallRects.front.innerPlaneOffset - model.frame.wallThickness / 2;
   const innerWallMidlineHighX = model.box.width - innerWallMidlineLow;
   const innerWallMidlineHighY = model.box.depth - innerWallMidlineLow;
+  // The bottom plate is a continuous solid floor (no bottom filter pocket, not the
+  // loading face) so its central seam band can carry a normal pin row. The default
+  // central band mirrors the TOP plate's surviving pins so the two rows line up,
+  // but a box-exhaust top has NO central pins, which would otherwise strip the
+  // solid base bare. When the base is solid, place its central pins on their own.
+  const solidBottomPlate =
+    filterLayout.bottomPlateThickness > 0 && !filterLayout.bottomFilter && filterLayout.loading.type !== "bottom-plate-slots";
 
   if (chunkGrid.countX > 1) {
     for (let index = 1; index < chunkGrid.countX; index += 1) {
@@ -336,7 +527,12 @@ function pinPlacementsQuad(
         placements.push({ position: [seamX, gridY, bottomZx], axis: "x" });
       }
       for (const gridY of rimPositions(filterLayout.structuralOffset, model.box.depth - filterLayout.structuralOffset, pin.spacing)) {
-        if (nearSeam(gridY, interiorSeamsY) || clampedTopPinDepth(topHoles, seamX, gridY, "x", pin.holeDepth) === null) {
+        if (nearSeam(gridY, interiorSeamsY)) {
+          continue;
+        }
+        // Solid base: place the central pin outright. Otherwise mirror the top
+        // plate so the rows line up (and skip where the top has no pin there).
+        if (!solidBottomPlate && clampedTopPinDepth(topHoles, seamX, gridY, "x", pin.holeDepth) === null) {
           continue;
         }
         placements.push({ position: [seamX, gridY, bottomZx], axis: "x" });
@@ -383,7 +579,12 @@ function pinPlacementsQuad(
         placements.push({ position: [gridX, seamY, bottomZy], axis: "y" });
       }
       for (const gridX of rimPositions(filterLayout.structuralOffset, model.box.width - filterLayout.structuralOffset, pin.spacing)) {
-        if (nearSeam(gridX, interiorSeamsX) || clampedTopPinDepth(topHoles, gridX, seamY, "y", pin.holeDepth) === null) {
+        if (nearSeam(gridX, interiorSeamsX)) {
+          continue;
+        }
+        // Solid base: place the central pin outright. Otherwise mirror the top
+        // plate so the rows line up (and skip where the top has no pin there).
+        if (!solidBottomPlate && clampedTopPinDepth(topHoles, gridX, seamY, "y", pin.holeDepth) === null) {
           continue;
         }
         placements.push({ position: [gridX, seamY, bottomZy], axis: "y" });
@@ -465,12 +666,36 @@ const TOP_PIN_MIN_DEPTH_MM = 3;
 type TopPlateHoleCircle = { readonly cx: number; readonly cy: number; readonly r: number };
 
 // The perpendicular holes a top-plate pin must avoid: each fan's grill opening
-// and its four screw holes. `single-box-fan` clears the whole centre, so it gets
-// no central pins (returns null).
+// and its four screw holes (fan-grid top), OR the single central exhaust opening
+// plus its screw rings (box-exhaust top). Returning the box-exhaust opening as a
+// circle (instead of null) keeps the top-plate pins that sit in the SOLID FRAME
+// between that opening and the walls; only pins over the opening are dropped.
 function quadTopPlateHoles(
   model: TempestModel,
   fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
 ): readonly TopPlateHoleCircle[] | null {
+  if (fanLayout.topExhaust === "box-exhaust") {
+    const box = model.settings.fan.boxExhaust;
+    if (box.fanHoleSize <= 0) {
+      return null;
+    }
+    const cx = model.box.width / 2;
+    const cy = model.box.depth / 2;
+    // Mirror towerBoxExhaustCuts: a central opening of fanHoleSize plus up to two
+    // screw rings (angleOffset PI/n seats a 4-hole ring at the corners).
+    const circles: TopPlateHoleCircle[] = [{ cx, cy, r: box.fanHoleSize / 2 }];
+    for (const ring of [box.ringOne, box.ringTwo]) {
+      if (ring.screwHoles <= 0 || ring.screwDiameter <= 0 || ring.radius <= 0) {
+        continue;
+      }
+      const angleOffset = Math.PI / ring.screwHoles;
+      for (let index = 0; index < ring.screwHoles; index += 1) {
+        const angle = angleOffset + (index * 2 * Math.PI) / ring.screwHoles;
+        circles.push({ cx: cx + ring.radius * Math.cos(angle), cy: cy + ring.radius * Math.sin(angle), r: ring.screwDiameter / 2 });
+      }
+    }
+    return circles;
+  }
   if (fanLayout.topExhaust !== "fan-grid") {
     return null;
   }
@@ -613,15 +838,32 @@ function sandwichFanBores(
   ];
 }
 
-function boreSwallowsPin(bore: SandwichFanBore, placement: TempestAlignmentPinPlacement, wallThickness: number): boolean {
-  const [pinX, pinY, pinZ] = placement.position;
-  const [boreX, boreY, boreZ] = bore.center;
-  const alongNormal = bore.normalAxis === "x" ? pinX - boreX : pinY - boreY;
-  if (Math.abs(alongNormal) > wallThickness / 2 + 1) {
+function boreSwallowsPin(
+  bore: SandwichFanBore,
+  placement: TempestAlignmentPinPlacement,
+  wallThickness: number,
+  clearance = 0,
+  reach = 0,
+): boolean {
+  const position = placement.position;
+  const center = bore.center;
+  const normalIndex = bore.normalAxis === "x" ? 0 : 1;
+  if (Math.abs(position[normalIndex] - center[normalIndex]) > wallThickness / 2 + 1) {
     return false;
   }
-  const planarDistance = bore.normalAxis === "x" ? Math.hypot(pinY - boreY, pinZ - boreZ) : Math.hypot(pinX - boreX, pinZ - boreZ);
-  return planarDistance < bore.radius;
+  // The bore's circular cross-section spans the two axes other than its normal.
+  const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
+  const planeAxes: readonly [number, number] = normalIndex === 0 ? [1, 2] : [0, 2];
+  // If the socket runs IN the bore's circle plane, it sweeps ±reach along its axis,
+  // so clamp that coordinate to the segment's nearest point to the bore centre.
+  const planar = planeAxes.map((axis) => {
+    if (axis === axisIndex) {
+      return Math.max(position[axis] - reach, Math.min(center[axis], position[axis] + reach));
+    }
+    return position[axis];
+  });
+  const planarDistance = Math.hypot(planar[0] - center[planeAxes[0]], planar[1] - center[planeAxes[1]]);
+  return planarDistance < bore.radius + clearance;
 }
 
 // #######################################
@@ -674,19 +916,37 @@ function sandwichLoadingSlots(
   });
 }
 
-function loadingSlotSwallowsPin(slot: SandwichLoadingSlot, placement: TempestAlignmentPinPlacement): boolean {
+// Extra standoff beyond the pin radius so a hole never even grazes the slot edge.
+const SLOT_PIN_CLEARANCE_MM = 0.5;
+
+function loadingSlotSwallowsPin(
+  slot: SandwichLoadingSlot,
+  placement: TempestAlignmentPinPlacement,
+  pin: AlignmentPinSpec | null,
+): boolean {
   const [x, y, z] = placement.position;
-  if (z <= slot.zMin || z >= slot.zMax) {
-    return false;
-  }
-  const lengthCoordinate = slot.lengthAxis === "x" ? x : y;
-  if (lengthCoordinate <= slot.lengthMin || lengthCoordinate >= slot.lengthMax) {
-    return false;
-  }
   const normalCoordinate = slot.normalAxis === "x" ? x : y;
   // Seam wall pins sit exactly on the wall midline; a 1 mm tolerance keeps the
   // test robust to rounding without reaching pins on the opposite wall.
-  return Math.abs(normalCoordinate - slot.normalPosition) <= 1;
+  if (Math.abs(normalCoordinate - slot.normalPosition) > 1) {
+    return false;
+  }
+  // The pin hole is a cylinder of radius pin.diameter/2 along `placement.axis`,
+  // reaching holeDepth each way. Its footprint in the wall plane (length axis x z)
+  // must clear the slot opening, or the hole breaks into it and leaves a paper-thin
+  // web at the slot edge. A pin whose CENTER sits just outside the strict slot
+  // bounds was previously kept, so its hole punched through there — inflate the
+  // slot by the hole's reach (full depth along the pin's own axis, the radius
+  // across it) plus a small standoff.
+  const radius = pin === null ? 0 : pin.diameter / 2 + SLOT_PIN_CLEARANCE_MM;
+  const depth = (placement.holeDepth ?? pin?.holeDepth ?? 0) + (pin === null ? 0 : SLOT_PIN_CLEARANCE_MM);
+  const lengthReach = placement.axis === slot.lengthAxis ? depth : radius;
+  const zReach = placement.axis === "z" ? depth : radius;
+  const lengthCoordinate = slot.lengthAxis === "x" ? x : y;
+  if (lengthCoordinate + lengthReach <= slot.lengthMin || lengthCoordinate - lengthReach >= slot.lengthMax) {
+    return false;
+  }
+  return z + zReach > slot.zMin && z - zReach < slot.zMax;
 }
 
 // #######################################
@@ -732,13 +992,18 @@ function quadSideWindows(
   ];
 }
 
-function windowSwallowsPin(window: QuadSideWindow, placement: TempestAlignmentPinPlacement): boolean {
+// `clearance` widens the opening by the pin's reach on its in-plane (length and
+// height) edges, so a socket whose CENTRE sits just outside the cut still counts
+// as swallowed when its radius would graze into the opening. Without it a z-pin
+// landing one wall-frame-pixel outside the window edge breaks out sideways into
+// the opening (the centre test alone misses it).
+function windowSwallowsPin(window: QuadSideWindow, placement: TempestAlignmentPinPlacement, clearance = 0): boolean {
   const [x, y, z] = placement.position;
-  if (z <= window.zMin || z >= window.zMax) {
+  if (z <= window.zMin - clearance || z >= window.zMax + clearance) {
     return false;
   }
   const lengthCoordinate = window.lengthAxis === "x" ? x : y;
-  if (lengthCoordinate <= window.lengthMin || lengthCoordinate >= window.lengthMax) {
+  if (lengthCoordinate <= window.lengthMin - clearance || lengthCoordinate >= window.lengthMax + clearance) {
     return false;
   }
   const normalCoordinate = window.normalAxis === "x" ? x : y;
@@ -780,6 +1045,42 @@ function quadFilterPocketColumns(
 function boxSwallowsPin(box: QuadPocketColumn, placement: TempestAlignmentPinPlacement): boolean {
   const [x, y, z] = placement.position;
   return x > box.xMin && x < box.xMax && y > box.yMin && y < box.yMax && z > box.zMin && z < box.zMax;
+}
+
+// How much solid material to keep between a pin socket and a perpendicular cut.
+const PIN_SEAM_MATERIAL_MM = 1.5;
+
+// A pin socket runs along its axis and is meant to open ONLY on the seam it
+// crosses. If the pin sits within (radius + standoff) of an INTERIOR chunk seam
+// that runs PERPENDICULAR to its axis (a cut plane the socket lies alongside),
+// the socket breaks out through that cut face, leaving an open trench in the
+// part edge. The planar (frame/plate) pins already clear perpendicular seams via
+// planarCoordClear; this is the matching guard for the wall pins, which span the
+// full wall length and would otherwise land right beside a crossing seam.
+const perpendicularSeamClearance = (pin: AlignmentPinSpec | null): number =>
+  (pin === null ? 0 : pin.diameter / 2) + PIN_SEAM_MATERIAL_MM;
+
+function pinBreachesPerpendicularSeam(
+  placement: TempestAlignmentPinPlacement,
+  chunkGrid: TempestChunkGrid,
+  clearance: number,
+): boolean {
+  const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
+  const interiorSeams: readonly (readonly number[])[] = [
+    chunkGrid.boundariesX.slice(1, -1),
+    chunkGrid.boundariesY.slice(1, -1),
+    chunkGrid.boundariesZ.slice(1, -1),
+  ];
+  for (let perp = 0; perp < 3; perp += 1) {
+    if (perp === axisIndex) {
+      continue;
+    }
+    const coordinate = placement.position[perp];
+    if (interiorSeams[perp].some((seam) => Math.abs(coordinate - seam) < clearance)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // The outer vertical corners are bevelled at 45° (chamferedPrism), so a pin whose

@@ -30,12 +30,14 @@ import {
   canonicalTempestDesign,
   cordHoleSides,
   cordHoleWalls,
+  cutStyles,
   defaultSettings,
   findPreviewMaterialColorPreset,
   topExhausts,
   type CameraPreset,
   type CordHoleSide,
   type CordHoleWall,
+  type CutStyle,
   type FilterSlotWall,
   type PreviewMaterialColorId,
   type PurifierDraft,
@@ -67,9 +69,19 @@ export function encodeSettings(
   params.set("rim", formatNumber(settings.rim));
   params.set("fanColor", settings.fanColor);
   params.set("fanDiameter", String(settings.fanDiameter));
+  params.set("fanModel", settings.fanModel);
+  params.set("customFanAirflow", formatNumber(settings.customFanAirflow));
+  params.set("customFanPressure", formatNumber(settings.customFanPressure));
+  params.set("customFanNoise", formatNumber(settings.customFanNoise));
+  params.set("customFanCurrent", formatNumber(settings.customFanCurrent));
+  params.set("customFanWatts", formatNumber(settings.customFanWatts));
+  params.set("roomUnit", settings.roomUnit);
+  params.set("electricityPrice", formatNumber(settings.electricityPrice));
+  params.set("currencySymbol", settings.currencySymbol);
   if (!isTempestPrintDesignId(settings.printDesign)) {
     params.set("filters", String(settings.filters));
     params.set("splitFrames", String(settings.splitFrames));
+    params.set("cutStyle", settings.cutStyle);
   }
   params.set("fansLeft", String(settings.fansLeft));
   params.set("fansRight", String(settings.fansRight));
@@ -92,6 +104,8 @@ export function encodeSettings(
   params.set("backPlateFans", String(settings.backPlateFans));
   params.set("boxDepth", formatNumber(settings.boxDepth));
   params.set("alignmentPinDiameter", formatNumber(settings.alignmentPinDiameter));
+  params.set("bottomFilter", String(settings.bottomFilter));
+  params.set("feetLength", formatNumber(settings.feetLength));
   params.set("topExhaust", settings.topExhaust);
   params.set("boxFanHoleSize", formatNumber(settings.boxFanHoleSize));
   params.set("boxRingOneScrewHoles", String(settings.boxRingOneScrewHoles));
@@ -185,6 +199,10 @@ export function decodeSettings(search: string): RawPurifierSettings {
     cordHoleWall: readCordHoleWall(params),
     cordHoleSide: readCordHoleSide(params),
     topExhaust: readTopExhaust(params),
+    cutStyle: readCutStyle(params),
+    fanModel: params.get("fanModel") ?? defaultSettings.fanModel,
+    roomUnit: params.get("roomUnit") === "m" ? "m" : defaultSettings.roomUnit,
+    currencySymbol: params.get("currencySymbol") ?? defaultSettings.currencySymbol,
     previewMaterialColor: readPreviewMaterialColor(params),
     cameraPreset: readCameraPreset(
       params,
@@ -267,6 +285,11 @@ function readCordHoleSide(params: URLSearchParams): CordHoleSide {
 function readTopExhaust(params: URLSearchParams): TopExhaust {
   const value = params.get("topExhaust");
   return topExhausts.find((style) => style === value) ?? defaultSettings.topExhaust;
+}
+
+function readCutStyle(params: URLSearchParams): CutStyle {
+  const value = params.get("cutStyle");
+  return cutStyles.find((style) => style === value) ?? defaultSettings.cutStyle;
 }
 
 function readTempestArrangement(
@@ -433,6 +456,18 @@ const purifierSettingsFieldKeys: Record<
   backPlateFans: "backPlateFans",
   boxDepth: "boxDepth",
   alignmentPinDiameter: "alignmentPinDiameter",
+  bottomFilter: "bottomFilter",
+  feetLength: "feetLength",
+  customFanAirflow: "customFanAirflow",
+  customFanPressure: "customFanPressure",
+  customFanNoise: "customFanNoise",
+  customFanCurrent: "customFanCurrent",
+  customFanWatts: "customFanWatts",
+  roomWidth: "roomWidth",
+  roomLength: "roomLength",
+  roomHeight: "roomHeight",
+  baselineAch: "baselineAch",
+  electricityPrice: "electricityPrice",
   boxFanHoleSize: "boxFanHoleSize",
   boxRingOneScrewHoles: "boxRingOneScrewHoles",
   boxRingOneScrewDiameter: "boxRingOneScrewDiameter",

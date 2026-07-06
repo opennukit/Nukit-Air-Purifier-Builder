@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How the estimates are calculated: Nukit FilterBoxBuilder</title>
+    <meta
+      name="description"
+      content="The formulas, assumptions, and citations behind each Performance estimate (CADR, airflow, face velocity, pressure drop, filter efficiency, power, cost, air changes per hour, infection-risk reduction, and noise) in the Nukit FilterBoxBuilder."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --surface: #f8f5ec;
+        --surface-strong: #fffdf6;
+        --ink: #17201c;
+        --muted: #59635b;
+        --line: #d9d0bf;
+        --line-soft: rgb(217 208 191 / 54%);
+        --accent: #1f6f56;
+        --accent-strong: #164d3d;
+        --accent-wash: rgb(31 111 86 / 8%);
+        --shadow: 0 20px 70px rgb(51 42 27 / 12%);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ece8dc;
+        background-image: radial-gradient(rgb(190 141 85 / 9%) 1px, transparent 1px);
+        background-size: 42px 42px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+      }
+      a { color: var(--accent-strong); }
+      .eyebrow {
+        margin: 0 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--accent-strong);
+      }
+      .page { max-width: 1120px; margin: 0 auto; padding: 32px 24px 96px; }
+      header.masthead {
+        padding: 28px 30px; background: var(--surface-strong); border: 1px solid var(--line);
+        box-shadow: var(--shadow); border-radius: 2px;
+      }
+      header.masthead h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.01em; }
+      header.masthead p { margin: 0; max-width: 74ch; color: var(--muted); }
+      .home-link {
+        display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 2px;
+        background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 0.85rem;
+      }
+      .home-link.secondary { margin-left: 8px; background: transparent; color: var(--accent-strong); border: 1px solid var(--line); }
+      .layout { display: grid; grid-template-columns: 240px 1fr; gap: 28px; margin-top: 28px; }
+      nav.toc {
+        position: sticky; top: 18px; align-self: start; max-height: calc(100vh - 36px); overflow: auto;
+        padding: 18px 18px 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; font-size: 0.86rem;
+      }
+      nav.toc strong { display: block; margin: 14px 0 6px; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+      nav.toc strong:first-child { margin-top: 0; }
+      nav.toc a { display: block; padding: 3px 0; color: var(--ink); text-decoration: none; }
+      nav.toc a:hover { color: var(--accent-strong); text-decoration: underline; }
+      main { min-width: 0; }
+      section.card {
+        padding: 26px 30px; margin-bottom: 22px; background: var(--surface-strong);
+        border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 10px 40px rgb(51 42 27 / 7%);
+      }
+      section.card > h2 { margin: 0 0 4px; font-size: 1.45rem; }
+      .lede { margin: 0 0 18px; color: var(--muted); }
+      .var { scroll-margin-top: 18px; padding: 18px 0; border-top: 1px solid var(--line-soft); }
+      .var:first-of-type { border-top: 0; }
+      .var h3 { margin: 0 0 8px; font-size: 1.12rem; }
+      .var p { margin: 0 0 8px; }
+      .var p:last-child { margin-bottom: 0; }
+      code { padding: 1px 5px; background: var(--accent-wash); border: 1px solid var(--line-soft); border-radius: 3px; font-size: 0.85em; }
+      .formula {
+        margin: 10px 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line-soft);
+        border-radius: 2px; font-size: 0.92rem; overflow-x: auto;
+      }
+      ul, ol { margin: 8px 0; padding-left: 22px; }
+      li { margin: 4px 0; }
+      .tip { margin: 14px 0; padding: 12px 16px; background: var(--accent-wash); border-left: 3px solid var(--accent); border-radius: 2px; }
+      .tip strong { color: var(--accent-strong); }
+      .warn { margin: 14px 0; padding: 12px 16px; background: rgb(190 141 85 / 12%); border-left: 3px solid var(--wood, #be8d55); border-radius: 2px; }
+      .refs { font-size: 0.9rem; }
+      .refs li { margin: 6px 0; }
+      footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Methodology</p>
+        <h1>How the estimates are calculated</h1>
+        <p>
+          All figures provided by the Builder interface are engineering <strong>estimates</strong> for the air purifier you are configuring, not measured ratings. The PC-fan physics are reverse-engineered from Nukit and community-sourced data. The box-fan "filter cube" model and the noise model are fit to independent bench and in-room measurements (NIOSH, UC&nbsp;Davis, and
+          <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a> reviews). Real-world results depend
+          on your fan brand, filter, leakage, and assembly. This page provides the formula, the assumptions, and citations for each metric, enabling you to verify the figures independently..
+        </p>
+        <a class="home-link" href="./">← Back to the builder</a>
+        <a class="home-link secondary" href="help.html">Help &amp; build guide</a>
+      </header>
+
+      <div class="layout">
+        <nav class="toc" aria-label="Contents">
+          <strong>Metrics</strong>
+          <a href="#cadr">CADR</a>
+          <a href="#infection-risk">Infection-risk reduction</a>
+          <a href="#airflow">Total airflow</a>
+          <a href="#face-velocity">Face velocity</a>
+          <a href="#pressure-drop">System pressure drop</a>
+          <a href="#filter-efficiency">Filter efficiency</a>
+          <a href="#power">Power &amp; current</a>
+          <a href="#cost">Cost to run</a>
+          <a href="#ach">Air changes per hour</a>
+          <a href="#noise">Noise</a>
+          <strong>Other</strong>
+          <a href="#calibration">Calibration &amp; limits</a>
+          <a href="#contribute">Contribute measurements</a>
+          <a href="#references">References</a>
+        </nav>
+
+        <main>
+          <section class="card">
+            <h2>The estimates, one by one</h2>
+            <p class="lede">
+              Units: airflow in m³/h and CFM (1 CFM = 1.699 m³/h); pressure in pascals (1&nbsp;inH₂O = 249.09&nbsp;Pa);
+              velocity in m/s (1&nbsp;ft/min = 0.00508&nbsp;m/s).
+            </p>
+
+            <div class="var" id="cadr">
+              <h3>CADR: clean-air delivery rate</h3>
+              <p>
+                CADR is the volume of fully clean air delivered per unit time: the airflow through the box multiplied by
+                how much of the targeted particulate it removes on a single pass. It is the standard portable-air-cleaner
+                metric defined by <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">ANSI/AHAM&nbsp;AC-1</a>.
+              </p>
+              <div class="formula">CADR = (operating-point airflow) × (build efficiency) × (single-pass filter efficiency)</div>
+              <p>
+                For PC-fan builds the operating-point airflow comes from the fan/filter intersection (see
+                <a href="#airflow">Total airflow</a>); it is then reduced by a build-efficiency factor of
+                <code>0.85</code> for leakage, fan guards, and fan-to-fan interaction, and multiplied by the MERV-13
+                single-pass efficiency (see <a href="#filter-efficiency">Filter efficiency</a>). For the box-fan
+                "filter cube" build, airflow comes from an empirical power-law fit through reference four-filter cubes
+                (capped at the unit's no-filter shroud airflow) and the single-pass capture is a conservative whole-cube
+                figure (0.50 for media ≥30&nbsp;mm deep, otherwise 0.43). The cube model's depth and shroud gains match
+                the EPA's DIY chamber study.
+              </p>
+              <p class="refs">
+                Sources:
+                <a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">AHAM AC-1 (CADR)</a> ·
+                box-fan airflow from NIOSH bench tests (<a href="https://doi.org/10.1016/j.buildenv.2022.109920" target="_blank" rel="noopener">Derk et&nbsp;al. 2023</a>);
+                cube single-pass capture calibrated to UC&nbsp;Davis (<a href="https://doi.org/10.1080/02786826.2022.2054674" target="_blank" rel="noopener">Dal&nbsp;Porto et&nbsp;al. 2022</a>) and
+                <a href="https://housefresh.com/corsi-rosenthal-box-review/" target="_blank" rel="noopener">HouseFresh</a> in-room reviews.
+              </p>
+            </div>
+
+            <div class="var" id="infection-risk">
+              <h3>Infection-risk reduction</h3>
+              <p>
+                A purifier delivers its CADR as <em>equivalent clean air</em>. In a well-mixed room the steady-state
+                airborne-pathogen concentration is inversely proportional to the total clean-air supply rate, so adding
+                the unit changes that rate from the room's baseline ventilation <code>B</code> to <code>B + CADR</code>.
+                The relative reduction in long-range airborne dose (and, for a fixed exposure, infection risk) is:
+              </p>
+              <div class="formula">reduction = CADR / (B + CADR) = ACH<sub>purifier</sub> / (ACH<sub>baseline</sub> + ACH<sub>purifier</sub>)</div>
+              <p>
+                Working in air changes per hour cancels the room volume, so the only extra input is the room's own
+                ventilation, which you set with the <strong>Room ventilation</strong> field in Advanced (default 1 ACH;
+                roughly 0.3 for a sealed room, 1 for a typical home, 3+ if well ventilated). This is the
+                <a href="https://pubmed.ncbi.nlm.nih.gov/12950586/" target="_blank" rel="noopener">Wells-Riley</a> result:
+                raising the clean-air supply <code>Q</code> lowers risk in proportion to <code>1/Q</code>.
+              </p>
+              <div class="warn">
+                <strong>Read this as a relative estimate, not a guarantee.</strong> It models only long-range, well-mixed
+                airborne transmission and ignores close-range exposure (being near an infectious person). It is not an
+                absolute chance of infection; that would require the pathogen's quanta-emission rate, the number of
+                people, and the exposure time, none of which this tool knows.
+              </div>
+              <p class="refs">
+                Sources:
+                <a href="https://pubmed.ncbi.nlm.nih.gov/12950586/" target="_blank" rel="noopener">Rudnick &amp; Milton, 2003 (rebreathed-fraction / Wells-Riley)</a> ·
+                <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7871780/" target="_blank" rel="noopener">dilution-based Wells-Riley expansion (well-mixed limits)</a>.
+              </p>
+            </div>
+
+            <div class="var" id="airflow">
+              <h3>Total airflow: the operating point</h3>
+              <p>
+                A fan and a filter meet at one operating point: the pressure where the fan can still push as much air as
+                the filter will pass. Each fan model carries a normalised pressure/flow (PQ) curve scaled to its rated
+                free-air flow <code>Q₀</code> and maximum static pressure <code>P₀</code>. The filter's resistance is a
+                quadratic in face velocity <code>V</code> (FPM), the standard media-resistance form:
+              </p>
+              <div class="formula">ΔP[inH₂O] = A·V² + B·V&nbsp;&nbsp;(MERV-13: A = 4.73×10⁻⁷, B = 3.38×10⁻⁴)</div>
+              <p>
+                The tool solves by bisection for the ΔP where <code>N · fan(Q) = filter(Q)</code>, then converts that
+                airflow to CFM/m³h. Effective pleated-media area is derived from the filter's outer dimensions and grows
+                with depth (up to 1.8× for deep media). When the honeycomb grill is enabled, its restriction is added in
+                series with each fan as an Idel'chik thin-perforated-plate loss (a deliberately conservative model, so it
+                never over-states airflow). Reported airflow is after the 0.85 build-efficiency factor.
+              </p>
+              <p class="refs">
+                Sources: the MERV-13 resistance coefficients, the effective-area formula, and the 120/140&nbsp;mm fan
+                curve shapes are reverse-engineered from Nukit and community data built on 3M&nbsp;Filtrete
+                lab data and Arctic P12/P14 PQ curves; the solver reproduces that sheet's worked example to ~0.1%.
+                The fan-curve / system-resistance intersection is standard fan engineering; the grill loss uses
+                I. E. Idel'chik, <em>Handbook of Hydraulic Resistance</em> (thin-perforated-plate coefficient).
+              </p>
+            </div>
+
+            <div class="var" id="face-velocity">
+              <h3>Face velocity</h3>
+              <p>
+                The air speed through the filter media: airflow divided by the effective media area, taken from the
+                resistance curve at the operating ΔP and converted from ft/min to m/s (× 0.00508).
+              </p>
+              <p>
+                It matters because a filter's rated efficiency is measured at a reference face velocity (around
+                2.5&nbsp;m/s in <a href="https://www.ashrae.org" target="_blank" rel="noopener">ASHRAE 52.2</a> testing).
+                The large media area of a multi-filter box runs far below that, which tends to <em>improve</em> capture
+                and keep pressure drop (and noise) low.
+              </p>
+            </div>
+
+            <div class="var" id="pressure-drop">
+              <h3>System pressure drop</h3>
+              <p>
+                The static pressure the fans work against at the operating point, where fan output equals the filter
+                (plus grill) resistance, converted from inH₂O to pascals (× 249.09). Higher pressure drop means a
+                clogged or undersized filter relative to the fans; it pushes the operating point to lower airflow.
+              </p>
+            </div>
+
+            <div class="var" id="filter-efficiency">
+              <h3>Filter efficiency</h3>
+              <p>
+                The single-pass fraction of particles the media captures. <a href="https://www.ashrae.org" target="_blank" rel="noopener">ANSI/ASHRAE&nbsp;52.2</a>
+                reports MERV efficiency in three particle-size bands: E1 (0.3–1&nbsp;µm), E2 (1–3&nbsp;µm), and E3
+                (3–10&nbsp;µm). This tool uses the published per-band values for a MERV-13 furnace filter
+                (62% / 87% / 95%) and averages them to about <code>81%</code> as the single headline figure; the per-band
+                numbers are shown in the breakdown. The box-fan cube pushes air through the media much faster, so it
+                uses a conservative whole-system single-pass figure instead (0.43 for 1" media, 0.50 for ≥2"),
+                consistent with the 41–58% effective efficiency measured at UC&nbsp;Davis and calibrated so the cube's
+                CADR matches independent room reviews.
+              </p>
+              <p class="refs">
+                Sources: <a href="https://www.ashrae.org" target="_blank" rel="noopener">ANSI/ASHRAE 52.2 (MERV / E1–E3 bands)</a>;
+                per-band values from the filter manufacturer's published MERV-13 data; cube efficiency from
+                <a href="https://doi.org/10.1080/02786826.2022.2054674" target="_blank" rel="noopener">Dal&nbsp;Porto et&nbsp;al. 2022 (UC&nbsp;Davis)</a>.
+              </p>
+            </div>
+
+            <div class="var" id="power">
+              <h3>Power &amp; current</h3>
+              <p>
+                PC fans run on 12&nbsp;V: total current is the per-fan rated current × the number of fans, and power is
+                <code>P = 12&nbsp;V × I</code>. The box fan runs on mains: the figure is its rated wattage at the selected
+                speed, and current is <code>I = P / 120&nbsp;V</code>. Per-fan specs come from each model's datasheet, or
+                from the values you enter for a Custom fan.
+              </p>
+            </div>
+
+            <div class="var" id="cost">
+              <h3>Cost to run (24/7)</h3>
+              <p>
+                Energy use at the build's maximum-power draw, run continuously, priced at your electricity rate:
+              </p>
+              <div class="formula">cost = (P[W] / 1000) × 24 × days × price-per-kWh&nbsp;&nbsp;(30.44 days/month, 365.25 days/year)</div>
+              <p>
+                It assumes the fans run flat-out around the clock, an upper bound. Running slower, or only when needed,
+                costs proportionally less. The rate shown by default is the approximate US residential average; set your
+                own from a recent bill in Advanced.
+              </p>
+            </div>
+
+            <div class="var" id="ach">
+              <h3>Air changes per hour (ACH)</h3>
+              <p>
+                How many times per hour the build can process a volume of clean air equal to the whole room:
+              </p>
+              <div class="formula">ACH = CADR[m³/h] ÷ room volume[m³]</div>
+              <p>
+                Room volume comes from the width, length, and ceiling height you enter. Public-health guidance for
+                infection control targets at least <strong>5 ACH</strong> of clean air in occupied spaces (US CDC), and
+                <a href="https://www.ashrae.org/technical-resources/standards-and-guidelines/ashrae-standards-and-guidelines" target="_blank" rel="noopener">ASHRAE Standard&nbsp;241</a>
+                frames the same idea as an "equivalent clean airflow" rate. A purifier's CADR counts toward that target
+                alongside any fresh-air ventilation.
+              </p>
+              <p class="refs">
+                Sources:
+                <a href="https://www.cdc.gov/niosh/ventilation/about/ventilation-in-buildings.html" target="_blank" rel="noopener">US CDC, ventilation (5+ ACH)</a> ·
+                <a href="https://www.ashrae.org/technical-resources/bookstore/standard-241-control-of-infectious-aerosols" target="_blank" rel="noopener">ASHRAE Standard 241</a>.
+              </p>
+            </div>
+
+            <div class="var" id="noise">
+              <h3>Noise</h3>
+              <p>
+                For PC-fan builds, each fan's spec dBA is first mapped to a realistic in-enclosure level: Arctic fans use
+                a measured linear fit (<code>0.461 × spec + 26.4</code>) and other brands use spec + a 3.4&nbsp;dB enclosure
+                offset. The fans are then summed as independent sources (<code>+10·log₁₀(N)</code>) and corrected from the
+                3&nbsp;ft spec distance to 1&nbsp;m (≈ −0.78&nbsp;dB). The box-fan build uses the whole unit's measured
+                dBA at the chosen speed, distance-corrected. These offsets are calibrated against
+                <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a> in-room measurements, so the
+                "real-world" figure is usually higher than the bare spec.
+              </p>
+              <p class="refs">
+                Sources: incoherent-source addition (standard acoustics, <code>L = 10·log₁₀ Σ 10^(Lᵢ/10)</code>);
+                calibration against <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a> measurements.
+              </p>
+            </div>
+          </section>
+
+          <section class="card" id="calibration">
+            <h2>Calibration &amp; limits</h2>
+            <p>
+              The fan PQ-curve shapes, the MERV-13 resistance and efficiency coefficients, the box-fan power law, and the
+              noise offsets are all fit to published data and independent measurements, but your build will differ.
+              Treat every figure as a ballpark for comparing designs, not a certified rating. In particular:
+            </p>
+            <ul>
+              <li>CADR drops as filters load with dust or smoke, so change them during heavy-use events.</li>
+              <li>Leakage, fan guards, and a missing shroud all cost airflow; the model already discounts for typical losses but can't see your exact assembly.</li>
+              <li>The filter media removes particles, not gases: it does not lower CO₂, and odor/VOC removal would need activated carbon, which these designs don't include.</li>
+              <li>The infection-risk figure is a relative, long-range, well-mixed estimate (see that section's caveat).</li>
+            </ul>
+          </section>
+
+          <section class="card" id="contribute">
+            <h2>Help improve these estimates</h2>
+            <p>
+              These numbers get more accurate every time a real build is measured. If you have measured the CADR,
+              airflow, noise, or power of a build that resembles one of these designs, we would be genuinely grateful
+              for the data, and happy to credit you. Even a single careful measurement helps anchor the model and
+              tightens the estimates for everyone who uses the builder after you.
+            </p>
+            <p>The most useful submissions include, where you have them:</p>
+            <ul>
+              <li>The build: filter size and MERV/MPR (or the box-fan model), fan model and count, and fan speed.</li>
+              <li>The measurement: CADR or airflow (with units), and how it was measured (instrument or method, test volume or chamber).</li>
+              <li>Optional but valued: measured noise (with distance), power draw, and any photos of the build.</li>
+            </ul>
+            <p>
+              You can send measurements or corrections through the <a href="contact.html">contact page</a>. Independent
+              reviewers whose published data already anchors this model are credited in the
+              <a href="#references">references</a> below; we would like to keep adding to that list.
+            </p>
+          </section>
+
+          <section class="card" id="references">
+            <h2>References</h2>
+            <p class="lede">Standards &amp; definitions</p>
+            <ul class="refs">
+              <li><a href="https://ahamverifide.org/ahams-air-filtration-standards/" target="_blank" rel="noopener">AHAM: Air filtration standards (ANSI/AHAM AC-1, CADR)</a></li>
+              <li><a href="https://www.ashrae.org" target="_blank" rel="noopener">ANSI/ASHRAE 52.2: Method of testing general ventilation air-cleaning devices (MERV; E1–E3 size bands)</a></li>
+              <li><a href="https://www.cdc.gov/niosh/ventilation/about/ventilation-in-buildings.html" target="_blank" rel="noopener">US CDC: Ventilation in buildings (5+ air changes per hour)</a></li>
+              <li><a href="https://www.ashrae.org/technical-resources/bookstore/standard-241-control-of-infectious-aerosols" target="_blank" rel="noopener">ASHRAE Standard 241: Control of Infectious Aerosols (equivalent clean airflow)</a></li>
+            </ul>
+            <p class="lede">Airborne-infection model</p>
+            <ul class="refs">
+              <li><a href="https://pubmed.ncbi.nlm.nih.gov/12950586/" target="_blank" rel="noopener">Rudnick &amp; Milton (2003), <em>Indoor Air</em>: airborne infection risk from CO₂ (rebreathed-fraction form of the Wells-Riley model)</a></li>
+              <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7871780/" target="_blank" rel="noopener">Dilution-based expansion of the Wells-Riley model: states the well-mixed / long-range limitation</a></li>
+            </ul>
+            <p class="lede">Box-fan ("filter cube") airflow, efficiency &amp; calibration</p>
+            <ul class="refs">
+              <li><a href="https://doi.org/10.1080/02786826.2022.2054674" target="_blank" rel="noopener">Dal&nbsp;Porto, Kunz, Pistochini, Corsi &amp; Cappa (2022), <em>Aerosol Science &amp; Technology</em> 56(6) 564–572: DIY box-fan filter performance; 41–58% effective efficiency (UC&nbsp;Davis)</a></li>
+              <li><a href="https://doi.org/10.1016/j.buildenv.2022.109920" target="_blank" rel="noopener">Derk et&nbsp;al. (2023), <em>Building and Environment</em> 229, 109920: NIOSH head-to-head airflow for seven box-fan models</a></li>
+              <li><a href="https://www.epa.gov/air-research/research-diy-air-cleaners-reduce-wildfire-smoke-indoors" target="_blank" rel="noopener">US EPA: Research on DIY air cleaners to reduce wildfire smoke indoors (shroud / filter-depth / four-filter gains)</a></li>
+              <li><a href="https://housefresh.com/corsi-rosenthal-box-review/" target="_blank" rel="noopener">HouseFresh: DIY filter-cube review (CADR, noise, power)</a></li>
+              <li><a href="https://www.jefftk.com/p/evaluating-a-corsi-rosenthal-filter-cube" target="_blank" rel="noopener">Jeff Kaufman: evaluating a DIY filter cube (Lasko + 4× MERV-13; ~246 cfm)</a></li>
+            </ul>
+            <p class="lede">Independent build measurements (noise / CADR anchors)</p>
+            <ul class="refs">
+              <li><a href="https://housefresh.com/cleanairkits-luggable-xl-review/" target="_blank" rel="noopener">HouseFresh: CleanAirKits Luggable XL-7 review (7× SickleFlow 120; 38.8 dBA @ 3 ft)</a></li>
+              <li><a href="https://housefresh.com/nukit-tempest-review/" target="_blank" rel="noopener">HouseFresh: Nukit Tempest review (6× Arctic P14; 41.8 dBA @ 3 ft, ~247 cfm)</a></li>
+            </ul>
+            <p class="lede">Source dataset &amp; specs</p>
+            <ul class="refs">
+              <li>Community filter/fan data: 3M&nbsp;Filtrete MERV/MPR resistance curves and Arctic P12/P14 PQ curves (PC-mode coefficients, effective-area formula, and fan-curve shapes reverse-engineered from it).</li>
+              <li>Manufacturer datasheets: Arctic P12/P14, Noctua NF-A12x25/NF-A14x25, be&nbsp;quiet! Silent Wings 4, Cooler&nbsp;Master SickleFlow/MasterFan/Mobius, NZXT F140P, Corsair RS140 MAX (airflow, pressure, noise, current); <a href="https://www.airkinglimited.com/wp-content/uploads/2020/09/9723spec1.pdf" target="_blank" rel="noopener">Air King 9723 spec sheet</a>; Lasko B20200/3723 and Hurricane HGC736501.</li>
+            </ul>
+          </section>
+
+          <footer class="site-footer">
+            <p>
+              These estimates are provided for design comparison and education. They are not a substitute for a
+              certified CADR rating or professional indoor-air-quality assessment.
+            </p>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

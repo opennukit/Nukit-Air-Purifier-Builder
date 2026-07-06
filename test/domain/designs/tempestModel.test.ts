@@ -144,6 +144,8 @@ describe("Tempest OpenSCAD model port", () => {
       arrangement: {
         type: "four-side-filter-tower",
         filter: defaultTempestTowerFilter,
+        bottomFilter: false,
+        feetLength: 0,
       },
     };
     const model = createTempestModel(settings);
@@ -217,7 +219,7 @@ describe("Tempest OpenSCAD model port", () => {
     const towerAt = (filterFitClearance: number) =>
       createTempestModel({
         ...defaultTempestSettings,
-        arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter },
+        arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter, bottomFilter: false, feetLength: 0 },
         frame: { ...defaultTempestSettings.frame, filterFitClearance },
       });
 

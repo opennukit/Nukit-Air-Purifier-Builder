@@ -73,11 +73,14 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
   const thickness = settings.cutting.materialThickness;
   const rim = geometry.rim;
   const filterThickness = settings.filter.thickness;
+  // Hand cut has no inner/outer filter flanges — the filter is taped in — so the
+  // preview shows no flange frames (the cut sheet already omits the frame panels).
+  const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
 
   return {
     panels: cutPanelFabrication.cutPanels.flatMap((panel) => createStructuralPanelPart(panel)),
-    filterRails: createFilterRailParts(layout),
-    filterFrames: geometry.filterLayers.flatMap((layer) => createFilterFrameParts(layer, width, depth, rim, thickness)),
+    filterRails: handCut ? [] : createFilterRailParts(layout),
+    filterFrames: handCut ? [] : geometry.filterLayers.flatMap((layer) => createFilterFrameParts(layer, width, depth, rim, thickness)),
     filterMedia: geometry.filterLayers.map((layer) => ({
       kind: "box",
       id: `filter-media-${layer.index + 1}`,

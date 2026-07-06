@@ -1,6 +1,7 @@
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import {
   findPrintVolumePreset,
+  isCutSheetExportFormat,
   readExportFormat,
   type ExportFormat,
   type PrintVolumePresetId,
@@ -12,7 +13,7 @@ import {
 
 export type WorkbenchFabrication =
   | {
-      readonly method: "laser-svg";
+      readonly method: "laser-svg" | "hand-svg";
     }
   | {
       readonly method: "print-3mf";
@@ -81,8 +82,24 @@ export function withPreviewMode(state: WorkbenchState, previewMode: PreviewMode)
   return {
     ...state,
     preview: "fabrication",
-    fabrication: createFabricationState(fabricationMethodFromPreviewMode(previewMode), printVolumePresetIdForWorkbenchState(state)),
+    // Keep the current fabrication method when it already matches the target
+    // preview mode, so switching to the cut-sheet preview doesn't collapse
+    // Hand cut (hand-svg) back to the default Laser cut (laser-svg).
+    fabrication: createFabricationState(
+      methodForPreviewMode(previewMode, state.fabrication.method),
+      printVolumePresetIdForWorkbenchState(state),
+    ),
   };
+}
+
+function methodForPreviewMode(previewMode: PreviewMode, current: ExportFormat): ExportFormat {
+  if (previewMode === "cut-sheet") {
+    return isCutSheetExportFormat(current) ? current : "laser-svg";
+  }
+  if (previewMode === "print-sheets") {
+    return current === "print-3mf" ? current : "print-3mf";
+  }
+  return fabricationMethodFromPreviewMode(previewMode);
 }
 
 export function withFabricationMethod(state: WorkbenchState, method: ExportFormat): WorkbenchState {

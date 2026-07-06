@@ -33,13 +33,23 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   const dimensions = settings.filter;
   const materialThickness = settings.cutting.materialThickness;
   const fanDiameter = settings.fan.spec.diameter;
-  const workingDepth = dimensions.depth - materialThickness;
+  // Hand cut (foamcore) sizes the box snugly to the filter with no joinery overlap:
+  // the inner depth equals the filter depth, and the chamber (the side panel's
+  // "width") is the fan frame plus the filter thickness — the filter rests against
+  // the fans and is taped in, so there are no flange layers to add.
+  const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
+  const workingDepth = handCut ? dimensions.depth : dimensions.depth - materialThickness;
   // The one-side "Back" box uses the user's Box depth as the chamber instead of
   // the fan-diameter chamber (fans live on the back plate, not the walls).
   const backFanChamberDepth = oneSideBackFanBoxDepth(settings);
-  const chamberHeight =
-    (backFanChamberDepth ?? fanDiameter + 2) +
-    settings.filterCount * (dimensions.thickness + materialThickness);
+  // Hand-cut depth is the airflow gap plus one filter thickness (the filter taped
+  // against the fans). The gap is the user's Box depth when the back-plate fan box
+  // is active, otherwise just the fan frame, so the Box depth control drives the
+  // depth exactly like it does for the laser box.
+  const chamberHeight = handCut
+    ? (backFanChamberDepth ?? fanDiameter) + settings.filterCount * dimensions.thickness
+    : (backFanChamberDepth ?? fanDiameter + 2) +
+      settings.filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(settings.cutting.rim, dimensions.width, workingDepth, chamberHeight);
 
   return {

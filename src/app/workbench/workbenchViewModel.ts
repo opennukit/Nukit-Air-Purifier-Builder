@@ -30,7 +30,7 @@ import {
   type WorkbenchState,
 } from "@/app/workbench/workbenchState";
 import type { PreviewMode } from "@/app/workbench/previewMode";
-import type { ExportFormat, PrintVolumePresetId } from "@/fabrication/printing/printableKit";
+import { isCutSheetExportFormat, type ExportFormat, type PrintVolumePresetId } from "@/fabrication/printing/printableKit";
 
 // #######################################
 // Workbench View Model
@@ -129,7 +129,7 @@ export function normalizeWorkbenchSession(
   let normalizedSettings = normalizePurifierDraft(settings);
   let normalizedState = normalizeWorkbenchStateForSettings(workbenchState, normalizedSettings);
 
-  if (fabricationMethodForWorkbenchState(normalizedState) === "laser-svg" && printDesignIdForPurifierDraft(normalizedSettings) !== "nukit-open-air") {
+  if (isCutSheetExportFormat(fabricationMethodForWorkbenchState(normalizedState)) && printDesignIdForPurifierDraft(normalizedSettings) !== "nukit-open-air") {
     normalizedSettings = normalizePurifierDraft(applyPrintDesignPreset(serializePurifierDraft(normalizedSettings), "nukit-open-air"));
     normalizedState = normalizeWorkbenchStateForSettings(normalizedState, normalizedSettings);
   } else if (
@@ -257,7 +257,7 @@ function createWorkbenchFabricationPreview(
   fabricationMethod: ExportFormat,
   design: WorkbenchDesignContext,
 ): WorkbenchFabricationPreview {
-  if (fabricationMethod === "laser-svg") {
+  if (isCutSheetExportFormat(fabricationMethod)) {
     return { type: "cut-sheet" };
   }
   if (design.type !== "static-reference") {
@@ -306,7 +306,10 @@ function exportActionLabelForDesign(
   if (fabricationMethod === "print-3mf" && design.type === "static-reference") {
     return "Open Printables Files";
   }
-  return fabricationMethod === "print-3mf" ? "Download print kit" : "Export Laser Drawing";
+  if (fabricationMethod === "print-3mf") {
+    return "Download print kit";
+  }
+  return fabricationMethod === "hand-svg" ? "Export Plans" : "Export Laser Drawing";
 }
 
 function findLaserCutDesignPreset(): LaserCutDesignPreset {

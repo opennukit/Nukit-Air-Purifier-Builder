@@ -15,6 +15,7 @@ import type {
   PurifierSettings,
 } from "@/domain/purifier/settingsModel";
 import { createTempestModel, type TempestFanLayout } from "@/domain/designs/tempest/model";
+import { estimateBuildCadr } from "@/domain/purifier/buildCadr";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import type { CutPanel } from "@/fabrication/laser/cutGeometry";
@@ -71,11 +72,13 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     left: resolveFanCount(configuration.fan.banks.left, geometry.workingDepth, configuration.fan.spec.diameter),
     right: resolveFanCount(configuration.fan.banks.right, geometry.workingDepth, configuration.fan.spec.diameter),
   };
+  const fans = createBuildFanSummary(configuration, resolvedFans, backPlateFanCount(fabrication));
   const summary: BuildSummary = {
     chamberHeight: geometry.chamberHeight,
     workingDepth: geometry.workingDepth,
-    fans: createBuildFanSummary(configuration, resolvedFans, backPlateFanCount(fabrication)),
+    fans,
     fabrication: createBuildFabricationSummary(fabrication),
+    cadr: estimateBuildCadr({ configuration, rawSettings: settings, fanCount: totalFanCount(fans) }),
   };
 
   return {
@@ -85,6 +88,16 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     fabrication,
     summary,
   };
+}
+
+// Total fans driving the build's airflow (PC grid / wall banks). Box/exhaust is one
+// box fan, handled inside estimateBuildCadr, so its tempest fanCount (0) is fine.
+function totalFanCount(fans: BuildFanSummary): number {
+  if (fans.type === "wall-banks") {
+    const banks = fans.resolvedFans;
+    return banks.left + banks.right + banks.top + banks.bottom + fans.backPlateFans;
+  }
+  return fans.fanCount;
 }
 
 export function createLaserSvg(layout: LayoutResult): string {
