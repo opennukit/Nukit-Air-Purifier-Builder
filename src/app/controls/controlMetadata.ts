@@ -47,7 +47,7 @@ export const fanPlacementControls: readonly { readonly name: FanCountSettingName
 ];
 export const filterDimensionControls: readonly DimensionControl<FilterDimensionName>[] = [
   { name: "filterWidth", label: "Filter width", step: "1" },
-  { name: "filterDepth", label: "Filter length", step: "1" },
+  { name: "filterDepth", label: "Filter height", step: "1" },
   { name: "filterThickness", label: "Filter thickness", step: "0.1" },
 ];
 export const donutFilterDimensionControls: readonly DimensionControl<DonutFilterDimensionName>[] = [
@@ -72,7 +72,7 @@ export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = 
     suffix: "mm",
     step: "0.5",
     info:
-      "Extra space added around your measured filter so it slides in instead of press-fitting. 1 mm per side works for most printers; 0 makes the cavity exactly the measured size.",
+      "Extra space around your measured filter so it slides in instead of press-fitting. Width and height get this per side; the thickness pocket gets it once, since those faces seal against the frame and a bigger gap there lets air bypass the filter. 1 mm works for most printers.",
   },
 ];
 // Tempest honeycomb fan grill (hidden in box/exhaust mode). hexSize is the hex
