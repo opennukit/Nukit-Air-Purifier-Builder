@@ -27,6 +27,7 @@ import {
   staticReferencePreviewZoom,
   staticReferenceSceneScale,
   tempestChunkSeamExplodeFraction,
+  tempestPreviewZoom,
   type FanAxis,
   type PreviewInteriorPlane,
 } from "@/rendering/three/preview/previewData";
@@ -148,6 +149,9 @@ function previewZoomForLayout(layout: LayoutResult): number {
   if (isStaticReferencePrintDesignId(layout.configuration.printDesign.id)) {
     return staticReferencePreviewZoom;
   }
+  if (isTempestPrintDesignId(layout.configuration.printDesign.id)) {
+    return tempestPreviewZoom;
+  }
 
   const largestPhysicalDimension = previewLargestPhysicalDimensionMillimeters(layout);
   const sizeRatio = Math.max(1, largestPhysicalDimension / generatedPreviewZoomReferenceMillimeters);
@@ -164,10 +168,6 @@ function previewLargestPhysicalDimensionMillimeters(layout: LayoutResult): numbe
       model.fanSize,
     );
   }
-  if (isTempestPrintDesignId(settings.printDesign.id)) {
-    return tempestFramingDimensionMillimeters(layout);
-  }
-
   return Math.max(
     settings.filter.width,
     layout.summary.workingDepth,

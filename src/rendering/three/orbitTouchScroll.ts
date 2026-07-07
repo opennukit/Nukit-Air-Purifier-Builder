@@ -15,4 +15,56 @@ export function reserveSingleFingerForPageScroll(controls: OrbitControls): void 
   }
   controls.touches = { ONE: null, TWO: TOUCH.DOLLY_ROTATE };
   canvas.style.touchAction = "pan-y";
+  if (canvas instanceof HTMLElement) {
+    showHintOnSingleFingerOrbitAttempt(canvas);
+  }
+}
+
+// A one-finger drag on the canvas never touches the model (a single finger is
+// reserved for page scrolling), so any deliberate drag over it surfaces the
+// two-finger gesture instead of leaving the user guessing.
+const orbitAttemptMinimumDragPx = 16;
+const hintVisibleMs = 2200;
+
+function showHintOnSingleFingerOrbitAttempt(canvas: HTMLElement): void {
+  const host = canvas.parentElement;
+  if (host === null) {
+    return;
+  }
+  const hint = document.createElement("div");
+  hint.className = "touch-orbit-hint";
+  hint.textContent = "Use two fingers to rotate and zoom";
+  hint.setAttribute("aria-hidden", "true");
+  host.append(hint);
+
+  let hideTimer = 0;
+  let start: { x: number; y: number } | null = null;
+
+  canvas.addEventListener(
+    "touchstart",
+    (event) => {
+      start = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+    },
+    { passive: true },
+  );
+  canvas.addEventListener(
+    "touchmove",
+    (event) => {
+      if (start === null || event.touches.length !== 1) {
+        // A second finger landed: the user found the gesture — stop hinting.
+        start = null;
+        hint.classList.remove("touch-orbit-hint-visible");
+        return;
+      }
+      const dx = event.touches[0].clientX - start.x;
+      const dy = event.touches[0].clientY - start.y;
+      if (Math.hypot(dx, dy) < orbitAttemptMinimumDragPx) {
+        return;
+      }
+      hint.classList.add("touch-orbit-hint-visible");
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => hint.classList.remove("touch-orbit-hint-visible"), hintVisibleMs);
+    },
+    { passive: true },
+  );
 }
