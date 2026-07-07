@@ -190,8 +190,10 @@ const FILAMENT_DENSITY_G_PER_CM3 = 1.24;
 // material volume overstates filament use by ~2x. Model a typical sliced wall:
 // the perimeter shells print solid on both faces, the enclosed core fills at a
 // sparse infill fraction. Thin walls are nearly all perimeter (factor -> 1);
-// thick walls benefit most from infill.
-const FILAMENT_INFILL_FRACTION = 0.15;
+// thick walls benefit most from infill. 10% is the field-tested setting these
+// boxes are actually printed at — rock solid, and the estimate should not
+// encourage wasting plastic.
+const FILAMENT_INFILL_FRACTION = 0.1;
 const PRINT_PERIMETER_COUNT = 2;
 const PRINT_LINE_WIDTH_MM = 0.45;
 const FILAMENT_INFILL_PERCENT_LABEL = `~${Math.round(FILAMENT_INFILL_FRACTION * 100)}% infill`;
