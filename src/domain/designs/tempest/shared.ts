@@ -135,11 +135,26 @@ export type TempestFrameSettings = {
   readonly rim: Millimeters;
   readonly chamferSize: Millimeters;
   readonly towerCornerPostChamfer: Millimeters;
-  // Clearance added per side around the MEASURED filter so it slides into its
-  // cavity instead of press-fitting; deliberately separate from the measurement
-  // so users enter the filter's real size and the box adds the play itself.
+  // Clearance added around the MEASURED filter so it slides into its cavity
+  // instead of press-fitting; deliberately separate from the measurement so
+  // users enter the filter's real size and the box adds the play itself.
+  // Width/length add it per side (plain walls); the thickness pocket adds it
+  // once — see filterPocketThickness.
   readonly filterFitClearance: Millimeters;
 };
+
+// The pocket a filter's THICKNESS sits in: the measured thickness plus the fit
+// clearance ONCE — not per side. Both thickness faces seal against flanges, so
+// every millimeter of slack here is an air-bypass path around the filter; one
+// clearance is just enough to slide in without wedging. Every topology must
+// take the pocket from here: the sandwich once inlined the bare thickness and
+// printed press-fit pockets while the tower had the clearance.
+export function filterPocketThickness(
+  filterThickness: Millimeters,
+  frame: Pick<TempestFrameSettings, "filterFitClearance">,
+): Millimeters {
+  return filterThickness + frame.filterFitClearance;
+}
 
 export type TempestFilterSlotSettings = {
   readonly wall: TempestWall;
