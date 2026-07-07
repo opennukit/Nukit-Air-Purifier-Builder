@@ -54,7 +54,7 @@ const kit: PrintableKit = {
       mesh: capMesh,
     },
   ],
-  summary: { partCount: 2, oversizedPartCount: 0 },
+  summary: { partCount: 2, oversizedPartCount: 0, materialVolumeMm3: 1234.5 },
 };
 
 describe("kit worker wire format", () => {
@@ -85,7 +85,7 @@ describe("kit worker wire format", () => {
     const emptyKit: PrintableKit = {
       preset: findPrintVolumePreset("bed-256"),
       parts: [],
-      summary: { partCount: 0, oversizedPartCount: 0 },
+      summary: { partCount: 0, oversizedPartCount: 0, materialVolumeMm3: 0 },
     };
     const built: KitBuildResult = { type: "built", kit: emptyKit };
     const { result, transfer } = packKitBuildResult(built);
@@ -108,7 +108,7 @@ describe("kit worker wire format", () => {
           mesh: emptyMesh,
         },
       ],
-      summary: { partCount: 1, oversizedPartCount: 0 },
+      summary: { partCount: 1, oversizedPartCount: 0, materialVolumeMm3: 0 },
     };
     const built: KitBuildResult = { type: "built", kit: kitWithEmptyMesh };
     const { result, transfer } = packKitBuildResult(built);
