@@ -17,6 +17,7 @@ import {
 import { alignmentPinPieceLength, type TempestSettings } from "@/domain/designs/tempest/shared";
 import {
   findPrintVolumePreset,
+  kitMaterialVolumeMm3,
   printBedFitForPart,
   type PrintableKit,
   type PrintablePart,
@@ -88,6 +89,7 @@ export function createTempestPrintableKit(
     summary: {
       partCount: parts.length,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
+      materialVolumeMm3: kitMaterialVolumeMm3(parts),
     },
   };
 }

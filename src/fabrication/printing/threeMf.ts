@@ -10,6 +10,24 @@ export type MeshTriangle = {
   readonly v3: number;
 };
 
+// Signed enclosed volume of a watertight mesh (mm^3) via the divergence
+// theorem. A consistently wound solid reports a positive volume; callers that
+// only want magnitude take the absolute value.
+export function meshVolumeMm3(mesh: {
+  readonly vertices: readonly MeshVertex[];
+  readonly triangles: readonly MeshTriangle[];
+}): number {
+  let volume = 0;
+  for (const t of mesh.triangles) {
+    const a = mesh.vertices[t.v1];
+    const b = mesh.vertices[t.v2];
+    const c = mesh.vertices[t.v3];
+    volume +=
+      (a.x * (b.y * c.z - c.y * b.z) - a.y * (b.x * c.z - c.x * b.z) + a.z * (b.x * c.y - c.x * b.y)) / 6;
+  }
+  return volume;
+}
+
 export type MeshObject = {
   readonly name: string;
   readonly vertices: readonly MeshVertex[];

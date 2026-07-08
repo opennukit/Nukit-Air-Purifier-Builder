@@ -169,6 +169,12 @@ export const staticReferencePreviewZoom = 1.52;
 export const generatedPreviewZoom = 1.5;
 export const generatedPreviewZoomReferenceMillimeters = 360;
 export const minimumLargeModelPreviewZoom = 0.85;
+// Tempest designs frame size-proportionally: the camera distance already
+// scales with the box, so every design fills the frame equally regardless of
+// absolute size. The size-ramped generatedPreviewZoom is skipped for them —
+// it zoomed small builds (Tempest Euro) in far tighter than the large ones
+// that this padding was tuned against (Original Cube / Pro at the 0.85 floor).
+export const tempestPreviewZoom = 0.85;
 export const previewControlClearanceTargetOffset = 0.1;
 // Local +Y is the exhaust/back side of the fan, which faces outside the purifier.
 // Positive Y rotation reads as slow clockwise motion from that outside view.

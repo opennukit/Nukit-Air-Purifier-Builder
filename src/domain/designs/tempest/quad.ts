@@ -2,6 +2,7 @@ import type { Millimeters } from "@/domain/units";
 import { assertNever } from "./topology";
 import {
   fanSpacing,
+  filterPocketThickness,
   mapTempestWalls,
   tempestFanBodyDepth,
   tempestFanScrewPitch,
@@ -48,15 +49,11 @@ function expectQuadArrangement(arrangement: TempestFilterArrangement): QuadArran
 }
 
 // The fit clearance sits inside the structural offset: the pocket deepens by one
-// clearance (thickness direction is single-sided — the filter rests against the
-// outer flange, so the play goes on the chamber side) and the inner wall steps
-// back with it, keeping a full wallThickness between pocket and air chamber.
+// clearance (see filterPocketThickness — the play goes on the chamber side) and
+// the inner wall steps back with it, keeping a full wallThickness between pocket
+// and air chamber.
 function towerStructuralOffset(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
-  return frame.outsideFlangeThickness + towerPocketDepth(arrangement, frame) + frame.wallThickness;
-}
-
-function towerPocketDepth(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
-  return arrangement.filter.thickness + frame.filterFitClearance;
+  return frame.outsideFlangeThickness + filterPocketThickness(arrangement.filter.thickness, frame) + frame.wallThickness;
 }
 
 // The corner feet length (>= 0).
@@ -69,7 +66,7 @@ function towerFeetLength(arrangement: QuadArrangement): Millimeters {
 // that separates that pocket from the chamber is counted as the normal bottom
 // plate, so it is NOT included here. Zero when there is no bottom filter.
 function towerBottomFilterStack(arrangement: QuadArrangement, frame: TempestFrameSettings): Millimeters {
-  return arrangement.bottomFilter ? frame.outsideFlangeThickness + towerPocketDepth(arrangement, frame) : 0;
+  return arrangement.bottomFilter ? frame.outsideFlangeThickness + filterPocketThickness(arrangement.filter.thickness, frame) : 0;
 }
 
 // The z of the air-chamber floor: feet + bottom-filter stack + the bottom plate.
@@ -99,7 +96,7 @@ export function createQuadFilterLayout(
 ): Extract<TempestFilterLayout, { readonly topology: "quad" }> {
   const arrangement = expectQuadArrangement(settings.arrangement);
   const structuralOffset = towerStructuralOffset(arrangement, frame);
-  const pocketDepth = towerPocketDepth(arrangement, frame);
+  const pocketDepth = filterPocketThickness(arrangement.filter.thickness, frame);
   const zMin = towerChamberFloorZ(arrangement, frame);
   const zMax = box.height - frame.outsideFlangeThickness;
   // Width gets the per-side clearance; depth gets the single-sided clearance

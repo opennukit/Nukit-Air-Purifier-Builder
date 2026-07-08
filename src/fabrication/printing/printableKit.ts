@@ -3,6 +3,7 @@ import { createBinaryStl } from "@/fabrication/printing/stl";
 import {
   createStoredZipPackage,
   createThreeMfPackage,
+  meshVolumeMm3,
   type MeshObject,
   type MeshPlate,
   type MeshTriangle,
@@ -128,6 +129,9 @@ export type PrintableMesh = {
 export type PrintableKitSummary = {
   readonly partCount: number;
   readonly oversizedPartCount: number;
+  // The kit's true solid material volume, summed over every part's mesh. The
+  // parts list turns this into an approximate filament-weight estimate.
+  readonly materialVolumeMm3: number;
 };
 
 export type PrintableKit = {
@@ -135,6 +139,13 @@ export type PrintableKit = {
   readonly parts: readonly PrintablePart[];
   readonly summary: PrintableKitSummary;
 };
+
+// The kit's true solid material volume: each part's signed mesh volume taken as
+// a magnitude (winding may vary per part) and summed. Every design's kit
+// builder feeds the same number into its summary.
+export function kitMaterialVolumeMm3(parts: readonly PrintablePart[]): number {
+  return parts.reduce((sum, part) => sum + Math.abs(meshVolumeMm3(part.mesh)), 0);
+}
 
 export type PrintableThreeMfExport = {
   readonly filename: string;

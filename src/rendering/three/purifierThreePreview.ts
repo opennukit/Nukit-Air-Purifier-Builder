@@ -280,9 +280,10 @@ export class PurifierThreePreview {
     this.controls.enablePan = false;
     this.controls.minDistance = 1.6;
     this.controls.maxDistance = 14;
-    // Keep the camera above the floor — you orbit around a box sitting on a surface,
-    // you don't fly underneath it. This reinforces "fixed box, moving camera".
-    this.controls.maxPolarAngle = Math.PI * 0.5;
+    // The full orbit is allowed, including from below — the open bottom is how
+    // you inspect the intake side. The floor plane is single-sided, so once the
+    // camera passes under it the floor drops out of view instead of blocking
+    // the model.
     reserveSingleFingerForPageScroll(this.controls);
     this.raycaster.params.Line = { threshold: 0.045 };
     this.renderer.domElement.addEventListener("pointermove", this.handlePointerMove);

@@ -75,30 +75,36 @@ Shell Container
 
 .app-shell {
   min-height: 100svh;
-  padding: 24px clamp(28px, 3vw, 44px);
+  padding: 14px clamp(28px, 3vw, 44px) 18px;
 }
 
 /* ##############################
 Footer / license
 ############################## */
 
+/* One compact row: badge beside the text instead of stacked above it, so the
+license note costs as little page height as possible. */
 .app-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   width: 100%;
   max-width: 1440px;
-  margin: 28px auto 0;
-  padding: 20px 0 0;
+  margin: 14px auto 0;
+  padding: 10px 0 0;
   border-top: 1px solid var(--line-soft);
   color: var(--muted);
   font-size: 0.82rem;
 }
 
 .app-footer p {
-  margin: 12px 0 0;
+  margin: 0;
   max-width: 80ch;
 }
 
 .cc-badge {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 9px;
   text-decoration: none;
@@ -108,7 +114,7 @@ Footer / license
 
 .cc-badge img {
   display: block;
-  height: 31px;
+  height: 22px;
   width: auto;
 }
 
@@ -389,22 +395,6 @@ Preview Toolbar
   box-shadow: inset 0 -2px 0 var(--ink);
 }
 
-.preview-toolbar-action-slot {
-  display: flex;
-  flex: 0 0 clamp(138px, 11vw, 168px);
-  justify-content: flex-end;
-}
-
-.preview-large-view-button {
-  width: 100%;
-  padding-inline: 12px;
-}
-
-.preview-large-view-button[disabled] {
-  visibility: hidden;
-  pointer-events: none;
-}
-
 [data-method-preview][hidden] {
   display: none;
 }
@@ -426,7 +416,7 @@ Preview Stage
 
 .preview-stage.is-three-preview,
 .preview-stage.is-print-sheet-three-preview {
-  min-height: clamp(420px, 54svh, 720px);
+  min-height: clamp(440px, 62svh, 820px);
   background:
     radial-gradient(circle at 50% 34%, rgb(31 111 86 / 18%), transparent 38%),
     linear-gradient(135deg, #f9f5ea 0%, #e1dbcb 100%);
@@ -435,13 +425,12 @@ Preview Stage
 .three-preview-host,
 .print-sheet-three-host {
   width: 100%;
-  height: clamp(420px, 54svh, 720px);
+  height: clamp(440px, 62svh, 820px);
   animation: settle-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .three-preview-host canvas,
-.print-sheet-three-host canvas,
-.print-sheet-dialog-host canvas {
+.print-sheet-three-host canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -496,6 +485,34 @@ screen; this small pill is the only cue that a refresh is on the way. */
   box-shadow: 0 10px 28px rgb(51 42 27 / 10%);
   backdrop-filter: blur(10px);
   pointer-events: none;
+}
+
+/* On touch screens one finger is reserved for page scrolling and never moves
+the model, so any deliberate one-finger drag on the canvas surfaces the
+two-finger gesture with this pill (shown by orbitTouchScroll.ts). */
+.touch-orbit-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  z-index: 3;
+  padding: 7px 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 253 246 / 92%);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 28px rgb(51 42 27 / 10%);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 220ms ease;
+}
+
+.touch-orbit-hint-visible {
+  opacity: 1;
 }
 
 /* Error tone of the same pill: the model on screen no longer matches the
@@ -1970,79 +1987,6 @@ Mobile Action Bar
   display: none;
 }
 
-/* #######################################
-Preview Dialog
-####################################### */
-
-/* ##############################
-Dialog Frame
-############################## */
-
-.sheet-dialog {
-  width: min(96vw, 1600px);
-  height: min(92svh, 980px);
-  padding: 0;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-  box-shadow: 0 28px 90px rgb(0 0 0 / 28%);
-}
-
-.sheet-dialog::backdrop {
-  background: rgb(23 32 28 / 42%);
-  backdrop-filter: blur(3px);
-}
-
-.sheet-dialog-surface {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-  padding: 18px;
-  background:
-    linear-gradient(90deg, rgb(23 32 28 / 5%) 1px, transparent 1px),
-    linear-gradient(rgb(23 32 28 / 4%) 1px, transparent 1px),
-    var(--surface);
-  background-size: 42px 42px;
-}
-
-.sheet-dialog-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 14px;
-}
-
-.sheet-dialog-bar h2 {
-  margin: 0;
-  font-size: 1.45rem;
-  letter-spacing: 0;
-}
-
-.sheet-dialog-preview {
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 24px;
-  border: 1px solid var(--line);
-  background: #fbfaf6;
-}
-
-.sheet-dialog-preview svg {
-  display: block;
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  height: auto;
-  margin: 0 auto;
-}
-
-.print-sheet-dialog-host {
-  width: 100%;
-  height: 100%;
-  min-height: 680px;
-}
-
 /* ##############################
 Preview Animation
 ############################## */
@@ -2268,14 +2212,14 @@ Tablet Control Grids
 
   .mobile-action-bar {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 5;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    padding: 8px;
-    border: 1px solid var(--line);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
     background: rgb(255 253 246 / 94%);
     box-shadow: 0 18px 48px rgb(0 0 0 / 18%);
     backdrop-filter: blur(12px);
@@ -2363,10 +2307,6 @@ Mobile Layout
 
   .preview-toolbar {
     flex-wrap: wrap;
-  }
-
-  .preview-toolbar-action-slot {
-    flex-basis: 138px;
   }
 
   .preview-stage {
