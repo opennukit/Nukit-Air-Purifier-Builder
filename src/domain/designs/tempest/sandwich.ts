@@ -3,6 +3,7 @@ import { assertNever } from "./topology";
 import {
   cordPositionAlongWall,
   fanSpacing,
+  filterPocketThickness,
   finiteNonNegativeInteger,
   horizontalCordOffset,
   tempestFanBodyDepth,
@@ -69,7 +70,7 @@ export function createSandwichBox(settings: TempestSettings, frame: TempestFrame
   const height =
     chamberDepth +
     2 * frame.outsideFlangeThickness +
-    filterCount * (arrangement.filter.thickness + frame.wallThickness);
+    filterCount * (filterPocketThickness(arrangement.filter.thickness, frame) + frame.wallThickness);
   // The interior is the measured footprint plus the slide-in clearance per side,
   // so the filter drops in without press-fitting against the walls.
   return {
@@ -88,12 +89,13 @@ export function createSandwichFilterLayout(
   const arrangement = expectSandwichArrangement(settings.arrangement);
   const filterSlot = settings.filterSlot;
   const filterCount = horizontalFilterCount(arrangement);
+  const pocketThickness = filterPocketThickness(arrangement.filter.thickness, frame);
   const filters = Array.from({ length: filterCount }, (_, index) => {
-    const zBottom = horizontalFilterZ(index, filterCount, box.height, frame.outsideFlangeThickness, arrangement.filter.thickness);
+    const zBottom = horizontalFilterZ(index, filterCount, box.height, frame.outsideFlangeThickness, pocketThickness);
     return {
       index,
       zBottom,
-      zTop: zBottom + arrangement.filter.thickness,
+      zTop: zBottom + pocketThickness,
     };
   });
   const flanges =
@@ -127,12 +129,12 @@ function horizontalFilterZ(
   filterCount: 1 | 2,
   boxHeight: Millimeters,
   outsideFlangeThickness: Millimeters,
-  filterThickness: Millimeters,
+  pocketThickness: Millimeters,
 ): Millimeters {
   if (filterCount === 1) {
-    return boxHeight - outsideFlangeThickness - filterThickness;
+    return boxHeight - outsideFlangeThickness - pocketThickness;
   }
-  return index === 0 ? outsideFlangeThickness : boxHeight - outsideFlangeThickness - filterThickness;
+  return index === 0 ? outsideFlangeThickness : boxHeight - outsideFlangeThickness - pocketThickness;
 }
 
 function createHorizontalFlange(
@@ -163,7 +165,7 @@ export function createSandwichFanLayout(
     filterCount,
     box.wallHeight,
     settings.fan.diameter,
-    arrangement.filter.thickness,
+    filterPocketThickness(arrangement.filter.thickness, settings.frame),
     settings.frame.wallThickness,
     settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter : 0,
   );
@@ -483,11 +485,11 @@ function horizontalFanVerticalCenter(
   filterCount: 1 | 2,
   wallHeight: Millimeters,
   fanDiameter: Millimeters,
-  filterThickness: Millimeters,
+  pocketThickness: Millimeters,
   insideFlangeThickness: Millimeters,
   cordHoleDiameter: Millimeters,
 ): Millimeters {
-  const natural = filterCount === 2 ? wallHeight / 2 : (wallHeight - filterThickness - insideFlangeThickness) / 2;
+  const natural = filterCount === 2 ? wallHeight / 2 : (wallHeight - pocketThickness - insideFlangeThickness) / 2;
   const fanRadius = fanDiameter / 2;
   const maxSafe = wallHeight - 2 * cordHoleDiameter - fanRadius;
   return Math.min(natural, maxSafe);
@@ -543,13 +545,14 @@ function sideWallCordHeight(settings: TempestSettings, box: TempestBoxEnvelope, 
   const cordRadius = settings.cordPassThrough.type === "wall" ? settings.cordPassThrough.diameter / 2 : 0;
   const bottomFans = settings.fan.bottomPlateFans;
   const backFansOn = filterCount === 1 && bottomFans !== undefined && !(bottomFans.type === "fixed" && bottomFans.count === 0);
+  const pocketThickness = filterPocketThickness(arrangement.filter.thickness, settings.frame);
   const bottomObstacleTop =
     filterCount === 2
-      ? flange + arrangement.filter.thickness + wall
+      ? flange + pocketThickness + wall
       : backFansOn
         ? flange + tempestFanBodyDepth(settings.fan.diameter)
         : flange;
-  const topObstacleBottom = box.height - flange - arrangement.filter.thickness - wall;
+  const topObstacleBottom = box.height - flange - pocketThickness - wall;
   const low = bottomObstacleTop + cordRadius;
   const high = topObstacleBottom - cordRadius;
   return side === "left" ? Math.min(low, high) : Math.max(low, high);
@@ -573,7 +576,8 @@ function sandwichCordVerticalCenter(settings: TempestSettings, box: TempestBoxEn
   const flange = settings.frame.outsideFlangeThickness;
   // insideFlangeThickness === wallThickness (see createFrameModel).
   const fanBodyTop = flange + tempestFanBodyDepth(settings.fan.diameter);
-  const insideFilterFlange = box.height - flange - arrangement.filter.thickness - settings.frame.wallThickness;
+  const insideFilterFlange =
+    box.height - flange - filterPocketThickness(arrangement.filter.thickness, settings.frame) - settings.frame.wallThickness;
   return (fanBodyTop + insideFilterFlange) / 2;
 }
 

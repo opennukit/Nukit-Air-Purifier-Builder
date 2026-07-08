@@ -67,7 +67,7 @@ describe("Tempest CSG printable kit", () => {
     expect(kit.parts).toHaveLength(1);
     expect(part).toMatchObject({
       width: 507,
-      depth: 262,
+      depth: 264,
       height: 507,
     });
     expect(meshBounds(part.mesh)).toEqual({
@@ -75,7 +75,7 @@ describe("Tempest CSG printable kit", () => {
       minY: 0,
       minZ: 0,
       maxX: 507,
-      maxY: 262,
+      maxY: 264,
       maxZ: 507,
     });
   });

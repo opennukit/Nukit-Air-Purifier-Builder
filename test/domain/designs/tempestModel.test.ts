@@ -17,12 +17,13 @@ describe("Tempest OpenSCAD model port", () => {
       ribThickness: 1.6,
       fullCellsOnly: false,
     });
-    // 495 measured footprint + 2*1 fit clearance + 2*5 walls.
+    // 495 measured footprint + 2*1 fit clearance + 2*5 walls; the height carries
+    // one fit clearance per filter pocket (filterPocketThickness).
     expect(model.box).toEqual({
       width: 507,
       depth: 507,
-      height: 262,
-      wallHeight: 242,
+      height: 264,
+      wallHeight: 244,
     });
     expect(model.chunkGrid).toMatchObject({
       countX: 2,
@@ -31,7 +32,7 @@ describe("Tempest OpenSCAD model port", () => {
       totalCount: 8,
       chunkWidth: 253.5,
       chunkDepth: 253.5,
-      chunkHeight: 131,
+      chunkHeight: 132,
     });
     expect(model.filterLayout.topology).toBe("sandwich");
     if (model.filterLayout.topology !== "sandwich") {
@@ -39,14 +40,14 @@ describe("Tempest OpenSCAD model port", () => {
     }
     expect(model.filterLayout.filterCount).toBe(2);
     expect(model.filterLayout.bottomPanel).toBe("open-frame");
-    expect(model.filterLayout.filters.map((filter) => filter.zBottom)).toEqual([10, 207]);
+    expect(model.filterLayout.filters.map((filter) => filter.zBottom)).toEqual([10, 208]);
     expect(model.filterLayout.flanges.map((flange) => [flange.type, flange.zBottom, flange.zTop])).toEqual([
-      ["above-filter", 55, 60],
-      ["below-filter", 202, 207],
+      ["above-filter", 56, 61],
+      ["below-filter", 203, 208],
     ]);
     expect(model.filterLayout.loading.slots.map((slot) => [slot.wall, slot.localZBottom, slot.localZTop])).toEqual([
-      ["back", 0, 46],
-      ["back", 196, 242],
+      ["back", 0, 47],
+      ["back", 197, 244],
     ]);
 
     expect(model.fanLayout.topology).toBe("sandwich");
@@ -56,7 +57,7 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.bodyDepth).toBe(27);
     expect(model.fanLayout.screwPitch).toBe(125);
     expect(model.fanLayout.cornerSafeMinimum).toBe(102);
-    expect(model.fanLayout.localVerticalCenter).toBe(121);
+    expect(model.fanLayout.localVerticalCenter).toBe(122);
     expect(model.fanLayout.walls.front.actualCount).toBe(0);
     expect(model.fanLayout.walls.back.actualCount).toBe(0);
     expect(model.fanLayout.walls.left.actualCount).toBe(3);
@@ -222,14 +223,30 @@ describe("Tempest OpenSCAD model port", () => {
       });
 
     // Sandwich: the interior (box minus walls) is the measured footprint plus one
-    // clearance per side, so the envelope grows by exactly 2*clearance.
+    // clearance per side, so the envelope grows by exactly 2*clearance. The
+    // height grows by ONE clearance per filter pocket (filterPocketThickness) —
+    // the thickness faces seal against flanges, so the pocket gets minimal play.
     const snugSandwich = sandwichAt(0);
     const easedSandwich = sandwichAt(clearance);
     const wall = defaultTempestSettings.frame.wallThickness;
     expect(snugSandwich.box.width - 2 * wall).toBe(defaultTempestHorizontalFilter.footprintWidth);
     expect(easedSandwich.box.width - snugSandwich.box.width).toBe(2 * clearance);
     expect(easedSandwich.box.depth - snugSandwich.box.depth).toBe(2 * clearance);
-    expect(easedSandwich.box.height).toBe(snugSandwich.box.height);
+    expect(easedSandwich.box.height - snugSandwich.box.height).toBe(2 * clearance); // 2 filters * 1 clearance
+    // The pocket between the flanges is the measured thickness plus one
+    // clearance — a snug build clamps the filter exactly, an eased build leaves
+    // slide-in room. This is the press-fit regression: the sandwich once kept
+    // the pocket at bare thickness no matter the clearance.
+    for (const [model, expectedPocket] of [
+      [snugSandwich, defaultTempestHorizontalFilter.thickness],
+      [easedSandwich, defaultTempestHorizontalFilter.thickness + clearance],
+    ] as const) {
+      if (model.filterLayout.topology !== "quad") {
+        for (const pocket of model.filterLayout.filters) {
+          expect(pocket.zTop - pocket.zBottom).toBe(expectedPocket);
+        }
+      }
+    }
 
     // Quad: pockets grow by 2*clearance across the face and 1*clearance in the
     // thickness direction (the filter rests against the outer flange), and the
@@ -347,7 +364,7 @@ describe("Tempest OpenSCAD model port", () => {
       totalCount: 8,
       chunkWidth: 253.5,
       chunkDepth: 253.5,
-      chunkHeight: 131,
+      chunkHeight: 132,
     });
     expect(model.fanLayout.topology).toBe("sandwich");
     if (model.fanLayout.topology !== "sandwich") {

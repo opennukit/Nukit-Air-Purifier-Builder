@@ -7,6 +7,7 @@ import {
   defaultSettings,
 } from "@/domain/purifier/settingsModel";
 import { normalizeRawSettings } from "@/domain/purifier/airPurifier";
+import { filterPocketThickness } from "@/domain/designs/tempest/shared";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import { tempestPinPlacementsClearOfFans } from "@/fabrication/printing/designs/tempest/geometry/pins";
@@ -162,7 +163,9 @@ describe('tempest "Box depth" (one-side panel chamber)', () => {
   const chamberDepth = (m: ReturnType<typeof modelFor>) => {
     if (m.topology !== "sandwich") throw new Error("expected sandwich");
     return m.box.height - 2 * m.frame.outsideFlangeThickness - m.frame.insideFlangeThickness -
-      (m.settings.arrangement.type === "four-side-filter-tower" ? 0 : m.settings.arrangement.filter.thickness);
+      (m.settings.arrangement.type === "four-side-filter-tower"
+        ? 0
+        : filterPocketThickness(m.settings.arrangement.filter.thickness, m.frame));
   };
 
   test("boxDepth survives the URL round-trip", () => {
@@ -212,7 +215,8 @@ describe('tempest "Back" panel cord placement', () => {
     if (m.topology !== "sandwich" || m.cordPassThrough.type !== "wall-cylinder") throw new Error("expected sandwich cord");
     const flange = m.frame.outsideFlangeThickness;
     const fanBodyTop = flange + 27; // 140mm fan body depth
-    const insideFilterFlange = m.box.height - flange - m.settings.arrangement.filter.thickness - m.frame.wallThickness;
+    const insideFilterFlange =
+      m.box.height - flange - filterPocketThickness(m.settings.arrangement.filter.thickness, m.frame) - m.frame.wallThickness;
     const vc = m.cordPassThrough.verticalCenter;
     expect(vc).toBeCloseTo((fanBodyTop + insideFilterFlange) / 2);
     // and it sits strictly between the two (clear of both)
