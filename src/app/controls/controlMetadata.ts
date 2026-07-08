@@ -47,6 +47,10 @@ export const fanPlacementControls: readonly { readonly name: FanCountSettingName
 ];
 export const filterDimensionControls: readonly DimensionControl<FilterDimensionName>[] = [
   { name: "filterWidth", label: "Filter width", step: "1" },
+  // NOTE nils 2026-07-08: the label says "height" but the setting stays
+  // `filterDepth` — that name is the URL param in every shared link and is
+  // all over Naomi's in-flight branch, so the internal rename waits until her
+  // branch lands. FILTER_DEPTH_RENAME_TAG.
   { name: "filterDepth", label: "Filter height", step: "1" },
   { name: "filterThickness", label: "Filter thickness", step: "0.1" },
 ];
