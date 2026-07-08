@@ -550,8 +550,8 @@
     fansTop: "Fans on the top wall. Auto fits as many as the wall allows.",
     fansBottom: "Fans on the bottom wall. Auto fits as many as the wall allows.",
     screwHoleDiameter: "Diameter of each PC-fan mounting screw hole.",
-    hexSize: "Honeycomb cell size, measured flat to flat.",
-    hexSpacing: "Rib (wall) thickness between honeycomb cells.",
+    hexSize: "Size of each grill opening, measured across the cell.",
+    hexSpacing: "Rib (wall) thickness between grill cells.",
     cordHoleSide: "Where along the wall the cord hole sits.",
     cordHoleCornerOffset: "Distance from the corner to the cord hole.",
     // Laser Cut material, fit, frame, and joint tuning.
@@ -2023,7 +2023,7 @@
 
                   {#if showHexGrillControls}
                     <fieldset class="fan-placement-field" data-tempest-hex-grill>
-                      <legend>Honeycomb grill {@render infoTip("info-hexGrill", "Print a honeycomb of hexagons across each fan opening instead of a plain round bore. It looks cleaner and stiffens the face. Tune the cell size and rib spacing in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
+                      <legend>Diamond grill {@render infoTip("info-hexGrill", "Print a diamond lattice across each fan opening instead of a plain round bore. The 45° edges print cleanly without supports, the grill stiffens the face, and the openings are small enough to keep fingers away from the fan. Tune the cell size and rib in Advanced. Integrated grills are less expensive and minimize parts, wire grills offer higher CADR.")}</legend>
                       <div class="fan-placement-checks">
                         <label class="toggle-field">
                           <input
@@ -2214,7 +2214,7 @@
                           checked={settings.hexFullCellsOnly}
                           onchange={(event) => updateBooleanSetting("hexFullCellsOnly", event)}
                         />
-                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole honeycomb cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
+                        <span>Full cells only {@render infoTip("info-hexFullCellsOnly", "Keep only whole diamond cells. Off (the default) lets cells at the rim be clipped to the round opening, so the grill fills more of the bore. Full is easier to fabricate, clipped allows higher CADR.")}</span>
                       </label>
                     {/if}
                     <!-- Chunk-label deboss is parked for now: control hidden and the

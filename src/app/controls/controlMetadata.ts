@@ -79,11 +79,12 @@ export const tempestFitControls: readonly NumberControl<NumericSettingName>[] = 
       "Extra space around your measured filter so it slides in instead of press-fitting. Width and height get this per side; the thickness pocket gets it once, since those faces seal against the frame and a bigger gap there lets air bypass the filter. 1 mm works for most printers.",
   },
 ];
-// Tempest honeycomb fan grill (hidden in box/exhaust mode). hexSize is the hex
-// flat-to-flat, hexSpacing the rib between cells — matches tempest-builder.html.
+// Fan grill cell controls, shared by the printed diamond grill and the laser
+// honeycomb (the hex* setting names are the shared wire format): hexSize is
+// the opening width across a cell, hexSpacing the rib between cells.
 export const tempestHexGrillControls: readonly NumberControl<NumericSettingName>[] = [
-  { name: "hexSize", label: "Grill hex size", suffix: "mm", step: "0.5" },
-  { name: "hexSpacing", label: "Grill hex spacing", suffix: "mm", step: "0.1" },
+  { name: "hexSize", label: "Grill cell size", suffix: "mm", step: "0.5" },
+  { name: "hexSpacing", label: "Grill rib width", suffix: "mm", step: "0.1" },
 ];
 // Tempest 4-filter tower box/exhaust geometry (shown only when Box-Exhaust is the
 // fan choice). A 0 size/radius means "auto" — see tempest-builder.html.
