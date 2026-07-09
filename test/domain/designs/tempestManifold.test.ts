@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { createTempestModel, defaultTempestSettings, defaultTempestTowerFilter } from "@/domain/designs/tempest/model";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { buildTempestGeometry, towerCornerChamfer } from "@/fabrication/printing/designs/tempest/geometry";
-import { fanPattern2d } from "@/fabrication/printing/designs/tempest/geometry/patterns2d";
 import { cuboidFromMinSize } from "@/fabrication/printing/designs/tempest/geometry/primitives";
 import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geometry/context";
 import { type Geom2, type Geom3, manifoldModeling } from "@/fabrication/printing/modeling/manifoldOps";
@@ -24,9 +23,9 @@ describe("Tempest meshes are 2-manifold", () => {
     }
   }, 30000);
 
-  test("diamond fan grills stay manifold", () => {
+  test("honeycomb fan grills stay manifold", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");
-    // The dense fan grill was the dominant source of T-junctions under the prior
+    // The honeycomb grill was the dominant source of T-junctions under the prior
     // CSG backend; guard that the manifold kernel keeps it clean.
     expect(defaultTempestSettings.fan.opening.type).toBe("honeycomb");
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
@@ -195,30 +194,5 @@ describe("Tempest meshes are 2-manifold", () => {
     expect(manifoldReport(boxExhaust.parts[0].mesh)).toEqual(cleanManifold);
     // A central hole + two screw rings is far simpler than the honeycomb fan grid.
     expect(boxExhaust.parts[0].mesh.triangles.length).toBeLessThan(grid.parts[0].mesh.triangles.length);
-  });
-  test("printed grill cells are diamonds with apexes on both axes (support-free on any wall)", () => {
-    // DIAMOND_GRILL_TAG: every cell edge must slope at 45 degrees on the bed no
-    // matter which wall carries the grill or how the housing is posed, which
-    // holds exactly when the cell is a diamond - open right up to an apex on
-    // BOTH pattern axes, solid across the diagonal between cells. Default
-    // grill: 10mm cells, so the apex reaches 5 from center.
-    const model = createTempestModel(defaultTempestSettings);
-    withGeometryArena(() => {
-      const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
-      const cutter = manifoldModeling.extrusions.extrudeLinear({ height: 4 }, fanPattern2d(ctx, model));
-      const probeAt = (x: number, y: number) =>
-        meshVolume(
-          extractWeldedMesh(
-            manifoldModeling.booleans.intersect(cutter, cuboidFromMinSize(ctx, x - 0.1, y - 0.1, 0, 0.2, 0.2, 4)),
-          ),
-        );
-      const probeVolume = 0.2 * 0.2 * 4;
-      // Open at the apex tips on both axes (45-degree edges meet there)...
-      expect(probeAt(4.6, 0)).toBeCloseTo(probeVolume, 3);
-      expect(probeAt(0, 4.6)).toBeCloseTo(probeVolume, 3);
-      // ...and solid on the diagonal rib between neighbouring cells.
-      expect(probeAt(2.8, 2.8)).toBe(0);
-      return [];
-    });
   });
 });
