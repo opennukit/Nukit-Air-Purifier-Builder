@@ -4,7 +4,7 @@ import type { GeometryContext } from "./context";
 import { CSG_SEGMENTS } from "./context";
 import { orientZExtrusion, unionAll2d } from "./primitives";
 
-// The grill is drawn this far inside the fan opening so the grill ring
+// The honeycomb grill is drawn this far inside the fan opening so the grill ring
 // sits within the bore; a plain opening is inset half this so its edge clears.
 const FAN_GRILL_DRAW_INSET_MM = 4;
 const FAN_PLAIN_OPENING_INSET_MM = 2;
@@ -19,35 +19,18 @@ const SCREW_HOLE_SEGMENTS = 16;
 // 2D Primitives
 // #######################################
 
-// One diamond grill cell: a square rotated 45°, `width` across its diagonals.
-// The printed grills draw diamonds instead of the original honeycomb
-// (DIAMOND_GRILL_TAG) after real test prints of both:
-// - every edge slopes at 45° on the bed no matter how the printed wall is
-//   posed (the cell is 90°-rotation symmetric), so grills print support-free
-//   in any orientation — honeycomb cell roofs collapsed into spaghetti on
-//   standing walls in every hex orientation tried;
-// - the diagonal lattice braces each rib at both ends, so the half-printed
-//   grill stays stiff instead of wobbling like the hex's long straight ribs;
-// - the tapered opening keeps a small child's finger away from the fan blades,
-//   unlike a honeycomb cell of the same width.
-// The laser path keeps its honeycomb — flat cuts have no overhangs. The
-// settings still travel as "honeycomb"/hex* (URL and settings-model names are
-// shared with the laser grill and Naomi's in-flight branches); for diamonds
-// hexFlatToFlat reads as the hole width across and ribThickness stays the rib.
-export function diamond2d<Solid, Region>(ctx: GeometryContext<Solid, Region>, width: number): Region {
+export function hex2d<Solid, Region>(ctx: GeometryContext<Solid, Region>, flatToFlat: number): Region {
   const { primitives } = ctx.modeling;
-  const half = width / 2;
+  const radius = flatToFlat / Math.sqrt(3);
   return primitives.polygon({
-    points: [
-      [half, 0],
-      [0, half],
-      [-half, 0],
-      [0, -half],
-    ],
+    points: Array.from({ length: 6 }, (_, index) => {
+      const angle = (Math.PI / 180) * (60 * index + 30);
+      return [radius * Math.cos(angle), radius * Math.sin(angle)];
+    }),
   });
 }
 
-export function diamondGrill2d<Solid, Region>(
+export function hexGrill2d<Solid, Region>(
   ctx: GeometryContext<Solid, Region>,
   model: TempestModel,
   outerDiameter: number,
@@ -58,32 +41,26 @@ export function diamondGrill2d<Solid, Region>(
     return primitives.circle({ radius: Math.max(0.001, outerDiameter / 2), segments: CSG_SEGMENTS });
   }
 
-  const width = opening.hexFlatToFlat;
-  // Checkerboard lattice: cells at every (i, j) plus every half-offset center.
-  // Neighbouring cells face each other along the 45° diagonals, so the pitch
-  // carries the rib thickness scaled by sqrt(2) to keep the perpendicular rib
-  // exactly ribThickness wide.
-  const pitch = width + opening.ribThickness * Math.SQRT2;
-  const count = Math.ceil(outerDiameter / pitch) + 2;
+  const pitchX = opening.hexFlatToFlat + opening.ribThickness;
+  const pitchY = pitchX * Math.sqrt(3) / 2;
+  const columnCount = Math.ceil(outerDiameter / pitchX) + 2;
+  const rowCount = Math.ceil(outerDiameter / pitchY) + 2;
   const clipRadius = Math.max(0, (outerDiameter - 2 * opening.ribThickness) / 2);
-  const cellReach = width / 2;
+  const hexRadius = opening.hexFlatToFlat / Math.sqrt(3);
   const holes: Region[] = [];
 
-  for (let i = -count; i <= count; i += 1) {
-    for (let j = -count; j <= count; j += 1) {
-      for (const [x, y] of [
-        [i * pitch, j * pitch],
-        [i * pitch + pitch / 2, j * pitch + pitch / 2],
-      ]) {
-        // Full-cells mode keeps only cells wholly inside the clip circle; the
-        // default keeps any that overlap it and trims them with the intersect
-        // below.
-        const reach = opening.fullCellsOnly ? cellReach : -cellReach;
-        if (Math.hypot(x, y) + reach > clipRadius) {
-          continue;
-        }
-        holes.push(transforms2d.translate([x, y], diamond2d(ctx, width)));
+  for (let row = -rowCount; row <= rowCount; row += 1) {
+    const rowOffset = row % 2 === 0 ? 0 : pitchX / 2;
+    for (let column = -columnCount; column <= columnCount; column += 1) {
+      const x = column * pitchX + rowOffset;
+      const y = row * pitchY;
+      // Full-cells mode keeps only hexes wholly inside the clip circle; the
+      // default keeps any that overlap it and trims them with the intersect below.
+      const reach = opening.fullCellsOnly ? hexRadius : -hexRadius;
+      if (Math.hypot(x, y) + reach > clipRadius) {
+        continue;
       }
+      holes.push(transforms2d.translate([x, y], hex2d(ctx, opening.hexFlatToFlat)));
     }
   }
 
@@ -106,7 +83,7 @@ export function fanPattern2d<Solid, Region>(ctx: GeometryContext<Solid, Region>,
   }
   const opening =
     model.settings.fan.opening.type === "honeycomb"
-      ? diamondGrill2d(ctx, model, model.settings.fan.diameter - FAN_GRILL_DRAW_INSET_MM)
+      ? hexGrill2d(ctx, model, model.settings.fan.diameter - FAN_GRILL_DRAW_INSET_MM)
       : primitives.circle({ radius: Math.max(0.001, model.settings.fan.diameter / 2 - FAN_PLAIN_OPENING_INSET_MM), segments: CSG_SEGMENTS });
   const screwDelta = model.fanLayout.screwPitch / 2;
   const screwRadius = model.settings.fan.screwHoleDiameter / 2;
