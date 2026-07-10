@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Measure a room's air changes per hour (ACH): Nukit FilterBoxBuilder</title>
+    <meta
+      name="description"
+      content="A simple calculator that estimates a room's ventilation rate in air changes per hour (ACH) from a CO2 decay measurement, using carbon dioxide as a tracer gas."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --surface: #f8f5ec;
+        --surface-strong: #fffdf6;
+        --ink: #17201c;
+        --muted: #59635b;
+        --line: #d9d0bf;
+        --line-soft: rgb(217 208 191 / 54%);
+        --accent: #1f6f56;
+        --accent-strong: #164d3d;
+        --accent-wash: rgb(31 111 86 / 8%);
+        --shadow: 0 20px 70px rgb(51 42 27 / 12%);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ece8dc;
+        background-image: radial-gradient(rgb(190 141 85 / 9%) 1px, transparent 1px);
+        background-size: 42px 42px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+      }
+      a { color: var(--accent-strong); }
+      .eyebrow {
+        margin: 0 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--accent-strong);
+      }
+      .page { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+      header.masthead {
+        padding: 28px 30px; background: var(--surface-strong); border: 1px solid var(--line);
+        box-shadow: var(--shadow); border-radius: 2px;
+      }
+      header.masthead h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.01em; }
+      header.masthead p { margin: 0; max-width: 74ch; color: var(--muted); }
+      .home-link {
+        display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 2px;
+        background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 0.85rem;
+      }
+      main { min-width: 0; margin-top: 28px; }
+      section.card {
+        padding: 26px 30px; margin-bottom: 22px; background: var(--surface-strong);
+        border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 10px 40px rgb(51 42 27 / 7%);
+      }
+      section.card > h2 { margin: 0 0 4px; font-size: 1.45rem; }
+      .lede { margin: 0 0 18px; color: var(--muted); }
+      h3 { margin: 18px 0 8px; font-size: 1.12rem; }
+      p { margin: 0 0 8px; }
+      ul, ol { margin: 8px 0; padding-left: 22px; }
+      li { margin: 4px 0; }
+      code { padding: 1px 5px; background: var(--accent-wash); border: 1px solid var(--line-soft); border-radius: 3px; font-size: 0.85em; }
+      .formula {
+        margin: 10px 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line-soft);
+        border-radius: 2px; font-size: 0.95rem; overflow-x: auto; white-space: nowrap;
+      }
+      .tip { margin: 14px 0; padding: 12px 16px; background: var(--accent-wash); border-left: 3px solid var(--accent); border-radius: 2px; }
+      .tip strong { color: var(--accent-strong); }
+      .warn { margin: 14px 0; padding: 12px 16px; background: rgb(190 141 85 / 12%); border-left: 3px solid #be8d55; border-radius: 2px; }
+      .video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 8px 0 0; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #000; }
+      .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+      .credit { margin: 8px 0 0; text-align: center; font-size: 0.82rem; color: var(--muted); }
+      .credit a { color: var(--muted); }
+      /* calculator */
+      .calc { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 4px; }
+      .field label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+      .field .hint { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
+      .field input {
+        width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 2px;
+        font-size: 1rem; background: var(--surface-strong); color: var(--ink); font-variant-numeric: tabular-nums;
+      }
+      .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .time-row { display: flex; gap: 10px; }
+      .time-row > div { flex: 1; }
+      .result {
+        margin: 20px 0 6px; padding: 20px; text-align: center; background: var(--accent-wash);
+        border: 1px solid var(--line); border-radius: 2px;
+      }
+      .result .big { font-size: 2.6rem; font-weight: 700; color: var(--accent-strong); line-height: 1.1; font-variant-numeric: tabular-nums; }
+      .result .unit { font-size: 1rem; color: var(--muted); margin-left: 4px; }
+      .result .sub { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+      .result.invalid .big { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
+      footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
+      @media (max-width: 620px) {
+        .calc { grid-template-columns: 1fr; }
+        .page { padding: 22px 16px 72px; }
+        section.card { padding: 22px 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Air changes per hour</p>
+        <h1>Measure your room's ventilation (ACH)</h1>
+        <p>
+          Estimate how many times per hour a room's air is replaced with outside air, using carbon dioxide as a
+          tracer gas. People exhale CO2, so a closed, occupied room builds up CO2 above the outdoor level. Once the
+          source stops, that excess decays back toward outside as fresh air dilutes it, and the speed of that decay is
+          the room's air-change rate. Take two CO2 readings a while apart and enter them below.
+        </p>
+        <a class="home-link" href="./">← Back to the builder</a>
+      </header>
+
+      <main>
+        <section class="card">
+          <h2>Calculator</h2>
+          <p class="lede">Enter your outdoor baseline and two indoor readings taken some time apart, with no fresh CO2 added in between.</p>
+
+          <div class="calc">
+            <div class="field">
+              <label for="baseline">Outdoor baseline CO2 (ppm)</label>
+              <input id="baseline" type="number" inputmode="decimal" min="0" step="1" value="578" />
+              <div class="hint">Take the meter outside; usually 400 to 450 ppm.</div>
+            </div>
+            <div class="field">
+              <label>Elapsed time between readings</label>
+              <div class="time-row">
+                <div><input id="hours" type="number" inputmode="numeric" min="0" step="1" value="3" aria-label="hours" /><div class="hint">hours</div></div>
+                <div><input id="minutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="minutes" /><div class="hint">minutes</div></div>
+              </div>
+            </div>
+            <div class="field">
+              <label for="cstart">CO2 at the start (ppm)</label>
+              <input id="cstart" type="number" inputmode="decimal" min="0" step="1" value="1411" />
+              <div class="hint">The higher, earlier reading.</div>
+            </div>
+            <div class="field">
+              <label for="cend">CO2 at the end (ppm)</label>
+              <input id="cend" type="number" inputmode="decimal" min="0" step="1" value="870" />
+              <div class="hint">The lower, later reading.</div>
+            </div>
+          </div>
+
+          <div class="result" id="result">
+            <div><span class="big" id="achValue">0.35</span><span class="unit">air changes / hour</span></div>
+            <p class="sub" id="achNote">Roughly one air change every 2 h 52 min.</p>
+          </div>
+          <div class="formula" id="worked">ACH = (−1 / 3.00) × ln((870 − 578) / (1411 − 578)) = 0.35 /h</div>
+        </section>
+
+        <section class="card">
+          <h2>How to run the test</h2>
+          <ol>
+            <li>Use an NDIR CO2 meter (the common desktop or handheld type). Let it warm up and settle.</li>
+            <li>Take it outside for a minute to read the <strong>outdoor baseline</strong>, then bring it back in.</li>
+            <li>Get the room's CO2 well above baseline, then close it up to the condition you want to measure. Occupying the room, or exhaling near the sensor briefly, raises it quickly.</li>
+            <li>Stop adding CO2: everyone leaves (or nobody breathes near the meter), no candles or gas appliances. Record the <strong>start</strong> reading and the time.</li>
+            <li>Wait long enough for a clear drop before recording the <strong>end</strong> reading and time. At least an hour, and 3 to 8 hours is best: a slowly ventilated room decays gradually, so a longer window gives a more reliable result.</li>
+            <li>Enter the two readings, the baseline, and the elapsed time above.</li>
+          </ol>
+          <div class="tip"><strong>Mixing helps.</strong> Run a small fan to keep the air well mixed, and keep the meter away from a person, a vent, or an open window, so it reads the room as a whole.</div>
+        </section>
+
+        <section class="card">
+          <h2>The math</h2>
+          <p>
+            The excess CO2 above the outdoor baseline decays exponentially as outside air dilutes it:
+          </p>
+          <div class="formula">C(t) − C_baseline = (C_start − C_baseline) × e^(−ACH × t)</div>
+          <p>Solving for the air-change rate gives:</p>
+          <div class="formula">ACH = (−1 / t_hours) × ln( (C_end − C_baseline) / (C_start − C_baseline) )</div>
+          <p>
+            where <code>C_baseline</code> is the outdoor CO2, <code>C_start</code> and <code>C_end</code> are the indoor
+            readings at the start and end of the period, and <code>t_hours</code> is the time between them. This is the
+            standard tracer-gas decay method (ASTM&nbsp;E741), with CO2 as the tracer.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>The method, demonstrated</h2>
+          <p class="lede">A clear walk-through of the CO2 decay test and this calculation.</p>
+          <div class="video-wrap">
+            <iframe
+              src="https://www.youtube.com/embed/dMTOLgIc8-I"
+              title="DIY Test for Home Ventilation: Simple CO2 Tracking Process"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
+          </div>
+          <p class="credit">Thanks to <a href="https://x.com/ukhadds" target="_blank" rel="noopener">Al Haddrell</a> for introducing this method.</p>
+        </section>
+
+        <section class="card">
+          <h2>What it tells you, and what it does not</h2>
+          <ul>
+            <li>It measures air <strong>exchange with outside</strong> (natural leakage plus any mechanical ventilation), which dilutes CO2 and other pollutants. Higher ACH means more fresh air.</li>
+            <li>It assumes a single, well-mixed room, a steady outdoor baseline, and no CO2 sources during the decay. Readings taken over a longer, steady decay are more reliable.</li>
+            <li>It does <strong>not</strong> count particle removal by a filter or air purifier. A purifier adds its own "equivalent" clean-air changes on top of this ventilation rate.</li>
+            <li>This is a quick field estimate, not a certified blower-door or professional tracer-gas test.</li>
+          </ul>
+          <div class="warn">The number you get here is the same quantity as the <strong>Room ventilation</strong> value in the builder's Advanced panel. Measuring your own room makes the builder's infection-risk estimate more accurate.</div>
+        </section>
+
+        <footer class="site-footer">
+          <p>Method: carbon-dioxide tracer-gas decay (ASTM&nbsp;E741). This page provides an estimate for planning, not a certified measurement.</p>
+          <a class="home-link" href="./">← Back to the builder</a>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      (function () {
+        var ids = ["baseline", "cstart", "cend", "hours", "minutes"];
+        var el = {};
+        ids.forEach(function (id) { el[id] = document.getElementById(id); });
+        var result = document.getElementById("result");
+        var achValue = document.getElementById("achValue");
+        var achNote = document.getElementById("achNote");
+        var worked = document.getElementById("worked");
+
+        function num(v) { var n = parseFloat(v); return isFinite(n) ? n : NaN; }
+
+        function fmtHM(hoursPerChange) {
+          if (!isFinite(hoursPerChange) || hoursPerChange <= 0) return "";
+          var totalMin = Math.round(hoursPerChange * 60);
+          var h = Math.floor(totalMin / 60);
+          var m = totalMin % 60;
+          if (h === 0) return "Roughly one air change every " + m + " min.";
+          if (m === 0) return "Roughly one air change every " + h + " h.";
+          return "Roughly one air change every " + h + " h " + m + " min.";
+        }
+
+        function invalid(msg) {
+          result.classList.add("invalid");
+          achValue.textContent = msg;
+          achNote.textContent = "";
+          worked.textContent = "ACH = (−1 / t) × ln( (C_end − baseline) / (C_start − baseline) )";
+        }
+
+        function update() {
+          var b = num(el.baseline.value);
+          var cs = num(el.cstart.value);
+          var ce = num(el.cend.value);
+          var h = num(el.hours.value);
+          var m = num(el.minutes.value);
+          var t = (isFinite(h) ? h : 0) + (isFinite(m) ? m : 0) / 60;
+
+          if (!isFinite(b) || !isFinite(cs) || !isFinite(ce) || t <= 0) {
+            return invalid("Fill in all four values and a time above zero.");
+          }
+          var top = ce - b;
+          var bottom = cs - b;
+          if (bottom <= 0) {
+            return invalid("The start reading must be above the outdoor baseline.");
+          }
+          if (top <= 0) {
+            return invalid("The end reading must be above the outdoor baseline.");
+          }
+          if (ce >= cs) {
+            return invalid("The end reading must be lower than the start (CO2 should have fallen).");
+          }
+          var ach = (-1 / t) * Math.log(top / bottom);
+          result.classList.remove("invalid");
+          achValue.textContent = ach.toFixed(2);
+          achNote.textContent = fmtHM(1 / ach);
+          worked.textContent =
+            "ACH = (−1 / " + t.toFixed(2) + ") × ln((" + ce + " − " + b + ") / (" + cs + " − " + b + ")) = " + ach.toFixed(2) + " /h";
+        }
+
+        ids.forEach(function (id) { el[id].addEventListener("input", update); });
+        update();
+      })();
+    </script>
+  </body>
+</html>
