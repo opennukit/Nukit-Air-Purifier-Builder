@@ -2951,5 +2951,6 @@
       The CADR, noise, and power estimates are calibrated against in-room measurements published by
       <a href="https://housefresh.com" target="_blank" rel="noopener">HouseFresh</a>.
     </p>
+    <p><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
   </footer>
 </main>
