@@ -1793,7 +1793,7 @@
               {@render customFanField("roomHeight", "Height", settings.roomHeight, 0.1, settings.roomUnit === "m" ? "m" : "ft")}
             </div>
             <label class="field">
-              <span>Room ventilation {@render infoTip("info-baselineAch", "The room's own ventilation in air changes per hour from windows, HVAC and leakage: roughly 0.3 for a sealed room, 1 for a typical home, 3 or more if well ventilated. Used only to estimate how much the purifier lowers long-range airborne infection risk.")}</span>
+              <span>Room ventilation {@render infoTip("info-baselineAch", "The room's own ventilation in air changes per hour from windows, HVAC and leakage: roughly 0.3 for a sealed room, 1 for a typical home, 3 or more if well ventilated. Used only to estimate how much the purifier lowers long-range airborne infection risk.")} <a class="info-tip-more" href="ach-calculator.html" target="_blank" rel="noopener">Measure</a></span>
               <span class="input-shell">
                 <input
                   type="number"
