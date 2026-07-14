@@ -1,13 +1,13 @@
 # Assets And Licenses
 
-The app code is GPL-3.0. Some browser preview assets have their own upstream sources and licenses.
+Copyright (C) 2026 OpenNukit (https://github.com/opennukit). The project is dual-licensed by component: the app source code is GPL-3.0, and the designs and output it generates (laser-cut SVG/DXF, 3MF print kits, box designs) plus documentation are CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Some browser preview assets have their own upstream sources and licenses, listed below.
 
 ## README Preview Image
 
 - `public/ui-filterboxbuilder.png`
 - Source: project UI screenshot.
 - Purpose: README preview image.
-- License: project GPL-3.0 license.
+- License: project documentation, CC BY-SA 4.0.
 
 ## Fan Preview Assets
 

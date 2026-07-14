@@ -1,0 +1,413 @@
+<!doctype html>
+<!--
+  Nukit PC Fan Gauge - fan test calculator
+  Copyright (C) 2026 OpenNukit  https://github.com/opennukit
+  Software licensed under the GNU General Public License v3.0 (GPL-3.0).
+  See the LICENSE file. This program comes with ABSOLUTELY NO WARRANTY.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nukit PC Fan Gauge: limited accuracy P-Q calculator</title>
+<style>
+  :root{--bg:#14181d;--panel:#1c222a;--panel2:#232b34;--ink:#dfe7ee;--dim:#8b98a6;--acc:#5f87b0;--line:#2c343d;--ok:#4a9d6a;--warn:#c79a3c;--err:#c25a5a;--ref:#5fb0a0;--meas:#d98a5a;--truth:#9a7fd1;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;padding:22px}
+  .wrap{width:100%;max-width:800px}
+  @media (min-width:1200px){ .wrap{zoom:1.5} }
+  @media (max-width:560px){ #tbl{display:block;overflow-x:auto;white-space:nowrap} }
+  h1{font-size:19px;margin:0 0 2px}
+  p.sub{color:var(--dim);font-size:12.5px;margin:0 0 16px;line-height:1.5}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--acc);margin:0 0 10px}
+  .card h2 .step{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--dim);margin-right:6px;font-size:11px}
+  label{display:block;font-size:11px;color:var(--dim);margin:0 0 4px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .row>div{flex:1;min-width:100px}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:8px 10px;font-size:15px}
+  select{font-size:13px}
+  button{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:9px 14px;font-size:13px;cursor:pointer}
+  button.sec{background:var(--panel2);border:1px solid var(--line);color:var(--ink)}
+  button.state{background:var(--panel2);border:1px solid var(--line);color:var(--ink)}
+  button.state.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  button:disabled{opacity:.45;cursor:default}
+  button:hover:not(:disabled){filter:brightness(1.08)}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .pill.ok{color:var(--ok);border-color:var(--ok)}
+  .pill.warn{color:var(--warn);border-color:var(--warn)}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .dp{font-size:22px;font-weight:600}
+  .dp .u{font-size:12px;color:var(--dim);font-weight:400;margin-left:3px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--dim);font-weight:500;font-size:11px}
+  td .x{color:var(--err);cursor:pointer}
+  canvas{width:100%;height:300px;background:#0e1216;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--dim);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+  .note{font-size:12px;color:var(--dim);line-height:1.5;margin-top:8px}
+  .fp{font-size:11px;color:var(--dim);margin-top:4px;min-height:14px}
+  .card ul{margin:4px 0 0;padding-left:20px;font-size:13px;line-height:1.55}
+  .card ul li{margin:6px 0}
+  .est{display:flex;gap:22px;flex-wrap:wrap;margin:8px 0 2px}
+  .est .b{font-size:16px;font-weight:600}
+  .est .l{font-size:11px;color:var(--dim)}
+  .est .d{font-size:12px;color:var(--dim)}
+  .foot{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5}
+  .foot a{color:var(--acc)}
+  a{color:var(--acc)}
+  details.adv{margin-bottom:14px}
+  details.adv>summary{list-style:none;cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--acc);user-select:none}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary::before{content:"▸ ";color:var(--dim)}
+  details.adv[open]>summary::before{content:"▾ "}
+  details.adv[open]>summary{margin-bottom:14px}
+  details.adv>.card:last-child{margin-bottom:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nukit PC Fan Gauge: limited accuracy P-Q calculator</h1>
+  <p class="sub">A free, low-resolution gauge for roughly measuring the properties of unlabeled, scavenged, or recycled
+    120mm and 140mm PC fans. Requires access to a 3D printer to make the test plenum and an Android or iOS phone
+    capable of running phyphox.</p>
+
+  <div class="card">
+    <h2>How to measure</h2>
+    <ul>
+      <li><b>3D print your plenum.</b> Download the plenum (testing box) and sliding cover for your fan size from the
+        <a href="plenum-builder.html" target="_blank" rel="noopener">Plenum Builder</a>. You will need a
+        <a href="https://www.amazon.com/s?k=silicone+120+140+fan+gasket" target="_blank" rel="noopener">fan gasket</a>;
+        if you cannot purchase one, the Plenum Builder will let you 3D print a serviceable one in 90A Shore TPU.</li>
+      <li><b>Set up phyphox.</b> On your <a href="https://play.google.com/store/apps/details?id=de.rwth_aachen.phyphox" target="_blank" rel="noopener">Android</a>
+        or <a href="https://apps.apple.com/app/phyphox/id1127319693" target="_blank" rel="noopener">iOS</a> phone, open
+        <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a>, choose <b>Pressure</b>, press play, and turn on
+        <b>Remote Access</b>. Note the IP address, and confirm you can open its page from another device's browser on the
+        same Wi-Fi network (it will not work over mobile data).</li>
+      <li><b>Assemble the testing apparatus.</b> Plug the fan into your power supply to verify that it works. Lay the
+        plenum on a flat, stable surface with <b>all ports covered</b> and facing up. Place the phone
+        inside the plenum. Attach the unplugged fan and gasket to the plenum with screws, ensuring that the fan is blowing
+        <b>outward</b>. Make sure the sliding door opens and closes fully and is not blocked by the fan gasket.</li>
+      <li><b>Baseline (fan off).</b> Read the pressure in the remote browser, from the phone running phyphox inside the plenum. The value cycles through a range; write down
+        the <b>center</b> of that range. Don't wait for it to settle; it only keeps drifting.</li>
+      <li><b>Closed.</b> Turn the fan on, wait ~10&nbsp;s to reach full speed, then record the center reading.</li>
+      <li><b>1 port.</b> Slide one port open to the debossed line, wait ~5&nbsp;s, then record the center reading.</li>
+      <li><b>2 ports.</b> Open the second port, wait ~5&nbsp;s, then record the center reading.</li>
+      <li><b>Type the four readings</b> into the fields below.</li>
+    </ul>
+    <div class="note"><b>Keep the whole run under 30 seconds</b> (baseline through 2 ports); the barometer drifts the
+      entire time, so speed beats waiting for a stable number.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">1</span>Test fan size</h2>
+    <div class="row" style="align-items:center">
+      <div style="flex:0 0 auto">
+        <select id="sizeSel" style="width:auto;display:inline-block;font-size:14px;padding:8px 10px">
+          <option value="140">140 mm</option>
+          <option value="120">120 mm</option>
+        </select>
+      </div>
+      <div class="note" style="margin-top:0">Sets the size of the fan and plenum you are using. Create your plenum <a href="plenum-builder.html" target="_blank" rel="noopener">here</a>.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Baseline (fan OFF)</h2>
+    <div class="row">
+      <div style="flex:0 0 200px"><label>Ambient pressure (hPa)</label><input id="base" type="number" step="0.001" placeholder="994.80"></div>
+      <div style="align-self:center"><span class="pill" id="basePill">not set</span></div>
+    </div>
+    <div class="note">Read with the fan off, immediately before the other measurements so drift can't creep in. Baseline has to be reestablished for each test run.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>Readings (fan ON, suction)</h2>
+    <div class="row">
+      <div><label>Closed, all ports covered (hPa)</label><input id="r0" type="number" step="0.001" placeholder="994.70"><div class="fp" id="d0">…</div></div>
+      <div><label>1 port open (hPa)</label><input id="r1" type="number" step="0.001" placeholder="994.74"><div class="fp" id="d1">…</div></div>
+      <div><label>2 ports open (hPa)</label><input id="r2" type="number" step="0.001" placeholder="994.79"><div class="fp" id="d2">…</div></div>
+    </div>
+    <div class="note">Type the phyphox reading at each door position; ΔP vs baseline shows under each.</div>
+  </div>
+
+  <details class="adv"><summary>Advanced: calibration &amp; comparison</summary>
+  <div class="card">
+    <h2><span class="step">4</span>Calibrate the plenum (optional)</h2>
+    <div class="row">
+      <div style="flex:2"><label>Reference fan, one you own with a Cybenetics curve</label><select id="refSel"></select></div>
+      <div style="flex:0 0 auto;align-self:center"><span class="pill" id="calPill">uncalibrated</span></div>
+    </div>
+    <div class="note" id="refInfo">Pick a reference fan, measure its readings above, then calibrate.</div>
+    <div class="btns">
+      <button id="cal">Calibrate from these readings</button>
+      <button id="calReset" class="sec">Reset calibration</button>
+    </div>
+    <div class="note" id="calStatus"></div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:0 0 160px"><label>plenum constant (mm²)</label><input id="leakIn" type="number" step="1" placeholder="e.g. 1500"></div>
+      <div style="align-self:flex-end"><div class="note" style="margin-top:0">Reuse a known plenum: type its <b>plenum constant</b> (its one calibration number). It also fills in here after you calibrate, so you can write it on your 3D printed plenum.</div></div>
+    </div>
+    <div class="note"><b>Optional</b>: without it you still get an uncalibrated estimate. Calibrating with a
+      fan in the <b>same pressure class</b> as what you plan to test corrects for your specific plenum.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">5</span>Fan under test, compare to Cybenetics (optional)</h2>
+    <div class="row">
+      <div style="flex:2"><label>If the fan you're testing is in the database, pick it to overlay its Cybenetics curve</label><select id="testSel"></select></div>
+    </div>
+    <div class="note">Leave on "Not listed" for an unknown fan; you still get an estimate.</div>
+  </div>
+  </details>
+
+  <div class="card">
+    <h2>Results</h2>
+    <div class="est">
+      <div><div class="b" id="estP"><div>…<span class="u" style="color:var(--dim)"> mm H₂O</span></div><div>…<span class="u" style="color:var(--dim)"> Pa</span></div></div><div class="l">est. dead-head (Q=0)</div><div class="d" id="estPd"></div></div>
+      <div><div class="b" id="estQ"><div>…<span class="u" style="color:var(--dim)"> m³/h</span></div><div>…<span class="u" style="color:var(--dim)"> CFM</span></div></div><div class="l">est. free-air (ΔP=0)</div><div class="d" id="estQd"></div></div>
+    </div>
+    <table id="tbl"><thead><tr>
+      <th>Position</th><th>ΔP (mm H₂O)</th><th>ΔP (Pa)</th><th>open ⌀eq</th><th>flow (m³/h)</th><th>flow (CFM)</th><th></th>
+    </tr></thead><tbody></tbody></table>
+    <div class="btns"><button id="csv" class="sec">Copy CSV</button><button id="clr" class="sec">Clear points</button></div>
+    <canvas id="plot" width="1600" height="600"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--ref)"></i>reference (calibration fan)</span>
+      <span><i style="background:var(--meas)"></i>your measured points (calibrated)</span>
+      <span><i style="background:var(--truth)"></i>fan-under-test (Cybenetics)</span>
+    </div>
+    <div class="foot">Reference fan data: <b>Cybenetics</b> Phi database, measured on a Long Win LW-9266.
+      Reused with attribution per Cybenetics' terms, <a href="https://www.cybenetics.com/index.php?option=fan-performance-database" target="_blank" rel="noopener">cybenetics.com</a>.
+      1&nbsp;mmAq = 9.807&nbsp;Pa · 1&nbsp;CFM = 1.699&nbsp;m³/h.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const RHO=1.2, CD0=0.6;
+  const PORTD={'140':71,'120':60};        // port ⌀ (mm) per plenum size
+  let boxSize='140', PDIAM=PORTD[boxSize];
+  const CFM=1.699, MMAQ=9.80665;          // CFM->m3/h, mmAq->Pa
+  const STATES=[['Closed (0)',0],['1 port',1],['2 ports',2]];
+
+  // ---- bundled Cybenetics reference fans (common + easy to buy in China) ----
+  // [brand, model, diameter, Pmax(mmAq), Qmax(CFM), rpm]
+  const FANS=[
+    ['Thermalright','TL-C12B V2',120,1.38,66.49,1548],
+    ['Thermalright','TL-C12C-X28 X3',120,1.39,69.31,1606],
+    ['Thermalright','TL-K12',120,2.50,63.74,2181],
+    ['Arctic','P12 PWM PST',120,1.76,52.15,1889],
+    ['Arctic','P12 Max (Black)',120,5.12,85.02,3332],
+    ['ID-Cooling','AT-120-K',120,4.93,81.92,3053],
+    ['Noctua','NF-A12x25',120,2.26,56.11,2134],
+    ['Noctua','NF-A12x25 G2',120,2.79,61.26,1818],
+    ['be quiet!','Silent Wings 4 120mm',120,1.28,44.91,1600],
+    ['Corsair','AF120 RGB Elite',120,2.53,65.23,2100],
+    ['Cooler Master','MF120 Halo2',120,2.17,52.43,2093],
+    ['Phanteks','T30-120 (Performance)',120,2.80,68.54,2000],
+    ['Jonsbo','SL-120W',120,1.41,54.21,1589],
+    ['Arctic','P14 PWM PST',140,1.96,71.90,1769],
+    ['Arctic','P14 Max',140,4.11,113.70,2783],
+    ['Arctic','P14 Pro PST',140,5.09,103.78,2459],
+    ['Thermalright','TR-TY141',140,1.66,55.03,1346],
+    ['Noctua','NF-A14x25 G2',140,2.51,94.59,1507],
+    ['Noctua','NF-P14s redux-1200',140,1.33,68.20,1260],
+    ['be quiet!','Silent Wings 4 140mm',140,0.80,49.97,1170],
+    ['Cooler Master','MF140 Halo2',140,1.73,58.29,1644],
+    ['Corsair','NR140HP',140,4.49,101.38,2445],
+    ['NZXT','F140RGB CORE',140,3.15,75.64,1555],
+    ['Lian Li','UNI Fan TL 140',140,2.15,95.34,1775],
+  ].map(f=>({brand:f[0],model:f[1],dia:f[2],P0:f[3]*MMAQ,Qmax:f[4]*CFM,cfm:f[4],rpm:f[5],
+             label:`${f[0]} ${f[1]} (${f[2]}mm), ${f[3].toFixed(2)} mm H₂O · ${(f[4]*CFM).toFixed(0)} m³/h · ${f[4].toFixed(0)} CFM`}));
+
+  // ---- state ----
+  let baseline=null, points=[];
+  let cal={cdEff:CD0, leakMm2:0, refName:null, ready:false, kP:null};
+  let refFan=null, testFan=null;
+
+  // ---- geometry / flow ----
+  const areaMm2=n=>n*Math.PI*(PDIAM/2)**2;                 // total open port area (mm²)
+  const eqD=A=>A>0?Math.sqrt(4*A/Math.PI):0;
+  const flow=(dPa,n)=>{ const A=(areaMm2(n)+cal.leakMm2)*1e-6; return A<=0?0:cal.cdEff*A*Math.sqrt(2*Math.abs(dPa)/RHO)*3600; }; // m³/h
+  const num=el=>{ const v=parseFloat(el.value); return isFinite(v)?v:null; };
+  // reference fan flow at pressure P, from its endpoints (linear P-Q between dead-head and free air)
+  const refFlowAtP=P=>{ if(!refFan) return null; if(P>=refFan.P0) return 0; if(P<=0) return refFan.Qmax; return refFan.Qmax*(1-P/refFan.P0); };
+
+  // ---- persistence (calibration is stored per plenum size) ----
+  function save(){ try{ localStorage.setItem('ft_cal_'+boxSize,JSON.stringify(cal)); if(baseline!=null) localStorage.setItem('ft_base',baseline); }catch(e){} }
+  function loadCal(){
+    cal={cdEff:CD0, leakMm2:0, refName:null, ready:false, kP:null};
+    try{ const c=localStorage.getItem('ft_cal_'+boxSize); if(c){ cal=Object.assign(cal,JSON.parse(c)); } }catch(e){}
+    cal.cdEff=CD0;   // port Cd is a fixed design constant, never per-plenum
+    $('calStatus').innerHTML = (cal.ready&&cal.refName)
+      ? `Using saved ${boxSize} mm calibration: plenum constant ${cal.leakMm2.toFixed(0)} mm² (⌀${eqD(cal.leakMm2).toFixed(0)} mm).` : '';
+    syncCalFields();
+  }
+  function load(){ try{
+      const s=localStorage.getItem('ft_size'); if(s==='120'||s==='140'){ boxSize=s; PDIAM=PORTD[boxSize]; }
+      const b=localStorage.getItem('ft_base'); if(b){ $('base').value=b; }
+    }catch(e){} }
+
+  // ---- dropdowns (filtered to the selected plenum size) ----
+  function fillSelect(sel,firstLabel,dia){
+    sel.innerHTML='';
+    const o0=document.createElement('option'); o0.value=''; o0.textContent=firstLabel; sel.appendChild(o0);
+    FANS.filter(f=>f.dia===dia).forEach(f=>{ const o=document.createElement('option');
+      o.value=FANS.indexOf(f); o.textContent=f.label; sel.appendChild(o); });
+  }
+
+  $('refSel').addEventListener('change',()=>{
+    refFan = $('refSel').value!==''?FANS[+$('refSel').value]:null;
+    $('refInfo').innerHTML = refFan
+      ? `<b>${refFan.brand} ${refFan.model}</b>, true dead-head <b>${(refFan.P0/MMAQ).toFixed(2)} mm H₂O</b> (${refFan.P0.toFixed(1)} Pa), free air <b>${refFan.Qmax.toFixed(0)} m³/h</b> (${refFan.cfm.toFixed(0)} CFM), ${refFan.rpm} rpm. Measure it above, then calibrate.`
+      : 'Pick a reference fan, measure its readings above, then calibrate.';
+    render();
+  });
+  $('testSel').addEventListener('change',()=>{
+    testFan = $('testSel').value!==''?FANS[+$('testSel').value]:null; render();
+  });
+  // plenum size: sets port ⌀, filters fans, loads that size's saved calibration
+  function applySize(){
+    PDIAM=PORTD[boxSize];
+    try{ localStorage.setItem('ft_size',boxSize); }catch(e){}
+    fillSelect($('refSel'),'Pick a reference fan',+boxSize); refFan=null;
+    $('refInfo').textContent='Pick a reference fan, measure its readings above, then calibrate.';
+    fillSelect($('testSel'),'Not listed / unknown fan',+boxSize); testFan=null;
+    loadCal(); refresh(); render();
+  }
+  $('sizeSel').addEventListener('change',()=>{ boxSize=$('sizeSel').value; applySize(); });
+
+  // ---- calibration ----
+  $('cal').addEventListener('click',()=>{
+    if(!refFan){ alert('Pick a reference fan first (step 4).'); return; }
+    const dh=points.find(p=>p.n===0);
+    if(!dh){ alert("Fill in the reference fan's Closed reading first."); return; }
+    const f=P=>Math.sqrt(2*P/RHO)*3600;                    // sqrt term -> m³/h per (m²·Cd)
+    const P0=Math.abs(dh.dPa);
+    const q0=refFlowAtP(P0);                               // m³/h the ref fan really flows at its dead-head
+    // at Closed, all of that passes through the plenum: q0 = Cd·A·√(2P/ρ)  ->  A = q0/(Cd·f)
+    const leak=(q0/(CD0*f(P0)))*1e6;                       // mm²  (CD0 is the fixed port constant)
+    cal={cdEff:CD0, leakMm2:Math.max(0,leak), refName:`${refFan.brand} ${refFan.model}`, ready:true, kP:refFan.P0/P0};
+    save();
+    $('calStatus').innerHTML=`Calibrated on <b>${cal.refName}</b>: your plenum reads <b>${((1-P0/refFan.P0)*100).toFixed(0)}% low</b> on pressure `+
+      `(×${cal.kP.toFixed(2)} to correct), plenum constant <b>${cal.leakMm2.toFixed(0)} mm²</b> (⌀${eqD(cal.leakMm2).toFixed(0)} mm).`;
+    syncCalFields(); render();
+  });
+  $('calReset').addEventListener('click',()=>{
+    cal={cdEff:CD0, leakMm2:0, refName:null, ready:false, kP:null};
+    try{localStorage.removeItem('ft_cal');}catch(e){}
+    $('calStatus').textContent=''; syncCalFields(); render();
+  });
+  // fill the manual field from the current calibration (so you can note it after calibrating)
+  function syncCalFields(){
+    $('leakIn').value = cal.leakMm2>0 ? +cal.leakMm2.toFixed(0) : '';
+  }
+  // manual entry: type a known plenum's plenum constant to restore its calibration without measuring
+  function applyManual(){
+    const L=num($('leakIn'));
+    cal.leakMm2=(L!=null&&L>=0)?L:0;
+    cal.cdEff=CD0;
+    cal.ready=cal.leakMm2>0;
+    cal.refName='manual entry'; cal.kP=null; save();
+    $('calStatus').innerHTML = cal.ready
+      ? `Manual calibration: plenum constant ${cal.leakMm2.toFixed(0)} mm² (⌀${eqD(cal.leakMm2).toFixed(0)} mm).`
+      : '';
+    render();
+  }
+  $('leakIn').addEventListener('input',applyManual);
+
+  // ---- readings -> points (three fixed door positions) ----
+  const FIELDS=[['r0',0],['r1',1],['r2',2]];
+  function refresh(){
+    const b=num($('base')); baseline=b;
+    $('basePill').textContent=b===null?'not set':`${b.toFixed(3)} hPa`; $('basePill').className=b===null?'pill':'pill ok';
+    points=[];
+    FIELDS.forEach(([id,n])=>{
+      const r=num($(id)), fp=$('d'+n);
+      if(b!==null && r!==null){ const dPa=(b-r)*100; points.push({label:STATES.find(s=>s[1]===n)[0], n, dPa});
+        fp.textContent=`${(dPa/MMAQ).toFixed(2)} mm H₂O · ${dPa.toFixed(1)} Pa`; fp.style.color=dPa>=0?'var(--dim)':'var(--warn)'; }
+      else { fp.textContent='…'; fp.style.color='var(--dim)'; }
+    });
+    if(b!=null) save();
+  }
+  ['base','r0','r1','r2'].forEach(id=>$(id).addEventListener('input',()=>{ refresh(); render(); }));
+  $('clr').onclick=()=>{ ['r0','r1','r2'].forEach(id=>$(id).value=''); refresh(); render(); };
+  $('csv').onclick=()=>{
+    const rows=[['position','ports','deltaP_mmH2O','deltaP_Pa','flow_m3h','flow_CFM','cdEff','plenum_constant_mm2']];
+    points.forEach(p=>rows.push([p.label,p.n,(p.dPa/MMAQ).toFixed(3),p.dPa.toFixed(2),flow(p.dPa,p.n).toFixed(1),(flow(p.dPa,p.n)/CFM).toFixed(1),cal.cdEff.toFixed(3),cal.leakMm2.toFixed(0)]));
+    navigator.clipboard.writeText(rows.map(r=>r.join(',')).join('\n')).then(()=>{$('csv').textContent='Copied ✓';setTimeout(()=>$('csv').textContent='Copy CSV',1200);});
+  };
+
+  // linear fit of measured (calibrated) points -> estimated dead-head & free-air
+  function estimate(){
+    const pts=points.map(p=>[flow(p.dPa,p.n),Math.abs(p.dPa)]);
+    if(pts.length<2) return null;
+    const n=pts.length; let sQ=0,sP=0,sQQ=0,sQP=0;
+    pts.forEach(([Q,P])=>{sQ+=Q;sP+=P;sQQ+=Q*Q;sQP+=Q*P;});
+    const den=n*sQQ-sQ*sQ; if(Math.abs(den)<1e-9) return null;
+    const m=(n*sQP-sQ*sP)/den, a=(sP-m*sQ)/n;               // P = a + m·Q
+    return {P0:a, Qmax:m<0?-a/m:null};
+  }
+
+  function render(){
+    $('calPill').textContent = cal.ready?`calibrated · ${cal.refName}`:'uncalibrated';
+    $('calPill').className = cal.ready?'pill ok':'pill warn';
+    // table
+    const tb=$('tbl').querySelector('tbody'); tb.innerHTML='';
+    points.forEach((p,i)=>{ const Q=flow(p.dPa,p.n); const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${p.label}</td><td>${(p.dPa/MMAQ).toFixed(2)}</td><td>${p.dPa.toFixed(1)}</td><td>⌀${eqD(areaMm2(p.n)+cal.leakMm2).toFixed(0)}</td>`+
+        `<td>${Q.toFixed(0)}</td><td>${(Q/CFM).toFixed(1)}</td><td><span class="x" data-i="${i}">✕</span></td>`; tb.appendChild(tr); });
+    tb.querySelectorAll('.x').forEach(x=>x.onclick=()=>{points.splice(+x.dataset.i,1);render();});
+    // estimate
+    const est=estimate();
+    const U='<span class="u" style="color:var(--dim)">';
+    const ln=(v,u)=>`<div>${v} ${U}${u}</span></div>`;
+    if(est){
+      $('estP').innerHTML=ln((est.P0/MMAQ).toFixed(2),'mm H₂O')+ln(est.P0.toFixed(1),'Pa');
+      $('estQ').innerHTML=est.Qmax!=null?ln(est.Qmax.toFixed(0),'m³/h')+ln((est.Qmax/CFM).toFixed(0),'CFM'):ln('…','m³/h')+ln('…','CFM');
+      if(testFan){
+        const dP=(est.P0/testFan.P0-1)*100, dQ=est.Qmax!=null?(est.Qmax/testFan.Qmax-1)*100:null;
+        $('estPd').innerHTML=`Cybenetics ${(testFan.P0/MMAQ).toFixed(2)} mm H₂O · <b>${dP>=0?'+':''}${dP.toFixed(0)}%</b>`;
+        $('estQd').innerHTML=dQ!=null?`Cybenetics ${testFan.Qmax.toFixed(0)} m³/h / ${testFan.cfm.toFixed(0)} CFM · <b>${dQ>=0?'+':''}${dQ.toFixed(0)}%</b>`:'';
+      } else { $('estPd').textContent=cal.ready?'calibrated estimate':'uncalibrated estimate'; $('estQd').textContent=''; }
+    } else { $('estP').innerHTML=ln('…','mm H₂O')+ln('…','Pa'); $('estQ').innerHTML=ln('…','m³/h')+ln('…','CFM'); $('estPd').textContent=''; $('estQd').textContent=''; }
+    plot();
+  }
+
+  function plot(){
+    const cv=$('plot'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,m=56; ctx.clearRect(0,0,W,H);
+    const meas=points.map(p=>[flow(p.dPa,p.n),Math.abs(p.dPa)]).sort((a,b)=>a[0]-b[0]);
+    const refPts=refFan?[[0,refFan.P0],[refFan.Qmax,0]]:[];
+    const testPts=testFan?[[0,testFan.P0],[testFan.Qmax,0]]:[];
+    const allQ=[...refPts.map(p=>p[0]),...testPts.map(p=>p[0]),...meas.map(p=>p[0]),80];
+    const allP=[...refPts.map(p=>p[1]),...testPts.map(p=>p[1]),...meas.map(p=>p[1]),20];
+    const Qmax=Math.max(...allQ)*1.05, Pmax=Math.max(...allP)*1.1;
+    const X=q=>m+(W-2*m)*q/Qmax, Y=p=>H-m-(H-2*m)*p/Pmax;
+    ctx.font='22px sans-serif';
+    const pStep=Pmax>60?10:5;
+    for(let g=0;g<=Pmax;g+=pStep){const y=Y(g);ctx.strokeStyle='#20272e';ctx.beginPath();ctx.moveTo(m,y);ctx.lineTo(W-m,y);ctx.stroke();ctx.fillStyle='#5b6672';ctx.textAlign='right';ctx.fillText(g,m-8,y+7);}
+    for(let g=0;g<=Qmax;g+=40){const x=X(g);ctx.fillStyle='#5b6672';ctx.textAlign='center';ctx.fillText(g,x,H-m+24);}
+    ctx.strokeStyle='#2c343d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(m,m);ctx.lineTo(m,H-m);ctx.lineTo(W-m,H-m);ctx.stroke();
+    ctx.fillStyle='#8b98a6';ctx.textAlign='center';ctx.fillText('flow  (m³/h)',W/2,H-16);
+    ctx.save();ctx.translate(20,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('ΔP  (Pa)',0,0);ctx.restore();
+    const line=(pts,color,dash,w)=>{ if(pts.length<2) return; ctx.strokeStyle=color;ctx.lineWidth=w||2;ctx.setLineDash(dash||[]);ctx.beginPath();pts.forEach((p,i)=>{const x=X(p[0]),y=Y(p[1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.setLineDash([]); };
+    line(refPts,'#5fb0a0',[],2.5);            // calibration reference
+    line(testPts,'#9a7fd1',[8,5],2.5);        // fan under test (Cybenetics truth)
+    line(meas,'#d98a5a',[6,5],2);             // measured
+    meas.forEach(p=>{ctx.fillStyle='#d98a5a';ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),7,0,7);ctx.fill();});
+    [[refPts,'#5fb0a0'],[testPts,'#9a7fd1']].forEach(([pts,c])=>pts.forEach(p=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),5,0,7);ctx.fill();}));
+  }
+
+  load();
+  $('sizeSel').value=boxSize;
+  fillSelect($('refSel'),'Pick a reference fan',+boxSize);
+  fillSelect($('testSel'),'Not listed / unknown fan',+boxSize);
+  loadCal(); refresh(); render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Measure a filter box's clean air delivery rate (CADR): Nukit FilterBoxBuilder</title>
+    <meta
+      name="description"
+      content="A simple calculator that estimates a DIY filter box's clean air delivery rate (CADR) from the pressure drop across its filters, measured with a phone barometer running phyphox."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --surface: #f8f5ec;
+        --surface-strong: #fffdf6;
+        --ink: #17201c;
+        --muted: #59635b;
+        --line: #d9d0bf;
+        --line-soft: rgb(217 208 191 / 54%);
+        --accent: #1f6f56;
+        --accent-strong: #164d3d;
+        --accent-wash: rgb(31 111 86 / 8%);
+        --shadow: 0 20px 70px rgb(51 42 27 / 12%);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #ece8dc;
+        background-image: radial-gradient(rgb(190 141 85 / 9%) 1px, transparent 1px);
+        background-size: 42px 42px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.55;
+      }
+      a { color: var(--accent-strong); }
+      .eyebrow {
+        margin: 0 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--accent-strong);
+      }
+      .page { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+      header.masthead {
+        padding: 28px 30px; background: var(--surface-strong); border: 1px solid var(--line);
+        box-shadow: var(--shadow); border-radius: 2px;
+      }
+      header.masthead h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); letter-spacing: -0.01em; }
+      header.masthead p { margin: 0; max-width: 74ch; color: var(--muted); }
+      .home-link {
+        display: inline-block; margin-top: 16px; padding: 8px 14px; border-radius: 2px;
+        background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 0.85rem;
+      }
+      main { min-width: 0; margin-top: 28px; }
+      section.card {
+        padding: 26px 30px; margin-bottom: 22px; background: var(--surface-strong);
+        border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 10px 40px rgb(51 42 27 / 7%);
+      }
+      section.card > h2 { margin: 0 0 4px; font-size: 1.45rem; }
+      .lede { margin: 0 0 18px; color: var(--muted); }
+      h3 { margin: 18px 0 8px; font-size: 1.12rem; }
+      p { margin: 0 0 8px; }
+      ul, ol { margin: 8px 0; padding-left: 22px; }
+      li { margin: 4px 0; }
+      code { padding: 1px 5px; background: var(--accent-wash); border: 1px solid var(--line-soft); border-radius: 3px; font-size: 0.85em; }
+      .formula {
+        margin: 10px 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line-soft);
+        border-radius: 2px; font-size: 0.95rem; overflow-x: auto; white-space: nowrap;
+      }
+      .tip { margin: 14px 0; padding: 12px 16px; background: var(--accent-wash); border-left: 3px solid var(--accent); border-radius: 2px; }
+      .tip strong { color: var(--accent-strong); }
+      .warn { margin: 14px 0; padding: 12px 16px; background: rgb(190 141 85 / 12%); border-left: 3px solid #be8d55; border-radius: 2px; }
+      /* calculator */
+      .calc { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 4px; }
+      .field { min-width: 0; }
+      .field.wide { grid-column: 1 / -1; }
+      .field label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+      .field .hint { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
+      .field input, .field select {
+        width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 2px;
+        font-size: 1rem; background: var(--surface-strong); color: var(--ink); font-variant-numeric: tabular-nums;
+      }
+      .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .dim-row { display: flex; gap: 10px; }
+      .dim-row > div { flex: 1; min-width: 0; }
+      .result {
+        margin: 20px 0 6px; padding: 20px; text-align: center; background: var(--accent-wash);
+        border: 1px solid var(--line); border-radius: 2px;
+      }
+      .result .big { font-size: 2.6rem; font-weight: 700; color: var(--accent-strong); line-height: 1.1; font-variant-numeric: tabular-nums; }
+      .result .unit { font-size: 1rem; color: var(--muted); margin-left: 4px; }
+      .result .sub { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+      .result.invalid .big { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
+      footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
+      footer.site-footer .cc-badge { display: inline-block; margin-bottom: 8px; }
+      footer.site-footer p a { color: inherit; }
+      @media (max-width: 620px) {
+        .calc { grid-template-columns: 1fr; }
+        .page { padding: 22px 16px 72px; }
+        section.card { padding: 22px 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Clean air delivery rate</p>
+        <h1>Measure your filter box's CADR</h1>
+        <p>
+          Estimate how much clean air your DIY filter box actually delivers, using nothing more than the barometer in a
+          phone. When the fans run, the box pulls air in through its filters, and the filters resist that flow, so the
+          air inside the box sits at a slightly lower pressure than the room. That pressure drop tells you how fast air
+          is moving through the filters. Combined with how well the filter media captures particles, it gives a rough
+          clean air delivery rate (CADR). Take one pressure reading with the fans off and one with them on, pick your
+          filter layout and size, and read the estimate below.
+        </p>
+        <a class="home-link" href="./">← Back to the builder</a>
+      </header>
+
+      <main>
+        <section class="card">
+          <h2>Calculator</h2>
+          <p class="lede">Pick the same filter layout and size you built with, then enter the two pressure readings from a phone sealed inside the box. Readings are in hPa, exactly as phyphox shows them.</p>
+
+          <div class="calc">
+            <div class="field">
+              <label for="layout">Filter layout</label>
+              <select id="layout">
+                <option value="1">One side (1 filter)</option>
+                <option value="2" selected>Both sides (2 filters)</option>
+                <option value="4">Four sides (4 filters)</option>
+                <option value="5">Four sides plus bottom (5 filters)</option>
+              </select>
+              <div class="hint">How many filters the air passes through in parallel.</div>
+            </div>
+            <div class="field">
+              <label for="size">Filter size</label>
+              <select id="size"></select>
+              <div class="hint">Same options as the builder. All are MERV-13 except STARKVIND (a PM2.5 filter), whose different media makes its estimate rougher.</div>
+            </div>
+
+            <div class="field wide" id="customWrap" style="display:none">
+              <label>Custom filter size (mm)</label>
+              <div class="dim-row">
+                <div><input id="cw" type="number" inputmode="decimal" min="0" step="1" value="500" aria-label="width mm" /><div class="hint">width</div></div>
+                <div><input id="cd" type="number" inputmode="decimal" min="0" step="1" value="500" aria-label="depth mm" /><div class="hint">depth</div></div>
+                <div><input id="ct" type="number" inputmode="decimal" min="0" step="1" value="44" aria-label="thickness mm" /><div class="hint">thickness</div></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="poff">Pressure, fans OFF (hPa)</label>
+              <input id="poff" type="number" inputmode="decimal" step="0.001" value="995.900" />
+              <div class="hint">The baseline: fans turned off, no flow.</div>
+            </div>
+            <div class="field">
+              <label for="pon">Pressure, fans ON (hPa)</label>
+              <input id="pon" type="number" inputmode="decimal" step="0.001" value="995.870" />
+              <div class="hint">Fans at your normal running speed.</div>
+            </div>
+          </div>
+
+          <div class="result" id="result">
+            <div><span class="big" id="cadrValue">0</span><span class="unit">CADR, CFM</span></div>
+            <p class="sub" id="cadrNote"></p>
+          </div>
+          <div class="formula" id="worked"></div>
+        </section>
+
+        <section class="card">
+          <h2>How to run the test</h2>
+          <ol>
+            <li>Install <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a> (free) on a phone that has a barometer, open the <strong>Pressure</strong> experiment, press play, and turn on <strong>Remote Access</strong> so you can read it live from another device on the same Wi-Fi.</li>
+            <li>Seal the phone inside the box. Put it in before you close up the last filter, or slip it through an access port, so the box stays as sealed as it is in normal use. The phone reads the pressure inside the box.</li>
+            <li>With the <strong>fans off</strong>, read the pressure and write it down. This is your baseline; with no flow, the inside of the box is at room pressure.</li>
+            <li>Turn the <strong>fans on</strong> at the speed you normally run them. Wait a few seconds for them to reach full speed, then read the pressure again.</li>
+            <li>Work quickly. Phone barometers drift as they warm, so take both readings within a minute or so, and write down the center of the small range the reading wanders through rather than waiting for it to settle.</li>
+            <li>Enter both readings, the layout, and the filter size above.</li>
+          </ol>
+          <div class="tip"><strong>Why inside the box?</strong> The number that matters is the pressure drop across the filters. With the fans running, the room is at the higher pressure and the sealed box is pulled below it. The phone inside measures that difference directly.</div>
+        </section>
+
+        <section class="card">
+          <h2>The math</h2>
+          <p>The pressure drop across the filters is just the difference between the two readings:</p>
+          <div class="formula">ΔP (Pa) = |P_off − P_on| × 100</div>
+          <p>
+            A MERV-13 filter's resistance follows a known curve, so a given ΔP corresponds to a particular face velocity
+            (the speed of air through the media, in feet per minute):
+          </p>
+          <div class="formula">ΔP (inH2O) = A × V² + B × V, &nbsp; A = 4.73e-7, &nbsp; B = 3.38e-4</div>
+          <p>
+            Solving that for <code>V</code> and multiplying by the total effective media area of all the filters gives the
+            airflow through the filters. The clean air delivery rate is that airflow times the filter's single-pass
+            capture efficiency:
+          </p>
+          <div class="formula">CADR = V × filter area × efficiency</div>
+          <p>
+            The resistance curve, the effective-area model (deeper filters pleat more media in), and the MERV-13
+            efficiency (about 81%, averaged across the 0.3 to 10 µm range) are the same ones the builder uses to predict
+            CADR. Here they run in reverse, from a real measurement instead of a fan-and-filter model.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>What it tells you, and what it does not</h2>
+          <ul>
+            <li>It estimates <strong>clean air delivery rate</strong>: the volume of filtered air per hour, counting only what the filters actually clean. Higher is better.</li>
+            <li>It assumes <strong>MERV-13 media</strong>, the filter type the builder is designed around. A different filter has a different resistance and efficiency, so the estimate would be off.</li>
+            <li>It assumes the box is reasonably sealed, so the pressure the phone sees really is the drop across the filters. Big leaks will throw it off.</li>
+            <li>Phone barometers read in steps of about 1 Pa with a few Pa of noise and drift, so treat the result as a ballpark, most useful for comparing builds or fan choices rather than as an exact figure.</li>
+            <li>This is a rough field estimate, not a certified CADR chamber test.</li>
+          </ul>
+          <div class="warn">This is the same CADR quantity the builder predicts in its Performance panel. Measuring your finished box is a good way to check the prediction against the real build.</div>
+        </section>
+
+        <footer class="site-footer">
+          <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
+            <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
+          </a>
+          <p>
+            The Nukit FilterBoxBuilder software is licensed under
+            <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="license noopener">GPL-3.0</a>;
+            the designs and files it produces are licensed under
+            <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">CC BY-SA 4.0</a>.
+            You may use, share, and adapt the designs, including commercially, as long as you credit Nukit and share any
+            derivatives under the same license. <a href="help.html#license">More about the license.</a>
+          </p>
+          <p>Method: filter pressure-drop measurement with a phone barometer. This page provides an estimate for planning, not a certified measurement.</p>
+          <a class="home-link" href="./">← Back to the builder</a>
+          <p><a href="privacy.html">Privacy policy</a></p>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      (function () {
+        // Filter physics, matched to the builder's CADR model (src/domain/purifier/cadr.ts).
+        var PA_PER_INH2O = 249.0889;
+        var MM_PER_IN = 25.4;
+        var M3H_PER_CFM = 1.699011;
+        var FA = 4.7302e-7, FB = 3.3752e-4;         // MERV-13 resistance: dP[inH2O] = A*V^2 + B*V
+        var MERV13_EFF = (0.62 + 0.87 + 0.95) / 3;   // single-pass, averaged 0.3-10 um
+
+        // Filter size presets, same list as the builder (id, label, w, d, t in mm).
+        var SIZES = [
+          { id: "starkvind", label: "STARKVIND (365 x 285 x 35 mm)", w: 365, d: 285, t: 35 },
+          { id: "starkvind-1x2", label: "STARKVIND 1x2 (730 x 285 x 35 mm)", w: 730, d: 285, t: 35 },
+          { id: "starkvind-2x1", label: "STARKVIND 2x1 (365 x 570 x 35 mm)", w: 365, d: 570, t: 35 },
+          { id: "filter-10x10x1", label: '10" x 10" x 1" (241 x 241 x 19 mm)', w: 241, d: 241, t: 19 },
+          { id: "filter-16x24x1", label: '16" x 24" x 1" (394 x 597 x 19 mm)', w: 394, d: 597, t: 19 },
+          { id: "filter-16x25x1", label: '16" x 25" x 1" (394 x 622 x 19 mm)', w: 394, d: 622, t: 19 },
+          { id: "filter-20x20x1", label: '20" x 20" x 1" (501 x 501 x 19 mm)', w: 501, d: 501, t: 19 },
+          { id: "filter-20x20x2", label: '20" x 20" x 2" (495 x 495 x 44 mm)', w: 495, d: 495, t: 44 },
+          { id: "filter-20x25x1", label: '20" x 25" x 1" (500 x 622 x 19 mm)', w: 500, d: 622, t: 19 },
+          { id: "filter-24x24x1", label: '24" x 24" x 1" (603 x 603 x 19 mm)', w: 603, d: 603, t: 19 },
+          { id: "filter-20x30x1", label: '20" x 30" x 1" (495 x 749 x 19 mm)', w: 495, d: 749, t: 19 },
+          { id: "custom", label: "Custom size", w: 0, d: 0, t: 0 }
+        ];
+
+        var el = {};
+        ["layout", "size", "poff", "pon", "cw", "cd", "ct"].forEach(function (id) { el[id] = document.getElementById(id); });
+        var customWrap = document.getElementById("customWrap");
+        var result = document.getElementById("result");
+        var cadrValue = document.getElementById("cadrValue");
+        var cadrNote = document.getElementById("cadrNote");
+        var worked = document.getElementById("worked");
+
+        // Populate the size dropdown, defaulting to 20x20x2.
+        SIZES.forEach(function (s) {
+          var o = document.createElement("option");
+          o.value = s.id; o.textContent = s.label;
+          if (s.id === "filter-20x20x2") o.selected = true;
+          el.size.appendChild(o);
+        });
+
+        function num(v) { var n = parseFloat(v); return isFinite(n) ? n : NaN; }
+
+        // Effective MERV-13 media area (ft^2) from outer dims (mm); deeper media pleats more.
+        function effAreaFt2(w, d, t) {
+          var wIn = w / MM_PER_IN, dIn = d / MM_PER_IN;
+          var a = (Math.max(0, wIn - 2.3) * Math.max(0, dIn - 1.15)) / 144;
+          var depthFactor = Math.min(1.8, t / 19);
+          return a * depthFactor;
+        }
+
+        // Invert the resistance curve: ΔP(inH2O) -> face velocity (FPM).
+        function faceVelFPM(dpIn) {
+          if (dpIn <= 0) return 0;
+          return (-FB + Math.sqrt(FB * FB + 4 * FA * dpIn)) / (2 * FA);
+        }
+
+        function invalid(msg) {
+          result.classList.add("invalid");
+          cadrValue.textContent = msg;
+          cadrValue.nextElementSibling.style.display = "none";
+          cadrNote.textContent = "";
+          worked.textContent = "CADR = face velocity × filter area × efficiency";
+        }
+
+        function ok() {
+          result.classList.remove("invalid");
+          cadrValue.nextElementSibling.style.display = "";
+        }
+
+        function update() {
+          var isCustom = el.size.value === "custom";
+          customWrap.style.display = isCustom ? "" : "none";
+
+          var n = num(el.layout.value);
+          var w, d, t;
+          if (isCustom) {
+            w = num(el.cw.value); d = num(el.cd.value); t = num(el.ct.value);
+          } else {
+            var s = SIZES.filter(function (x) { return x.id === el.size.value; })[0];
+            w = s.w; d = s.d; t = s.t;
+          }
+          var pOff = num(el.poff.value), pOn = num(el.pon.value);
+
+          if (!(w > 0) || !(d > 0) || !(t > 0)) {
+            return invalid("Enter the filter width, depth, and thickness.");
+          }
+          if (!isFinite(pOff) || !isFinite(pOn)) {
+            return invalid("Enter both pressure readings.");
+          }
+          var dPpa = Math.abs(pOff - pOn) * 100; // hPa -> Pa
+          if (dPpa <= 0) {
+            return invalid("The fans-on reading should differ from fans-off.");
+          }
+
+          var dpIn = dPpa / PA_PER_INH2O;
+          var vFpm = faceVelFPM(dpIn);
+          var areaFt2 = effAreaFt2(w, d, t) * n;
+          var flowCfm = vFpm * areaFt2;
+          var cadrCfm = flowCfm * MERV13_EFF;
+          var cadrM3h = cadrCfm * M3H_PER_CFM;
+
+          ok();
+          cadrValue.textContent = Math.round(cadrCfm);
+          cadrNote.textContent =
+            "About " + Math.round(cadrM3h) + " m³/h of clean air. Filter ΔP " + dPpa.toFixed(1) +
+            " Pa, airflow through the filters about " + Math.round(flowCfm) + " CFM.";
+          worked.textContent =
+            "ΔP " + dPpa.toFixed(1) + " Pa → " + Math.round(vFpm) + " FPM × " + areaFt2.toFixed(2) +
+            " ft² = " + Math.round(flowCfm) + " CFM; CADR = " + Math.round(flowCfm) + " × " +
+            MERV13_EFF.toFixed(2) + " = " + Math.round(cadrCfm) + " CFM";
+        }
+
+        ["layout", "size", "poff", "pon", "cw", "cd", "ct"].forEach(function (id) {
+          el[id].addEventListener("input", update);
+          el[id].addEventListener("change", update);
+        });
+        update();
+      })();
+    </script>
+  </body>
+</html>

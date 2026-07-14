@@ -94,6 +94,8 @@
       .result .sub { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
       .result.invalid .big { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
       footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
+      footer.site-footer .cc-badge { display: inline-block; margin-bottom: 8px; }
+      footer.site-footer p a { color: inherit; }
       @media (max-width: 620px) {
         .calc { grid-template-columns: 1fr; }
         .page { padding: 22px 16px 72px; }
@@ -110,8 +112,8 @@
           Estimate how many times per hour a room's air is replaced with outside air, using carbon dioxide as a
           tracer gas. People exhale CO2, so a closed, occupied room builds up CO2 above the outdoor level. Once the
           source stops, that excess decays back toward outside as fresh air dilutes it, and the speed of that decay is
-          the room's air-change rate. Take two CO2 readings a few hours apart, at least an hour and ideally three to
-          eight, then enter them below.
+          the room's air-change rate. Take two CO2 readings a couple of hours apart, with two hours a good starting
+          point, then enter them below.
         </p>
         <a class="home-link" href="./">← Back to the builder</a>
       </header>
@@ -119,7 +121,7 @@
       <main>
         <section class="card">
           <h2>Calculator</h2>
-          <p class="lede">Enter your outdoor baseline, two indoor readings, and the time between them, with no fresh CO2 added during that interval. We suggest starting with three hours.</p>
+          <p class="lede">Enter your outdoor baseline, two indoor readings, and the time between them, with no fresh CO2 added during that interval. We suggest starting with two hours.</p>
 
           <div class="calc">
             <div class="field">
@@ -130,7 +132,7 @@
             <div class="field">
               <label>Elapsed time between readings</label>
               <div class="time-row">
-                <div><input id="hours" type="number" inputmode="numeric" min="0" step="1" value="3" aria-label="hours" /><div class="hint">hours</div></div>
+                <div><input id="hours" type="number" inputmode="numeric" min="0" step="1" value="2" aria-label="hours" /><div class="hint">hours</div></div>
                 <div><input id="minutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="minutes" /><div class="hint">minutes</div></div>
               </div>
             </div>
@@ -160,7 +162,7 @@
             <li>Take it outside for 5 minutes to read the <strong>outdoor baseline</strong>, then bring it back in.</li>
             <li>Get the room's CO2 well above baseline by doing light exercise such as jumping jacks or jogging in place, or just talking with a few friends in the same room.</li>
             <li>Stop adding CO2: everyone leaves (or nobody breathes near the meter), no candles or gas appliances. Record the <strong>start</strong> reading and the time.</li>
-            <li>Wait at least an hour before recording the <strong>end</strong> reading and time; 3 to 8 hours is better. A slowly ventilated room decays gradually, so a longer window gives a more reliable result.</li>
+            <li>Wait about two hours before recording the <strong>end</strong> reading and time. You want a long enough window to see a clear drop, but the <strong>end</strong> reading should still be well above the outdoor baseline. If the room has already fallen back to baseline, use a shorter interval.</li>
             <li>Enter the two readings, the baseline, and the elapsed time above.</li>
           </ol>
           <div class="tip"><strong>Mixing helps.</strong> Run a small fan in the room to keep the air well mixed, and keep the meter away from people, vents, and open windows, so it reads the room as a whole.</div>
@@ -201,7 +203,7 @@
           <h2>What it tells you, and what it does not</h2>
           <ul>
             <li>It measures air <strong>exchange with outside</strong> (natural leakage plus any mechanical ventilation), which dilutes CO2 and other pollutants. Higher ACH means more fresh air.</li>
-            <li>It assumes a single, well-mixed room, a steady outdoor baseline, and no CO2 sources during the decay. Readings taken over a longer, steady decay are more reliable.</li>
+            <li>It assumes a single, well-mixed room, a steady outdoor baseline, and no CO2 sources during the decay. Choose a window that shows a clear drop while the end reading stays well above the outdoor baseline.</li>
             <li>It does <strong>not</strong> count particle removal by a filter or air purifier. A purifier adds its own "equivalent" clean-air changes on top of this ventilation rate.</li>
             <li>This is a quick field estimate, not a certified blower-door or professional tracer-gas test.</li>
           </ul>
@@ -209,6 +211,17 @@
         </section>
 
         <footer class="site-footer">
+          <a class="cc-badge" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">
+            <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
+          </a>
+          <p>
+            The Nukit FilterBoxBuilder software is licensed under
+            <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="license noopener">GPL-3.0</a>;
+            the designs and files it produces are licensed under
+            <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">CC BY-SA 4.0</a>.
+            You may use, share, and adapt the designs, including commercially, as long as you credit Nukit and share any
+            derivatives under the same license. <a href="help.html#license">More about the license.</a>
+          </p>
           <p>Method: carbon-dioxide tracer-gas decay (ASTM&nbsp;E741). This page provides an estimate for planning, not a certified measurement.</p>
           <a class="home-link" href="./">← Back to the builder</a>
           <p><a href="privacy.html">Privacy policy</a></p>

@@ -68,9 +68,16 @@ bun run oracle:airpurifier
 - `scripts/`: comparison and audit scripts.
 - `test/`: Bun tests covering URL parsing, fabrication workflows, generated print kits, and 3MF output.
 
-## Assets And Licenses
+## License and Reuse
 
-The project code is GPL-3.0, matching the upstream Nukit open hardware repository. Browser preview assets under `public/vendor/` keep their own source and license notes; see [docs/assets-and-licenses.md](./docs/assets-and-licenses.md).
+Copyright (C) 2026 [OpenNukit](https://github.com/opennukit). Dual-licensed by component:
+
+- **Software** (the builder's source code) is licensed under **GPL-3.0**; see [LICENSE](./LICENSE). This matches the upstream Nukit open hardware repository.
+- **Designs and output** (the laser-cut SVG/DXF drawings, 3MF print kits, and the box designs) and **documentation** are licensed under **CC BY-SA 4.0**: <https://creativecommons.org/licenses/by-sa/4.0/>.
+
+Reuse or adapt either part with attribution; derivative works must stay under the same license (share-alike).
+
+Browser preview assets under `public/vendor/` keep their own source and license notes; see [docs/assets-and-licenses.md](./docs/assets-and-licenses.md).
 
 ## Safety
 

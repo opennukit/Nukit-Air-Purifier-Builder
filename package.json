@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "GPL-3.0-only",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",

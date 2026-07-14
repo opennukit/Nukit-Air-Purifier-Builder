@@ -1760,7 +1760,7 @@
           {/snippet}
           {#snippet fanModelControls()}
             <label class="field">
-              <span>Fan model {@render infoTip("info-fanModel", "The specific fan used for the CADR, noise and power estimate. The list matches your fan size (or Box/Exhaust for the four-side tower); choose 'Custom (enter specs)' to enter your own fan's numbers.")}</span>
+              <span>Fan model {@render infoTip("info-fanModel", "The specific fan used for the CADR, noise and power estimate. The list matches your fan size (or Box/Exhaust for the four-side tower); choose 'Custom (enter specs)' to enter your own fan's numbers.")}{#if cadrFanModelId === CUSTOM_FAN_ID} <a class="info-tip-more" href="https://filterboxbuilder.com/fangauge/" target="_blank" rel="noopener">Measure</a>{/if}</span>
               <select name="fanModel" onchange={updateFanModel}>
                 {#each cadrFanOptions as option}
                   <option value={option.id} selected={cadrFanModelId === option.id}>{option.name}</option>
@@ -2878,6 +2878,31 @@
         </div>
 
         <!-- #######################################
+        Tools
+        ####################################### -->
+
+        <section class="guides-card" aria-label="Tools">
+          <strong>Tools</strong>
+          <ul>
+            <li>
+              <a href="ach-calculator.html" target="_blank" rel="noopener">
+                Measure room ventilation (ACH)
+              </a>
+            </li>
+            <li>
+              <a href="cadr-calculator.html" target="_blank" rel="noopener">
+                Measure a filter box's CADR
+              </a>
+            </li>
+            <li>
+              <a href="https://filterboxbuilder.com/fangauge/" target="_blank" rel="noopener">
+                Test a PC fan's pressure and flow (P-Q)
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <!-- #######################################
         Guides
         ####################################### -->
 
@@ -2937,9 +2962,11 @@
       <img src="help/by-sa.png" alt="Creative Commons Attribution-ShareAlike 4.0" width="88" height="31" />
     </a>
     <p>
-      The Nukit FilterBoxBuilder and its output are licensed under
+      The Nukit FilterBoxBuilder software is licensed under
+      <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="license noopener">GPL-3.0</a>;
+      the designs and files it produces are licensed under
       <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="license noopener">CC BY-SA 4.0</a>.
-      Use, share, and adapt freely, including commercially, with credit to Nukit and the same license on derivatives.
+      Use, share, and adapt the designs freely, including commercially, with credit to Nukit and the same license on derivatives.
       <a href="help.html#license" target="_blank" rel="noopener">More.</a>
     </p>
     <p>
