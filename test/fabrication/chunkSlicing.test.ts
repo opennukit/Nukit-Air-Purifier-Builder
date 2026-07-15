@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createTempestModel, defaultTempestSettings, type TempestModel, type TempestPrintablePose } from "@/domain/designs/tempest/model";
 import { createTempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
-import { featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import { axisCuts, featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { decodeSettings } from "@/domain/purifier/settingsCodec";
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
@@ -87,5 +87,40 @@ describe("feature-aware chunk slicing", () => {
         expect(seam > low && seam < high).toBe(false);
       }
     }
+  });
+});
+
+describe("axisCuts: balanced, sliver-free, feature-avoiding boundaries", () => {
+  const MIN_CHUNK = 40;
+  const sizesOf = (boundaries: number[]): number[] => boundaries.slice(1).map((v, i) => v - boundaries[i]);
+  const insideAnyBand = (seam: number, bands: ReadonlyArray<readonly [number, number]>): boolean =>
+    bands.some(([low, high]) => seam > low + 1e-6 && seam < high - 1e-6);
+
+  const cases: Array<{ name: string; length: number; bed: number; bands: Array<readonly [number, number]> }> = [
+    { name: "even split when there are no features", length: 555, bed: 250, bands: [] },
+    { name: "fan-grid gaps (the reported sliver failure)", length: 555, bed: 250, bands: [[68, 212], [343, 487]] },
+    { name: "a grill hugging the edge does not strand a sliver", length: 555, bed: 250, bands: [[10, 154], [401, 545]] },
+    { name: "a tall axis with a single top grill band", length: 650, bed: 270, bands: [[576, 720]] },
+    { name: "tight gaps between two features", length: 500, bed: 250, bands: [[60, 200], [300, 440]] },
+  ];
+
+  for (const { name, length, bed, bands } of cases) {
+    test(name, () => {
+      const boundaries = axisCuts(length, bed, bands);
+      expect(boundaries[0]).toBe(0);
+      expect(boundaries[boundaries.length - 1]).toBeCloseTo(length, 3);
+      const chunks = sizesOf(boundaries);
+      for (const size of chunks) {
+        expect(size).toBeGreaterThanOrEqual(MIN_CHUNK - 1e-6); // no sliver
+        expect(size).toBeLessThanOrEqual(bed + 1e-6); // still fits the bed
+      }
+      for (const seam of boundaries.slice(1, -1)) {
+        expect(insideAnyBand(seam, bands)).toBe(false); // never cuts a fragile feature
+      }
+    });
+  }
+
+  test("a part that already fits the bed is never cut", () => {
+    expect(axisCuts(200, 250, [])).toEqual([0, 200]);
   });
 });

@@ -23,7 +23,14 @@ type Band = readonly [number, number];
 type GrillCentre = readonly [number, number, number];
 type AxisBands = { readonly x: Band[]; readonly y: Band[]; readonly z: Band[] };
 
-const SEAM_GAP_MM = 0.5; // a seam must clear the previous one (and the bed edge) by at least this
+const EPS = 1e-6;
+// Every print chunk must be at least this big on each axis, so a feature-avoidance
+// seam can never isolate a thin, hard-to-handle sliver or crowd the alignment pins.
+// When honoring it would force a seam through a fragile feature, the slicer adds
+// another plate instead (more, chunkier plates beat fewer slivered ones). It is
+// relaxed toward smaller chunks only when a model is so constrained that 40 mm is
+// impossible, and never relaxed by cutting a feature.
+const MIN_CHUNK_MM = 40;
 const GRILL_MARGIN_MM = 2; // grill keep-out band radius padding beyond the fan radius
 // A seam must clear a thin internal wall (e.g. the inside filter flanges) by at
 // least this on the wall's thin axis, so it is never split into weak slivers.
@@ -172,54 +179,78 @@ function mergeAxisBands(a: AxisBands, b: AxisBands): AxisBands {
 // Axis Cuts
 // #######################################
 
-// Boundaries that keep each chunk <= bed AND keep all seams out of `bands`,
-// adding chunks as needed and staying as even as possible. Ported from Naomi's
-// builder.
-function axisCuts(length: number, bed: number, bands: readonly Band[]): number[] {
-  const merged = mergeBands(bands);
-  const minCount = Math.max(1, Math.ceil(length / bed));
-  if (merged.length === 0) {
-    return uniformBoundaries(length, minCount);
+// Boundaries that keep every chunk within [minChunk, bed] AND keep all seams out
+// of `bands` (fragile features), staying as even as possible. When a slice count
+// cannot satisfy that, it adds a slice (another plate) rather than accept a sliver;
+// when a model is so constrained that even a small minimum is impossible, it lowers
+// the minimum before ever cutting a feature. Ported and hardened from Naomi's builder.
+export function axisCuts(length: number, bed: number, bands: readonly Band[]): number[] {
+  if (length <= bed) {
+    return [0, length]; // fits the bed whole; never cut a part that does not need it
   }
-  const gaps = gapsBetween(merged, length);
-  const snap = (position: number): number => {
-    for (const [low, high] of gaps) {
-      if (position >= low - 0.01 && position <= high + 0.01) {
-        return position;
+  const gaps = gapsBetween(mergeBands(bands), length);
+  const minCount = Math.ceil(length / bed);
+  // Prefer the target minimum; relax toward smaller chunks only for a model too
+  // constrained to honor it. Seams always stay in `gaps`, so relaxing never cuts a
+  // feature, it only permits smaller chunks as a last resort.
+  for (const minChunk of [MIN_CHUNK_MM, 20, 8, 1]) {
+    const maxCount = Math.min(24, Math.max(minCount, Math.floor(length / minChunk)));
+    for (let count = minCount; count <= maxCount; count += 1) {
+      const seams = solveSeams(count, length, bed, gaps, minChunk);
+      if (seams !== null) {
+        return [0, ...seams, length];
       }
     }
-    let best = position;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const [low, high] of gaps) {
-      for (const edge of [low, high]) {
-        const distance = Math.abs(edge - position);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = edge;
-        }
-      }
-    }
-    return best;
-  };
+  }
+  return uniformBoundaries(length, minCount); // last resort: a keep-out wider than the bed
+}
 
-  for (let count = minCount; count <= 16; count += 1) {
-    const seams: number[] = [];
-    let ok = true;
-    let previous = 0;
-    for (let index = 1; index < count; index += 1) {
-      const seam = snap((index * length) / count);
-      if (seam <= previous + SEAM_GAP_MM || seam - previous > bed + SEAM_GAP_MM) {
-        ok = false;
-        break;
-      }
-      seams.push(Number(seam.toFixed(4)));
-      previous = seam;
+// Places count-1 interior seams, each inside a feature-free gap, so every chunk is
+// within [minChunk, bed]. Best-first over gap-snapped candidates with backtracking,
+// each seam preferring the position closest to its even split so the result stays
+// balanced. Returns null when this count cannot be satisfied.
+function solveSeams(count: number, length: number, bed: number, gaps: readonly Band[], minChunk: number): number[] | null {
+  const place = (index: number, previous: number): number[] | null => {
+    if (index === count) {
+      const last = length - previous;
+      return last >= minChunk - EPS && last <= bed + EPS ? [] : null;
     }
-    if (ok && length - previous <= bed + SEAM_GAP_MM) {
-      return [0, ...seams, length];
+    const remaining = count - index; // chunks that follow this seam
+    const low = Math.max(previous + minChunk, length - remaining * bed);
+    const high = Math.min(previous + bed, length - remaining * minChunk);
+    if (low > high + EPS) {
+      return null;
+    }
+    const target = clamp((index * length) / count, low, high);
+    for (const candidate of gapCandidates(gaps, low, high, target)) {
+      const rest = place(index + 1, candidate);
+      if (rest !== null) {
+        return [Number(candidate.toFixed(4)), ...rest];
+      }
+    }
+    return null;
+  };
+  return place(1, 0);
+}
+
+// Seam positions inside [low, high] that lie in a feature-free gap, ordered by
+// closeness to `target` so the search prefers the most even split.
+function gapCandidates(gaps: readonly Band[], low: number, high: number, target: number): number[] {
+  const candidates = new Set<number>();
+  for (const [gapLow, gapHigh] of gaps) {
+    const windowLow = Math.max(gapLow, low);
+    const windowHigh = Math.min(gapHigh, high);
+    if (windowLow <= windowHigh + EPS) {
+      candidates.add(clamp(target, windowLow, windowHigh));
+      candidates.add(windowLow);
+      candidates.add(windowHigh);
     }
   }
-  return uniformBoundaries(length, minCount);
+  return [...candidates].sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
+}
+
+function clamp(value: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value));
 }
 
 function mergeBands(bands: readonly Band[]): Band[] {
