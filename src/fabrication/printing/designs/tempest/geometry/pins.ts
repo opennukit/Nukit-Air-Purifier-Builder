@@ -3,7 +3,7 @@ import type { TempestExtrudeAxis } from "@/domain/designs/tempest/shared";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import type { GeometryContext } from "./context";
 import { CORD_CYLINDER_SEGMENTS, EPSILON_LIP, SHELL_OVERLAP_MM } from "./context";
-import { cylinderAlong, cylinderAlongFromStart, unionAll } from "./primitives";
+import { cylinderAlong, cylinderAlongFromStart, orientZExtrusion, unionAll } from "./primitives";
 import { towerCornerChamfer } from "./quadAssembly";
 
 type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number; readonly spacing: number };
@@ -11,6 +11,9 @@ type AlignmentPinSpec = { readonly diameter: number; readonly holeDepth: number;
 // #######################################
 // Cord Pass-Through
 // #######################################
+
+const CORD_BOSS_DEPTH_MM = 4;
+const CORD_BOSS_FACE_MEAT_MM = 4;
 
 export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid[] {
   const cord = model.cordPassThrough;
@@ -21,9 +24,12 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
     return [cylinderAlong(ctx, "z", [cord.x, cord.y, cord.zStart + cord.depth / 2], cord.depth + 2 * EPSILON_LIP, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
 
-  const wallCenter = model.frame.wallThickness / 2;
+  // The bore pierces the wall AND the drillable boss on its inside face
+  // (DRILLABLE_CORD_BOSS_TAG), so the drilled span centers on wall + boss.
+  const boredDepth = model.frame.wallThickness + CORD_BOSS_DEPTH_MM;
+  const wallCenter = boredDepth / 2;
   const oppositeWallCenter = cord.wall === "front" || cord.wall === "back" ? model.box.depth - wallCenter : model.box.width - wallCenter;
-  const length = model.frame.wallThickness + 2 * SHELL_OVERLAP_MM;
+  const length = boredDepth + 2 * SHELL_OVERLAP_MM;
   if (cord.wall === "front") {
     return [cylinderAlong(ctx, "y", [cord.positionAlongWall, wallCenter, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
@@ -34,6 +40,57 @@ export function cordHoleCylinders<Solid, Region>(ctx: GeometryContext<Solid, Reg
     return [cylinderAlong(ctx, "x", [wallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
   }
   return [cylinderAlong(ctx, "x", [oppositeWallCenter, cord.positionAlongWall, cord.verticalCenter], length, cord.diameter / 2, CORD_CYLINDER_SEGMENTS)];
+}
+
+// DRILLABLE_CORD_BOSS_TAG: extra meat around the wall cord bore so a builder
+// can drill it out for a larger connector without breaking through a bare 5mm
+// wall. A 45-degree truncated cone on the wall's inside face: in the upright
+// print pose the bore axis lies horizontal, so every boss surface slopes at
+// 45 degrees or steeper and prints without support. The tower's top-cylinder
+// cord passes through the 10mm top plate, which already has drilling headroom.
+export function cordBossCones<Solid, Region>(ctx: GeometryContext<Solid, Region>, model: TempestModel): Solid[] {
+  const cord = model.cordPassThrough;
+  if (cord.type !== "wall-cylinder") {
+    return [];
+  }
+  const faceRadius = cord.diameter / 2 + CORD_BOSS_FACE_MEAT_MM;
+  const baseRadius = faceRadius + CORD_BOSS_DEPTH_MM;
+  const wall = model.frame.wallThickness;
+  // The base end starts SHELL_OVERLAP_MM inside the wall so the union never
+  // leaves a coincident-face sliver against the interior wall surface.
+  const height = CORD_BOSS_DEPTH_MM + SHELL_OVERLAP_MM;
+  const halfway = height / 2 - SHELL_OVERLAP_MM; // base face to cone center
+
+  // orientZExtrusion maps the cone's local -z (bottomRadius) end to:
+  // axis "x" -> global -x, axis "y" -> global +y. Pick bottom/top radii so the
+  // wide end always sits at the wall's interior face.
+  const cone = (axis: "x" | "y", center: readonly [number, number, number], wideEndAt: "negative" | "positive"): Solid => {
+    const wideAtBottom = (axis === "x" && wideEndAt === "negative") || (axis === "y" && wideEndAt === "positive");
+    return ctx.modeling.transforms.translate(
+      center,
+      orientZExtrusion(
+        ctx,
+        axis,
+        ctx.modeling.primitives.cone({
+          height,
+          bottomRadius: wideAtBottom ? baseRadius : faceRadius,
+          topRadius: wideAtBottom ? faceRadius : baseRadius,
+          segments: CORD_CYLINDER_SEGMENTS,
+        }),
+      ),
+    );
+  };
+
+  if (cord.wall === "front") {
+    return [cone("y", [cord.positionAlongWall, wall + halfway, cord.verticalCenter], "negative")];
+  }
+  if (cord.wall === "back") {
+    return [cone("y", [cord.positionAlongWall, model.box.depth - wall - halfway, cord.verticalCenter], "positive")];
+  }
+  if (cord.wall === "left") {
+    return [cone("x", [wall + halfway, cord.positionAlongWall, cord.verticalCenter], "negative")];
+  }
+  return [cone("x", [model.box.width - wall - halfway, cord.positionAlongWall, cord.verticalCenter], "positive")];
 }
 
 // #######################################

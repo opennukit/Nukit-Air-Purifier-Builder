@@ -16,7 +16,7 @@ import {
   towerSideOpening,
 } from "./quadAssembly";
 import { flangePanel, framePanel, platePanel, wall } from "./sandwichAssembly";
-import { cordHoleCylinders, pinHoles } from "./pins";
+import { cordBossCones, cordHoleCylinders, pinHoles } from "./pins";
 
 // #######################################
 // The Build Timeline
@@ -57,8 +57,9 @@ function finalModel<Solid, Region>(
 ): Solid {
   // Build the shell once and reuse it: the pin-coverage check needs the finished
   // shell (windows, pockets, exhaust cuts included) to see how each chunk splits
-  // into separate printed pieces before the pin holes are drilled into it.
-  const shell = assembly(ctx, model);
+  // into separate printed pieces before the pin holes are drilled into it. The
+  // cord boss joins the shell before the bore is drilled through both.
+  const shell = unionAll(ctx, [assembly(ctx, model), ...cordBossCones(ctx, model)]);
   return subtractAll(ctx, shell, [
     ...cordHoleCylinders(ctx, model),
     ...pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid, shell),

@@ -195,4 +195,36 @@ describe("Tempest meshes are 2-manifold", () => {
     // A central hole + two screw rings is far simpler than the honeycomb fan grid.
     expect(boxExhaust.parts[0].mesh.triangles.length).toBeLessThan(grid.parts[0].mesh.triangles.length);
   });
+  test("the wall cord bore carries a drillable 45-degree boss on the inside face", () => {
+    // DRILLABLE_CORD_BOSS_TAG: extra meat around the cord bore (approved
+    // parts-list item) so builders can drill the hole out for larger
+    // connectors. Default model: right wall, cord near the floor corner; the
+    // boss face ring reaches bore/2 + 4mm and grows at 45 degrees toward the
+    // wall, so the probes below sit inside the meat at any default diameter.
+    const model = createTempestModel(defaultTempestSettings);
+    if (model.topology !== "sandwich" || model.cordPassThrough.type !== "wall-cylinder") {
+      throw new Error("Expected the default sandwich wall cord");
+    }
+    const face = model.box.width - model.frame.wallThickness;
+    const y = model.cordPassThrough.positionAlongWall;
+    const z = model.cordPassThrough.verticalCenter;
+    withGeometryArena(() => {
+      const ctx: GeometryContext<Geom3, Geom2> = { modeling: manifoldModeling, fanPatternCache: new Map() };
+      const solid = buildTempestGeometry(manifoldModeling, model);
+      const probeAt = (x: number, yy: number, zz: number) =>
+        meshVolume(
+          extractWeldedMesh(
+            manifoldModeling.booleans.intersect(solid, cuboidFromMinSize(ctx, x - 0.2, yy - 0.2, zz - 0.2, 0.4, 0.4, 0.4)),
+          ),
+        );
+      const probeVolume = 0.4 * 0.4 * 0.4;
+      // Solid boss meat 2mm in from the wall face, 6.5mm out from the bore axis...
+      expect(probeAt(face - 2, y + 6.5, z)).toBeCloseTo(probeVolume, 3);
+      // ...the bore itself stays open through the boss...
+      expect(probeAt(face - 2, y, z)).toBe(0);
+      // ...and past the boss depth it is open chamber again.
+      expect(probeAt(face - 6, y + 6.5, z)).toBe(0);
+      return [];
+    });
+  });
 });
