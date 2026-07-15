@@ -80,28 +80,27 @@ const pc = (id: string, name: string, group: FanGroup, q0: number, p0: number, d
   arctic: /^arctic/i.test(name),
 });
 
+// Airflow (q0, m³/h) and static pressure (p0, mmH₂O) are third-party Cybenetics
+// LW-9266 measurements, not manufacturer specs. Noise (db) and current (a) are not
+// published by Cybenetics, so they retain their prior values (noise is separately
+// calibrated).
 export const PC_FAN_MODELS: readonly PcFanModel[] = [
-  pc("arctic-p12-pwm-pst", "ARCTIC P12 PWM PST", "120", 95.7, 2.2, 16.5, 0.08),
-  pc("arctic-p12-max", "ARCTIC P12 Max", "120", 137.7, 2.2, 22.5, 0.29),
-  pc("noctua-nf-a12x25-pwm", "Noctua NF-A12x25 PWM", "120", 102.1, 2.34, 22.6, 0.14),
-  pc("noctua-nf-a12x25-g2", "Noctua NF-A12x25 G2", "120", 107.3, 2.79, 29.8, 0.15),
-  pc("bequiet-silent-wings-4-hs-120", "be quiet! Silent Wings 4 High Speed", "120", 130.3, 2.36, 31.2, 0.22),
-  pc("cm-sickleflow-120", "Cooler Master SickleFlow 120", "120", 105.3, 2.5, 27.0, 0.27),
-  pc("cm-masterfan-sf120m", "Cooler Master MasterFan SF120M (High)", "120", 105.3, 2.4, 22.0, 0.12),
-  pc("cm-masterfan-mf120-halo2", "Cooler Master MasterFan MF120 HALO²", "120", 88.1, 2.89, 27.0, 0.14),
-  pc("cm-sickleflow-edge-120", "Cooler Master SickleFlow Edge 120", "120", 120.1, 3.61, 27.2, 0.2),
-  pc("cm-mobius-120", "Cooler Master Mobius 120", "120", 122.3, 2.69, 22.6, 0.12),
-  pc("cm-mobius-120-oc", "Cooler Master Mobius 120 OC (Med)", "120", 127.4, 2.76, 31.1, 0.2),
-  pc("cm-mobius-120p-argb", "Cooler Master Mobius 120P ARGB 30th", "120", 127.8, 3.63, 30.0, 0.18),
-  pc("cm-mobius-120-slim", "Cooler Master Mobius 120 Slim", "120", 91.2, 2.53, 31.4, 0.2),
-  pc("arctic-p14-pwm-pst", "ARCTIC P14 PWM PST", "140", 123.7, 2.4, 16.5, 0.12),
-  pc("arctic-p14-max", "ARCTIC P14 Max", "140", 161.4, 2.5, 30.6, 0.35),
-  pc("noctua-nf-a14x25-g2", "Noctua NF-A14x25 G2", "140", 155.6, 2.56, 32.4, 0.19),
-  pc("bequiet-silent-wings-4-hs-140", "be quiet! Silent Wings 4 High Speed", "140", 133.2, 2.36, 29.3, 0.4),
-  pc("nzxt-f140p", "NZXT F140P", "140", 158.4, 4.45, 30.0, 0.23),
-  pc("corsair-rs140-max", "Corsair RS140 MAX", "140", 176.7, 3.0, 31.0, 0.35),
-  pc("cm-masterfan-mf140-halo2", "Cooler Master MasterFan MF140 HALO²", "140", 101.1, 2.53, 27.0, 0.13),
-  pc("cm-sickleflow-140-argb", "Cooler Master SickleFlow 140 ARGB", "140", 113.9, 2.2, 27.0, 0.2),
+  pc("arctic-p12-pwm-pst", "ARCTIC P12 PWM PST", "120", 88.6, 1.76, 16.5, 0.08),
+  pc("arctic-p12-max", "ARCTIC P12 Max", "120", 144.4, 5.12, 22.5, 0.29),
+  pc("noctua-nf-a12x25-pwm", "Noctua NF-A12x25 PWM", "120", 95.3, 2.26, 22.6, 0.14),
+  pc("noctua-nf-a12x25-g2", "Noctua NF-A12x25 G2", "120", 104.1, 2.79, 29.8, 0.15),
+  pc("bequiet-silent-wings-4-hs-120", "be quiet! Silent Wings 4 High Speed", "120", 123.6, 3.07, 31.2, 0.22),
+  pc("cm-masterfan-sf120m", "Cooler Master MasterFan SF120M (High)", "120", 92.9, 1.88, 22.0, 0.12),
+  pc("cm-masterfan-mf120-halo2", "Cooler Master MasterFan MF120 HALO²", "120", 89.1, 2.17, 27.0, 0.14),
+  pc("cm-mobius-120", "Cooler Master Mobius 120", "120", 98.7, 1.98, 22.6, 0.12),
+  pc("cm-mobius-120-oc", "Cooler Master Mobius 120 OC (High Speed)", "120", 153.4, 4.36, 31.1, 0.2),
+  pc("cm-mobius-120p-argb", "Cooler Master Mobius 120P ARGB 30th", "120", 123.6, 3.05, 30.0, 0.18),
+  pc("arctic-p14-pwm-pst", "ARCTIC P14 PWM PST", "140", 122.2, 1.96, 16.5, 0.12),
+  pc("arctic-p14-max", "ARCTIC P14 Max", "140", 193.2, 4.11, 30.6, 0.35),
+  pc("noctua-nf-a14x25-g2", "Noctua NF-A14x25 G2", "140", 160.7, 2.51, 32.4, 0.19),
+  pc("bequiet-silent-wings-4-hs-140", "be quiet! Silent Wings 4 High Speed", "140", 136.9, 2.03, 29.3, 0.4),
+  pc("corsair-rs140-max", "Corsair RS140 MAX", "140", 170.4, 2.2, 31.0, 0.35),
+  pc("cm-masterfan-mf140-halo2", "Cooler Master MasterFan MF140 HALO²", "140", 99.0, 1.73, 27.0, 0.13),
 ];
 
 export const DEFAULT_PC_FAN_ID: Record<FanGroup, string> = {

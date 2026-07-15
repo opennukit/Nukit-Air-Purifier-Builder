@@ -1760,7 +1760,7 @@
           {/snippet}
           {#snippet fanModelControls()}
             <label class="field">
-              <span>Fan model {@render infoTip("info-fanModel", "The specific fan used for the CADR, noise and power estimate. The list matches your fan size (or Box/Exhaust for the four-side tower); choose 'Custom (enter specs)' to enter your own fan's numbers.")}{#if cadrFanModelId === CUSTOM_FAN_ID} <a class="info-tip-more" href="https://filterboxbuilder.com/fangauge/" target="_blank" rel="noopener">Measure</a>{/if}</span>
+              <span>Fan model {@render infoTip("info-fanModel", "The specific fan used for the CADR, noise and power estimate. The list matches your fan size (or Box/Exhaust for the four-side tower); choose 'Custom (enter specs)' to enter your own fan's numbers. We only list fans with independent third-party LW-9266 test data, so their airflow and pressure are measured, not manufacturer claims.")}{#if cadrFanModelId === CUSTOM_FAN_ID} <a class="info-tip-more" href="https://filterboxbuilder.com/fangauge/" target="_blank" rel="noopener">Measure</a>{/if}</span>
               <select name="fanModel" onchange={updateFanModel}>
                 {#each cadrFanOptions as option}
                   <option value={option.id} selected={cadrFanModelId === option.id}>{option.name}</option>
