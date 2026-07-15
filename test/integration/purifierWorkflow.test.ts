@@ -112,25 +112,25 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("preserves the tempest cord hole diameter through the URL codec into the cord pass-through", () => {
-    // Default = the shipped cord hole: right wall, 8 mm bore.
+    // Default = the shipped cord hole: right wall, 10 mm bore.
     const defaultLayout = createLayout(decodeSettings("printDesign=nukit-tempest"));
     expect(createTempestSettingsFromLayout(defaultLayout).cordPassThrough).toMatchObject({
       type: "wall",
       wall: "right",
-      diameter: 8,
+      diameter: 10,
     });
 
-    const decoded = decodeSettings("printDesign=nukit-tempest&cordHoleDiameter=10");
-    expect(decoded.cordHoleDiameter).toBe(10);
+    const decoded = decodeSettings("printDesign=nukit-tempest&cordHoleDiameter=12");
+    expect(decoded.cordHoleDiameter).toBe(12);
 
     const decodedAgain = decodeSettings(encodeSettings(decoded));
-    expect(decodedAgain.cordHoleDiameter).toBe(10);
+    expect(decodedAgain.cordHoleDiameter).toBe(12);
 
     const chosenLayout = createLayout(decoded);
     expect(createTempestSettingsFromLayout(chosenLayout).cordPassThrough).toMatchObject({
       type: "wall",
       wall: "right",
-      diameter: 10,
+      diameter: 12,
     });
 
     // The diameter clamps at the boundary.
@@ -677,8 +677,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     expect(horizontalKit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
     expect(towerLayout.configuration.design.type).toBe("tempest");
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.arrangement : undefined).toBe("four-side-filter-tower");
-    // 290 face + 2*1 fit clearance + 2*41 structural offset (10 flange + 25+1 pocket + 5 wall).
-    expect(towerModel.box.width).toBe(374);
+    // 290 face + 2*0.6 fit clearance + 2*40.6 structural offset (10 flange +
+    // 25.6 pocket + 5 wall).
+    expect(towerModel.box.width).toBeCloseTo(372.4);
     expect(towerModel.box.height).toBe(305);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
     expect(towerModel.chunkGrid.totalCount).toBe(8);

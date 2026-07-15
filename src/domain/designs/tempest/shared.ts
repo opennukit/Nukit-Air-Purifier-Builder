@@ -179,12 +179,12 @@ export type TempestCordPassThrough =
       readonly cornerOffset: Millimeters;
     };
 
-// The shipped cord hole: an 8 mm bore hugging the right corner of the right
-// wall. The raw purifier settings expose only the diameter as a user choice;
-// the placement is fixed.
+// The shipped cord hole: a 10 mm bore (the common female barrel connector
+// passes through) hugging the right corner of the right wall. The raw purifier
+// settings expose only the diameter as a user choice; the placement is fixed.
 export const defaultTempestCordPassThrough = {
   type: "wall",
-  diameter: 8,
+  diameter: 10,
   wall: "right",
   side: "center",
   cornerOffset: 17,
