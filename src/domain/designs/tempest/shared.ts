@@ -184,7 +184,7 @@ export type TempestCordPassThrough =
 // the placement is fixed.
 export const defaultTempestCordPassThrough = {
   type: "wall",
-  diameter: 8,
+  diameter: 10,
   wall: "right",
   side: "center",
   cornerOffset: 17,

@@ -34,7 +34,7 @@ describe("per-chunk STL ZIP", () => {
   const kit: PrintableKit = {
     preset: findPrintVolumePreset("bed-256"),
     parts: [part("a"), part("b")],
-    summary: { partCount: 2, oversizedPartCount: 0, materialVolumeMm3: 0 },
+    summary: { partCount: 2, oversizedPartCount: 0, materialVolumeMm3: 0, fragilePartNames: [] },
   };
   const zip = createPrintableStlZipFromKit(kit, "test-kit");
 

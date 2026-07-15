@@ -72,7 +72,7 @@ describe("Tempest OpenSCAD model port", () => {
       type: "wall-cylinder",
       wall: "right",
       side: "center",
-      diameter: 8,
+      diameter: 10,
       axis: "x",
     });
     if (model.cordPassThrough.type !== "wall-cylinder") throw new Error("expected wall cord");
@@ -202,7 +202,7 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.cordPassThrough).toMatchObject({
       topology: "quad",
       type: "top-cylinder",
-      diameter: 8,
+      diameter: 10,
       x: 541,
       y: 78,
       zStart: 500,

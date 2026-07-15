@@ -190,8 +190,63 @@ export function tempestFinalPinPlacements<Solid, Region>(
   const base = tempestPinPlacementsClearOfFans(model, chunkGrid).filter((placement) =>
     pinCutsMaterial(ctx.modeling, assembledSolid, placement, pin.holeDepth),
   );
-  const coverage = tempestCoveragePins(ctx, assembledSolid, model, chunkGrid, base);
-  return [...base, ...coverage];
+  // Drop base pins whose socket would break through thin material (a through-hole),
+  // BEFORE coverage, so coverage then re-fastens any piece a dropped pin had held.
+  // Coverage pins are already embedded (socketEmbedded), so they need no clamp.
+  const blindBase = blindDepthClampedPlacements(ctx, assembledSolid, base, pin.holeDepth, pin.diameter / 2);
+  const coverage = tempestCoveragePins(ctx, assembledSolid, model, chunkGrid, blindBase);
+  // Shorten (don't drop) any socket near a perpendicular seam so no two crossing
+  // sockets meet at a shared chunk edge, the last source of pin through-holes.
+  return clampPinDepthToPerpendicularSeams([...blindBase, ...coverage], chunkGrid, pin);
+}
+
+// #######################################
+// Socket Containment
+// #######################################
+
+// Extra clearance beyond the pin radius the socket wall must keep from open space,
+// so a socket that merely grazes a face (its wall tangent to a void) is rejected too.
+const SOCKET_LATERAL_MARGIN_MM = 0.5;
+
+// Is the whole pin socket buried in material, not just its tip along the axis? The
+// socket is a cylinder reaching `depth` into the chunk on EACH side of the seam. Point
+// sampling its wall misses a void that sits off a diagonal, so this tests it EXACTLY:
+// build the socket cylinder (grown by a margin) and subtract the solid; anything left
+// is socket wall or tip standing in open space, a through-hole along the axis or a
+// side breakout into an internal void, so the pin is rejected. One boolean per pin,
+// and exact, which the earlier tip-only probe was not: it let base pins in the housing
+// corners bore sideways into the bottom-filter pocket and air chamber (original-cube on
+// small beds). Both the base band and the coverage grid gate on this same test.
+function socketFullyEmbedded<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  solid: Solid,
+  position: readonly [number, number, number],
+  axis: TempestExtrudeAxis,
+  depth: number,
+  radius: number,
+): boolean {
+  const socket = cylinderAlong(ctx, axis, position, 2 * depth, radius, CORD_CYLINDER_SEGMENTS);
+  return ctx.modeling.analysis.isEmpty(ctx.modeling.booleans.subtract(socket, solid));
+}
+
+// #######################################
+// Blind-Socket Depth Clamp
+// #######################################
+
+// Drop any pin whose socket would break through material, out a thin wall along its
+// axis OR sideways into an internal void, so every drilled socket stays a blind
+// pocket instead of a through-hole. Bites on small beds where the housing splits into
+// thin pieces; coverage still fastens any piece a dropped pin would have held.
+function blindDepthClampedPlacements<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  solid: Solid,
+  placements: readonly TempestAlignmentPinPlacement[],
+  fullDepth: number,
+  radius: number,
+): TempestAlignmentPinPlacement[] {
+  return placements.filter((placement) =>
+    socketFullyEmbedded(ctx, solid, placement.position, placement.axis, placement.holeDepth ?? fullDepth, radius + SOCKET_LATERAL_MARGIN_MM),
+  );
 }
 
 // #######################################
@@ -241,34 +296,12 @@ export function tempestCoveragePins<Solid, Region>(
   const placed: TempestAlignmentPinPlacement[] = basePlacements.map((p) => ({ position: p.position, axis: p.axis }));
   const coverage: TempestAlignmentPinPlacement[] = [];
 
-  const hasMaterial = (point: readonly [number, number, number]): boolean => probeHasMaterial(modeling, assembledSolid, point);
-
-  // Is the whole pin socket embedded in material — not just at its centre? Samples
-  // the socket's cylindrical surface (a pin-radius out, at several stations along
-  // its full length into both chunks) plus its two far ends. Any sample in open
-  // space means the socket would graze out through a face, so the pin is rejected.
-  // This is what keeps the denser coverage grid from placing a pin that breaks out
-  // on a thin or curved piece (e.g. the top exhaust ring).
-  const socketEmbedded = (position: readonly [number, number, number], axisIndex: 0 | 1 | 2): boolean => {
-    const [u, v] = ([0, 1, 2] as const).filter((k) => k !== axisIndex) as [0 | 1 | 2, 0 | 1 | 2];
-    for (const t of [-0.9, -0.5, 0, 0.5, 0.9]) {
-      const axial = position[axisIndex] + t * pin.holeDepth;
-      for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
-        const probe: [number, number, number] = [position[0], position[1], position[2]];
-        probe[axisIndex] = axial;
-        probe[u] = position[u] + lateralReach * Math.cos(angle);
-        probe[v] = position[v] + lateralReach * Math.sin(angle);
-        if (!hasMaterial(probe)) {
-          return false;
-        }
-      }
-    }
-    const lo: [number, number, number] = [position[0], position[1], position[2]];
-    const hi: [number, number, number] = [position[0], position[1], position[2]];
-    lo[axisIndex] = position[axisIndex] - pin.holeDepth * 0.95;
-    hi[axisIndex] = position[axisIndex] + pin.holeDepth * 0.95;
-    return hasMaterial(lo) && hasMaterial(hi);
-  };
+  // Is the whole pin socket embedded in material, not just at its centre? Uses the
+  // same exact cylinder-minus-solid test the base band gates on, so a coverage pin
+  // never grazes out through a face or bores into an internal void on a thin or
+  // curved piece (e.g. the top exhaust ring).
+  const socketEmbedded = (position: readonly [number, number, number], axisIndex: 0 | 1 | 2): boolean =>
+    socketFullyEmbedded(ctx, assembledSolid, position, axisName(axisIndex), pin.holeDepth, lateralReach);
 
   // Is there already a pin (base or coverage) crossing `seam` within MIN_PIN_GAP of
   // this spot, in the seam's plane? Used to fill a face to the target spacing
@@ -1115,8 +1148,57 @@ const PIN_SEAM_MATERIAL_MM = 1.5;
 // part edge. The planar (frame/plate) pins already clear perpendicular seams via
 // planarCoordClear; this is the matching guard for the wall pins, which span the
 // full wall length and would otherwise land right beside a crossing seam.
+// A pin's free coordinate must clear a perpendicular interior seam by its radius plus
+// a sliver of material, so the socket's SIDE never breaks out through that cut. (The
+// separate crossing hazard, two perpendicular sockets meeting at a shared chunk edge
+// is handled by clamping socket depth, not by dropping the pin; see
+// clampPinDepthToPerpendicularSeams.)
 const perpendicularSeamClearance = (pin: AlignmentPinSpec | null): number =>
   (pin === null ? 0 : pin.diameter / 2) + PIN_SEAM_MATERIAL_MM;
+
+// Below this a clamped socket is too shallow to grip, so the pin is dropped instead
+// (coverage still fastens the piece elsewhere).
+const MIN_PIN_DEPTH_MM = 1.5;
+
+// Two pins on perpendicular seams that share a chunk edge cross, merging into one
+// cavity open on both seam faces, i.e. a through-hole, when each socket reaches far
+// enough along its axis to meet the other. A pin sits `g` from the nearest
+// perpendicular seam (its free coordinate); clamping its socket to reach at most
+// `g - (radius + margin)` guarantees no such pair can meet: if pin A must reach B's
+// position it needs gA >= gB + (r+margin), and B needs gB >= gA + (r+margin), both
+// cannot hold. This keeps the pin (only shorter) rather than dropping it, so no chunk
+// is left unpinned. Applied uniformly to base and coverage pins.
+function clampPinDepthToPerpendicularSeams(
+  placements: readonly TempestAlignmentPinPlacement[],
+  chunkGrid: TempestChunkGrid,
+  pin: AlignmentPinSpec,
+): TempestAlignmentPinPlacement[] {
+  const reachMargin = pin.diameter / 2 + PIN_SEAM_MATERIAL_MM;
+  const interiorSeams: readonly (readonly number[])[] = [
+    chunkGrid.boundariesX.slice(1, -1),
+    chunkGrid.boundariesY.slice(1, -1),
+    chunkGrid.boundariesZ.slice(1, -1),
+  ];
+  const kept: TempestAlignmentPinPlacement[] = [];
+  for (const placement of placements) {
+    const axisIndex = placement.axis === "x" ? 0 : placement.axis === "y" ? 1 : 2;
+    let nearest = Infinity;
+    for (let perp = 0; perp < 3; perp += 1) {
+      if (perp === axisIndex) {
+        continue;
+      }
+      for (const seam of interiorSeams[perp]) {
+        nearest = Math.min(nearest, Math.abs(placement.position[perp] - seam));
+      }
+    }
+    const full = placement.holeDepth ?? pin.holeDepth;
+    const depth = Math.min(full, nearest - reachMargin);
+    if (depth >= MIN_PIN_DEPTH_MM) {
+      kept.push(depth < full ? { ...placement, holeDepth: depth } : placement);
+    }
+  }
+  return kept;
+}
 
 function pinBreachesPerpendicularSeam(
   placement: TempestAlignmentPinPlacement,

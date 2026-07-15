@@ -28,7 +28,7 @@ import {
   type PrintableSheetPlan,
   type PrintVolumePresetId,
 } from "@/fabrication/printing/printableKit";
-import type { CadrEstimate } from "@/domain/purifier/cadr";
+import { CUSTOM_FAN_ID, findBoxFanModel, findPcFanModel, type CadrEstimate } from "@/domain/purifier/cadr";
 import { createTempestChunkPlan, createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/printableKit";
 import type {
   StaticPrintEstimate,
@@ -44,11 +44,18 @@ export type SummaryItem = {
 };
 // Describes what this design needs as neutral quantities and measured
 // dimensions; urls appear only on source-file and license attribution rows.
+// A detail can optionally be a run of plain-text and linked keyword segments, so a
+// single note can carry several inline links (e.g. one fastener line linking each of
+// its parts to a supplier). `detail` stays the plain-text equivalent for anything
+// that renders text only.
+export type PartsListDetailSegment = string | { readonly text: string; readonly url: string };
+
 export type PartsListItem = {
   readonly category: string;
   readonly label: string;
   readonly detail: string;
   readonly url?: string;
+  readonly detailSegments?: readonly PartsListDetailSegment[];
 };
 
 // ##############################
@@ -221,6 +228,31 @@ function staticPrintEstimateSummaryItems(estimate: StaticPrintEstimate | undefin
 // states the electrical requirement rather than a product.
 const FAN_POWER_NOTE = "4-pin PWM, 12 V";
 
+// The specific fan the build is priced/spec'd against, so the parts list names it
+// alongside the neutral "any fan of this size" note. Falls back to the bare size
+// when the fan is custom or unrecognized.
+function selectedFanTypeLabel(currentLayout: LayoutResult): string {
+  const id = currentLayout.summary.cadr.fanModelId;
+  if (id === CUSTOM_FAN_ID) {
+    return "Custom fan";
+  }
+  return findPcFanModel(id)?.name ?? findBoxFanModel(id)?.name ?? `${currentLayout.configuration.fan.spec.diameter} mm fan`;
+}
+
+// The 3D-printed enclosure is thicker than a PC case, so the short self-tapping
+// screws bundled with fans do not reach; the fastener row links each option to a
+// supplier listing at the matching size.
+const FAN_SCREW_LINKS = {
+  m4Bolts:
+    "https://www.mcmaster.com/products/screws/system-of-measurement~metric/thread-size~m4-1/length~45-mm/fastener-head-type~rounded/rounded-head-screws-2~rounded-head-style~pan/",
+  m4Locknuts:
+    "https://www.mcmaster.com/products/locknuts/nylon-insert-locknuts-2~~/system-of-measurement~metric/thread-size~m4-1/nut-type~locknut/",
+  m4Washers:
+    "https://www.mcmaster.com/products/washers/general-purpose-washers-3~~/system-of-measurement~metric/screw-size~m4/",
+  m5Tapping:
+    "https://www.mcmaster.com/products/product-line~~screws-and-bolts~~2q3Rr7zj/tapping-screws-2~/system-of-measurement~metric/screw-size~m5/length~20-mm/tapping-screws-2~fastener-head-type~rounded/",
+} as const;
+
 // Power-supply parts row sized from the estimated draw. PC fans run on a 12 V
 // PWM supply / fan hub; we round the calculated current UP to the next whole amp
 // so the suggested rating always has headroom (1.5 A draw -> "≥ 2 A"). The box
@@ -367,7 +399,7 @@ export function createPartsListItems(
     {
       category: "Fans",
       label: `${fanCount} x ${currentLayout.configuration.fan.spec.diameter} mm`,
-      detail: FAN_POWER_NOTE,
+      detail: `${selectedFanTypeLabel(currentLayout)} · ${FAN_POWER_NOTE}`,
     },
     fanPowerSupplyItem(currentLayout.summary.cadr),
   ];
@@ -441,12 +473,26 @@ function tempestPrintPartsItems(
             : []),
         ]
       : [];
+  const boltCount = configuredFanCountFor(currentLayout, "print-3mf") * 4;
   return [
     filamentPartsItem(currentGeneratedPlan, "the housing", currentLayout.configuration.cutting.materialThickness),
     {
       category: "Fasteners",
       label: "Fan screws",
-      detail: "Included with the fans; the screw holes are sized for them",
+      detail:
+        `You will need ${boltCount} 45mm M4 bolts with washers and lock nuts or 20mm M5 self-tapping screws. ` +
+        "The self-tapping screws included with most fans are not long enough for the 3D printed enclosure.",
+      detailSegments: [
+        `You will need ${boltCount} `,
+        { text: "45mm M4 bolts", url: FAN_SCREW_LINKS.m4Bolts },
+        " with ",
+        { text: "washers", url: FAN_SCREW_LINKS.m4Washers },
+        " and ",
+        { text: "lock nuts", url: FAN_SCREW_LINKS.m4Locknuts },
+        " or ",
+        { text: "20mm M5 self-tapping screws", url: FAN_SCREW_LINKS.m5Tapping },
+        ". The self-tapping screws included with most fans are not long enough for the 3D printed enclosure.",
+      ],
     },
     ...seamItems,
   ];

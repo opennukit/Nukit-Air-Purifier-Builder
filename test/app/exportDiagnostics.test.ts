@@ -18,6 +18,7 @@ const cleanKitSummary: PrintableKitSummary = {
   partCount: 4,
   oversizedPartCount: 0,
   materialVolumeMm3: 0,
+  fragilePartNames: [],
 };
 
 function kitWithSummary(summary: PrintableKitSummary): PrintableKit {

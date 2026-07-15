@@ -42,7 +42,18 @@ export function featureAwarePrintableChunkGrid(
   bed: { readonly width: number; readonly depth: number; readonly height: number },
 ): TempestChunkGrid {
   const radius = model.settings.fan.diameter / 2 + GRILL_MARGIN_MM;
-  const bands = mergeAxisBands(grillBandsInPose(model, pose, radius), internalWallBandsInPose(model, pose));
+  const grill = grillBandsInPose(model, pose, radius);
+  const wall = internalWallBandsInPose(model, pose);
+  const rim = towerOpeningRimBandsInPose(model, pose);
+  // Every fragile feature is a HARD keep-out: a chunk seam never cuts a fan grill
+  // (slicing one ruins a hex grill), never bisects a thin inside flange into a
+  // sliver, and never shaves a filter-opening rim into a detached stick. When
+  // honoring them needs more plates on a small bed, the slicer adds plates, a
+  // higher part count is always preferred to a cut feature.
+  const bands = matchTopology(model, {
+    quad: () => mergeAxisBands(mergeAxisBands(grill, wall), rim),
+    sandwich: () => mergeAxisBands(grill, wall),
+  });
   return chunkGridFromBoundaries(
     axisCuts(pose.envelope.width, bed.width, bands.x),
     axisCuts(pose.envelope.depth, bed.depth, bands.y),
@@ -176,14 +187,49 @@ function mergeAxisBands(a: AxisBands, b: AxisBands): AxisBands {
 }
 
 // #######################################
+// Tower Opening-Rim Bands
+// #######################################
+
+// A tower carries a big square opening (the filter face minus its rim) through the
+// bottom flange, the bottom plate, and each side wall. The plate/flange rim around
+// that opening is only `rim` wide, so a seam landing a few mm short of an opening
+// EDGE clips off a thin strip of that rim, a detached stick once the pocket void
+// separates the flange band from the plate band. Material sits OUTSIDE the opening,
+// so we forbid a seam within one min-chunk of an edge on the material side: a seam
+// AT the edge (a clean cut flush with the void) or a full min-chunk clear is fine,
+// anything between shaves a sliver. X and Y both carry the square opening's edges;
+// Z runs along the opening so no rim is shaved there.
+function towerOpeningRimBandsInPose(model: TempestModel, pose: TempestPrintablePose): AxisBands {
+  const empty: AxisBands = { x: [], y: [], z: [] };
+  return matchTopology(model, {
+    sandwich: () => empty,
+    quad: ({ filterLayout }) => {
+      const openHalf = (filterLayout.filter.faceWidth - 2 * model.frame.rim) / 2;
+      // The tower prints in the source pose (no upright rotation), so source X/Y map
+      // straight to pose X/Y; bail to no bands if that ever changes.
+      if (openHalf <= 0 || pose.type === "upright-dual-filter") {
+        return empty;
+      }
+      const edgeBands = (center: number): Band[] => [
+        [center - openHalf - MIN_CHUNK_MM, center - openHalf],
+        [center + openHalf, center + openHalf + MIN_CHUNK_MM],
+      ];
+      return { x: edgeBands(model.box.width / 2), y: edgeBands(model.box.depth / 2), z: [] };
+    },
+  });
+}
+
+// #######################################
 // Axis Cuts
 // #######################################
 
-// Boundaries that keep every chunk within [minChunk, bed] AND keep all seams out
-// of `bands` (fragile features), staying as even as possible. When a slice count
-// cannot satisfy that, it adds a slice (another plate) rather than accept a sliver;
-// when a model is so constrained that even a small minimum is impossible, it lowers
-// the minimum before ever cutting a feature. Ported and hardened from Naomi's builder.
+// Boundaries whose seams all stay out of `bands` (every fragile feature: fan grills,
+// thin inside flanges, filter-opening rims), as even as possible. A fan grill is
+// never cut, slicing one ruins a hex grill, so when a slice count cannot clear
+// every feature the slicer adds a slice (another plate); more plates are always
+// preferred to a cut feature. When a model is so constrained that even a small
+// minimum chunk is impossible, it lowers the minimum before ever cutting a feature.
+// Ported and hardened from Naomi's builder.
 export function axisCuts(length: number, bed: number, bands: readonly Band[]): number[] {
   if (length <= bed) {
     return [0, length]; // fits the bed whole; never cut a part that does not need it

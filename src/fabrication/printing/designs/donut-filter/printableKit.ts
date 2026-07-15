@@ -14,6 +14,7 @@ import {
 } from "@/domain/designs/donut-filter/model";
 import {
   findPrintVolumePreset,
+  flagFragileParts,
   kitMaterialVolumeMm3,
   partFitsPrintBed,
   type PrintableKit,
@@ -58,6 +59,7 @@ export function createDonutFilterPrintableKit(layout: LayoutResult, presetId: Pr
       partCount: parts.length,
       oversizedPartCount: parts.filter((part) => !partFitsPrintBed(part, preset.bed)).length,
       materialVolumeMm3: kitMaterialVolumeMm3(parts),
+      fragilePartNames: flagFragileParts(parts),
     },
   };
 }

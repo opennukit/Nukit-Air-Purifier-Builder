@@ -112,12 +112,12 @@ describe("FilterBoxBuilder purifier workflow", () => {
   });
 
   test("preserves the tempest cord hole diameter through the URL codec into the cord pass-through", () => {
-    // Default = the shipped cord hole: right wall, 8 mm bore.
+    // Default = the shipped cord hole: right wall, 10 mm bore.
     const defaultLayout = createLayout(decodeSettings("printDesign=nukit-tempest"));
     expect(createTempestSettingsFromLayout(defaultLayout).cordPassThrough).toMatchObject({
       type: "wall",
       wall: "right",
-      diameter: 8,
+      diameter: 10,
     });
 
     const decoded = decodeSettings("printDesign=nukit-tempest&cordHoleDiameter=10");

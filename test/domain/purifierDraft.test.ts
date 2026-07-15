@@ -57,10 +57,10 @@ describe("Purifier draft model", () => {
     }
 
     expect(draft.design.arrangement).toBe("four-side-filter-tower");
-    expect(draft.design.cordHoleDiameter).toBe(8);
+    expect(draft.design.cordHoleDiameter).toBe(10);
     expect(serializePurifierDraft(draft).printDesign).toBe("nukit-tempest");
     expect(serializePurifierDraft(draft).tempestArrangement).toBe("four-side-filter-tower");
-    expect(serializePurifierDraft(draft).cordHoleDiameter).toBe(8);
+    expect(serializePurifierDraft(draft).cordHoleDiameter).toBe(10);
   });
 
   test("parses shared URLs into the draft model at the boundary", () => {

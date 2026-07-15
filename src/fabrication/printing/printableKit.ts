@@ -1,4 +1,5 @@
 import { orientChunkVerticesForPrinting } from "@/fabrication/printing/partOrientation";
+import { inspectMeshFragility } from "@/fabrication/printing/meshWelding";
 import { createBinaryStl } from "@/fabrication/printing/stl";
 import {
   createStoredZipPackage,
@@ -132,6 +133,10 @@ export type PrintableKitSummary = {
   // The kit's true solid material volume, summed over every part's mesh. The
   // parts list turns this into an approximate filament-weight estimate.
   readonly materialVolumeMm3: number;
+  // Names of parts the fragility validator flagged as likely too delicate to print
+  // or handle cleanly (a wafer-thin panel or a tiny nub); an advisory, not a
+  // blocker. Empty for a clean kit. See `flagFragileParts`.
+  readonly fragilePartNames: readonly string[];
 };
 
 export type PrintableKit = {
@@ -145,6 +150,31 @@ export type PrintableKit = {
 // builder feeds the same number into its summary.
 export function kitMaterialVolumeMm3(parts: readonly PrintablePart[]): number {
   return parts.reduce((sum, part) => sum + Math.abs(meshVolumeMm3(part.mesh)), 0);
+}
+
+// A part is at or above a full material thickness on every axis of every body when
+// it is sound; below this on a body's thinnest axis it is a wafer that warps or
+// snaps, and a body small on ALL axes is a loose nub. These catch a genuinely
+// delicate part while leaving normal wall panels (a wall's own thickness, ~4-5 mm)
+// and every larger part unflagged. The flake drop already removes fully detached
+// shavings, so this is the residual "is anything that shipped still too delicate"
+// guard, surfaced to the user as an advisory rather than silently exported.
+const FRAGILE_MIN_THICKNESS_MM = 2.5;
+const FRAGILE_NUB_MAX_DIM_MM = 8;
+
+// Names of the parts the fragility validator flags. Attached wafer-thin spikes on
+// an otherwise solid body cannot be told apart from a legitimate thin wall by
+// bounding box alone, so this deliberately does NOT try to; it flags whole bodies
+// that are themselves too thin or too tiny, which is reliable and low-noise.
+export function flagFragileParts(parts: readonly PrintablePart[]): string[] {
+  const flagged: string[] = [];
+  for (const part of parts) {
+    const { thinnestBodyMm, smallestBodyMaxDimMm } = inspectMeshFragility(part.mesh);
+    if (thinnestBodyMm < FRAGILE_MIN_THICKNESS_MM || smallestBodyMaxDimMm < FRAGILE_NUB_MAX_DIM_MM) {
+      flagged.push(part.name);
+    }
+  }
+  return flagged;
 }
 
 export type PrintableThreeMfExport = {

@@ -5,7 +5,7 @@ import {
 } from "@/fabrication/printing/modeling/manifoldOps";
 import { withGeometryArena } from "@/fabrication/printing/modeling/manifoldKernel";
 import { extractWeldedMesh } from "@/fabrication/printing/modeling/meshConversion";
-import { roundMillimeters } from "@/fabrication/printing/meshWelding";
+import { dropMeshFlakes, roundMillimeters } from "@/fabrication/printing/meshWelding";
 import type { GeometryContext } from "@/fabrication/printing/designs/tempest/geometry/context";
 import {
   createTempestModel,
@@ -17,6 +17,7 @@ import {
 import { alignmentPinPieceLength, type TempestSettings } from "@/domain/designs/tempest/shared";
 import {
   findPrintVolumePreset,
+  flagFragileParts,
   kitMaterialVolumeMm3,
   printBedFitForPart,
   type PrintableKit,
@@ -90,6 +91,7 @@ export function createTempestPrintableKit(
       partCount: parts.length,
       oversizedPartCount: parts.filter((part) => printBedFitForPart(part, preset.bed).type === "oversized").length,
       materialVolumeMm3: kitMaterialVolumeMm3(parts),
+      fragilePartNames: flagFragileParts(parts),
     },
   };
 }
@@ -302,7 +304,7 @@ function createChunkParts(
       seams === undefined || seams.length === 0
         ? []
         : seamDebossPlacements(seams, chunk.mesh, boxCenter, chunk.bounds.origin);
-    const mesh =
+    const debossedMesh =
       placements.length === 0
         ? chunk.mesh
         : extractWeldedMesh(
@@ -312,6 +314,11 @@ function createChunkParts(
               withArrow: false,
             }),
           );
+    // Shed any wafer-thin detached shaving a seam clipped off a chamfer lip (small
+    // beds thread seams past fan/opening chamfers); these would just fall off the
+    // plate. Runs on the final welded mesh, whose shared-index connectivity is the
+    // exact topology that prints, so it never touches a real connected body.
+    const mesh = dropMeshFlakes(debossedMesh);
     parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh, labelPlan?.labels.get(cellKey(chunk.address))));
   }
   return parts;

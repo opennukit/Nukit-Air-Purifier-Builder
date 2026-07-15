@@ -2864,7 +2864,18 @@
                     <div>
                       <small>{item.category}</small>
                       <strong>{item.label}</strong>
-                      <span>{item.detail}</span>
+                      {#if item.detailSegments !== undefined}
+                        <span>
+                          {#each item.detailSegments as segment}
+                            {#if typeof segment === "string"}{segment}{:else}<a
+                                href={segment.url}
+                                target="_blank"
+                                rel="noreferrer">{segment.text}</a>{/if}
+                          {/each}
+                        </span>
+                      {:else}
+                        <span>{item.detail}</span>
+                      {/if}
                     </div>
                     {#if item.url !== undefined}
                       <a href={item.url} target="_blank" rel="noreferrer">Open</a>

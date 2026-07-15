@@ -40,6 +40,18 @@ export function evaluateActiveExportDiagnostics(
       detail: `${kit.summary.oversizedPartCount} part${kit.summary.oversizedPartCount === 1 ? "" : "s"} exceed ${kit.preset.label}.`,
     });
   }
+  const fragile = kit.summary.fragilePartNames;
+  if (fragile.length > 0) {
+    const preview = fragile.slice(0, 4).join(", ");
+    printDiagnostics.push({
+      id: "fragile-print-part",
+      severity: "warning",
+      title: "Delicate print part",
+      detail:
+        `${fragile.length} part${fragile.length === 1 ? "" : "s"} may be too thin or small to print cleanly ` +
+        `(${preview}${fragile.length > 4 ? ", …" : ""}). A larger print bed usually splits this design into sturdier parts.`,
+    });
+  }
   return [...baseDiagnostics, ...printDiagnostics];
 }
 

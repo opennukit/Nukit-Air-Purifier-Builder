@@ -15,7 +15,7 @@ import { applyPrintDesignPreset, defaultSettings } from "@/domain/purifier/setti
 const emptyTempestKit: PrintableKit = {
   preset: findPrintVolumePreset("bed-256"),
   parts: [],
-  summary: { partCount: 0, oversizedPartCount: 0, materialVolumeMm3: 0 },
+  summary: { partCount: 0, oversizedPartCount: 0, materialVolumeMm3: 0, fragilePartNames: [] },
 };
 
 function valueFor(items: readonly { label: string; value: string }[], label: string): string | undefined {

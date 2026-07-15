@@ -240,25 +240,44 @@ function prepareZipFile(file: StoredZipFile): PreparedZipFile {
   };
 }
 
+// ZIP entries carry the last-modified time as a packed MS-DOS time/date pair. Left
+// at zero it decodes to an invalid pre-1980 date (extractors show 1979/1980, and a
+// zero month/day reads back as an off-by-a-bit 1978-ish stamp), so every extracted
+// STL looked decades old. Stamp the moment of export instead; before 1980 (the DOS
+// epoch, unreachable in practice) it floors to 1980-01-01 since the format can't go
+// earlier.
+type DosTimestamp = { readonly time: number; readonly date: number };
+
+function dosTimestamp(when: Date): DosTimestamp {
+  const year = when.getFullYear();
+  if (year < 1980) {
+    return { time: 0, date: (1 << 5) | 1 };
+  }
+  const time = (when.getHours() << 11) | (when.getMinutes() << 5) | (when.getSeconds() >> 1);
+  const date = ((year - 1980) << 9) | ((when.getMonth() + 1) << 5) | when.getDate();
+  return { time, date };
+}
+
 function createZip(files: readonly PreparedZipFile[]): Uint8Array {
+  const stamp = dosTimestamp(new Date());
   const localParts: Uint8Array[] = [];
   const centralEntries: CentralDirectoryEntry[] = [];
   let offset = 0;
 
   for (const file of files) {
-    const localHeader = createLocalFileHeader(file);
+    const localHeader = createLocalFileHeader(file, stamp);
     localParts.push(localHeader, file.content);
     centralEntries.push({ file, localHeaderOffset: offset });
     offset += localHeader.length + file.content.length;
   }
 
-  const centralParts = centralEntries.map(createCentralDirectoryHeader);
+  const centralParts = centralEntries.map((entry) => createCentralDirectoryHeader(entry, stamp));
   const centralDirectorySize = centralParts.reduce((total, part) => total + part.length, 0);
   const endRecord = createEndOfCentralDirectory(files.length, centralDirectorySize, offset);
   return concatBytes([...localParts, ...centralParts, endRecord]);
 }
 
-function createLocalFileHeader(file: PreparedZipFile): Uint8Array {
+function createLocalFileHeader(file: PreparedZipFile, stamp: DosTimestamp): Uint8Array {
   const filename = textEncoder.encode(file.name);
   const header = new Uint8Array(30 + filename.length);
   const view = new DataView(header.buffer);
@@ -266,8 +285,8 @@ function createLocalFileHeader(file: PreparedZipFile): Uint8Array {
   view.setUint16(4, 20, true);
   view.setUint16(6, 0, true);
   view.setUint16(8, 0, true);
-  view.setUint16(10, 0, true);
-  view.setUint16(12, 0, true);
+  view.setUint16(10, stamp.time, true);
+  view.setUint16(12, stamp.date, true);
   view.setUint32(14, file.crc, true);
   view.setUint32(18, file.content.length, true);
   view.setUint32(22, file.content.length, true);
@@ -277,7 +296,7 @@ function createLocalFileHeader(file: PreparedZipFile): Uint8Array {
   return header;
 }
 
-function createCentralDirectoryHeader(entry: CentralDirectoryEntry): Uint8Array {
+function createCentralDirectoryHeader(entry: CentralDirectoryEntry, stamp: DosTimestamp): Uint8Array {
   const filename = textEncoder.encode(entry.file.name);
   const header = new Uint8Array(46 + filename.length);
   const view = new DataView(header.buffer);
@@ -286,8 +305,8 @@ function createCentralDirectoryHeader(entry: CentralDirectoryEntry): Uint8Array 
   view.setUint16(6, 20, true);
   view.setUint16(8, 0, true);
   view.setUint16(10, 0, true);
-  view.setUint16(12, 0, true);
-  view.setUint16(14, 0, true);
+  view.setUint16(12, stamp.time, true);
+  view.setUint16(14, stamp.date, true);
   view.setUint32(16, entry.file.crc, true);
   view.setUint32(20, entry.file.content.length, true);
   view.setUint32(24, entry.file.content.length, true);

@@ -48,7 +48,7 @@ describe("Tempest CSG printable kit", () => {
     // Feature-aware slicing threads seams between the 140 mm fan grills, which
     // needs a third chunk on the fan-dense axis (2×2×3) rather than a uniform 2×2×2.
     expect(kit.parts).toHaveLength(12);
-    expect(Object.keys(kit.summary).sort()).toEqual(["materialVolumeMm3", "oversizedPartCount", "partCount"]);
+    expect(Object.keys(kit.summary).sort()).toEqual(["fragilePartNames", "materialVolumeMm3", "oversizedPartCount", "partCount"]);
     expect(kit.summary.partCount).toBe(12);
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
@@ -118,7 +118,7 @@ describe("Tempest CSG printable kit", () => {
     );
 
     expect(kit.parts).toHaveLength(18);
-    expect(Object.keys(kit.summary).sort()).toEqual(["materialVolumeMm3", "oversizedPartCount", "partCount"]);
+    expect(Object.keys(kit.summary).sort()).toEqual(["fragilePartNames", "materialVolumeMm3", "oversizedPartCount", "partCount"]);
     expect(kit.summary.partCount).toBe(18);
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
