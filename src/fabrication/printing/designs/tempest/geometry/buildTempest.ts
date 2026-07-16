@@ -16,7 +16,7 @@ import {
   towerSideOpening,
 } from "./quadAssembly";
 import { flangePanel, framePanel, platePanel, wall } from "./sandwichAssembly";
-import { cordHoleCylinders, pinHoles } from "./pins";
+import { cordBossCones, cordHoleCylinders, pinHoles } from "./pins";
 
 // #######################################
 // The Build Timeline
@@ -55,14 +55,15 @@ function finalModel<Solid, Region>(
   model: TempestModel,
   options: TempestGeometryOptions,
 ): Solid {
-  // Build the shell, then drill the cord pass-through BEFORE placing pins. The
-  // pin socket-embedding test and the chunk-split coverage check both read this
-  // shell, so they must see the cord void: testing sockets against a pre-cord
-  // shell let a seam pin drill coaxially through the cord hole (the socket then
-  // opens sideways into the bore, a through-hole into an internal void). The
-  // finished shell (windows, pockets, exhaust cuts) is still what the coverage
-  // check needs to see how each chunk splits into separate printed pieces.
-  const shell = assembly(ctx, model);
+  // Build the shell (plus the drillable cord boss), then drill the cord
+  // pass-through BEFORE placing pins. The pin socket-embedding test and the
+  // chunk-split coverage check both read this shell, so they must see the cord
+  // void: testing sockets against a pre-cord shell let a seam pin drill coaxially
+  // through the cord hole (the socket then opens sideways into the bore, a
+  // through-hole into an internal void). The boss joins the shell first so the
+  // bore pierces both, and the finished shell (windows, pockets, exhaust cuts) is
+  // still what the coverage check needs to see how each chunk splits into pieces.
+  const shell = unionAll(ctx, [assembly(ctx, model), ...cordBossCones(ctx, model)]);
   const cordCylinders = cordHoleCylinders(ctx, model);
   const boredShell = cordCylinders.length === 0 ? shell : subtractAll(ctx, shell, cordCylinders);
   return subtractAll(ctx, boredShell, pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid, boredShell));

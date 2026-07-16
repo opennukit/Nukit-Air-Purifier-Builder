@@ -30,6 +30,9 @@ export interface ModelingApi<Solid, Region> {
   readonly primitives: {
     cuboid(spec: { center: Vec3; size: Vec3 }): Solid;
     cylinder(spec: { height: number; radius: number; segments?: number }): Solid;
+    // A truncated cone along z, centered like cylinder: bottomRadius at -height/2,
+    // topRadius at +height/2.
+    cone(spec: { height: number; bottomRadius: number; topRadius: number; segments?: number }): Solid;
     circle(spec: { radius: number; segments?: number }): Region;
     polygon(spec: { points: ReadonlyArray<readonly number[]> }): Region;
     rectangle(spec: { center: Vec2; size: Vec2 }): Region;

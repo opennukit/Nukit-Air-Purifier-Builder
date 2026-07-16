@@ -70,6 +70,11 @@ export const primitives = {
     return track(Manifold.cylinder(height, radius, radius, segments, true));
   },
 
+  cone({ height, bottomRadius, topRadius, segments }: { height: number; bottomRadius: number; topRadius: number; segments?: number }): Geom3 {
+    const { Manifold } = manifoldKernel();
+    return track(Manifold.cylinder(height, bottomRadius, topRadius, segments, true));
+  },
+
   roundedRectangle({
     center,
     size,
