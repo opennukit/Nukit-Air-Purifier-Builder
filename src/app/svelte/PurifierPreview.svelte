@@ -181,9 +181,26 @@
   // tempest, which kit the assembled preview renders: changing the print
   // volume while exploded view is on must re-render with the new chunks.
   function previewRebuildKey(currentLayout: LayoutResult): string {
+    // Drop settings that never change the rendered scene, so editing them does not
+    // tear down and rebuild the whole three.js scene: the room-size, baseline-ACH,
+    // operating-cost, and custom-fan-spec fields feed only the CADR and cost panels.
+    // fanModel and the display toggles/colors DO shape the scene (box-fan visual,
+    // shown parts), so they stay in the key.
     return JSON.stringify({
       ...currentLayout.rawSettings,
       autoRotate: undefined,
+      roomUnit: undefined,
+      roomWidth: undefined,
+      roomLength: undefined,
+      roomHeight: undefined,
+      baselineAch: undefined,
+      electricityPrice: undefined,
+      currencySymbol: undefined,
+      customFanAirflow: undefined,
+      customFanPressure: undefined,
+      customFanNoise: undefined,
+      customFanCurrent: undefined,
+      customFanWatts: undefined,
       assembledTempestPresetId: isTempestPrintDesignId(currentLayout.configuration.printDesign.id)
         ? assembledTempestPresetId(currentLayout)
         : undefined,

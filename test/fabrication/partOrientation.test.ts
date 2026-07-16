@@ -84,4 +84,29 @@ describe("orientChunkVerticesForPrinting", () => {
     expect(zExtent(oriented)).toBeCloseTo(4, 6);
     expect(footprint(oriented)).toEqual([30, 40]);
   });
+
+  test("rejects a low-support orientation that would overflow a non-cubic bed", () => {
+    // A 40 x 4 x 40 part. Lowest support rests the 40 x 40 face on the plate
+    // (height 4), but that footprint is 40 x 40 and overflows a 38 mm bed axis.
+    const { vertices, triangles } = makeBox(40, 4, 40);
+
+    // Without a bed, orientation ignores fit and lays it flat (40 x 40 footprint).
+    expect(footprint(orientChunkVerticesForPrinting(vertices, triangles))).toEqual([40, 40]);
+
+    // With the bed, the overflowing flat pose is rejected for a standing pose that fits.
+    const bed = { width: 40, depth: 38, height: 40 };
+    const fitted = orientChunkVerticesForPrinting(vertices, triangles, bed);
+    expect(footprint(fitted)).toEqual([4, 40]);
+    expect(extent(fitted, "x") <= bed.width && extent(fitted, "y") <= bed.depth && zExtent(fitted) <= bed.height).toBe(true);
+  });
+
+  test("falls back to the least-support pose when no orientation fits (oversized part)", () => {
+    // A part larger than the bed on two axes cannot fit in any orientation; the
+    // search must still return a result (the oversized-part check blocks export).
+    const { vertices, triangles } = makeBox(60, 60, 4);
+    const bed = { width: 50, depth: 50, height: 50 };
+    const fitted = orientChunkVerticesForPrinting(vertices, triangles, bed);
+    expect(fitted.length).toBe(vertices.length);
+    expect(zExtent(fitted)).toBeCloseTo(4, 6); // still the least-support (flat) pose
+  });
 });

@@ -687,8 +687,11 @@ function fanCenterXs(
     [centeredFirst, keepOut.x + keepOut.reach, keepOut.x - keepOut.reach - groupWidth]
       .map((value) => clamp(value, loFirst, hiFirst))
       .filter((value) => !hits(value))
-      .sort((a, b) => Math.abs(a - centeredFirst) - Math.abs(b - centeredFirst))[0] ?? clamp(centeredFirst, loFirst, hiFirst);
-  return positions(first);
+      .sort((a, b) => Math.abs(a - centeredFirst) - Math.abs(b - centeredFirst))[0];
+  // No repacked start clears the cord (a wall packed to its max fan count). Keep the
+  // even spread rather than a bunched min-pitch group that still collides; the
+  // cord/fan build warning flags the residual overlap.
+  return first === undefined ? spread : positions(first);
 }
 
 // #######################################

@@ -6,6 +6,8 @@ import {
   filterPocketThickness,
   finiteNonNegativeInteger,
   horizontalCordOffset,
+  sandwichCordFanReach,
+  sandwichCordWallLocalPos,
   tempestFanBodyDepth,
   tempestFanScrewPitch,
   type TempestFanCountRequest,
@@ -182,19 +184,15 @@ export function createSandwichFanLayout(
   // cords and cords on fan-free walls leave the even spread untouched.
   const cord = createSandwichCordPlacement(settings, box);
   const fanRowHeight = settings.frame.outsideFlangeThickness + localVerticalCenter;
-  const cordFanReach = (cord.type === "wall-cylinder" ? cord.diameter / 2 : 0) + settings.fan.diameter / 2 + CORD_FAN_WALL_CLEARANCE_MM;
   const wallCordKeepOut = (wall: TempestWall): { readonly pos: Millimeters; readonly reach: Millimeters } | null => {
     if (cord.type !== "wall-cylinder" || cord.wall !== wall) {
       return null;
     }
-    if (Math.abs(cord.verticalCenter - fanRowHeight) >= cordFanReach) {
+    const reach = sandwichCordFanReach(cord.diameter, settings.fan.diameter);
+    if (Math.abs(cord.verticalCenter - fanRowHeight) >= reach) {
       return null;
     }
-    // Map the cord along-wall position into the local frame the fan positions use
-    // for this wall (front/right run with the cord; back/left mirror across length).
-    const localPos =
-      wall === "front" || wall === "right" ? cord.positionAlongWall : (wall === "back" ? box.width : box.depth) - cord.positionAlongWall;
-    return { pos: localPos, reach: cordFanReach };
+    return { pos: sandwichCordWallLocalPos(wall, cord.positionAlongWall, box.width, box.depth), reach };
   };
   const walls: Record<TempestWall, TempestWallFanLayout> = {
     front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter, wallCordKeepOut("front")),
@@ -216,10 +214,6 @@ export function createSandwichFanLayout(
 // Clearance kept between a back-plate fan body and a wall fan body before they are
 // treated as colliding (mm).
 const BACK_FAN_WALL_CLEARANCE_MM = 1;
-
-// Clearance kept between a wall cord bore and a wall fan body before the fan row is
-// repacked to leave the cord a clear spot (mm).
-const CORD_FAN_WALL_CLEARANCE_MM = 1;
 
 type Aabb = {
   readonly x0: number;
@@ -543,7 +537,12 @@ function horizontalFanVerticalCenter(
   const natural = filterCount === 2 ? wallHeight / 2 : (wallHeight - pocketThickness - insideFlangeThickness) / 2;
   const fanRadius = fanDiameter / 2;
   const maxSafe = wallHeight - 2 * cordHoleDiameter - fanRadius;
-  return Math.min(natural, maxSafe);
+  // Floor the center at fanRadius so the bore (and its screw holes, which sit inside
+  // it) never drops below the wall bottom. A thick cord (up to 25 mm) with a thin
+  // filter drives maxSafe low enough to push the fan opening off the wall otherwise,
+  // truncating the bore and dropping the lower screw holes. wallFansFit already
+  // guarantees wallHeight >= fanDiameter, so fanRadius always leaves the top clear.
+  return Math.max(fanRadius, Math.min(natural, maxSafe));
 }
 
 export function createSandwichCordPlacement(

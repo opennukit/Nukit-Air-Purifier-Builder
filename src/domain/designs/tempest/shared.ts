@@ -190,6 +190,27 @@ export const defaultTempestCordPassThrough = {
   cornerOffset: 17,
 } as const satisfies TempestCordPassThrough;
 
+// Shared cord/fan overlap rule for the sandwich walls, used by BOTH the fan-row
+// repack (sandwich.ts) and the residual-collision detector (cordFanCollision.ts) so
+// the warning and the geometry can never drift apart.
+export const SANDWICH_CORD_FAN_CLEARANCE_MM: Millimeters = 1;
+
+export function sandwichCordFanReach(cordDiameter: Millimeters, fanDiameter: Millimeters): Millimeters {
+  return cordDiameter / 2 + fanDiameter / 2 + SANDWICH_CORD_FAN_CLEARANCE_MM;
+}
+
+// A cord's along-wall position mapped into the local frame the fan positions use for
+// that wall: front and right run with the cord, back and left mirror across the wall
+// length (the geometry rotates those two walls by pi).
+export function sandwichCordWallLocalPos(
+  wall: TempestWall,
+  cordPositionAlongWall: Millimeters,
+  boxWidth: Millimeters,
+  boxDepth: Millimeters,
+): Millimeters {
+  return wall === "front" || wall === "right" ? cordPositionAlongWall : (wall === "back" ? boxWidth : boxDepth) - cordPositionAlongWall;
+}
+
 export type TempestAlignmentPinSettings =
   | {
       readonly type: "disabled";

@@ -40,22 +40,25 @@ The download is **one 3MF per print chunk, bundled in a ZIP** rather than a
 single multi-plate 3MF. Slicers that ignore Bambu/Orca plate metadata
 (PrusaSlicer, Cura) otherwise stack every chunk on one bed, so the kit was
 unprintable there; a lone single-object 3MF places cleanly in every slicer.
-`createPrintDesignThreeMfExport` (the single multi-plate `.3mf`) is retained —
-the in-app print-sheet preview still builds on its sheet plan.
+`createPrintDesignThreeMfExport` (the single multi-plate `.3mf`) is retained as a
+whole-kit export used by tests; the in-app print-sheet preview does NOT go through
+it, it builds directly from the sheet plan (`createPrintableSheetPlanFromKit`).
 
 Each chunk is **auto-oriented for the bed** before export (`partOrientation.ts`):
-chunks are split full-depth along the assembly's Y axis, so the candidate
-orientations are the four quarter-turns about that depth axis. Each is scored by
-the steep downward (overhang) area it would strand above the bed, minus a reward
-for resting a large flat face on the plate, and the lowest-support one is kept.
-The 0° orientation is always a candidate and wins ties, so orientation can only
-reduce support versus the as-modelled pose, never add it — which is what lets the
-same rule apply to every configuration. `orientPrintablePart` (in
-`printableKit.ts`) wraps this for a whole part — rotate, re-seat at the origin,
-recompute width/depth/height — and is applied both to the per-chunk ZIP and to
-the sheet plan, so the **print-plate preview shows each chunk in the same
-orientation it will export in**. Only the export/preview paths call it; the kit
-itself is never mutated, so the assembled-box view keeps its assembly pose.
+a chunk can rest on the plate in any of the 24 axis-aligned orientations (the
+cube's rotation group), so all 24 are tried. Each is scored by the steep downward
+(overhang) area it would strand above the bed, minus a reward for resting a large
+flat face on the plate, and the lowest-support one is kept. When a print bed is
+supplied, orientations whose bounding box would overflow the plate are rejected
+(the as-cut identity always fits by construction, so a fitting candidate exists
+unless the part is genuinely oversized). The 0 degree orientation is always a
+candidate and wins ties, so orientation can only reduce support versus the
+as-modelled pose, never add it. `orientPrintablePart` (in `printableKit.ts`) wraps
+this for a whole part (rotate, re-seat at the origin, recompute
+width/depth/height) and is applied both to the per-chunk ZIP and to the sheet
+plan, so the **print-plate preview shows each chunk in the same orientation it
+will export in**. Only the export/preview paths call it; the kit itself is never
+mutated, so the assembled-box view keeps its assembly pose.
 
 The geometry layer never names a kernel. `buildTempestGeometry` is generic over
 `<Solid, Region>` and takes a `ModelingApi<Solid, Region>`; whichever backend you

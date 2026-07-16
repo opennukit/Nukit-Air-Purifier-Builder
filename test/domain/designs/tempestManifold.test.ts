@@ -31,6 +31,23 @@ describe("Tempest meshes are 2-manifold", () => {
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
   });
 
+  test("a honeycomb grill too coarse for the bore falls back to a plain bore, still watertight", () => {
+    // fullCellsOnly with a hex larger than the fan bore leaves zero whole cells;
+    // hexGrill2d must fall back to a plain circular opening instead of unioning an
+    // empty set (which threw and failed the whole kit build).
+    const degenerate = {
+      ...defaultTempestSettings,
+      fan: {
+        ...defaultTempestSettings.fan,
+        diameter: 40,
+        opening: { type: "honeycomb" as const, hexFlatToFlat: 30, ribThickness: 1.6, fullCellsOnly: true },
+      },
+    };
+    const kit = createTempestPrintableKit(degenerate, "unsplit");
+    expect(kit.parts.length).toBeGreaterThan(0);
+    expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
+  });
+
   test("filter-slot ends stay sealed at the wall corners", () => {
     // The loading slot reaches past the adjacent wall's inner face (endMargin 4 <
     // wall 5). When the wall body's inner-face corners carried chamfers, the slot

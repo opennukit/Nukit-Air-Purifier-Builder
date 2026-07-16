@@ -78,7 +78,10 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
-  if (layout.summary.fans.type === "tempest" && layout.summary.fans.cordThroughFan) {
+  if (
+    (layout.summary.fans.type === "tempest" || layout.summary.fans.type === "wall-banks") &&
+    layout.summary.fans.cordThroughFan
+  ) {
     diagnostics.push({
       id: "cord-through-fan",
       severity: "warning",

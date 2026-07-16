@@ -115,6 +115,33 @@ export type LaidOutCutPanel = CutPanelDraft & {
 
 export type CutPanel = LaidOutCutPanel;
 
+// True when a wall panel carries a cord bore that overlaps one of its fan openings.
+// The fan row is repacked clear of the cord where there is room (fanCenterXs), but a
+// wall packed to its maximum fan count leaves no clear spot, so a center cord can
+// still land in a fan opening. This scans the built panels (cord and fan circles
+// share the panel frame) so the same "cord runs through a fan" build warning the
+// 3D-print path emits also covers the laser cut sheet.
+const CORD_FAN_PANEL_CLEARANCE_MM = 1;
+export function cutPanelsCordThroughFan(panels: readonly CutPanel[]): boolean {
+  for (const panel of panels) {
+    const circles = panel.cuts.filter((cut): cut is CircleCut => cut.type === "circle");
+    const cord = circles.find((circle) => circle.role === "cord");
+    if (cord === undefined) {
+      continue;
+    }
+    for (const fan of circles) {
+      if (fan.role !== "fan") {
+        continue;
+      }
+      const distance = Math.hypot(fan.cx - cord.cx, fan.cy - cord.cy);
+      if (distance < fan.radius + cord.radius + CORD_FAN_PANEL_CLEARANCE_MM) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export type EdgeKind = "plain" | "plain-outset" | "finger" | "finger-counter" | "finger-holes" | "dovetail" | "dovetail-counter";
 
 export type EdgeSection = {

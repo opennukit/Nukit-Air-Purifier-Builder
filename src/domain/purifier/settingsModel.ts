@@ -82,6 +82,9 @@ export type BuildFanSummary =
       readonly resolvedFans: ResolvedFanBanks;
       // One-side "Back" fan grid count (laser), in addition to the wall banks.
       readonly backPlateFans: number;
+      // A cord bore that overlaps a fan opening on its wall after the fan row was
+      // repacked as far as it could go. Surfaced as a build warning.
+      readonly cordThroughFan: boolean;
     }
   | {
       readonly type: "donut-filter-adapter";

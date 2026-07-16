@@ -416,7 +416,7 @@ export function createPrintableThreeMfZipFromKit(
     return {
       part,
       filename,
-      bytes: createPrintablePartThreeMf(part, `${title} – ${part.name}`, kit.preset.bed, displayColor),
+      bytes: createPrintablePartThreeMf(part, `${title} - ${part.name}`, kit.preset.bed, displayColor),
     };
   });
 

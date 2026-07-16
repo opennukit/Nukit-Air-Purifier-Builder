@@ -20,6 +20,7 @@ import { estimateBuildCadr } from "@/domain/purifier/buildCadr";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import type { CutPanel } from "@/fabrication/laser/cutGeometry";
+import { cutPanelsCordThroughFan } from "@/fabrication/laser/cutGeometry";
 import { createAirPurifierCutSheet, resolveFanCount } from "@/fabrication/laser/panels";
 import { createTempestSettingsFromConfiguration } from "@/fabrication/printing/designs/tempest/settings";
 import { renderBoxesDocumentSvg } from "@/ports/boxes/svg";
@@ -73,7 +74,12 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     left: resolveFanCount(configuration.fan.banks.left, geometry.workingDepth, configuration.fan.spec.diameter),
     right: resolveFanCount(configuration.fan.banks.right, geometry.workingDepth, configuration.fan.spec.diameter),
   };
-  const fans = createBuildFanSummary(configuration, resolvedFans, backPlateFanCount(fabrication));
+  const fans = createBuildFanSummary(
+    configuration,
+    resolvedFans,
+    backPlateFanCount(fabrication),
+    fabrication.type === "cut-panel-source" ? fabrication.cutPanels : [],
+  );
   const summary: BuildSummary = {
     chamberHeight: geometry.chamberHeight,
     workingDepth: geometry.workingDepth,
@@ -176,6 +182,7 @@ function createBuildFanSummary(
   configuration: PurifierSettings,
   resolvedWallFans: ResolvedFanBanks,
   backPlateFans: number,
+  cutPanels: readonly CutPanel[],
 ): BuildFanSummary {
   if (configuration.design.type === "donut-filter-adapter") {
     return {
@@ -205,6 +212,7 @@ function createBuildFanSummary(
     type: "wall-banks",
     resolvedFans: resolvedWallFans,
     backPlateFans,
+    cordThroughFan: cutPanelsCordThroughFan(cutPanels),
   };
 }
 

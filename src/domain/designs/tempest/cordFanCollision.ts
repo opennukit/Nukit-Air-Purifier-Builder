@@ -1,8 +1,10 @@
 import type { TempestModel } from "@/domain/designs/tempest/model";
+import { sandwichCordWallLocalPos, SANDWICH_CORD_FAN_CLEARANCE_MM } from "@/domain/designs/tempest/shared";
 
 // Clearance kept between the cord hole and a fan body before they are treated as
-// colliding (mm). Touching exactly is already too close to print cleanly.
-const CORD_FAN_CLEARANCE_MM = 1;
+// colliding (mm). Touching exactly is already too close to print cleanly. Shared
+// with the sandwich fan-row repack so the warning and the geometry stay in lockstep.
+const CORD_FAN_CLEARANCE_MM = SANDWICH_CORD_FAN_CLEARANCE_MM;
 
 // True when the power-cord pass-through overlaps a fan in the current model.
 //
@@ -46,13 +48,7 @@ export function tempestCordFanCollision(model: TempestModel): boolean {
     if (Math.abs(cord.verticalCenter - fanRowHeight) >= reach) {
       return false;
     }
-    // Map the cord along-wall position into the same local frame the fan positions
-    // use for this wall (front/right run with the cord; back/left mirror across the
-    // wall length).
-    const localPos =
-      cord.wall === "front" || cord.wall === "right"
-        ? cord.positionAlongWall
-        : (cord.wall === "back" ? model.box.width : model.box.depth) - cord.positionAlongWall;
+    const localPos = sandwichCordWallLocalPos(cord.wall, cord.positionAlongWall, model.box.width, model.box.depth);
     return row.positionsAlongWall.some((position) => Math.abs(position - localPos) < reach);
   }
 
