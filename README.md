@@ -1,15 +1,36 @@
 # Nukit Open Air Purifier Builder
 
-Browser-based builder for DIY clean-air purifier designs. It creates live 3D previews, laser-cut SVG drawings, and printable 3MF kits from explicit parametric models.
+Browser-based builder for DIY clean-air purifier designs. Enter a few filter and fan measurements and it produces a live 3D preview, ready-to-fabricate files, and a parts list, all from explicit parametric models.
+
+**Live app: [filterboxbuilder.com](https://filterboxbuilder.com)**
 
 ![FilterBoxBuilder UI preview](./public/ui-filterboxbuilder.png)
 
 ## What It Builds
 
-- Parametric laser-cut and 3D-printed filter boxes.
-- One static reference option for designs that are not parametric.
+Three ways to fabricate the same enclosure, chosen per project:
 
-The laser-cut Nukit model and the 3D-printable Tempest model are intentionally separate. Their shared concepts are filter size, fan size, layout, and export workflow; their construction details can diverge.
+- **3D print**: a watertight, slicer-ready model split into bed-sized chunks with alignment pins, exported as a single multi-plate 3MF or a per-chunk STL/3MF ZIP.
+- **Laser cut**: finger-jointed panels exported as kerf-corrected SVG and DXF cut sheets (layout adapted from Boxes.py).
+- **Hand cut**: the same layout as plain taped foamcore panels, with dimensioned SVG/DXF drawings and no fingers or flanges, for building without a laser.
+
+
+## Features:
+
+Interactive tools:
+
+- **Live 3D preview** of the assembled enclosure, with an exploded assembly view for split prints.
+- **Shareable links**: the full configuration is encoded in the URL, so a design round-trips just by copying the address.
+- **Parts list**: filters, fans, fasteners, a filament estimate, and seam consumables for split prints.
+- **Multiple exports**: a single multi-plate 3MF, a per-chunk STL/3MF ZIP, and laser or hand-cut SVG/DXF.
+
+As you edit, the builder estimates performance: clean-air delivery rate (CADR, in m³/h and CFM), air changes per hour for a room you size, estimated noise, and power draw with operating cost. Advisories flag problems before you export.
+
+Companion tools (standalone pages on the same site):
+
+- **Room ventilation (ACH) calculator**: measures how well a room already ventilates using a CO2 decay test. Enter an outdoor baseline and two indoor CO2 readings taken a set time apart, with no fresh CO2 added in between, and it returns the room's air changes per hour.
+- **Filter box CADR calculator**: estimates a finished box's clean-air delivery rate from its filter pressure drop. Pick the filter layout and size you built, enter two pressure readings taken with a phone sealed inside the box, and it works out the CADR.
+- **PC fan gauge (P-Q)**: a limited-accuracy pressure-versus-flow tester for PC fans, so you can gauge how a fan holds up against back pressure before designing around it.
 
 ## Requirements
 
@@ -52,13 +73,13 @@ bun run oracle:airpurifier
 
 - Browser previews use Three.js for display.
 - Generated laser files come from the laser fabrication model.
-- Generated 3MF files come from the parametric model built on the Manifold CSG kernel, which guarantees watertight, slicer-ready meshes.
-- The Tempest print model is a hand port of the OpenSCAD reference in [references/tempest-openscad-reference](./references/tempest-openscad-reference); watertightness and topology are pinned by manifold/genus tests. They do not replace manual print-fit validation.
+- Generated 3MF and STL files come from the parametric model built on the Manifold CSG kernel, which guarantees watertight, slicer-ready meshes.
+- Performance numbers (CADR, ACH, noise, power, and cost) are engineering estimates derived from the fan and filter specs, not measured values.
 
 ## Repository Layout
 
 - `src/app/`: browser workbench, URL state, tabs, controls, and styles.
-- `src/domain/`: purifier settings, presets, units, and specialized printable design models.
+- `src/domain/`: purifier settings, presets, units, performance estimation, and specialized printable design models.
 - `src/fabrication/`: laser panels, cut geometry, assembly model, print kit planning, and 3MF export.
 - `src/ports/boxes/`: small Boxes.py-inspired drawing/kernel port used for SVG generation.
 - `src/rendering/`: Three.js previews for assembled models and fabrication sheets.
