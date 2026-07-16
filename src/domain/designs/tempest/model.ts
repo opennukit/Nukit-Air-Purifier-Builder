@@ -355,7 +355,7 @@ export const defaultTempestSettings: TempestSettings = {
     rim: 30,
     chamferSize: 2,
     towerCornerPostChamfer: 55,
-    filterFitClearance: 1,
+    filterFitClearance: 0.6,
   },
   filterSlot: {
     wall: "back",

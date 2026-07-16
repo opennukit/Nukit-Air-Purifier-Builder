@@ -17,22 +17,22 @@ describe("Tempest OpenSCAD model port", () => {
       ribThickness: 1.6,
       fullCellsOnly: false,
     });
-    // 495 measured footprint + 2*1 fit clearance + 2*5 walls; the height carries
+    // 495 measured footprint + 2*0.6 fit clearance + 2*5 walls; the height carries
     // one fit clearance per filter pocket (filterPocketThickness).
     expect(model.box).toEqual({
-      width: 507,
-      depth: 507,
-      height: 264,
-      wallHeight: 244,
+      width: 506.2,
+      depth: 506.2,
+      height: 263.2,
+      wallHeight: 243.2,
     });
     expect(model.chunkGrid).toMatchObject({
       countX: 2,
       countY: 2,
       countZ: 2,
       totalCount: 8,
-      chunkWidth: 253.5,
-      chunkDepth: 253.5,
-      chunkHeight: 132,
+      chunkWidth: 253.1,
+      chunkDepth: 253.1,
+      chunkHeight: 131.6,
     });
     expect(model.filterLayout.topology).toBe("sandwich");
     if (model.filterLayout.topology !== "sandwich") {
@@ -40,14 +40,14 @@ describe("Tempest OpenSCAD model port", () => {
     }
     expect(model.filterLayout.filterCount).toBe(2);
     expect(model.filterLayout.bottomPanel).toBe("open-frame");
-    expect(model.filterLayout.filters.map((filter) => filter.zBottom)).toEqual([10, 208]);
+    expect(model.filterLayout.filters.map((filter) => filter.zBottom)).toEqual([10, 207.6]);
     expect(model.filterLayout.flanges.map((flange) => [flange.type, flange.zBottom, flange.zTop])).toEqual([
-      ["above-filter", 56, 61],
-      ["below-filter", 203, 208],
+      ["above-filter", 55.6, 60.6],
+      ["below-filter", 202.6, 207.6],
     ]);
     expect(model.filterLayout.loading.slots.map((slot) => [slot.wall, slot.localZBottom, slot.localZTop])).toEqual([
-      ["back", 0, 47],
-      ["back", 197, 244],
+      ["back", 0, 46.6],
+      ["back", 196.6, 243.2],
     ]);
 
     expect(model.fanLayout.topology).toBe("sandwich");
@@ -57,12 +57,12 @@ describe("Tempest OpenSCAD model port", () => {
     expect(model.fanLayout.bodyDepth).toBe(27);
     expect(model.fanLayout.screwPitch).toBe(125);
     expect(model.fanLayout.cornerSafeMinimum).toBe(102);
-    expect(model.fanLayout.localVerticalCenter).toBe(122);
+    expect(model.fanLayout.localVerticalCenter).toBe(121.6);
     expect(model.fanLayout.walls.front.actualCount).toBe(0);
     expect(model.fanLayout.walls.back.actualCount).toBe(0);
     expect(model.fanLayout.walls.left.actualCount).toBe(3);
-    expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 253.5, 405]);
-    expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 253.5, 405]);
+    expect(model.fanLayout.walls.left.positionsAlongWall).toEqual([102, 253.1, 404.2]);
+    expect(model.fanLayout.walls.right.positionsAlongWall).toEqual([102, 253.1, 404.2]);
 
     // The cord defaults to "center": it sits the corner offset up from the floor
     // (near the bottom in the upright view) and centred horizontally along the
@@ -151,11 +151,12 @@ describe("Tempest OpenSCAD model port", () => {
     };
     const model = createTempestModel(settings);
 
-    // 495 face + 2*1 fit clearance + 2*61 structural offset (the offset itself
-    // carries the 1mm pocket-depth clearance: 10 flange + 45+1 pocket + 5 wall).
+    // 495 face + 2*0.6 fit clearance + 2*60.6 structural offset (the offset
+    // itself carries the 0.6mm pocket-depth clearance: 10 flange + 45.6 pocket +
+    // 5 wall).
     expect(model.box).toEqual({
-      width: 619,
-      depth: 619,
+      width: 617.4,
+      depth: 617.4,
       height: 510,
       wallHeight: 495,
     });
@@ -163,19 +164,19 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.filterLayout.topology !== "quad") {
       throw new Error("Expected tower Tempest layout");
     }
-    expect(model.filterLayout.structuralOffset).toBe(61);
+    expect(model.filterLayout.structuralOffset).toBeCloseTo(60.6);
     expect(model.filterLayout.airChamber).toEqual({
-      xMin: 61,
-      xMax: 558,
-      yMin: 61,
-      yMax: 558,
+      xMin: 60.6,
+      xMax: 556.8,
+      yMin: 60.6,
+      yMax: 556.8,
       zMin: 5,
       zMax: 500,
     });
     expect(Object.keys(model.filterLayout.filterPockets)).toHaveLength(4);
     expect(
       Object.values(model.filterLayout.filterPockets).every(
-        (pocket) => pocket.width === 497 && pocket.height === 495 && pocket.depth === 46,
+        (pocket) => pocket.width === 496.2 && pocket.height === 495 && pocket.depth === 45.6,
       ),
     ).toBe(true);
 
@@ -183,28 +184,28 @@ describe("Tempest OpenSCAD model port", () => {
     if (model.fanLayout.topology !== "quad") {
       throw new Error("Expected tower fan layout");
     }
-    expect(model.fanLayout.minimumCenterFromEdge).toBe(131);
+    expect(model.fanLayout.minimumCenterFromEdge).toBeCloseTo(130.6);
     expect(model.fanLayout.columns).toBe(3);
     expect(model.fanLayout.rows).toBe(3);
     expect(model.fanLayout.fanCount).toBe(9);
-    expect(model.fanLayout.positionsX).toEqual([159.5, 309.5, 459.5]);
-    expect(model.fanLayout.positionsY).toEqual([159.5, 309.5, 459.5]);
+    expect(model.fanLayout.positionsX).toEqual([158.7, 308.7, 458.7]);
+    expect(model.fanLayout.positionsY).toEqual([158.7, 308.7, 458.7]);
 
     expect(model.chunkGrid).toMatchObject({
       countX: 3,
       countY: 3,
       countZ: 2,
       totalCount: 18,
-      chunkWidth: 619 / 3,
-      chunkDepth: 619 / 3,
+      chunkWidth: 617.4 / 3,
+      chunkDepth: 617.4 / 3,
       chunkHeight: 255,
     });
     expect(model.cordPassThrough).toMatchObject({
       topology: "quad",
       type: "top-cylinder",
       diameter: 10,
-      x: 541,
-      y: 78,
+      x: 539.8,
+      y: 77.6,
       zStart: 500,
       depth: 10,
     });
@@ -364,9 +365,9 @@ describe("Tempest OpenSCAD model port", () => {
       countY: 2,
       countZ: 2,
       totalCount: 8,
-      chunkWidth: 253.5,
-      chunkDepth: 253.5,
-      chunkHeight: 132,
+      chunkWidth: 253.1,
+      chunkDepth: 253.1,
+      chunkHeight: 131.6,
     });
     expect(model.fanLayout.topology).toBe("sandwich");
     if (model.fanLayout.topology !== "sandwich") {

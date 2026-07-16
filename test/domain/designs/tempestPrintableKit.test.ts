@@ -66,17 +66,17 @@ describe("Tempest CSG printable kit", () => {
 
     expect(kit.parts).toHaveLength(1);
     expect(part).toMatchObject({
-      width: 507,
-      depth: 264,
-      height: 507,
+      width: 506.2,
+      depth: 263.2,
+      height: 506.2,
     });
     expect(meshBounds(part.mesh)).toEqual({
       minX: 0,
       minY: 0,
       minZ: 0,
-      maxX: 507,
-      maxY: 264,
-      maxZ: 507,
+      maxX: 506.2,
+      maxY: 263.2,
+      maxZ: 506.2,
     });
   });
 
@@ -84,8 +84,8 @@ describe("Tempest CSG printable kit", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "unsplit");
     const part = kit.parts[0];
 
-    expect(meshCoordinateValues(part.mesh, "x")).toEqual(expect.arrayContaining([2, 505]));
-    expect(meshCoordinateValues(part.mesh, "z")).toEqual(expect.arrayContaining([2, 505]));
+    expect(meshCoordinateValues(part.mesh, "x")).toEqual(expect.arrayContaining([2, 504.2]));
+    expect(meshCoordinateValues(part.mesh, "z")).toEqual(expect.arrayContaining([2, 504.2]));
   });
 
   test("does not add alignment pin holes when the posed printable output is unsplit", () => {
@@ -142,8 +142,8 @@ describe("Tempest CSG printable kit", () => {
 
     expect(kit.parts).toHaveLength(1);
     expect(part).toMatchObject({
-      width: 619,
-      depth: 619,
+      width: 617.4,
+      depth: 617.4,
       height: 510,
     });
     expect(meshCoordinateValues(part.mesh, "x")).toEqual(
