@@ -55,14 +55,17 @@ function finalModel<Solid, Region>(
   model: TempestModel,
   options: TempestGeometryOptions,
 ): Solid {
-  // Build the shell once and reuse it: the pin-coverage check needs the finished
-  // shell (windows, pockets, exhaust cuts included) to see how each chunk splits
-  // into separate printed pieces before the pin holes are drilled into it.
+  // Build the shell, then drill the cord pass-through BEFORE placing pins. The
+  // pin socket-embedding test and the chunk-split coverage check both read this
+  // shell, so they must see the cord void: testing sockets against a pre-cord
+  // shell let a seam pin drill coaxially through the cord hole (the socket then
+  // opens sideways into the bore, a through-hole into an internal void). The
+  // finished shell (windows, pockets, exhaust cuts) is still what the coverage
+  // check needs to see how each chunk splits into separate printed pieces.
   const shell = assembly(ctx, model);
-  return subtractAll(ctx, shell, [
-    ...cordHoleCylinders(ctx, model),
-    ...pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid, shell),
-  ]);
+  const cordCylinders = cordHoleCylinders(ctx, model);
+  const boredShell = cordCylinders.length === 0 ? shell : subtractAll(ctx, shell, cordCylinders);
+  return subtractAll(ctx, boredShell, pinHoles(ctx, model, options.alignmentPinChunkGrid ?? model.chunkGrid, boredShell));
 }
 
 // Pick the recipe named by the model's topology. TempestModel is a union, so the

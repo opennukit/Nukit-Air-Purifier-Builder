@@ -438,7 +438,7 @@ export function createPrintableThreeMfZipFromKit(
 export function createPrintableStlZipFromKit(kit: PrintableKit, baseName: string): PrintableStlZip {
   const usedNames = new Set<string>();
   const entries: PrintablePartStl[] = kit.parts.map((part, index) => {
-    const oriented = orientPrintablePart(part);
+    const oriented = orientPrintablePart(part, kit.preset.bed);
     return {
       part,
       filename: uniquePartFileName(usedNames, baseName, part, index, "stl"),
@@ -466,7 +466,7 @@ export function createPrintablePartThreeMf(
   bed: PrintBed,
   displayColor?: string,
 ): Uint8Array {
-  const oriented = orientPrintablePart(part);
+  const oriented = orientPrintablePart(part, bed);
   const bounds = meshBounds(oriented.mesh.vertices);
   const object: MeshObject = {
     name: oriented.name,
@@ -487,12 +487,13 @@ export function createPrintablePartThreeMf(
 // chunks (e.g. the donut adaptor) are already authored print-ready and pass
 // through untouched. The kit itself is never mutated — only the export and
 // preview paths call this — so the assembled-box view keeps its assembly pose.
-export function orientPrintablePart(part: PrintablePart): PrintablePart {
+export function orientPrintablePart(part: PrintablePart, bed?: PrintBed): PrintablePart {
   if (part.kind !== "tempest-print-chunk") {
     return part;
   }
 
-  const rotated = orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles);
+  const bedDimensions = bed !== undefined && bed.type !== "unbounded" ? { width: bed.width, depth: bed.depth, height: bed.height } : undefined;
+  const rotated = orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles, bedDimensions);
   const bounds = meshBounds(rotated);
   // Re-seat the rotated mesh's min corner at the origin: sheet packing and the
   // preview both place a part by its (0,0,0) corner, and bed-centering expects
@@ -593,7 +594,7 @@ export function createPrintableSheetPlanFromKit(kit: PrintableKit): PrintableShe
   // Pack the print-ready (auto-oriented) parts so the plate preview and the
   // legacy multi-plate 3MF show each chunk in the same orientation as the
   // per-chunk ZIP download. `kit` keeps the original parts for the assembled view.
-  const orientedParts = kit.parts.map(orientPrintablePart);
+  const orientedParts = kit.parts.map((part) => orientPrintablePart(part, kit.preset.bed));
   return {
     kit,
     sheets: arrangePrintSheets(orientedParts, kit.preset.bed),

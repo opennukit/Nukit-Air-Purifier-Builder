@@ -76,6 +76,10 @@ export function encodeSettings(
   params.set("customFanCurrent", formatNumber(settings.customFanCurrent));
   params.set("customFanWatts", formatNumber(settings.customFanWatts));
   params.set("roomUnit", settings.roomUnit);
+  params.set("roomWidth", formatNumber(settings.roomWidth));
+  params.set("roomLength", formatNumber(settings.roomLength));
+  params.set("roomHeight", formatNumber(settings.roomHeight));
+  params.set("baselineAch", formatNumber(settings.baselineAch));
   params.set("electricityPrice", formatNumber(settings.electricityPrice));
   params.set("currencySymbol", settings.currencySymbol);
   if (!isTempestPrintDesignId(settings.printDesign)) {
@@ -550,7 +554,10 @@ function hasAnyParam(
 // #######################################
 
 function formatNumber(value: number): string {
+  // Round-trip precision: encode-then-decode must be identity. 2 decimals dropped
+  // finer values (electricity price 0.1765 became 0.18); 4 decimals match the mesh
+  // precision used elsewhere and cover every settable value. Trailing zeros trimmed.
   return Number.isInteger(value)
     ? String(value)
-    : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    : value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 }

@@ -175,11 +175,32 @@ export function createSandwichFanLayout(
   const wallFansFit = box.wallHeight >= settings.fan.diameter;
   const wallRequest = (request: TempestFanCountRequest): TempestFanCountRequest =>
     wallFansFit ? request : { type: "fixed", count: 0 };
+  // Keep a wall fan row clear of a cord that shares its wall: a front/back cord at
+  // side center lands exactly where the middle fan sits. The cord never moves; the
+  // row repacks (see horizontalWallFanPositions). Only engages when the cord
+  // overlaps the fan row both vertically and along the wall, so ordinary corner
+  // cords and cords on fan-free walls leave the even spread untouched.
+  const cord = createSandwichCordPlacement(settings, box);
+  const fanRowHeight = settings.frame.outsideFlangeThickness + localVerticalCenter;
+  const cordFanReach = (cord.type === "wall-cylinder" ? cord.diameter / 2 : 0) + settings.fan.diameter / 2 + CORD_FAN_WALL_CLEARANCE_MM;
+  const wallCordKeepOut = (wall: TempestWall): { readonly pos: Millimeters; readonly reach: Millimeters } | null => {
+    if (cord.type !== "wall-cylinder" || cord.wall !== wall) {
+      return null;
+    }
+    if (Math.abs(cord.verticalCenter - fanRowHeight) >= cordFanReach) {
+      return null;
+    }
+    // Map the cord along-wall position into the local frame the fan positions use
+    // for this wall (front/right run with the cord; back/left mirror across length).
+    const localPos =
+      wall === "front" || wall === "right" ? cord.positionAlongWall : (wall === "back" ? box.width : box.depth) - cord.positionAlongWall;
+    return { pos: localPos, reach: cordFanReach };
+  };
   const walls: Record<TempestWall, TempestWallFanLayout> = {
-    front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter),
-    back: createWallFanLayout("back", box.width, wallRequest(settings.fan.wallRequests.back), cornerSafeMinimum, settings.fan.diameter),
-    left: createWallFanLayout("left", box.depth, wallRequest(settings.fan.wallRequests.left), cornerSafeMinimum, settings.fan.diameter),
-    right: createWallFanLayout("right", box.depth, wallRequest(settings.fan.wallRequests.right), cornerSafeMinimum, settings.fan.diameter),
+    front: createWallFanLayout("front", box.width, wallRequest(settings.fan.wallRequests.front), cornerSafeMinimum, settings.fan.diameter, wallCordKeepOut("front")),
+    back: createWallFanLayout("back", box.width, wallRequest(settings.fan.wallRequests.back), cornerSafeMinimum, settings.fan.diameter, wallCordKeepOut("back")),
+    left: createWallFanLayout("left", box.depth, wallRequest(settings.fan.wallRequests.left), cornerSafeMinimum, settings.fan.diameter, wallCordKeepOut("left")),
+    right: createWallFanLayout("right", box.depth, wallRequest(settings.fan.wallRequests.right), cornerSafeMinimum, settings.fan.diameter, wallCordKeepOut("right")),
   };
   return {
     topology: "sandwich",
@@ -195,6 +216,10 @@ export function createSandwichFanLayout(
 // Clearance kept between a back-plate fan body and a wall fan body before they are
 // treated as colliding (mm).
 const BACK_FAN_WALL_CLEARANCE_MM = 1;
+
+// Clearance kept between a wall cord bore and a wall fan body before the fan row is
+// repacked to leave the cord a clear spot (mm).
+const CORD_FAN_WALL_CLEARANCE_MM = 1;
 
 type Aabb = {
   readonly x0: number;
@@ -436,6 +461,7 @@ function createWallFanLayout(
   requested: TempestFanCountRequest,
   cornerSafeMinimum: Millimeters,
   fanDiameter: Millimeters,
+  cordKeepOut: { readonly pos: Millimeters; readonly reach: Millimeters } | null = null,
 ): TempestWallFanLayout {
   const maximumCount = maxHorizontalWallFans(wallLength, cornerSafeMinimum, fanDiameter);
   const actualCount = actualWallFanCount(requested, maximumCount);
@@ -444,7 +470,7 @@ function createWallFanLayout(
     requested,
     maximumCount,
     actualCount,
-    positionsAlongWall: horizontalWallFanPositions(actualCount, wallLength, cornerSafeMinimum, fanDiameter),
+    positionsAlongWall: horizontalWallFanPositions(actualCount, wallLength, cornerSafeMinimum, fanDiameter, cordKeepOut),
   };
 }
 
@@ -469,6 +495,7 @@ function horizontalWallFanPositions(
   wallLength: Millimeters,
   cornerSafeMinimum: Millimeters,
   fanDiameter: Millimeters,
+  cordKeepOut: { readonly pos: Millimeters; readonly reach: Millimeters } | null = null,
 ): readonly Millimeters[] {
   if (fanCount === 0) {
     return [];
@@ -478,7 +505,31 @@ function horizontalWallFanPositions(
   const spacing = Math.max(minimumSpacing, spread);
   const total = fanCount <= 1 ? 0 : (fanCount - 1) * spacing;
   const first = fanCount === 1 ? wallLength / 2 : (wallLength - total) / 2;
-  return Array.from({ length: fanCount }, (_, index) => first + index * spacing);
+  const evenSpread = Array.from({ length: fanCount }, (_, index) => first + index * spacing);
+  if (cordKeepOut === null || !evenSpread.some((center) => Math.abs(center - cordKeepOut.pos) < cordKeepOut.reach)) {
+    return evenSpread;
+  }
+  // A cord shares this wall and the even spread would run a fan through it. Repack
+  // the row at the minimum fan pitch (bodies still clear each other and the corner
+  // posts, since the group stays inside cornerSafeMinimum) and slide it to the spot
+  // nearest the wall center that leaves the cord untouched. This mirrors the laser
+  // path (fanCenterXs); the cord itself never moves. If nothing fits, keep the even
+  // spread and let the cord/fan diagnostic flag it.
+  const groupWidth = (fanCount - 1) * minimumSpacing;
+  const loFirst = cornerSafeMinimum;
+  const hiFirst = wallLength - cornerSafeMinimum - groupWidth;
+  if (hiFirst < loFirst) {
+    return evenSpread;
+  }
+  const centeredFirst = (wallLength - groupWidth) / 2;
+  const positionsFrom = (start: number): number[] => Array.from({ length: fanCount }, (_, index) => start + index * minimumSpacing);
+  const clears = (start: number): boolean => !positionsFrom(start).some((center) => Math.abs(center - cordKeepOut.pos) < cordKeepOut.reach);
+  const clampFirst = (value: number): number => Math.min(hiFirst, Math.max(loFirst, value));
+  const chosen = [centeredFirst, cordKeepOut.pos + cordKeepOut.reach, cordKeepOut.pos - cordKeepOut.reach - groupWidth]
+    .map(clampFirst)
+    .filter(clears)
+    .sort((a, b) => Math.abs(a - centeredFirst) - Math.abs(b - centeredFirst))[0];
+  return chosen === undefined ? evenSpread : positionsFrom(chosen);
 }
 
 function horizontalFanVerticalCenter(

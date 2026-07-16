@@ -150,7 +150,37 @@ export type TempestAssemblyPinDiagram = {
   readonly placements: readonly TempestPosedPinPlacement[];
 };
 
+// The exploded assembly preview rebuilds on every settings change. Building the
+// diagram runs a full Manifold shell build plus the exact per-pin containment pass
+// on the calling thread, so memoize it by the geometry inputs: repeated rebuilds
+// with unchanged settings reuse the last result instead of paying that cost again.
+const pinDiagramCache = new Map<string, TempestAssemblyPinDiagram | null>();
+const PIN_DIAGRAM_CACHE_CAPACITY = 4;
+
 export function createTempestAssemblyPinDiagram(
+  settings: TempestSettings,
+  presetId: PrintVolumePresetId,
+): TempestAssemblyPinDiagram | null {
+  const cacheKey = `${presetId}|${JSON.stringify(settings)}`;
+  if (pinDiagramCache.has(cacheKey)) {
+    const cached = pinDiagramCache.get(cacheKey) ?? null;
+    // Refresh recency (Map keeps insertion order, so re-inserting moves it last).
+    pinDiagramCache.delete(cacheKey);
+    pinDiagramCache.set(cacheKey, cached);
+    return cached;
+  }
+  const diagram = buildTempestAssemblyPinDiagram(settings, presetId);
+  pinDiagramCache.set(cacheKey, diagram);
+  if (pinDiagramCache.size > PIN_DIAGRAM_CACHE_CAPACITY) {
+    const oldest = pinDiagramCache.keys().next().value;
+    if (oldest !== undefined) {
+      pinDiagramCache.delete(oldest);
+    }
+  }
+  return diagram;
+}
+
+function buildTempestAssemblyPinDiagram(
   settings: TempestSettings,
   presetId: PrintVolumePresetId,
 ): TempestAssemblyPinDiagram | null {
@@ -318,7 +348,7 @@ function createChunkParts(
     // beds thread seams past fan/opening chamfers); these would just fall off the
     // plate. Runs on the final welded mesh, whose shared-index connectivity is the
     // exact topology that prints, so it never touches a real connected body.
-    const mesh = dropMeshFlakes(debossedMesh);
+    const mesh = dropMeshFlakes(debossedMesh, model.frame.wallThickness);
     parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh, labelPlan?.labels.get(cellKey(chunk.address))));
   }
   return parts;

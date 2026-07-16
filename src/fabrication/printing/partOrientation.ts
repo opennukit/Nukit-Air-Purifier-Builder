@@ -112,18 +112,48 @@ function buildAxisAlignedRotations(): readonly AxisRotation[] {
 export function orientChunkVerticesForPrinting(
   vertices: readonly MeshVertex[],
   triangles: readonly MeshTriangle[],
+  bed?: { readonly width: number; readonly depth: number; readonly height: number },
 ): readonly MeshVertex[] {
+  // Two winners: `best` is the lowest-support orientation that also fits the bed,
+  // `fallback` is the lowest-support orientation ignoring fit. When a bed is given
+  // we never ship an orientation that overflows the plate (a low-support rotation
+  // can map a long axis onto a shorter bed axis); the as-cut identity always fits a
+  // chunk by construction, so a fitting candidate exists unless the part is
+  // genuinely oversized, in which case fallback keeps the old least-support choice.
   let best: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
+  let fallback: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
 
   for (const rotate of axisAlignedRotations) {
     const rotated = vertices.map(rotate);
     const score = supportScore(rotated, triangles);
+    if (fallback === undefined || score < fallback.score - 1e-6) {
+      fallback = { score, vertices: rotated };
+    }
+    if (bed !== undefined && !fitsBedDimensions(rotated, bed)) {
+      continue;
+    }
     if (best === undefined || score < best.score - 1e-6) {
       best = { score, vertices: rotated };
     }
   }
 
-  return best?.vertices ?? vertices;
+  return (best ?? fallback)?.vertices ?? vertices;
+}
+
+// True when the mesh's axis-aligned bounding box fits the bed footprint and height.
+function fitsBedDimensions(
+  vertices: readonly MeshVertex[],
+  bed: { readonly width: number; readonly depth: number; readonly height: number },
+): boolean {
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const vertex of vertices) {
+    minX = Math.min(minX, vertex.x); maxX = Math.max(maxX, vertex.x);
+    minY = Math.min(minY, vertex.y); maxY = Math.max(maxY, vertex.y);
+    minZ = Math.min(minZ, vertex.z); maxZ = Math.max(maxZ, vertex.z);
+  }
+  const epsilon = 0.001;
+  return maxX - minX <= bed.width + epsilon && maxY - minY <= bed.depth + epsilon && maxZ - minZ <= bed.height + epsilon;
 }
 
 // Lower is better: overhang area the slicer would have to prop up, discounted

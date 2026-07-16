@@ -15,6 +15,7 @@ import type {
   PurifierSettings,
 } from "@/domain/purifier/settingsModel";
 import { createTempestModel, type TempestFanLayout } from "@/domain/designs/tempest/model";
+import { tempestCordFanCollision } from "@/domain/designs/tempest/cordFanCollision";
 import { estimateBuildCadr } from "@/domain/purifier/buildCadr";
 import { matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
@@ -189,6 +190,7 @@ function createBuildFanSummary(
       type: "tempest",
       arrangement: configuration.design.arrangement,
       fanCount: resolvedTempestFanCount(tempestModel.fanLayout),
+      cordThroughFan: tempestCordFanCollision(tempestModel),
     };
   }
 

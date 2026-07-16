@@ -85,11 +85,16 @@ export function createMeshWelder(): MeshWelder {
 // thick, well above the threshold, so only shavings are ever removed.
 const FLAKE_MIN_THICKNESS_MM = 2.5;
 
-export function dropMeshFlakes(mesh: WeldedMesh): WeldedMesh {
+export function dropMeshFlakes(mesh: WeldedMesh, wallThicknessMm?: number): WeldedMesh {
   const vertexCount = mesh.vertices.length;
   if (vertexCount === 0 || mesh.triangles.length === 0) {
     return mesh;
   }
+  // A real wall is a full material thickness thick; a flake is a shaving well under
+  // that. materialThickness can be as low as 1.5 mm, below the 2.5 mm default, so cap
+  // the drop threshold at the model wall thickness to never delete a legitimate thin
+  // wall fragment (0.6x leaves margin between a real wall and a true shaving).
+  const flakeThreshold = wallThicknessMm === undefined ? FLAKE_MIN_THICKNESS_MM : Math.min(FLAKE_MIN_THICKNESS_MM, 0.6 * wallThicknessMm);
   const parent = Array.from({ length: vertexCount }, (_, index) => index);
   const find = (node: number): number => {
     let root = node;
@@ -153,7 +158,7 @@ export function dropMeshFlakes(mesh: WeldedMesh): WeldedMesh {
     }
     const box = pieces.get(root)!;
     const thinnest = Math.min(box.maxX - box.minX, box.maxY - box.minY, box.maxZ - box.minZ);
-    return thinnest >= FLAKE_MIN_THICKNESS_MM;
+    return thinnest >= flakeThreshold;
   };
   let droppedAny = false;
   for (const root of pieces.keys()) {

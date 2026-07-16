@@ -78,6 +78,16 @@ export function evaluateBuildDiagnostics(layout: LayoutResult): BuildDiagnostic[
     });
   }
 
+  if (layout.summary.fans.type === "tempest" && layout.summary.fans.cordThroughFan) {
+    diagnostics.push({
+      id: "cord-through-fan",
+      severity: "warning",
+      title: "Cord runs through a fan",
+      detail:
+        "The power-cord hole overlaps a fan on the same wall and the fans cannot be repacked clear of it. Move the cord to another position or wall, or use fewer fans on that wall.",
+    });
+  }
+
   if (layout.summary.fans.type !== "wall-banks") {
     return diagnostics;
   }

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { decodeSettings } from "@/domain/purifier/settingsCodec";
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
-import { createTempestModel } from "@/domain/designs/tempest/model";
+import { createTempestModel, defaultTempestSettings } from "@/domain/designs/tempest/model";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { tempestCordFanCollision } from "@/domain/designs/tempest/cordFanCollision";
 import { cleanManifold, manifoldReport } from "../helpers/manifoldChecks";
@@ -50,5 +50,45 @@ describe("tempest cord auto-shifts clear of the fans", () => {
     );
     const kit = createTempestPrintableKit(settings, "unsplit");
     expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
+  });
+});
+
+// A cord on a sandwich wall that carries fans can land where the middle fan sits.
+// The row repacks to leave the cord a clear spot; when the wall is packed to its
+// maximum fan count there is no slack, and the residual collision is reported.
+function sandwichBackWallFans(count: number) {
+  return createTempestModel({
+    ...defaultTempestSettings,
+    fan: {
+      ...defaultTempestSettings.fan,
+      wallRequests: {
+        front: { type: "fixed", count: 0 },
+        back: { type: "fixed", count },
+        left: { type: "fixed", count: 0 },
+        right: { type: "fixed", count: 0 },
+      },
+    },
+    cordPassThrough: { type: "wall", diameter: 10, wall: "back", side: "center", cornerOffset: 17 },
+  });
+}
+
+describe("tempest sandwich cord clears the wall fan row", () => {
+  test("a single center fan is repacked off the cord (no collision, and the fan moved)", () => {
+    const m = sandwichBackWallFans(1);
+    expect(tempestCordFanCollision(m)).toBe(false);
+    if (m.fanLayout.topology !== "sandwich") throw new Error("expected sandwich");
+    expect(Math.abs(m.fanLayout.walls.back.positionsAlongWall[0] - m.box.width / 2)).toBeGreaterThan(50);
+  });
+
+  test("two fans straddle the center cord without a repack", () => {
+    expect(tempestCordFanCollision(sandwichBackWallFans(2))).toBe(false);
+  });
+
+  test("a fan wall packed to its maximum reports the residual cord/fan collision", () => {
+    expect(tempestCordFanCollision(sandwichBackWallFans(3))).toBe(true);
+  });
+
+  test("the stock default (cord on a fan-free corner) never collides", () => {
+    expect(tempestCordFanCollision(createTempestModel(defaultTempestSettings))).toBe(false);
   });
 });

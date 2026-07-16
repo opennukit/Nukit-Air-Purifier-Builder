@@ -64,6 +64,12 @@ export function hexGrill2d<Solid, Region>(
     }
   }
 
+  if (holes.length === 0) {
+    // No hex cell fits the bore (a large hex or thick rib under fullCellsOnly leaves
+    // zero whole cells). Fall back to a plain open bore instead of unioning an empty
+    // set, which throws and fails the whole kit build.
+    return primitives.circle({ radius: Math.max(0.001, outerDiameter / 2), segments: CSG_SEGMENTS });
+  }
   const union = unionAll2d(ctx, holes);
   if (opening.fullCellsOnly) {
     return union;

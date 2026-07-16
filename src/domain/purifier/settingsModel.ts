@@ -91,6 +91,10 @@ export type BuildFanSummary =
       readonly type: "tempest";
       readonly arrangement: TempestArrangementPreset;
       readonly fanCount: number;
+      // A wall/top cord that still runs through a fan after the layout has tried to
+      // clear it (a max-packed fan wall, or a tower corner with no gap). Surfaced as
+      // a build warning.
+      readonly cordThroughFan: boolean;
     }
   | {
       readonly type: "static-reference";

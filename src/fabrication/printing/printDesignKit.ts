@@ -43,10 +43,36 @@ export function printKitCacheKey(
     // baked into its geometry.
     previewMaterialColor,
     fanColor,
+    // Fan model and custom-fan specs feed the CADR estimate and the box-fan visual,
+    // never the kit meshes (the fan bore comes from fanDiameter, which stays in).
+    fanModel,
+    customFanAirflow,
+    customFanPressure,
+    customFanNoise,
+    customFanCurrent,
+    customFanWatts,
+    // Room sizing, baseline ventilation, and operating-cost fields are display-only.
+    roomUnit,
+    roomWidth,
+    roomLength,
+    roomHeight,
+    baselineAch,
+    electricityPrice,
+    currencySymbol,
     // Laser-only settings; the print pipeline never reads them.
     labels,
     referenceScale,
     splitFrames,
+    cutStyle,
+    kerfFit,
+    fingerWidthMultiplier,
+    fingerSpaceMultiplier,
+    fingerPlayMultiplier,
+    fingerHoleWidthMultiplier,
+    fingerHoleOffsetMultiplier,
+    dovetailSizeMultiplier,
+    dovetailDepthMultiplier,
+    dovetailTaper,
     ...kitGeometryInputs
   } = rawSettings;
   return JSON.stringify({ printVolumePresetId: presetId, ...kitGeometryInputs });
