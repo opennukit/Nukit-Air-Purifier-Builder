@@ -105,7 +105,11 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width,
       height: rearWallHeight,
       requestedFans: settings.fan.banks.top,
-      fanCenterY: rearWallHeight / 2,
+      // Hand cut makes the rear wall span the FULL chamber, so centering the fans
+      // on the wall (rearWallHeight / 2) drops them into the filter zone. Center
+      // them on the fan-clear zone instead, matching the bottom and side walls. The
+      // laser rear wall is only fan-diameter tall and already sits in the fan zone.
+      fanCenterY: handCut ? fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight) : rearWallHeight / 2,
       settings,
       edges: structuralEdges("ffff"),
       cordHole: cordCut("back"),
@@ -643,11 +647,18 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
     return { type: "circle", cx, cy, radius, role: "cord" };
   }
 
-  // The back (top) fan wall is only as tall as the fan band.
-  const panelHeight = wall === "back" ? settings.fan.spec.diameter : chamberHeight;
+  // The "side" (left/center/right) slides the cord along the wall width; the
+  // vertical position sits in the fan-clear zone so the cord never runs through
+  // the filter. Hand cut makes the front/back walls span the full chamber, so use
+  // the fan-clear zone center (aligned with the fans); the laser rear wall is only
+  // fan-diameter tall and already sits in the fan zone, so its own center is right.
+  const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
+  const cy = handCut
+    ? fanCenterYForWall(settings.filterCount, chamberHeight, t, filterHeight)
+    : (wall === "back" ? settings.fan.spec.diameter : chamberHeight) / 2;
   const along = cord.side === "center" ? width / 2 : cord.side === "left" ? Math.max(cord.cornerOffset, margin) : width - Math.max(cord.cornerOffset, margin);
   const cx = clamp(along, margin, width - margin);
-  return { type: "circle", cx, cy: panelHeight / 2, radius, role: "cord" };
+  return { type: "circle", cx, cy, radius, role: "cord" };
 }
 
 // Clearance kept between the cord bore and any fan opening on the same wall (mm),
