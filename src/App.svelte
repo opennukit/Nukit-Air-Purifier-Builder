@@ -45,7 +45,7 @@
   } from "@/domain/purifier/fans";
   import { BOX_FAN_MODELS, CUSTOM_FAN_ID, pcFanModelsForGroup, type FanGroup, type CadrEstimate } from "@/domain/purifier/cadr";
   import { resolveFanModelId, type CadrFanMode } from "@/domain/purifier/buildCadr";
-  import { filterSizePresets, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
+  import { filterHasStockCadrData, filterSizePresets, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
   import {
     advancedJointControls,
     cordHoleInfo,
@@ -334,6 +334,10 @@
   $: exportReadiness = summarizeActiveBuildReadiness(layout, exportDiagnostics, fabricationMethod);
   $: previewSummaryItems = createPreviewSummaryItems(layout, previewMode, fabricationMethod, printVolumePresetId, generatedPrintSheetPlan);
   $: cadr = layout.summary.cadr;
+  // A custom filter (no matched stock size) has no characterized pressure drop, so
+  // the MERV-13 CADR model does not apply; the Performance view says so instead of
+  // showing extrapolated numbers.
+  $: filterIsCustom = !filterHasStockCadrData(settings.filterWidth, settings.filterDepth, settings.filterThickness);
   $: partsItems = createPartsListItems(layout, fabricationMethod, settings, printVolumePresetId, generatedPrintSheetPlan);
   $: activePrintSheetPlan = previewMode === "print-sheets" ? createActivePrintSheetPlan(layout, printVolumePresetId, generatedPrintSheetPlan) : null;
   $: activeDesignContext = workbenchView.design;
@@ -1399,6 +1403,11 @@
     {#snippet performancePanel()}
       <div class="performance-panel" aria-label="Estimated results">
         <p class="performance-eyebrow">Estimated results</p>
+        {#if filterIsCustom}
+          <p class="performance-unavailable">
+            Estimate not available for this filter. The performance figures assume a standard MERV-13 filter; choose a stock filter size to see an estimate.
+          </p>
+        {:else}
         <div class="performance-grid">
           <a class="perf-tile perf-tile--hero" href="methodology.html#cadr" target="_blank" rel="noopener">
             <span class="perf-k">Estimated CADR</span>
@@ -1454,6 +1463,7 @@
             {#if cadr.noiseRawDbA !== null}<span class="perf-sub">raw spec ≈ {cadr.noiseRawDbA.toFixed(1)} dBA</span>{/if}
           </a>
         </div>
+        {/if}
       </div>
     {/snippet}
 

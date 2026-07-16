@@ -59,18 +59,33 @@ export const filterSizePresets: readonly FilterSizePreset[] = [
 ];
 
 // The preset whose dimensions match the measured filter (either orientation), or
-// undefined for a custom size.
+// undefined for a custom size. toleranceMm widens the match: 0 (the default, used by
+// the "Filter size" selector) means exact to the millimeter; a positive value counts
+// a near-standard size as that preset.
 export function matchedFilterSizePreset(
   width: Millimeters,
   depth: Millimeters,
   thickness: Millimeters,
+  toleranceMm = 0,
 ): FilterSizePreset | undefined {
   const w = Math.round(width);
   const d = Math.round(depth);
   const t = Math.round(thickness);
+  const near = (a: number, b: number): boolean => Math.abs(a - b) <= toleranceMm;
   return filterSizePresets.find(
     (preset) =>
-      t === preset.thickness &&
-      ((w === preset.width && d === preset.depth) || (w === preset.depth && d === preset.width)),
+      near(t, preset.thickness) &&
+      ((near(w, preset.width) && near(d, preset.depth)) || (near(w, preset.depth) && near(d, preset.width))),
   );
+}
+
+// The CADR model is calibrated for the stock filters, so a size within this tolerance
+// of a stock preset counts as that filter for the estimate. Wider than the exact
+// selector match so a standard filter measured a millimeter or two off, or a design
+// default like 495 x 495 x 45 vs the 44 mm preset, still gets an estimate; a wildly
+// off size (e.g. a 109 mm thick filter) stays custom and shows no estimate.
+const STOCK_FILTER_CADR_TOLERANCE_MM = 6;
+
+export function filterHasStockCadrData(width: Millimeters, depth: Millimeters, thickness: Millimeters): boolean {
+  return matchedFilterSizePreset(width, depth, thickness, STOCK_FILTER_CADR_TOLERANCE_MM) !== undefined;
 }

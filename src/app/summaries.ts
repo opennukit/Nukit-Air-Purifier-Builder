@@ -17,7 +17,7 @@ import type {
 } from "@/domain/purifier/designPresets";
 import { formatMillimeters } from "@/domain/purifier/settingsCodec";
 import type { RawPurifierSettings } from "@/domain/purifier/settingsModel";
-import { matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
+import { filterHasStockCadrData, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
 import { staticReferenceFilesUrl } from "@/app/externalLinks";
 import type { PreviewMode } from "@/app/workbench/previewMode";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -125,7 +125,7 @@ export function createPreviewSummaryItems(
   if (currentFabricationMethod === "print-3mf" && isTempestPrintDesignId(currentLayout.configuration.printDesign.id)) {
     // Assembled-box (enclosure) view: estimated performance only. The build
     // quantities (chunks, filament, bed) live in the print-sheets view.
-    return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch);
+    return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch, isCustomFilter(currentLayout));
   }
 
   const cutPanelSummary = requireCutPanelFabricationSummary(currentLayout, "createPreviewSummaryItems");
@@ -145,11 +145,29 @@ export function createPreviewSummaryItems(
       },
     ];
   }
-  return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch);
+  return cadrSummaryItems(currentLayout.summary.cadr, currentLayout.rawSettings.baselineAch, isCustomFilter(currentLayout));
 }
 
-// The performance tiles shown under the assembled-box (enclosure) preview.
-function cadrSummaryItems(cadr: CadrEstimate, baselineAch: number): readonly SummaryItem[] {
+// A custom filter has no characterized pressure drop, so the MERV-13 CADR model does
+// not apply and the performance figures are suppressed. Stock sizes (within the CADR
+// tolerance) keep their estimate.
+function isCustomFilter(layout: LayoutResult): boolean {
+  const filter = layout.configuration.filter;
+  return !filterHasStockCadrData(filter.width, filter.depth, filter.thickness);
+}
+
+// The performance tiles shown under the assembled-box (enclosure) preview. A custom
+// filter (no matched stock size) has no characterized pressure drop, so the CADR
+// model does not apply; show it as unavailable rather than an extrapolated number.
+function cadrSummaryItems(cadr: CadrEstimate, baselineAch: number, filterIsCustom: boolean): readonly SummaryItem[] {
+  if (filterIsCustom) {
+    // No characterized drop for a custom filter, so the whole filter-derived estimate
+    // (CADR, ACH, infection risk) is unavailable. Keep the fan count for context.
+    return [
+      { label: "CADR", value: "n/a", detail: "estimate not available for this filter" },
+      { label: "Fans", value: String(cadr.fanCount) },
+    ];
+  }
   return [
     cadr.cadrCfm > 0
       ? { label: "CADR", value: `${Math.round(cadr.cadrCfm)} CFM`, detail: `${Math.round(cadr.cadrM3h)} m³/h` }

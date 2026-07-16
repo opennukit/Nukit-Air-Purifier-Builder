@@ -78,4 +78,36 @@ describe("createPreviewSummaryItems", () => {
     expect(valueFor(items, "Sheet")).toBeDefined();
     expect(valueFor(items, "Fans")).toBeDefined();
   });
+
+  test("a custom filter size suppresses the CADR estimate (no stock drop data)", () => {
+    const customLayout = createLayout({
+      ...defaultSettings,
+      printDesign: "nukit-open-air",
+      filters: 1,
+      filterWidth: 502,
+      filterDepth: 625,
+      filterThickness: 109,
+    } as never);
+    const items = createPreviewSummaryItems(customLayout, "enclosure", "laser-svg", "bed-256", null);
+    const cadr = items.find((item) => item.label === "CADR");
+    expect(cadr?.value).toBe("n/a");
+    expect(cadr?.detail).toContain("not available");
+    // The filter-derived tiles are dropped; fan-based ones (Noise, Power, Fans) stay.
+    expect(items.map((item) => item.label)).not.toContain("ACH");
+    expect(items.map((item) => item.label)).not.toContain("Infection risk");
+  });
+
+  test("a standard filter size keeps its CADR estimate", () => {
+    const stockLayout = createLayout({
+      ...defaultSettings,
+      printDesign: "nukit-open-air",
+      filters: 1,
+      filterWidth: 495,
+      filterDepth: 495,
+      filterThickness: 44,
+    } as never);
+    const items = createPreviewSummaryItems(stockLayout, "enclosure", "laser-svg", "bed-256", null);
+    expect(items.find((item) => item.label === "CADR")?.value).not.toBe("n/a");
+    expect(items.map((item) => item.label)).toContain("ACH");
+  });
 });
