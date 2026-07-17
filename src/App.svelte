@@ -43,7 +43,7 @@
     fixedFanCountOptions,
     type FanColor,
   } from "@/domain/purifier/fans";
-  import { BOX_FAN_MODELS, CUSTOM_FAN_ID, pcFanModelsForGroup, type FanGroup, type CadrEstimate } from "@/domain/purifier/cadr";
+  import { BOX_FAN_MODELS, CFM_PER_M3H, CUSTOM_FAN_ID, M3H_PER_CFM, pcFanModelsForGroup, type FanGroup, type CadrEstimate } from "@/domain/purifier/cadr";
   import { resolveFanModelId, type CadrFanMode } from "@/domain/purifier/buildCadr";
   import { filterHasStockCadrData, filterSizePresets, matchedFilterSizePreset } from "@/domain/purifier/filterPresets";
   import {
@@ -691,6 +691,14 @@
       [name]: readNumberInput(event, settings[name]),
     };
     commitSettings(nextSettings);
+  }
+
+  // The custom-fan free-air Q₀ field is shown and entered in CFM (the common US fan
+  // spec unit), but customFanAirflow is stored in m³/h to match the CADR model and
+  // keep existing shared URLs valid, so convert on the way in and out.
+  function updateAirflowCfm(event: Event): void {
+    const cfm = readNumberInput(event, settings.customFanAirflow * CFM_PER_M3H);
+    commitSettings({ ...settings, customFanAirflow: cfm * M3H_PER_CFM });
   }
 
   function updateCordHoleWall(event: Event): void {
@@ -1779,7 +1787,21 @@
               </select>
             </label>
             {#if cadrFanModelId === CUSTOM_FAN_ID}
-              {@render customFanField("customFanAirflow", "Airflow Q₀ (free-air)", settings.customFanAirflow, 1, "m³/h")}
+              <label class="field">
+                <span>Airflow Q₀ (free-air)</span>
+                <span class="input-shell">
+                  <input
+                    type="number"
+                    name="customFanAirflow"
+                    min="0"
+                    step={1}
+                    inputmode="decimal"
+                    value={Math.round(settings.customFanAirflow * CFM_PER_M3H)}
+                    onchange={updateAirflowCfm}
+                  />
+                  <small>CFM</small>
+                </span>
+              </label>
               {@render customFanField("customFanPressure", "Static pressure P₀", settings.customFanPressure, 0.1, "mmH₂O")}
               {@render customFanField("customFanNoise", "Noise (optional)", settings.customFanNoise, 0.1, "dBA")}
               {#if cadrFanMode === "box"}

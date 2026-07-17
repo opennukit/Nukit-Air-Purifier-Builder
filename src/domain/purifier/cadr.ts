@@ -14,8 +14,8 @@
 // Units / constants
 // ##############################
 
-const CFM_PER_M3H = 0.588578;
-const M3H_PER_CFM = 1.699011;
+export const CFM_PER_M3H = 0.588578;
+export const M3H_PER_CFM = 1.699011;
 const MMH2O_PER_INH2O = 25.4;
 const MM_PER_IN = 25.4;
 const PA_PER_INH2O = 249.0889;
