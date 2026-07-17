@@ -81,9 +81,9 @@ export function matchedFilterSizePreset(
 
 // The CADR model is calibrated for the stock filters, so a size within this tolerance
 // of a stock preset counts as that filter for the estimate. Wider than the exact
-// selector match so a standard filter measured a millimeter or two off, or a design
-// default like 495 x 495 x 45 vs the 44 mm preset, still gets an estimate; a wildly
-// off size (e.g. a 109 mm thick filter) stays custom and shows no estimate.
+// selector match so a standard filter (like the 495 x 495 x 44 Tempest default)
+// measured a millimeter or two off still gets an estimate; a wildly off size
+// (e.g. a 109 mm thick filter) stays custom and shows no estimate.
 const STOCK_FILTER_CADR_TOLERANCE_MM = 6;
 
 export function filterHasStockCadrData(width: Millimeters, depth: Millimeters, thickness: Millimeters): boolean {
