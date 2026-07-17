@@ -40,6 +40,18 @@ describe("hand-cut thick filter keeps fans and cord out of the filter zone", () 
     expect(top[0]!.cy).toBeCloseTo(bottom[0]!.cy, 1);
   });
 
+  test("the fan opening clears the filter zone (chamber is grown to fit the fan)", () => {
+    const panels = build({ fansTop: -1, fansBottom: -1, cordHoleWall: "none" });
+    // Hand cut: the filter occupies the bottom filterCount * thickness of the wall
+    // (no material flange). The fan opening must sit entirely above it.
+    const filterTop = 1 * 109;
+    for (const id of ["top-fan-wall", "bottom-fan-wall", "left-side-wall", "right-side-wall"]) {
+      const fan = circles(panels.find((panel) => panel.id === id), "fan")[0];
+      expect(fan).toBeDefined();
+      expect(fan!.cy - fan!.radius).toBeGreaterThanOrEqual(filterTop);
+    }
+  });
+
   test("a back-wall cord clears the filter (sits in the fan band, above the filter zone)", () => {
     const panels = build({ fansTop: 0, fansBottom: -1, cordHoleWall: "back", cordHoleSide: "right", cordHoleDiameter: 10 });
     const cord = circles(panels.find((panel) => panel.id === "top-fan-wall"), "cord")[0];

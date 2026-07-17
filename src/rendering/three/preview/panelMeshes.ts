@@ -107,7 +107,12 @@ export function createPrintableMeshContourEdgeGeometry(source: BufferGeometry): 
 // touch the surrounding exploded panels.
 const explodedFanInwardShiftMm = 30;
 
-function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: number, exploded: boolean): number {
+function panelInteriorFanCenterZ(
+  part: AssemblyPanelPart,
+  materialThickness: number,
+  exploded: boolean,
+  fanAppearance: FanAppearance,
+): number {
   const [rx, ry, rz] = part.rotation;
   const localPositiveNormal = new Vector3(0, 0, 1).applyEuler(new Euler(rx, ry, rz));
   const assembledPosition = new Vector3(part.position[0], part.position[1], part.position[2]);
@@ -118,8 +123,15 @@ function panelInteriorFanCenterZ(part: AssemblyPanelPart, materialThickness: num
   const inwardShift = exploded ? explodedFanInwardShiftMm * sceneScale : 0;
   // The back plate mounts its fans fully inside the box (rear flush with the inner
   // face) so they don't protrude out the back; wall fans keep the shallow grille
-  // offset so their bodies read as exhausting through the wall.
-  const interiorClearance = part.role === "closed-back" ? fanPreviewRearDepth : fanPreviewFrontDepth;
+  // offset so their bodies read as exhausting through the wall. That shallow
+  // offset fits the procedural fan, whose body sits almost entirely behind its
+  // origin; the CAD preview fan is centered on its origin and roughly twice as
+  // deep, so with the shallow offset it pierces the wall and sticks out past the
+  // outer face. CAD fans take the full rear clearance on every panel instead,
+  // matching how they already seat on panels whose local normal points outward.
+  const usesCadPreviewFan = fanAppearance.previewCadModel !== undefined;
+  const interiorClearance =
+    part.role === "closed-back" || usesCadPreviewFan ? fanPreviewRearDepth : fanPreviewFrontDepth;
   return localPositiveNormalPointsOutward
     ? -(panelHalfThickness + fanPreviewRearDepth) - inwardShift
     : panelHalfThickness + interiorClearance + inwardShift;
@@ -160,7 +172,7 @@ export function createPanelGroup(
   group.add(createPanelCutMarkGroup(panel, materialThickness, screwMarkMaterial));
 
   if (showFans) {
-    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness, exploded);
+    const fanCenterZ = panelInteriorFanCenterZ(part, materialThickness, exploded, fanAppearance);
     for (const cut of panel.cuts) {
       if (cut.type === "circle" && cut.role === "fan") {
         group.add(

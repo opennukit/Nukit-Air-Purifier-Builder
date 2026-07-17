@@ -29,6 +29,14 @@ const minimumRim = 12;
 const maximumRim = 90;
 const minimumFrameOpening = 1;
 
+// The fan-placement clamp keeps a fan this far (its frame radius plus 4 mm) from
+// each panel edge (createFanCuts). The hand-cut chamber must give the fan that
+// margin on both sides of its clear zone, or a thick filter squeezes the zone and
+// the fan is clamped down into the filter. 2 x 4 mm = 8 mm of clearance beyond the
+// fan frame does it. The laser chamber keeps its own +2 (matched to the Boxes.py
+// oracle) and adds a material flange, so it is not touched here.
+const HAND_CUT_FAN_CHAMBER_CLEARANCE_MM = 8;
+
 export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifierGeometry {
   const dimensions = settings.filter;
   const materialThickness = settings.cutting.materialThickness;
@@ -47,7 +55,7 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   // is active, otherwise just the fan frame, so the Box depth control drives the
   // depth exactly like it does for the laser box.
   const chamberHeight = handCut
-    ? (backFanChamberDepth ?? fanDiameter) + settings.filterCount * dimensions.thickness
+    ? (backFanChamberDepth ?? fanDiameter + HAND_CUT_FAN_CHAMBER_CLEARANCE_MM) + settings.filterCount * dimensions.thickness
     : (backFanChamberDepth ?? fanDiameter + 2) +
       settings.filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(settings.cutting.rim, dimensions.width, workingDepth, chamberHeight);
