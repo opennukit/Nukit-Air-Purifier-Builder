@@ -44,6 +44,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build
+        env:
+          # Public Cloudflare Web Analytics token (served in the page HTML, not a
+          # secret). Set only on the production build, so the cookieless beacon is
+          # injected into index.html on filterboxbuilder.com but not on beta or dev.
+          CF_WEB_ANALYTICS_TOKEN: "0123026129c7446d9ffd00f165428825"
       - run: bun test
       - uses: aws-actions/configure-aws-credentials@v4
         with:
