@@ -1,4 +1,5 @@
 import type { Millimeters } from "@/domain/units";
+import type { FilterCadrCalibration } from "@/domain/purifier/cadr";
 
 // A single STARKVIND filter's face. The STARKVIND 1x2 / 2x1 presets are exact
 // grids of this unit, so the preview can draw the seams between the filters.
@@ -42,12 +43,21 @@ export type FilterSizePreset = {
   readonly width: Millimeters;
   readonly depth: Millimeters;
   readonly thickness: Millimeters;
+  // Present when the filter has its own measured CADR calibration; absent means the
+  // MERV-13 furnace baseline is used (all the plain furnace filters below).
+  readonly cadr?: FilterCadrCalibration;
 };
 
+// STARKVIND is a packaged EPA12 particle filter (~99.5% PM2.5). Its resistance and
+// efficiency are calibrated to a measured box (4x Arctic P14 Max + 2x STARKVIND,
+// about 240 CFM CADR): flows easier per unit frontal area than furnace pleats, so a
+// direct frontal-area model with a resistance multiplier below 1.
+const STARKVIND_CADR: FilterCadrCalibration = { cls: "EPA12", eff: 0.99, res: 0.668, area: "direct" };
+
 export const filterSizePresets: readonly FilterSizePreset[] = [
-  { id: "starkvind", label: "STARKVIND (365 x 285 x 35 mm)", width: 365, depth: 285, thickness: 35 },
-  { id: "starkvind-1x2", label: "STARKVIND 1x2 (730 x 285 x 35 mm)", width: 730, depth: 285, thickness: 35 },
-  { id: "starkvind-2x1", label: "STARKVIND 2x1 (365 x 570 x 35 mm)", width: 365, depth: 570, thickness: 35 },
+  { id: "starkvind", label: "STARKVIND (365 x 285 x 35 mm)", width: 365, depth: 285, thickness: 35, cadr: STARKVIND_CADR },
+  { id: "starkvind-1x2", label: "STARKVIND 1x2 (730 x 285 x 35 mm)", width: 730, depth: 285, thickness: 35, cadr: STARKVIND_CADR },
+  { id: "starkvind-2x1", label: "STARKVIND 2x1 (365 x 570 x 35 mm)", width: 365, depth: 570, thickness: 35, cadr: STARKVIND_CADR },
   { id: "filter-10x10x1", label: '10" x 10" x 1" (241 x 241 x 19 mm)', width: 241, depth: 241, thickness: 19 },
   { id: "filter-16x24x1", label: '16" x 24" x 1" (394 x 597 x 19 mm)', width: 394, depth: 597, thickness: 19 },
   { id: "filter-16x25x1", label: '16" x 25" x 1" (394 x 622 x 19 mm)', width: 394, depth: 622, thickness: 19 },
@@ -88,4 +98,14 @@ const STOCK_FILTER_CADR_TOLERANCE_MM = 6;
 
 export function filterHasStockCadrData(width: Millimeters, depth: Millimeters, thickness: Millimeters): boolean {
   return matchedFilterSizePreset(width, depth, thickness, STOCK_FILTER_CADR_TOLERANCE_MM) !== undefined;
+}
+
+// The stock preset (carrying its CADR calibration, if any) that an entered filter
+// matches for the estimate, using the same tolerance as filterHasStockCadrData.
+export function matchedStockCadrPreset(
+  width: Millimeters,
+  depth: Millimeters,
+  thickness: Millimeters,
+): FilterSizePreset | undefined {
+  return matchedFilterSizePreset(width, depth, thickness, STOCK_FILTER_CADR_TOLERANCE_MM);
 }

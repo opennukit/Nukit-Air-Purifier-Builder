@@ -18,6 +18,7 @@ export const CFM_PER_M3H = 0.588578;
 export const M3H_PER_CFM = 1.699011;
 const MMH2O_PER_INH2O = 25.4;
 const MM_PER_IN = 25.4;
+const MM_PER_FT = 304.8;
 const PA_PER_INH2O = 249.0889;
 const VOLTAGE_PC = 12;
 const VOLTAGE_MAINS = 120;
@@ -150,14 +151,45 @@ export function findBoxFanModel(id: string): BoxFanModel | undefined {
 
 type FilterDims = { readonly w: number; readonly l: number; readonly t: number };
 
+// How a filter's effective media area is derived: "furnace" pleated media (frame
+// and depth math) or "direct" packaged particle filter (plain frontal face area).
+export type FilterAreaModel = "direct" | "furnace";
+
+// Per-filter CADR calibration. A stock filter with its own measured data pins its
+// single-pass efficiency (eff), resistance multiplier vs the MERV-13 baseline curve
+// (res, below 1 flows easier), area model (area), and class label (cls). Anything
+// omitted falls back to the MERV-13 furnace defaults, so custom sizes are unchanged.
+export type FilterCadrCalibration = {
+  readonly cls?: string;
+  readonly eff?: number;
+  readonly res?: number;
+  readonly area?: FilterAreaModel;
+};
+
 // Effective MERV-13 furnace media area (ft²) from outer dimensions (mm). Deeper
-// media pleats more, so resistance eases up to a 1.8× depth factor.
-function effAreaFt2(f: FilterDims): number {
+// media pleats more, so resistance eases up to a 1.8× depth factor. A packaged
+// particle filter (area "direct") has no furnace frame or pleats, so it uses its
+// plain frontal face area and leans on its own resistance multiplier instead.
+function effAreaFt2(f: FilterDims, area: FilterAreaModel = "furnace"): number {
+  if (area === "direct") {
+    return (f.w / MM_PER_FT) * (f.l / MM_PER_FT);
+  }
   const wIn = f.w / MM_PER_IN;
   const lIn = f.l / MM_PER_IN;
   const a = (Math.max(0, wIn - 2.3) * Math.max(0, lIn - 1.15)) / 144;
   const depthFactor = Math.min(1.8, f.t / 19);
   return a * depthFactor;
+}
+
+// The efficiency badge/breakdown for a filter: the published MERV-13 particle-size
+// split by default, or a single calibrated figure for a pinned non-MERV filter.
+function efficiencyBreakdownFor(
+  calibration: FilterCadrCalibration | undefined,
+): readonly { readonly label: string; readonly value: number }[] {
+  if (calibration?.eff === undefined && calibration?.cls === undefined) {
+    return MERV13_BREAKDOWN;
+  }
+  return [{ label: calibration.cls ?? "Single-pass", value: calibration.eff ?? MERV13_EFF }];
 }
 
 function faceVelFPM(dpIn: number, res = 1): number {
@@ -310,6 +342,9 @@ export type CadrEstimate = {
   readonly pressureDropPa: number; // system pressure drop at the operating point, Pa
   readonly filterEfficiency: number; // single-figure filter efficiency, 0-1
   readonly efficiencyBreakdown: readonly { readonly label: string; readonly value: number }[];
+  // Efficiency class label for the badge (e.g. "MERV-13", "EPA12"); absent means the
+  // MERV-13 baseline.
+  readonly filterClass?: string;
   readonly noiseRawDbA: number | null; // raw spec sum before real-world calibration
 };
 
@@ -343,12 +378,17 @@ export type PcCadrInput = {
   readonly arctic: boolean;
   readonly buildEfficiency?: number;
   readonly grill?: GrillLoss;
+  readonly calibration?: FilterCadrCalibration;
 };
 
 export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
   const { group, nFans, nFilters, filter, q0_m3h, p0_mm, noiseDb, currentA, arctic } = input;
   const buildEff = input.buildEfficiency ?? DEFAULT_BUILD_EFFICIENCY;
-  const totalAreaFt2 = effAreaFt2(filter) * nFilters;
+  // A matched stock filter can pin its own resistance, efficiency and area model; an
+  // unknown/custom size falls back to the MERV-13 furnace baseline (res 1).
+  const res = input.calibration?.res ?? 1;
+  const eff = input.calibration?.eff ?? MERV13_EFF;
+  const totalAreaFt2 = effAreaFt2(filter, input.calibration?.area ?? "furnace") * nFilters;
   const currentTotal = nFans * currentA;
   const noiseDbA = nFans > 0 && Number.isFinite(noiseDb) ? realPerFanSPL(noiseDb, arctic) + 10 * Math.log10(nFans) + DIST_3FT_TO_1M : null;
 
@@ -359,9 +399,9 @@ export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
   }
 
   const q0cfm = q0_m3h * CFM_PER_M3H;
-  const op = solve({ q0cfm, p0mm: p0_mm, shape: FAN_SHAPE[group], nFans, totalAreaFt2, res: 1, grill: input.grill });
+  const op = solve({ q0cfm, p0mm: p0_mm, shape: FAN_SHAPE[group], nFans, totalAreaFt2, res, grill: input.grill });
   const flowCfm = op.cfm * buildEff;
-  const cadrCfm = flowCfm * MERV13_EFF;
+  const cadrCfm = flowCfm * eff;
   return {
     cadrCfm,
     cadrM3h: cadrCfm * M3H_PER_CFM,
@@ -374,10 +414,11 @@ export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
     ach: null,
     roomLabel: "",
     fanModelId: "",
-    faceVelocityMs: faceVelFPM(op.dpIn) * FPM_TO_MS,
+    faceVelocityMs: faceVelFPM(op.dpIn, res) * FPM_TO_MS,
     pressureDropPa: op.dpIn * PA_PER_INH2O,
-    filterEfficiency: MERV13_EFF,
-    efficiencyBreakdown: MERV13_BREAKDOWN,
+    filterEfficiency: eff,
+    efficiencyBreakdown: efficiencyBreakdownFor(input.calibration),
+    filterClass: input.calibration?.cls ?? "MERV-13",
     noiseRawDbA,
   };
 }

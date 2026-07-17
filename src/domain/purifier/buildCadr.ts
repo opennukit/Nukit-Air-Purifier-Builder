@@ -21,6 +21,7 @@ import {
   type FanGroup,
   type GrillLoss,
 } from "@/domain/purifier/cadr";
+import { matchedStockCadrPreset } from "@/domain/purifier/filterPresets";
 
 // Whether the build runs a 20" box/exhaust fan (tower with box-exhaust top) rather
 // than a grid of PC fans.
@@ -130,6 +131,9 @@ function grillForBuild(config: PurifierSettings, raw: RawPurifierSettings): Gril
 export function estimateBuildCadr(input: BuildCadrInput): CadrEstimate {
   const { configuration: config, rawSettings: raw, fanCount } = input;
   const filter = { w: config.filter.width, l: config.filter.depth, t: config.filter.thickness };
+  // A matched stock filter pins its own resistance/efficiency/area (PC mode); custom
+  // sizes leave this undefined and fall back to the MERV-13 furnace baseline.
+  const calibration = matchedStockCadrPreset(config.filter.width, config.filter.depth, config.filter.thickness)?.cadr;
   const nFilters = buildFilterCount(config);
   const group = fanGroupForBuild(config);
   const mode: CadrFanMode = isBoxExhaustBuild(config) ? "box" : "pc";
@@ -164,11 +168,12 @@ export function estimateBuildCadr(input: BuildCadrInput): CadrEstimate {
         currentA: raw.customFanCurrent,
         arctic: false,
         grill,
+        calibration,
       });
     }
     // resolveFanModelId guarantees a known PC id here.
     const m = findPcFanModel(id) ?? findPcFanModel(DEFAULT_PC_FAN_ID[group])!;
-    return estimatePcCadr({ group, nFans: fanCount, nFilters, filter, q0_m3h: m.q0, p0_mm: m.p0, noiseDb: m.db, currentA: m.a, arctic: m.arctic, grill });
+    return estimatePcCadr({ group, nFans: fanCount, nFilters, filter, q0_m3h: m.q0, p0_mm: m.p0, noiseDb: m.db, currentA: m.a, arctic: m.arctic, grill, calibration });
   })();
 
   return { ...base, ...roomAch(base.cadrM3h, raw), fanModelId: id };

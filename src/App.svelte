@@ -1446,7 +1446,7 @@
             <span class="perf-sub">at operating point</span>
           </a>
           <a class="perf-tile" href="methodology.html#filter-efficiency" target="_blank" rel="noopener">
-            <span class="perf-k">Filter efficiency <span class="perf-badge">MERV-13</span></span>
+            <span class="perf-k">Filter efficiency <span class="perf-badge">{cadr.filterClass ?? "MERV-13"}</span></span>
             <span class="perf-v">{Math.round(cadr.filterEfficiency * 100)}<small> %</small></span>
             <span class="perf-sub">single-pass capture</span>
           </a>
