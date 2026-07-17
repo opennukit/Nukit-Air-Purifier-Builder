@@ -48,11 +48,11 @@ export type FilterSizePreset = {
   readonly cadr?: FilterCadrCalibration;
 };
 
-// STARKVIND is a packaged EPA12 particle filter (~99.5% PM2.5). Its resistance and
-// efficiency are calibrated to a measured box (4x Arctic P14 Max + 2x STARKVIND,
-// about 240 CFM CADR): flows easier per unit frontal area than furnace pleats, so a
-// direct frontal-area model with a resistance multiplier below 1.
-const STARKVIND_CADR: FilterCadrCalibration = { cls: "EPA12", eff: 0.99, res: 0.668, area: "direct" };
+// STARKVIND is a packaged EPA12 particle filter (~99.5% PM2.5) modeled on its plain
+// frontal area (no furnace frame or pleats). res is solved so the measured reference
+// box (4x Arctic P14 Max + 2x STARKVIND, 85% build efficiency, eff 0.99) reproduces
+// its ~240 CFM CADR against the current measured (Cybenetics) fan data.
+const STARKVIND_CADR: FilterCadrCalibration = { cls: "EPA12", eff: 0.99, res: 1.494, area: "direct" };
 
 export const filterSizePresets: readonly FilterSizePreset[] = [
   { id: "starkvind", label: "STARKVIND (365 x 285 x 35 mm)", width: 365, depth: 285, thickness: 35, cadr: STARKVIND_CADR },

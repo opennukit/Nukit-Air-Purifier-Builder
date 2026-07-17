@@ -23,11 +23,33 @@ const PA_PER_INH2O = 249.0889;
 const VOLTAGE_PC = 12;
 const VOLTAGE_MAINS = 120;
 
-// MERV-13 (3M MPR-1900) filter resistance: dP[inH2O] = A*V^2 + B*V (V = FPM).
-const FILTER = { A: 4.7302e-7, B: 3.3752e-4 };
+// A filter media resistance curve: dP[inH2O] = A*V^2 + B*V, V = face velocity in FPM.
+export type FilterResistanceCurve = { readonly A: number; readonly B: number };
 
-// MERV-13 particle-size efficiency (published @ ~2.5 m/s); weighted average is the
-// single-pass efficiency used for the low-velocity PC case.
+// Resistance curves fit from 3M Filtrete lab data (the community "Filters and Fans"
+// spreadsheet), keyed by media grade (3M MPR label in the comment). MERV-13 / MPR-1900
+// is the baseline the geometry model scales; the others let a filter with a different
+// media grade use its own curve instead of a multiplier on the MERV-13 one.
+export const FILTER_CURVES = {
+  "merv-11": { A: 1.5617e-7, B: 2.2639e-4 }, // MPR-1085
+  "merv-12": { A: 2.0662e-7, B: 2.0764e-4 }, // MPR-1500
+  "merv-13": { A: 4.7302e-7, B: 3.3752e-4 }, // MPR-1900 (baseline)
+  "merv-13-hi": { A: 5.9773e-7, B: 3.4182e-4 }, // MPR-2200
+  "merv-14": { A: 6.094e-7, B: 4.2826e-4 }, // MPR-2500
+  "merv-14-hi": { A: 6.5569e-7, B: 4.571e-4 }, // MPR-2800
+} as const satisfies Record<string, FilterResistanceCurve>;
+
+const FILTER: FilterResistanceCurve = FILTER_CURVES["merv-13"];
+
+// Measured DIY CADR datasets to sanity-check the model and pin future filters against:
+// the NIOSH/Derk 2023 wildfire-smoke chamber study (a single MERV-13 box fan about
+// 111 CFM; shroud +40%, 4 inch filter +123%, two-filter wedge +137%, CR box +261%) and
+// the IIT 2021 CR-box test report. Fan/noise anchors stay the HouseFresh boxes above.
+
+// MERV-13 particle-size efficiency (published @ ~2.5 m/s). The plain mean of the three
+// bands (about 0.813) is the single headline single-pass efficiency for the low-velocity
+// PC case. These are high-velocity lab figures, so real fine-particle capture at DIY
+// velocity is usually better, which makes this the conservative side.
 const PSE = { fine: 0.62, mid: 0.87, coarse: 0.95 };
 const MERV13_EFF = (PSE.fine + PSE.mid + PSE.coarse) / 3;
 const MERV13_BREAKDOWN: readonly { readonly label: string; readonly value: number }[] = [
@@ -164,6 +186,9 @@ export type FilterCadrCalibration = {
   readonly eff?: number;
   readonly res?: number;
   readonly area?: FilterAreaModel;
+  // The media resistance curve (e.g. a FILTER_CURVES entry) when the filter is not the
+  // MERV-13 baseline. Omitted means the MERV-13 curve, optionally scaled by res.
+  readonly curve?: FilterResistanceCurve;
 };
 
 // Effective MERV-13 furnace media area (ft²) from outer dimensions (mm). Deeper
@@ -192,8 +217,8 @@ function efficiencyBreakdownFor(
   return [{ label: calibration.cls ?? "Single-pass", value: calibration.eff ?? MERV13_EFF }];
 }
 
-function faceVelFPM(dpIn: number, res = 1): number {
-  const { A, B } = FILTER;
+function faceVelFPM(dpIn: number, res = 1, curve: FilterResistanceCurve = FILTER): number {
+  const { A, B } = curve;
   const x = dpIn / res;
   if (x <= 0) {
     return 0;
@@ -201,8 +226,8 @@ function faceVelFPM(dpIn: number, res = 1): number {
   return (-B + Math.sqrt(B * B + 4 * A * x)) / (2 * A);
 }
 
-function filterCFM(dpIn: number, totalAreaFt2: number, res = 1): number {
-  return faceVelFPM(dpIn, res) * totalAreaFt2;
+function filterCFM(dpIn: number, totalAreaFt2: number, res = 1, curve: FilterResistanceCurve = FILTER): number {
+  return faceVelFPM(dpIn, res, curve) * totalAreaFt2;
 }
 
 function fanCFMperFan(dpIn: number, q0cfm: number, p0mm: number, shape: readonly (readonly [number, number])[]): number {
@@ -255,15 +280,16 @@ type SolveParams = {
   readonly totalAreaFt2: number;
   readonly res: number;
   readonly grill?: GrillLoss;
+  readonly curve?: FilterResistanceCurve;
 };
 
 // Operating point: the ΔP where N·fan(Q) = filter(Q), found by bisection. With a
 // grill the fan must overcome the filter ΔP plus the per-fan grill ΔP, so the fan
 // is evaluated at the higher pressure while the filter still sees only its own ΔP.
 function solve(params: SolveParams): { dpIn: number; cfm: number } {
-  const { q0cfm, p0mm, shape, nFans, totalAreaFt2, res, grill } = params;
+  const { q0cfm, p0mm, shape, nFans, totalAreaFt2, res, grill, curve } = params;
   const diff = (dp: number): number => {
-    const totalFlow = filterCFM(dp, totalAreaFt2, res);
+    const totalFlow = filterCFM(dp, totalAreaFt2, res, curve);
     const fanPressure = grill === undefined ? dp : dp + grillPressureDropInH2O(totalFlow / nFans, grill);
     return nFans * fanCFMperFan(fanPressure, q0cfm, p0mm, shape) - totalFlow;
   };
@@ -281,7 +307,7 @@ function solve(params: SolveParams): { dpIn: number; cfm: number } {
     }
   }
   const dpIn = (lo + hi) / 2;
-  return { dpIn, cfm: filterCFM(dpIn, totalAreaFt2, res) };
+  return { dpIn, cfm: filterCFM(dpIn, totalAreaFt2, res, curve) };
 }
 
 function realPerFanSPL(spec: number, isArctic: boolean): number {
@@ -296,12 +322,21 @@ function realPerFanSPL(spec: number, isArctic: boolean): number {
 const CUBE_REF_1IN: FilterDims = { w: 501, l: 501, t: 19 };
 const CUBE_REF_2IN: FilterDims = { w: 495, l: 495, t: 44 };
 
-function cubeEff(f: FilterDims): number {
+// Single-pass efficiency at box-fan face velocity (PM1/smoke basis): MERV-13 eases to
+// ~0.43 (1") / ~0.50 (2") at that high velocity, but a calibrated high-grade filter
+// keeps its own measured rating.
+function cubeEff(f: FilterDims, calibration?: FilterCadrCalibration): number {
+  if (calibration?.eff !== undefined) {
+    return calibration.eff;
+  }
   return f.t >= 30 ? 0.5 : 0.43;
 }
 
-function cubeArea(f: FilterDims, n: number): number {
-  return effAreaFt2(f) * n; // MERV-13 res = 1
+// Cube hydraulic area (ft²): total effective media area, enlarged for low-resistance
+// media (res below 1) and using the filter's own area model. The reference cubes are
+// plain MERV-13, so they keep the furnace area at res 1.
+function cubeArea(f: FilterDims, n: number, calibration?: FilterCadrCalibration): number {
+  return (effAreaFt2(f, calibration?.area ?? "furnace") / (calibration?.res ?? 1)) * n;
 }
 
 function cubeAirflow(fan: BoxFanModel, speed: number, area: number, shroud: boolean): number {
@@ -388,6 +423,7 @@ export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
   // unknown/custom size falls back to the MERV-13 furnace baseline (res 1).
   const res = input.calibration?.res ?? 1;
   const eff = input.calibration?.eff ?? MERV13_EFF;
+  const curve = input.calibration?.curve ?? FILTER;
   const totalAreaFt2 = effAreaFt2(filter, input.calibration?.area ?? "furnace") * nFilters;
   const currentTotal = nFans * currentA;
   const noiseDbA = nFans > 0 && Number.isFinite(noiseDb) ? realPerFanSPL(noiseDb, arctic) + 10 * Math.log10(nFans) + DIST_3FT_TO_1M : null;
@@ -399,7 +435,7 @@ export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
   }
 
   const q0cfm = q0_m3h * CFM_PER_M3H;
-  const op = solve({ q0cfm, p0mm: p0_mm, shape: FAN_SHAPE[group], nFans, totalAreaFt2, res, grill: input.grill });
+  const op = solve({ q0cfm, p0mm: p0_mm, shape: FAN_SHAPE[group], nFans, totalAreaFt2, res, grill: input.grill, curve });
   const flowCfm = op.cfm * buildEff;
   const cadrCfm = flowCfm * eff;
   return {
@@ -414,7 +450,7 @@ export function estimatePcCadr(input: PcCadrInput): CadrEstimate {
     ach: null,
     roomLabel: "",
     fanModelId: "",
-    faceVelocityMs: faceVelFPM(op.dpIn, res) * FPM_TO_MS,
+    faceVelocityMs: faceVelFPM(op.dpIn, res, curve) * FPM_TO_MS,
     pressureDropPa: op.dpIn * PA_PER_INH2O,
     filterEfficiency: eff,
     efficiencyBreakdown: efficiencyBreakdownFor(input.calibration),
@@ -438,12 +474,17 @@ export type BoxCadrInput = {
   // Exactly one of preset / custom is used.
   readonly preset?: BoxFanModel;
   readonly custom?: BoxCadrCustom;
+  readonly calibration?: FilterCadrCalibration;
 };
 
 export function estimateBoxCadr(input: BoxCadrInput): CadrEstimate {
-  const { nFilters, filter, speed, shroud, preset, custom } = input;
-  const effW = cubeEff(filter);
-  const area = effAreaFt2(filter) * nFilters;
+  const { nFilters, filter, speed, shroud, preset, custom, calibration } = input;
+  const effW = cubeEff(filter, calibration);
+  const res = calibration?.res ?? 1;
+  const curve = calibration?.curve ?? FILTER;
+  // Physical frontal media area (for face velocity and the custom-fan solve); the
+  // preset power-law uses the resistance-eased hydraulic area (cubeArea) instead.
+  const area = effAreaFt2(filter, calibration?.area ?? "furnace") * nFilters;
   let airflowCfm = 0;
   let noiseDbA: number | null = null;
   let noiseRawDbA: number | null = null;
@@ -451,13 +492,13 @@ export function estimateBoxCadr(input: BoxCadrInput): CadrEstimate {
   let currentA: number | null = null;
 
   if (preset !== undefined) {
-    airflowCfm = cubeAirflow(preset, speed, area, shroud);
+    airflowCfm = cubeAirflow(preset, speed, cubeArea(filter, nFilters, calibration), shroud);
     noiseRawDbA = preset.noise[speed];
     noiseDbA = preset.noise[speed] + DIST_3FT_TO_1M;
     powerW = preset.watts[speed];
     currentA = powerW / VOLTAGE_MAINS;
   } else if (custom !== undefined && custom.q0_m3h > 0 && custom.p0_mm > 0) {
-    const op = solve({ q0cfm: custom.q0_m3h * CFM_PER_M3H, p0mm: custom.p0_mm, shape: FAN_SHAPE["140"], nFans: 1, totalAreaFt2: area, res: 1 });
+    const op = solve({ q0cfm: custom.q0_m3h * CFM_PER_M3H, p0mm: custom.p0_mm, shape: FAN_SHAPE["140"], nFans: 1, totalAreaFt2: area, res, curve });
     airflowCfm = op.cfm;
     const hasNoise = Number.isFinite(custom.noiseDb) && custom.noiseDb > 0;
     noiseRawDbA = hasNoise ? custom.noiseDb : null;
@@ -481,9 +522,10 @@ export function estimateBoxCadr(input: BoxCadrInput): CadrEstimate {
     roomLabel: "",
     fanModelId: "",
     faceVelocityMs: faceVelFpm * FPM_TO_MS,
-    pressureDropPa: (FILTER.A * faceVelFpm * faceVelFpm + FILTER.B * faceVelFpm) * PA_PER_INH2O,
+    pressureDropPa: res * (curve.A * faceVelFpm * faceVelFpm + curve.B * faceVelFpm) * PA_PER_INH2O,
     filterEfficiency: effW,
-    efficiencyBreakdown: [],
+    efficiencyBreakdown: calibration?.cls !== undefined ? [{ label: calibration.cls, value: effW }] : [],
+    filterClass: calibration?.cls ?? "MERV-13",
     noiseRawDbA,
   };
 }

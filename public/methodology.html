@@ -209,6 +209,8 @@
                 Sources: the MERV-13 resistance coefficients, the effective-area formula, and the 120/140&nbsp;mm fan
                 curve shapes are reverse-engineered from Nukit and community data built on 3M&nbsp;Filtrete
                 lab data and Arctic P12/P14 PQ curves; the solver reproduces that sheet's worked example to ~0.1%.
+                Each fan's free-air flow <code>Q₀</code> and static pressure <code>P₀</code> come from independent
+                Cybenetics LW-9266 bench measurements where available, rather than manufacturer marketing specs.
                 The fan-curve / system-resistance intersection is standard fan engineering; the grill loss uses
                 I. E. Idel'chik, <em>Handbook of Hydraulic Resistance</em> (thin-perforated-plate coefficient).
               </p>
@@ -248,6 +250,12 @@
                 uses a conservative whole-system single-pass figure instead (0.43 for 1" media, 0.50 for ≥2"),
                 consistent with the 41–58% effective efficiency measured at UC&nbsp;Davis and calibrated so the cube's
                 CADR matches independent room reviews.
+              </p>
+              <p>
+                A packaged particle filter (such as the IKEA STARKVIND, an EPA12 unit rated at about 99.5% of PM2.5)
+                is not a furnace pleat, so it is modeled with its own rated single-pass efficiency and a plain
+                frontal-area resistance, both calibrated so a measured reference box reproduces its published CADR. The
+                Performance panel shows that filter's own grade (for example EPA12) on the efficiency tile.
               </p>
               <p class="refs">
                 Sources: <a href="https://www.ashrae.org" target="_blank" rel="noopener">ANSI/ASHRAE 52.2 (MERV / E1–E3 bands)</a>;
@@ -383,7 +391,9 @@
             <p class="lede">Source dataset &amp; specs</p>
             <ul class="refs">
               <li>Community filter/fan data: 3M&nbsp;Filtrete MERV/MPR resistance curves and Arctic P12/P14 PQ curves (PC-mode coefficients, effective-area formula, and fan-curve shapes reverse-engineered from it).</li>
-              <li>Manufacturer datasheets: Arctic P12/P14, Noctua NF-A12x25/NF-A14x25, be&nbsp;quiet! Silent Wings 4, Cooler&nbsp;Master SickleFlow/MasterFan/Mobius, NZXT F140P, Corsair RS140 MAX (airflow, pressure, noise, current); <a href="https://www.airkinglimited.com/wp-content/uploads/2020/09/9723spec1.pdf" target="_blank" rel="noopener">Air King 9723 spec sheet</a>; Lasko B20200/3723 and Hurricane HGC736501.</li>
+              <li>Fan airflow (Q₀) and static pressure (P₀): independent Cybenetics LW-9266 open-loop bench measurements, used in place of manufacturer marketing figures where available.</li>
+              <li>Manufacturer specs: Arctic P12/P14, Noctua NF-A12x25/NF-A14x25, be&nbsp;quiet! Silent Wings 4, Cooler&nbsp;Master SickleFlow/MasterFan/Mobius, NZXT F140P, Corsair RS140 MAX (noise and rated current); <a href="https://www.airkinglimited.com/wp-content/uploads/2020/09/9723spec1.pdf" target="_blank" rel="noopener">Air King 9723 spec sheet</a>; Lasko B20200/3723 and Hurricane HGC736501.</li>
+              <li>IKEA STARKVIND particle filter: EPA12, rated about 99.5% of PM2.5 (its grade and frontal dimensions drive its calibrated efficiency and resistance).</li>
             </ul>
           </section>
 

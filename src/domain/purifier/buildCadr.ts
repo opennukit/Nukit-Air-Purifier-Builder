@@ -151,9 +151,10 @@ export function estimateBuildCadr(input: BuildCadrInput): CadrEstimate {
           speed: 2,
           shroud: true,
           custom: { q0_m3h: raw.customFanAirflow, p0_mm: raw.customFanPressure, noiseDb: raw.customFanNoise, watts: raw.customFanWatts },
+          calibration,
         });
       }
-      return estimateBoxCadr({ nFilters, filter, speed: 2, shroud: true, preset: findBoxFanModel(id) });
+      return estimateBoxCadr({ nFilters, filter, speed: 2, shroud: true, preset: findBoxFanModel(id), calibration });
     }
 
     if (id === CUSTOM_FAN_ID) {
