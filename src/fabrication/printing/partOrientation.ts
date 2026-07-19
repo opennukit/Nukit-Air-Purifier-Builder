@@ -113,6 +113,7 @@ export function orientChunkVerticesForPrinting(
   vertices: readonly MeshVertex[],
   triangles: readonly MeshTriangle[],
   bed?: { readonly width: number; readonly depth: number; readonly height: number },
+  grillDownNormal?: { readonly x: number; readonly y: number; readonly z: number },
 ): readonly MeshVertex[] {
   // Two winners: `best` is the lowest-support orientation that also fits the bed,
   // `fallback` is the lowest-support orientation ignoring fit. When a bed is given
@@ -122,18 +123,45 @@ export function orientChunkVerticesForPrinting(
   // genuinely oversized, in which case fallback keeps the old least-support choice.
   let best: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
   let fallback: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
+  // When the chunk carries a single fan-grill face, we force that face down (its
+  // outward normal to -Z) so the hex grill prints support-free. Track the best
+  // fitting grill-down pose and a grill-down fallback separately.
+  let grillBest: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
+  let grillFallback: { readonly score: number; readonly vertices: readonly MeshVertex[] } | undefined;
+  const grillNormalLength =
+    grillDownNormal !== undefined ? Math.hypot(grillDownNormal.x, grillDownNormal.y, grillDownNormal.z) : 0;
 
   for (const rotate of axisAlignedRotations) {
     const rotated = vertices.map(rotate);
     const score = supportScore(rotated, triangles);
+    const fits = bed === undefined || fitsBedDimensions(rotated, bed);
     if (fallback === undefined || score < fallback.score - 1e-6) {
       fallback = { score, vertices: rotated };
     }
-    if (bed !== undefined && !fitsBedDimensions(rotated, bed)) {
-      continue;
-    }
-    if (best === undefined || score < best.score - 1e-6) {
+    if (fits && (best === undefined || score < best.score - 1e-6)) {
       best = { score, vertices: rotated };
+    }
+    if (grillDownNormal !== undefined) {
+      const rotatedNormal = rotate(grillDownNormal);
+      const grillFacesDown = rotatedNormal.z < -grillNormalLength + 1e-6;
+      if (grillFacesDown) {
+        if (grillFallback === undefined || score < grillFallback.score - 1e-6) {
+          grillFallback = { score, vertices: rotated };
+        }
+        if (fits && (grillBest === undefined || score < grillBest.score - 1e-6)) {
+          grillBest = { score, vertices: rotated };
+        }
+      }
+    }
+  }
+
+  if (grillDownNormal !== undefined) {
+    // Force the single grill face down: prefer a fitting grill-down pose, otherwise a
+    // grill-down pose even if oversized (the chunker sizes chunks to fit grill-down,
+    // and an oversized part is oversized in any pose).
+    const grillChoice = grillBest ?? grillFallback;
+    if (grillChoice !== undefined) {
+      return grillChoice.vertices;
     }
   }
 

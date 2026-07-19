@@ -45,11 +45,12 @@ describe("Tempest CSG printable kit", () => {
   test("generates bed-sized CSG chunks for the default two-filter housing", () => {
     const kit = createTempestPrintableKit(defaultTempestSettings, "bed-256");
 
-    // Feature-aware slicing threads seams between the 140 mm fan grills, which
-    // needs a third chunk on the fan-dense axis (2×2×3) rather than a uniform 2×2×2.
-    expect(kit.parts).toHaveLength(12);
+    // Feature-aware slicing threads seams between the 140 mm fan grills, and the ±X
+    // fan-wall grills force those chunks grill-down, capping the width axis at the
+    // 250 mm usable Z so it splits three ways instead of two.
+    expect(kit.parts).toHaveLength(16);
     expect(Object.keys(kit.summary).sort()).toEqual(["fragilePartNames", "materialVolumeMm3", "oversizedPartCount", "partCount"]);
-    expect(kit.summary.partCount).toBe(12);
+    expect(kit.summary.partCount).toBe(16);
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
     expect(kit.parts.every((part) => part.kind === "tempest-print-chunk")).toBe(true);
@@ -319,7 +320,8 @@ function chunkAddressFromId(id: string): { readonly x: number; readonly y: numbe
 function bed256TempestSettings(): typeof defaultTempestSettings {
   return {
     ...defaultTempestSettings,
-    printBed: { width: 256, depth: 256, height: 256 },
+    // Matches the bed-256 preset's usable Z of 250 mm (not the nominal 256).
+    printBed: { width: 256, depth: 256, height: 250 },
   };
 }
 

@@ -100,6 +100,11 @@ export type PrintablePartWithMesh<Mesh> =
   | (PrintablePartBase<Mesh> & {
       readonly kind: "tempest-print-chunk";
       readonly sourcePlacement: TempestChunkPlacement;
+      // Outward normal (in the chunk's mesh frame) of the single fan-grill face this
+      // chunk carries, when it has exactly one. Auto-orientation forces that face down
+      // so the hex grill prints without supports. Absent when a chunk has no grill or
+      // grills on two or more different faces (nothing to force).
+      readonly grillDownNormal?: { readonly x: number; readonly y: number; readonly z: number };
     })
   | (PrintablePartBase<Mesh> & {
       readonly kind: Exclude<PrintablePartKind, "tempest-print-chunk">;
@@ -493,7 +498,7 @@ export function orientPrintablePart(part: PrintablePart, bed?: PrintBed): Printa
   }
 
   const bedDimensions = bed !== undefined && bed.type !== "unbounded" ? { width: bed.width, depth: bed.depth, height: bed.height } : undefined;
-  const rotated = orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles, bedDimensions);
+  const rotated = orientChunkVerticesForPrinting(part.mesh.vertices, part.mesh.triangles, bedDimensions, part.grillDownNormal);
   const bounds = meshBounds(rotated);
   // Re-seat the rotated mesh's min corner at the origin: sheet packing and the
   // preview both place a part by its (0,0,0) corner, and bed-centering expects

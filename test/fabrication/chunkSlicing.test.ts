@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createTempestModel, defaultTempestSettings, type TempestModel, type TempestPrintablePose } from "@/domain/designs/tempest/model";
 import { createTempestPrintablePose } from "@/fabrication/printing/designs/tempest/printableKit";
-import { axisCuts, featureAwarePrintableChunkGrid } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import { axisCuts, featureAwarePrintableChunkGrid, grillDownNormalForChunk, grillFacesInPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { decodeSettings } from "@/domain/purifier/settingsCodec";
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
@@ -122,5 +122,37 @@ describe("axisCuts: balanced, sliver-free, feature-avoiding boundaries", () => {
 
   test("a part that already fits the bed is never cut", () => {
     expect(axisCuts(200, 250, [])).toEqual([0, 200]);
+  });
+});
+
+describe("grill-face-down chunking", () => {
+  const model = createTempestModel(defaultTempestSettings);
+  const pose = createTempestPrintablePose(model);
+  const faces = grillFacesInPose(model, pose);
+
+  test("the default sandwich's grills carry opposite left/right pose normals", () => {
+    expect(faces.length).toBeGreaterThan(0);
+    const normals = [...new Set(faces.map((face) => face.normal.join(",")))].sort();
+    expect(normals).toEqual(["-1,0,0", "1,0,0"]);
+  });
+
+  test("one wall's chunk takes that wall's normal; a chunk spanning both takes none", () => {
+    // A slab hugging the left wall (small X) carries only the -X grills.
+    const leftOnly = grillDownNormalForChunk(faces, [0, 0, 0], [30, pose.envelope.depth, pose.envelope.height]);
+    expect(leftOnly).toEqual([-1, 0, 0]);
+    // A chunk spanning the full width holds both ±X grills, so nothing to force down.
+    const both = grillDownNormalForChunk(faces, [0, 0, 0], [pose.envelope.width, pose.envelope.depth, pose.envelope.height]);
+    expect(both).toBeUndefined();
+    // A grill-free slab at the middle of the width takes no normal.
+    const middle = grillDownNormalForChunk(faces, [pose.envelope.width / 2 - 15, 0, 0], [30, pose.envelope.depth, pose.envelope.height]);
+    expect(middle).toBeUndefined();
+  });
+
+  test("the grill-normal axis is capped at the bed height so grilled chunks fit grill-down", () => {
+    const bed = { width: 256, depth: 256, height: 250 };
+    const grid = featureAwarePrintableChunkGrid(model, pose, bed);
+    // X is the ±X grill-normal axis, so its chunks must fit the 250 mm height when
+    // laid grill-down, not the 256 mm footprint width.
+    expect(grid.chunkWidth).toBeLessThanOrEqual(bed.height + 0.5);
   });
 });

@@ -32,7 +32,7 @@ import {
   tempestFinalPinPlacements,
   type TempestAlignmentPinPlacement,
 } from "@/fabrication/printing/designs/tempest/geometry";
-import { featureAwarePrintableChunkGrid, sourceChunkGridForPose } from "@/fabrication/printing/designs/tempest/chunkSlicing";
+import { featureAwarePrintableChunkGrid, grillDownNormalForChunk, grillFacesInPose, sourceChunkGridForPose, type GrillFace } from "@/fabrication/printing/designs/tempest/chunkSlicing";
 import { cellKey, planChunkLabels, type ChunkSeamLabel, type SeamAxis } from "@/fabrication/printing/designs/tempest/geometry/chunkLabels";
 import { debossChunkSeamLabels, type SeamDebossPlacement } from "@/fabrication/printing/designs/tempest/geometry/chunkLabelDeboss";
 import { createTempestSettingsFromLayout } from "@/fabrication/printing/designs/tempest/settings";
@@ -81,7 +81,7 @@ export function createTempestPrintableKit(
       pose,
       createFinalAssemblyGeometry(model, sourceChunkGrid),
     );
-    return createChunkParts(ctx, model, printableChunkGrid, assembly);
+    return createChunkParts(ctx, model, printableChunkGrid, assembly, grillFacesInPose(model, pose));
   });
 
   return {
@@ -290,6 +290,7 @@ function createChunkParts(
   model: TempestModel,
   chunkGrid: TempestChunkGrid,
   assembly: Geom3,
+  grillFaces: readonly GrillFace[],
 ): PrintablePart[] {
   // Pass 1: clip every cell and record which ones actually hold material — the
   // letter plan and seam codes can only reference occupied chunks.
@@ -349,7 +350,7 @@ function createChunkParts(
     // plate. Runs on the final welded mesh, whose shared-index connectivity is the
     // exact topology that prints, so it never touches a real connected body.
     const mesh = dropMeshFlakes(debossedMesh, model.frame.wallThickness);
-    parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh, labelPlan?.labels.get(cellKey(chunk.address))));
+    parts.push(buildChunkPart(chunk.address, chunk.bounds, mesh, grillFaces, labelPlan?.labels.get(cellKey(chunk.address))));
   }
   return parts;
 }
@@ -885,10 +886,14 @@ function buildChunkPart(
   address: ChunkAddress,
   bounds: ChunkBounds,
   mesh: ReturnType<typeof extractWeldedMesh>,
+  grillFaces: readonly GrillFace[],
   letter?: string,
 ): PrintablePart {
   const [width, depth, height] = bounds.size;
   const [originX, originY, originZ] = bounds.origin;
+  // If this chunk carries exactly one fan-grill face, record its outward normal so
+  // auto-orientation lays that grill face down (support-free hex print).
+  const grillDown = grillDownNormalForChunk(grillFaces, bounds.origin, bounds.size);
   return {
     id: `tempest-chunk-${address.x}-${address.y}-${address.z}`,
     // Name by the chunk letter (A, B, ...) when the print is split, so the export
@@ -900,6 +905,7 @@ function buildChunkPart(
       y: roundMillimeters(originY),
       z: roundMillimeters(originZ),
     },
+    ...(grillDown !== undefined ? { grillDownNormal: { x: grillDown[0], y: grillDown[1], z: grillDown[2] } } : {}),
     width: roundMillimeters(width),
     depth: roundMillimeters(depth),
     height: roundMillimeters(height),

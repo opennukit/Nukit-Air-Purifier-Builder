@@ -109,4 +109,21 @@ describe("orientChunkVerticesForPrinting", () => {
     expect(fitted.length).toBe(vertices.length);
     expect(zExtent(fitted)).toBeCloseTo(4, 6); // still the least-support (flat) pose
   });
+
+  test("forces a chunk's single grill face down even when another pose needs less support", () => {
+    const { vertices, triangles } = makeBox(30, 20, 10);
+    const bed = { width: 256, depth: 256, height: 250 };
+    // Unforced, it rests on the large 30 x 20 face (height 10).
+    expect(zExtent(orientChunkVerticesForPrinting(vertices, triangles, bed))).toBeCloseTo(10, 6);
+    // Forcing the +Y grill face down stands the 20 mm axis up (height 20) even though
+    // that needs more support, so the grill lands flat on the plate.
+    const grillDown = orientChunkVerticesForPrinting(vertices, triangles, bed, { x: 0, y: 1, z: 0 });
+    expect(zExtent(grillDown)).toBeCloseTo(20, 6);
+    // The vertices that were on the +Y face (max Y) are now the lowest (grill on bed).
+    const maxYIndexes = vertices.map((v, i) => ({ i, y: v.y })).filter((a) => a.y === 20).map((a) => a.i);
+    const minZ = Math.min(...grillDown.map((v) => v.z));
+    for (const i of maxYIndexes) {
+      expect(grillDown[i]!.z).toBeCloseTo(minZ, 6);
+    }
+  });
 });

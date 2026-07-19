@@ -54,9 +54,24 @@ export function featureAwarePrintableChunkGrid(
     quad: () => mergeAxisBands(mergeAxisBands(grill, wall), rim),
     sandwich: () => mergeAxisBands(grill, wall),
   });
+  // A grilled chunk prints grill-face-down, so the axis of that grill's outward
+  // normal becomes vertical and must fit the bed height, not the (larger) footprint
+  // dimension. Cap any grill-normal axis at bed.height; this can add plates when the
+  // grill is on, which is expected. Skip the cap when the whole model already fits the
+  // bed (e.g. the "unsplit" preset, whose bed is the envelope): it prints as one piece
+  // with grills on opposing walls, a conflict that is never forced grill-down, so there
+  // is nothing to cap and a spurious split must not be introduced.
+  const grillAxis = grillNormalPoseAxes(grillFacesInPose(model, pose));
+  const capEps = 1e-6;
+  const fitsWhole =
+    bed.width + capEps >= pose.envelope.width &&
+    bed.depth + capEps >= pose.envelope.depth &&
+    bed.height + capEps >= pose.envelope.height;
+  const cap = (isGrillNormal: boolean, footprint: number): number =>
+    isGrillNormal && !fitsWhole ? Math.min(footprint, bed.height) : footprint;
   return chunkGridFromBoundaries(
-    axisCuts(pose.envelope.width, bed.width, bands.x),
-    axisCuts(pose.envelope.depth, bed.depth, bands.y),
+    axisCuts(pose.envelope.width, cap(grillAxis.x, bed.width), bands.x),
+    axisCuts(pose.envelope.depth, cap(grillAxis.y, bed.depth), bands.y),
     axisCuts(pose.envelope.height, bed.height, bands.z),
   );
 }
@@ -106,8 +121,8 @@ export function chunkGridFromBoundaries(
 
 function grillBandsInPose(model: TempestModel, pose: TempestPrintablePose, radius: number): AxisBands {
   const bands: AxisBands = { x: [], y: [], z: [] };
-  for (const centre of grillCentresSource(model)) {
-    const [px, py, pz] = toPose(centre, pose);
+  for (const face of grillFacesSource(model)) {
+    const [px, py, pz] = toPose(face.centre, pose);
     bands.x.push([px - radius, px + radius]);
     bands.y.push([py - radius, py + radius]);
     bands.z.push([pz - radius, pz + radius]);
@@ -115,23 +130,30 @@ function grillBandsInPose(model: TempestModel, pose: TempestPrintablePose, radiu
   return bands;
 }
 
-// Fan-grill centres in source (model) coordinates. Wall positions are local to
-// each wall, so they are mapped through the same placement the geometry uses.
-function grillCentresSource(model: TempestModel): GrillCentre[] {
+// A fan-grill face in a chunk: its centre and outward normal. Auto-orientation
+// forces a chunk's single grill face down (its outward normal to -Z) so the hex
+// grill prints support-free; the chunker caps the axis of that normal at the bed
+// height so the chunk fits when laid that way.
+export type GrillFace = { readonly centre: GrillCentre; readonly normal: GrillCentre };
+
+// Fan-grill faces (centre + outward normal) in source (model) coordinates. Wall
+// positions are local to each wall, so they are mapped through the same placement
+// the geometry uses. Each wall's outward normal points away from the box interior.
+function grillFacesSource(model: TempestModel): GrillFace[] {
   const { box, frame } = model;
   return matchTopology(model, {
     sandwich: ({ fanLayout }) => {
       const z = frame.outsideFlangeThickness + fanLayout.localVerticalCenter;
       const wall = frame.wallThickness / 2;
-      // The "Back" grid lies flat in the bottom plate (normal +z), centred on its
-      // thickness.
+      // The "Back" grid lies flat in the bottom plate (outward normal -z), centred on
+      // its thickness.
       const plateZ = frame.outsideFlangeThickness / 2;
       return [
-        ...fanLayout.walls.front.positionsAlongWall.map((p): GrillCentre => [p, wall, z]),
-        ...fanLayout.walls.back.positionsAlongWall.map((p): GrillCentre => [box.width - p, box.depth - wall, z]),
-        ...fanLayout.walls.left.positionsAlongWall.map((p): GrillCentre => [wall, box.depth - p, z]),
-        ...fanLayout.walls.right.positionsAlongWall.map((p): GrillCentre => [box.width - wall, p, z]),
-        ...fanLayout.bottomPlate.positions.map(({ x, y }): GrillCentre => [x, y, plateZ]),
+        ...fanLayout.walls.front.positionsAlongWall.map((p): GrillFace => ({ centre: [p, wall, z], normal: [0, -1, 0] })),
+        ...fanLayout.walls.back.positionsAlongWall.map((p): GrillFace => ({ centre: [box.width - p, box.depth - wall, z], normal: [0, 1, 0] })),
+        ...fanLayout.walls.left.positionsAlongWall.map((p): GrillFace => ({ centre: [wall, box.depth - p, z], normal: [-1, 0, 0] })),
+        ...fanLayout.walls.right.positionsAlongWall.map((p): GrillFace => ({ centre: [box.width - wall, p, z], normal: [1, 0, 0] })),
+        ...fanLayout.bottomPlate.positions.map(({ x, y }): GrillFace => ({ centre: [x, y, plateZ], normal: [0, 0, -1] })),
       ];
     },
     quad: ({ fanLayout, filterLayout }) => {
@@ -140,7 +162,7 @@ function grillCentresSource(model: TempestModel): GrillCentre[] {
         return [];
       }
       const z = box.height - filterLayout.topPlateThickness / 2;
-      return fanLayout.positionsX.flatMap((x) => fanLayout.positionsY.map((y): GrillCentre => [x, y, z]));
+      return fanLayout.positionsX.flatMap((x) => fanLayout.positionsY.map((y): GrillFace => ({ centre: [x, y, z], normal: [0, 0, 1] })));
     },
   });
 }
@@ -150,6 +172,58 @@ function toPose([x, y, z]: GrillCentre, pose: TempestPrintablePose): GrillCentre
     return [x, pose.envelope.depth - z, y];
   }
   return [x, y, z];
+}
+
+// A direction transforms by the pose's linear part only (no translation): the
+// upright pose maps source (x,y,z) to (x, depth - z, y), so a normal (nx,ny,nz)
+// maps to (nx, -nz, ny).
+function toPoseNormal([nx, ny, nz]: GrillCentre, pose: TempestPrintablePose): GrillCentre {
+  // Normalize -0 to 0 so the normals compare cleanly (negating a 0 component yields -0).
+  const noNegZero = (value: number): number => (value === 0 ? 0 : value);
+  if (pose.type === "upright-dual-filter") {
+    return [noNegZero(nx), noNegZero(-nz), noNegZero(ny)];
+  }
+  return [noNegZero(nx), noNegZero(ny), noNegZero(nz)];
+}
+
+// Grill faces (centre + outward normal) mapped into the posed (cut) frame the chunks
+// are cut and printed in.
+export function grillFacesInPose(model: TempestModel, pose: TempestPrintablePose): GrillFace[] {
+  return grillFacesSource(model).map((face) => ({ centre: toPose(face.centre, pose), normal: toPoseNormal(face.normal, pose) }));
+}
+
+// The single outward grill-face normal (pose frame) a chunk in [origin, origin+size]
+// carries, or undefined when it has no grill or grills on two or more distinct faces
+// (which cannot all face down, so those fall back to plain auto-orientation).
+export function grillDownNormalForChunk(
+  faces: readonly GrillFace[],
+  origin: readonly number[],
+  size: readonly number[],
+): GrillCentre | undefined {
+  const eps = 1e-3;
+  const inside = (c: GrillCentre): boolean =>
+    [0, 1, 2].every((i) => c[i] >= origin[i] - eps && c[i] <= origin[i] + size[i] + eps);
+  const key = (n: GrillCentre): string => `${Math.sign(n[0])},${Math.sign(n[1])},${Math.sign(n[2])}`;
+  const distinct = new Map<string, GrillCentre>();
+  for (const face of faces) {
+    if (inside(face.centre)) {
+      distinct.set(key(face.normal), face.normal);
+    }
+  }
+  return distinct.size === 1 ? [...distinct.values()][0] : undefined;
+}
+
+// Which pose axes are the outward normal of some grilled wall. The chunker caps those
+// axes at the bed height so a grilled chunk still fits once laid grill-down (that axis
+// becomes vertical). This is why toggling the hex grill can change the plate count.
+function grillNormalPoseAxes(faces: readonly GrillFace[]): { x: boolean; y: boolean; z: boolean } {
+  const axes = { x: false, y: false, z: false };
+  for (const { normal } of faces) {
+    axes.x = axes.x || normal[0] !== 0;
+    axes.y = axes.y || normal[1] !== 0;
+    axes.z = axes.z || normal[2] !== 0;
+  }
+  return axes;
 }
 
 // #######################################
