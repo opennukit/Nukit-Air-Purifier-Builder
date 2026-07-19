@@ -458,6 +458,22 @@ export function createPartsListItems(
       detail: "Measured width x length x thickness",
     },
     ...baseItems,
+    // Laser-cut and hand-cut boxes are PC-case thin, so the fans' own bundled screws
+    // (or push-in silicone pins) reach; no longer bolts like the thick 3D print.
+    ...(isCutSheetExportFormat(currentFabricationMethod)
+      ? [
+          {
+            category: "Fasteners",
+            label: "Fan screws",
+            detail: "You can use the M5 self-tapping screws that come with the fans or silicone pins.",
+            detailSegments: [
+              "You can use the M5 self-tapping screws that come with the fans or ",
+              { text: "silicone pins", url: "https://www.amazon.com/s?k=silicone%2Bpc%2Bcase%2Bfan%2Bpins" },
+              ".",
+            ],
+          } satisfies PartsListItem,
+        ]
+      : []),
     ...laserSheetPartsItems(currentLayout, currentFabricationMethod),
   ];
 }
