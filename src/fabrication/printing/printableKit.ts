@@ -312,8 +312,8 @@ export const printVolumePresets: readonly PrintVolumePreset[] = [
   },
   {
     id: "bed-256",
-    label: "256 x 256 x 256 mm",
-    bed: { type: "bounded", width: 256, depth: 256, height: 256 },
+    label: "256 x 256 x 250 mm",
+    bed: { type: "bounded", width: 256, depth: 256, height: 250 },
   },
   {
     id: "bed-300",

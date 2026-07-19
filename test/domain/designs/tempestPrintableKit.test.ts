@@ -32,12 +32,12 @@ describe("Tempest CSG printable kit", () => {
     // preview shows exactly what the per-chunk ZIP exports.
     for (const placement of placements) {
       const source = kit.parts.find((part) => part.id === placement.part.id)!;
-      expect(dims(placement.part)).toEqual(dims(orientPrintablePart(source)));
+      expect(dims(placement.part)).toEqual(dims(orientPrintablePart(source, kit.preset.bed)));
     }
     // The kit itself is untouched (assembled view keeps assembly pose), and the
     // orientation actually does something: at least one chunk is re-oriented.
     const rotatedCount = kit.parts.filter(
-      (part) => JSON.stringify(dims(part)) !== JSON.stringify(dims(orientPrintablePart(part))),
+      (part) => JSON.stringify(dims(part)) !== JSON.stringify(dims(orientPrintablePart(part, kit.preset.bed))),
     ).length;
     expect(rotatedCount).toBeGreaterThan(0);
   });
@@ -117,9 +117,11 @@ describe("Tempest CSG printable kit", () => {
       "bed-256",
     );
 
-    expect(kit.parts).toHaveLength(18);
+    // The tall four-side tower splits into more chunks on the 250 mm usable-Z bed
+    // (bed-256 preset) than it did at a full 256 mm.
+    expect(kit.parts).toHaveLength(22);
     expect(Object.keys(kit.summary).sort()).toEqual(["fragilePartNames", "materialVolumeMm3", "oversizedPartCount", "partCount"]);
-    expect(kit.summary.partCount).toBe(18);
+    expect(kit.summary.partCount).toBe(22);
     expect(kit.summary.oversizedPartCount).toBe(0);
     expect(kit.summary.materialVolumeMm3).toBeGreaterThan(0);
     expect(kit.parts.every((part) => part.width <= 256 && part.depth <= 256 && part.height <= 256)).toBe(true);
