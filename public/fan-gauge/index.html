@@ -129,6 +129,8 @@
   footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
   footer.site-footer .cc-badge { display: inline-block; margin-bottom: 8px; }
   footer.site-footer p a { color: inherit; }
+  .section-head { margin: 36px 0 16px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .section-head .section-title { margin: 2px 0 6px; font-size: clamp(1.4rem, 2.4vw, 1.8rem); letter-spacing: -0.01em; }
   .card h3 { display: flex; align-items: baseline; gap: 8px; margin: 24px 0 6px; font-size: 1.02rem; }
   .card h3:first-of-type { margin-top: 4px; }
   .card h3 .n { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.8rem; font-weight: 700; }
@@ -234,6 +236,12 @@
     <p>Set the same <b>fan size</b> in the calculator below and type the four readings into the fields. It shows the estimate:
       <b>dead-head static pressure</b> (mm H&#8322;O and Pa) and <b>free-air flow</b> (m&sup3;/h and CFM), plus the plotted curve.</p>
   </section>
+
+  <div class="section-head">
+    <p class="eyebrow">The calculator</p>
+    <h2 class="section-title">Enter your readings</h2>
+    <p class="note" style="margin-top:0">Fill in the four pressure readings you took above. The estimate and P-Q curve update as you type.</p>
+  </div>
 
   <section class="card">
     <h2><span class="step">1</span>Test fan size</h2>
