@@ -94,6 +94,12 @@
       footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
       footer.site-footer .cc-badge { display: inline-block; margin-bottom: 8px; }
       footer.site-footer p a { color: inherit; }
+      .hero { display: block; margin: 16px 0 4px; line-height: 0; }
+      .hero img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 2px; }
+      .figrow { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 2px; }
+      .figrow a { flex: 1 1 0; min-width: 140px; line-height: 0; }
+      .figrow.one a { flex: 0 1 480px; }
+      .figrow img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 2px; }
       @media (max-width: 620px) {
         .calc { grid-template-columns: 1fr; }
         .page { padding: 22px 16px 72px; }
@@ -106,6 +112,9 @@
       <header class="masthead">
         <p class="eyebrow">Clean air delivery rate</p>
         <h1>Measure your filter box's CADR</h1>
+        <a class="hero" href="/cadr-calc/cadr-calc-Hero.jpg" target="_blank" rel="noopener">
+          <img src="/cadr-calc/cadr-calc-Hero.jpg" alt="Measuring a DIY filter box's CADR with a phone barometer">
+        </a>
         <p>
           Estimate how much clean air your DIY filter box actually delivers, using nothing more than the barometer in a
           phone. When the fans run, the box pulls air in through its filters, and the filters resist that flow, so the
@@ -171,9 +180,15 @@
           <h2>How to run the test</h2>
           <ol>
             <li>Install <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a> (free) on a phone that has a barometer, open the <strong>Pressure</strong> experiment, press play, and turn on <strong>Remote Access</strong> so you can read it live from another device on the same Wi-Fi.</li>
-            <li>Seal the phone inside the box. Put it in before you close up the last filter, or slip it through an access port, so the box stays as sealed as it is in normal use. The phone reads the pressure inside the box.</li>
-            <li>With the <strong>fans off</strong>, read the pressure and write it down. This is your baseline; with no flow, the inside of the box is at room pressure.</li>
-            <li>Turn the <strong>fans on</strong> at the speed you normally run them. Wait a few seconds for them to reach full speed, then read the pressure again.</li>
+            <li>Seal the phone inside the box. Put it in before you close up the last filter, or slip it through an access port, so the box stays as sealed as it is in normal use. The phone reads the pressure inside the box.
+              <div class="figrow one"><a href="/cadr-calc/cadr-calc-1.jpg" target="_blank" rel="noopener"><img src="/cadr-calc/cadr-calc-1.jpg" alt="Phone sealed inside the filter box" loading="lazy"></a></div>
+            </li>
+            <li>With the <strong>fans off</strong>, read the pressure and write it down. This is your baseline; with no flow, the inside of the box is at room pressure.
+              <div class="figrow one"><a href="/cadr-calc/cadr-calc-2.jpg" target="_blank" rel="noopener"><img src="/cadr-calc/cadr-calc-2.jpg" alt="Reading the baseline pressure with the fans off" loading="lazy"></a></div>
+            </li>
+            <li>Turn the <strong>fans on</strong> at the speed you normally run them. Wait a few seconds for them to reach full speed, then read the pressure again.
+              <div class="figrow"><a href="/cadr-calc/cadr-calc-3a.jpg" target="_blank" rel="noopener"><img src="/cadr-calc/cadr-calc-3a.jpg" alt="Reading the pressure with the fans running" loading="lazy"></a><a href="/cadr-calc/cadr-calc-3b.jpg" target="_blank" rel="noopener"><img src="/cadr-calc/cadr-calc-3b.jpg" alt="Reading the pressure with the fans running" loading="lazy"></a></div>
+            </li>
             <li>Work quickly. Phone barometers drift as they warm, so take both readings within a minute or so, and write down the center of the small range the reading wanders through rather than waiting for it to settle.</li>
             <li>Enter both readings, the layout, and the filter size above.</li>
           </ol>
