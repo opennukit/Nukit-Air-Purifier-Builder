@@ -2938,7 +2938,7 @@
               </a>
             </li>
             <li>
-              <a href="https://filterboxbuilder.com/fangauge/" target="_blank" rel="noopener">
+              <a href="/fan-gauge/" target="_blank" rel="noopener">
                 Test a PC fan's pressure and flow (P-Q)
               </a>
             </li>
