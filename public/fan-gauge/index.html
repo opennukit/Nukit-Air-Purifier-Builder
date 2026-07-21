@@ -129,6 +129,14 @@
   footer.site-footer { margin-top: 26px; color: var(--muted); font-size: 0.86rem; }
   footer.site-footer .cc-badge { display: inline-block; margin-bottom: 8px; }
   footer.site-footer p a { color: inherit; }
+  .card h3 { display: flex; align-items: baseline; gap: 8px; margin: 24px 0 6px; font-size: 1.02rem; }
+  .card h3:first-of-type { margin-top: 4px; }
+  .card h3 .n { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.8rem; font-weight: 700; }
+  .figrow { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .figrow a { flex: 1 1 0; min-width: 140px; line-height: 0; }
+  .figrow img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; display: block; }
+  .card ol { margin: 8px 0 0; padding-left: 22px; font-size: 0.9rem; line-height: 1.55; }
+  .card ol li { margin: 5px 0; }
   @media (max-width: 620px) {
     .page { padding: 22px 16px 72px; }
     section.card { padding: 22px 20px; }
@@ -152,30 +160,79 @@
 
   <main>
   <section class="card">
-    <h2>How to measure</h2>
+    <h2>What you need</h2>
     <ul>
-      <li><b>3D print your plenum.</b> Download the plenum (testing box) and sliding cover for your fan size from the
-        <a href="/plenum-builder.html" target="_blank" rel="noopener">Plenum Builder</a>. You will need a
-        <a href="https://www.amazon.com/s?k=silicone+120+140+fan+gasket" target="_blank" rel="noopener">fan gasket</a>;
-        if you cannot purchase one, the Plenum Builder will let you 3D print a serviceable one in 90A Shore TPU.</li>
-      <li><b>Set up phyphox.</b> On your <a href="https://play.google.com/store/apps/details?id=de.rwth_aachen.phyphox" target="_blank" rel="noopener">Android</a>
-        or <a href="https://apps.apple.com/app/phyphox/id1127319693" target="_blank" rel="noopener">iOS</a> phone, open
-        <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a>, choose <b>Pressure</b>, press play, and turn on
-        <b>Remote Access</b>. Note the IP address, and confirm you can open its page from another device's browser on the
-        same Wi-Fi network (it will not work over mobile data).</li>
-      <li><b>Assemble the testing apparatus.</b> Plug the fan into your power supply to verify that it works. Lay the
-        plenum on a flat, stable surface with <b>all ports covered</b> and facing up. Place the phone
-        inside the plenum. Attach the unplugged fan and gasket to the plenum with screws, ensuring that the fan is blowing
-        <b>outward</b>. Make sure the sliding door opens and closes fully and is not blocked by the fan gasket.</li>
-      <li><b>Baseline (fan off).</b> Read the pressure in the remote browser, from the phone running phyphox inside the plenum. The value cycles through a range; write down
-        the <b>center</b> of that range. Don't wait for it to settle; it only keeps drifting.</li>
-      <li><b>Closed.</b> Turn the fan on, wait ~10&nbsp;s to reach full speed, then record the center reading.</li>
-      <li><b>1 port.</b> Slide one port open to the debossed line, wait ~5&nbsp;s, then record the center reading.</li>
-      <li><b>2 ports.</b> Open the second port, wait ~5&nbsp;s, then record the center reading.</li>
-      <li><b>Type the four readings</b> into the fields below.</li>
+      <li>A <b>3D printer</b> and filament (PLA or PETG for the plenum and cover).</li>
+      <li>A <b>fan gasket</b>. A <a href="https://www.amazon.com/s?k=silicone+120+140+fan+gasket" target="_blank" rel="noopener">commercial silicone fan gasket</a>
+        is strongly preferred: it seals better, compresses evenly, and lasts far longer. Only as a last resort, print one in
+        <b>90A Shore TPU or softer</b> (the builder generates one sized to your fan).</li>
+      <li>The <b>120&nbsp;mm or 140&nbsp;mm fan</b> you want to test.</li>
+      <li>A <b>12&nbsp;V supply</b> for the fan (a bench supply, a 12&nbsp;V adapter, or a PWM controller for set speeds).</li>
+      <li>An <b>Android or iOS phone</b> with a barometer, running <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a> (free, from RWTH Aachen).</li>
+      <li><b>M4 self-tapping screws</b>, or <a href="https://cybernightmarket.com/products/heat-set-insert-press" target="_blank" rel="noopener">heat-set threaded inserts</a>
+        plus M4 machine screws for a plenum that survives many fan swaps (recommended: self-tapping screws will eventually strip the plastic).</li>
     </ul>
+  </section>
+
+  <section class="card">
+    <h2>How to measure</h2>
+    <p class="note" style="margin-top:0">Build the gauge, run the fan against it, and read the pressure at three door positions. Work fast: each measurement run should take under about 30 seconds.</p>
+
+    <h3><span class="n">1</span>Build and print the box</h3>
+    <p>Open the <a href="/plenum-builder.html" target="_blank" rel="noopener">Plenum Builder</a>. Choose your <b>fan size</b> (120 or 140&nbsp;mm),
+      then use the <b>Part</b> dropdown to export each STL: <b>Plenum</b> (the box), <b>Dovetail cover</b> (the sliding door), and <b>Fan gasket</b>.
+      A live <b>print estimate</b> (dimensions and filament) shows for each part. Everything prints support-free: plenum upright with the fan opening
+      up, cover flat, gasket flat. Print the gasket (in soft TPU) only if you cannot get a commercial silicone one, which is strongly preferred.</p>
+    <div class="figrow">
+      <a href="/fangauge/images/fan-gauge-slicer-plenum.png" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-slicer-plenum.png" alt="Plenum laid out in the slicer" loading="lazy"></a>
+      <a href="/fangauge/images/fan-gauge-slicer-door.png" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-slicer-door.png" alt="Sliding door laid out in the slicer" loading="lazy"></a>
+    </div>
+    <p class="note">A well-fitted door provides the best seal and holds by friction alone: you should be able to turn the plenum upside-down and
+      shake it gently without the door falling out. If it does, print additional doors, adjusting the <b>door-fit</b> sliders between them, until one
+      slides on smoothly but firmly and stays in place. If you want heat-set inserts, enable <b>Heat-set threaded inserts</b> and set the seat
+      diameter and depth to match your inserts (the tooltips explain the sizing).</p>
+
+    <h3><span class="n">2</span>Set up phyphox</h3>
+    <p>On your <a href="https://play.google.com/store/apps/details?id=de.rwth_aachen.phyphox" target="_blank" rel="noopener">Android</a>
+      or <a href="https://apps.apple.com/app/phyphox/id1127319693" target="_blank" rel="noopener">iOS</a> phone, open
+      <a href="https://phyphox.org/" target="_blank" rel="noopener">phyphox</a>, choose <b>Pressure</b>, press play, and turn on
+      <b>Remote Access</b>. Note the IP address it shows, and confirm you can open that page from another device's browser
+      <b>on the same Wi-Fi network</b> (it will not work over mobile data).</p>
+    <div class="figrow">
+      <a href="/fangauge/images/phyphox-1-pressure.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-1-pressure.png" alt="phyphox Pressure experiment" loading="lazy"></a>
+      <a href="/fangauge/images/phyphox-2-start.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-2-start.png" alt="phyphox measurement running" loading="lazy"></a>
+      <a href="/fangauge/images/phyphox-3-remote_access.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-3-remote_access.png" alt="phyphox Remote Access enabled" loading="lazy"></a>
+    </div>
+
+    <h3><span class="n">3</span>Assemble</h3>
+    <p>Plug the fan into your supply to confirm it spins. Lay the plenum on a flat, stable surface with the ports <b>covered and facing up</b>.
+      Place the phone inside, then screw the fan and gasket on so the fan blows <b>outward</b>. Check that the sliding door opens and closes fully
+      and is not blocked by the gasket.</p>
+    <div class="figrow">
+      <a href="/fangauge/images/fan-gauge-setup-1.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-1.jpg" alt="Fan gauge assembly" loading="lazy"></a>
+      <a href="/fangauge/images/fan-gauge-setup-2.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-2.jpg" alt="Fan gauge assembly" loading="lazy"></a>
+    </div>
+
+    <h3><span class="n">4</span>Take the readings</h3>
+    <p>The barometer drifts constantly, so work fast and write down the <b>center</b> of the range the reading cycles through. Do not wait for it to settle.</p>
+    <ol>
+      <li><b>Baseline:</b> fan off, read the ambient pressure (hPa).</li>
+      <li><b>Closed:</b> fan on, wait about 10&nbsp;s for full speed, read.</li>
+      <li><b>1 port:</b> slide the door to the debossed line, wait about 5&nbsp;s, read.</li>
+      <li><b>2 ports:</b> open the second port, read.</li>
+    </ol>
+    <div class="figrow">
+      <a href="/fangauge/images/fan-gauge-setup-3.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-3.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fangauge/images/fan-gauge-setup-4.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-4.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fangauge/images/fan-gauge-setup-5.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-5.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fangauge/images/fan-gauge-setup-6.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-6.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+    </div>
     <div class="note big"><b>Keep the whole run under 30 seconds</b> (baseline through 2 ports); the barometer drifts the
       entire time, so speed beats waiting for a stable number.</div>
+
+    <h3><span class="n">5</span>Read the result</h3>
+    <p>Set the same <b>fan size</b> in the calculator below and type the four readings into the fields. It shows the estimate:
+      <b>dead-head static pressure</b> (mm H&#8322;O and Pa) and <b>free-air flow</b> (m&sup3;/h and CFM), plus the plotted curve.</p>
   </section>
 
   <section class="card">
