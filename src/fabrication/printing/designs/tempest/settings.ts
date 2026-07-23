@@ -1,10 +1,14 @@
-import { defaultTempestSettings } from "@/domain/designs/tempest/model";
+import { createTempestModel, defaultTempestSettings } from "@/domain/designs/tempest/model";
 import {
   type TempestBoxExhaust,
   type TempestFanCountRequest,
   type TempestSettings,
 } from "@/domain/designs/tempest/shared";
+import { recommendedTowerFeetLengthMm } from "@/domain/purifier/cadr";
 import type { PurifierSettings } from "@/domain/purifier/settingsModel";
+
+// Sentinel: feetLength === -1 means "Auto" (resolve from the bottom fan/filter flow).
+const AUTO_FEET_LENGTH = -1;
 import type { FanCountRequest as PurifierFanCountRequest } from "@/domain/purifier/fans";
 import type { FilterDimensions } from "@/domain/purifier/filter";
 import type { LayoutResult } from "@/fabrication/purifierLayout";
@@ -14,6 +18,38 @@ export function createTempestSettingsFromLayout(layout: LayoutResult): TempestSe
 }
 
 export function createTempestSettingsFromConfiguration(configuration: PurifierSettings): TempestSettings {
+  const settings = buildTempestSettings(configuration);
+  if (
+    settings.arrangement.type !== "four-side-filter-tower" ||
+    settings.arrangement.feetLength !== AUTO_FEET_LENGTH
+  ) {
+    return settings;
+  }
+  // Auto feet: probe the model (feet at 0; footprint and fan grid are feet-
+  // independent) to read the box footprint and bottom fan count, then size the
+  // legs so the perimeter intake curtain does not choke the bottom flow.
+  const probe = createTempestModel({
+    ...settings,
+    arrangement: { ...settings.arrangement, feetLength: 0 },
+  });
+  const feetLength =
+    probe.fanLayout.topology === "quad" && probe.filterLayout.topology === "quad"
+      ? recommendedTowerFeetLengthMm({
+          boxWidthMm: probe.box.width,
+          boxDepthMm: probe.box.depth,
+          structuralOffsetMm: probe.filterLayout.structuralOffset,
+          fanCount:
+            probe.fanLayout.bottomFanCount > 0
+              ? probe.fanLayout.bottomFanCount
+              : probe.fanLayout.fanCount,
+          group: configuration.fan.spec.diameter >= 135 ? "140" : "120",
+          active: probe.fanLayout.bottomFanCount > 0 || probe.filterLayout.bottomFilter,
+        })
+      : 100;
+  return { ...settings, arrangement: { ...settings.arrangement, feetLength } };
+}
+
+function buildTempestSettings(configuration: PurifierSettings): TempestSettings {
   const design = requireTempestDesign(configuration);
   // Hole depth and spacing keep their built-in defaults; only the pin diameter is
   // user-adjustable (0 disables the pins). Fall back to fixed values if the

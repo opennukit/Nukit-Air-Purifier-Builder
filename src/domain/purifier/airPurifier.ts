@@ -191,7 +191,9 @@ export function normalizeRawSettings(
     boxDepth: normalizeBoxDepth(input.boxDepth),
     alignmentPinDiameter: normalizeAlignmentPinDiameter(input.alignmentPinDiameter),
     bottomFilter: input.bottomFilter,
-    feetLength: normalizeFeetLength(input.feetLength),
+    // -1 is the "Auto" sentinel (resolved to a concrete height at the geometry
+    // boundary from the bottom fan/filter flow); preserve it, else clamp.
+    feetLength: input.feetLength === -1 ? -1 : normalizeFeetLength(input.feetLength),
     // CADR fan model + custom specs: display-only, dropped by toRawSettings, so
     // restore them from the original input (non-negative).
     fanModel: input.fanModel,
@@ -685,7 +687,9 @@ function createConfiguredPrintDesign(input: {
       boxDepth: normalizeBoxDepth(input.raw.boxDepth),
       alignmentPinDiameter: normalizeAlignmentPinDiameter(input.raw.alignmentPinDiameter),
       bottomFilter: input.raw.bottomFilter,
-      feetLength: normalizeFeetLength(input.raw.feetLength),
+      // Carry the -1 "Auto" sentinel through the design so it survives draft
+      // round-trips; settings.ts resolves it to a concrete height for geometry.
+      feetLength: input.raw.feetLength === -1 ? -1 : normalizeFeetLength(input.raw.feetLength),
       ...normalizeTempestExhaustFields(input.raw),
     };
   }

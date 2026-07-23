@@ -418,6 +418,10 @@
   // Box/exhaust applies only to the four-side tower; show it alongside 120/140 mm
   // whenever that layout is selected (no need to open Advanced).
   $: showBoxExhaustOption = isFourFilterTower;
+  // Foot length auto: feetLength -1 = Auto; the resolved concrete height comes from
+  // the layout (sized from the bottom fan/filter flow, or 100 mm when neither).
+  $: feetLengthIsAuto = settings.feetLength < 0;
+  $: resolvedFeetLengthMm = layout.towerFeetLengthMm;
   // Fan-placement checkboxes: all four walls for the horizontal layouts; only
   // "Top" for the four-side tower (its other faces are filters), where it
   // toggles the top-panel fan grid.
@@ -859,9 +863,17 @@
   // geometric effect and must not silently add feet the user then has to remove.
   function updateBottomFilter(event: Event): void {
     const enabled = readCheckboxInput(event);
-    const squareFace = Math.abs(settings.filterWidth - settings.filterDepth) <= 1;
-    const feetLength = enabled && squareFace ? 100 : 0;
-    commitSettings({ ...settings, bottomFilter: enabled, feetLength });
+    // Feet stay on Auto (feetLength -1): with the bottom filter on, Auto sizes the
+    // legs from the flow so air can reach the underside; off, Auto is 100 mm.
+    commitSettings({ ...settings, bottomFilter: enabled });
+  }
+
+  // Auto foot length: -1 means the length is resolved from the bottom fan/filter
+  // flow (shown as the resolved value). Unchecking Auto freezes it to that value
+  // as a manual number the user can then edit.
+  function updateFeetAuto(event: Event): void {
+    const auto = readCheckboxInput(event);
+    commitSettings({ ...settings, feetLength: auto ? -1 : Math.max(0, layout.towerFeetLengthMm) });
   }
 
   function updatePreviewMaterialColor(color: PreviewMaterialColorId): void {
@@ -893,18 +905,9 @@
   // Advanced write the same setting and so override this.
   function updateFanAuto(name: FanCountSettingName, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
-    // Turning on the tower's bottom fan plate raises the box on feet by default so
-    // the intake can breathe (matches the bottom-filter default; the user can still
-    // adjust). Turning it off drops the feet back to zero.
-    if (name === "fansBottom" && isFourFilterTower) {
-      commitSettings({
-        ...settings,
-        fansBottom: checked ? automaticFanCount : 0,
-        feetLength: checked ? 100 : 0,
-      });
-      return;
-    }
     commitSettings({ ...settings, [name]: checked ? automaticFanCount : 0 });
+    // Feet default to Auto (feetLength -1), which sizes itself from the resolved
+    // bottom-fan/filter flow, so toggling the bottom fan needs no feet handling here.
   }
 
   // The "Back" placement checkbox toggles the bottom-plate fan grid: checked =
@@ -2550,7 +2553,7 @@
                     {/each}
                     {#if isFourFilterTower}
                       <label class="field">
-                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Set to 0 for no feet. Turning on the bottom filter raises this to 100 mm so air can reach it.")}</span>
+                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Auto sizes them from the bottom fan or filter airflow so the intake gap around the base doesn't restrict it (about 100 mm when there's no bottom fan or filter). Uncheck Auto to set your own length; 0 removes the feet.")}</span>
                         <span class="input-shell">
                           <input
                             type="number"
@@ -2559,11 +2562,17 @@
                             max="500"
                             step="1"
                             inputmode="decimal"
-                            value={settings.feetLength}
+                            value={feetLengthIsAuto ? "" : settings.feetLength}
+                            placeholder={feetLengthIsAuto ? `Auto (${resolvedFeetLengthMm})` : ""}
+                            disabled={feetLengthIsAuto}
                             onchange={(event) => updateNumberSetting("feetLength", event)}
                           />
                           <small>mm</small>
                         </span>
+                      </label>
+                      <label class="toggle-field">
+                        <input type="checkbox" name="feetAuto" checked={feetLengthIsAuto} onchange={updateFeetAuto} />
+                        <span>Auto foot length</span>
                       </label>
                     {/if}
                     {#if selectedFanSizeChoice === "box-exhaust"}

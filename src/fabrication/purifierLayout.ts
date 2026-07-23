@@ -60,6 +60,9 @@ export type LayoutResult = {
   readonly configuration: PurifierSettings;
   readonly fabrication: LayoutFabricationPlan;
   readonly summary: BuildSummary;
+  // Resolved four-side-tower foot length (mm), with "Auto" already resolved to a
+  // concrete height. 0 for non-tower builds. Lets the UI show the auto value.
+  readonly towerFeetLengthMm: number;
 };
 
 export function createLayout(input: RawPurifierSettings | PurifierDraft): LayoutResult {
@@ -88,12 +91,22 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     cadr: estimateBuildCadr({ configuration, rawSettings: settings, fanCount: totalFanCount(fans) }),
   };
 
+  const towerSettings =
+    configuration.design.type === "tempest"
+      ? createTempestSettingsFromConfiguration(configuration)
+      : undefined;
+  const towerFeetLengthMm =
+    towerSettings?.arrangement.type === "four-side-filter-tower"
+      ? towerSettings.arrangement.feetLength
+      : 0;
+
   return {
     settingsDraft,
     rawSettings: settings,
     configuration,
     fabrication,
     summary,
+    towerFeetLengthMm,
   };
 }
 

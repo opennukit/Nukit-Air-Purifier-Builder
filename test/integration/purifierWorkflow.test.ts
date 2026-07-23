@@ -680,7 +680,9 @@ describe("FilterBoxBuilder purifier workflow", () => {
     // 290 face + 2*0.6 fit clearance + 2*40.6 structural offset (10 flange +
     // 25.6 pocket + 5 wall).
     expect(towerModel.box.width).toBeCloseTo(372.4);
-    expect(towerModel.box.height).toBe(305);
+    // 305 body + 100 Auto feet: with no bottom fan or filter, Auto foot length
+    // (the default) resolves to 100 mm.
+    expect(towerModel.box.height).toBe(405);
     expect(towerLayout.summary.fans.type === "tempest" ? towerLayout.summary.fans.fanCount : undefined).toBe(4);
     expect(towerModel.chunkGrid.totalCount).toBe(8);
     expect(printExport.filename).toBe("nukit-filterboxbuilder.3mf");

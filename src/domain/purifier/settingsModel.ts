@@ -645,7 +645,7 @@ export const defaultSettings: RawPurifierSettings = {
   boxDepth: 70,
   alignmentPinDiameter: 2,
   bottomFilter: false,
-  feetLength: 0,
+  feetLength: -1, // -1 = Auto (flow-based when a bottom fan/filter is present, else 100 mm)
   topExhaust: "fan-grid",
   // Box/exhaust sizes are concrete diameters, auto-populated from the filter
   // width (fan hole 70%, ring 1 80%, ring 2 90%) — here for the default width.

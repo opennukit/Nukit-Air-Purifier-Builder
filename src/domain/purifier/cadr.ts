@@ -167,6 +167,42 @@ export function findBoxFanModel(id: string): BoxFanModel | undefined {
   return BOX_FAN_MODELS.find((model) => model.id === id);
 }
 
+// Recommended four-side-tower foot length (mm) so the perimeter intake "curtain"
+// under the raised box does not restrict the bottom fan/filter flow. The air the
+// bottom draws enters through the gap around the base, an orifice in series with
+// the fans; sizing that gap so its velocity stays low (~2 m/s) keeps its loss to a
+// couple of Pa. h = Q / (v * P): total bottom flow over curtain velocity times the
+// open base perimeter (minus the four corner legs). Returns 100 mm when there is no
+// bottom fan or filter to feed. Uses the size group's representative fan free-air,
+// so it is a robust default the user can override.
+const FEET_CURTAIN_VELOCITY_MPS = 2;
+const FEET_MIN_MM = 40;
+const FEET_PLAIN_MM = 100;
+
+export function recommendedTowerFeetLengthMm(p: {
+  readonly boxWidthMm: number;
+  readonly boxDepthMm: number;
+  readonly structuralOffsetMm: number;
+  readonly fanCount: number;
+  readonly group: FanGroup;
+  readonly active: boolean;
+}): number {
+  if (!p.active) {
+    return FEET_PLAIN_MM;
+  }
+  const q0 = findPcFanModel(DEFAULT_PC_FAN_ID[p.group])?.q0 ?? 0;
+  if (p.fanCount <= 0 || q0 <= 0) {
+    return FEET_PLAIN_MM;
+  }
+  const qM3s = (p.fanCount * q0) / 3600;
+  const perimeterM = (2 * (p.boxWidthMm + p.boxDepthMm) - 8 * p.structuralOffsetMm) / 1000;
+  if (perimeterM <= 0) {
+    return FEET_PLAIN_MM;
+  }
+  const hMm = (qM3s / (FEET_CURTAIN_VELOCITY_MPS * perimeterM)) * 1000;
+  return Math.min(500, Math.max(FEET_MIN_MM, Math.round(hMm)));
+}
+
 // ##############################
 // Filter / fan physics
 // ##############################

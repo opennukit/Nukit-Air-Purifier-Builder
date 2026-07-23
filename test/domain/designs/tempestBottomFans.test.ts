@@ -7,6 +7,7 @@ import {
 } from "@/domain/designs/tempest/model";
 import type { TempestFanCountRequest, TempestSettings } from "@/domain/designs/tempest/shared";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
+import { recommendedTowerFeetLengthMm } from "@/domain/purifier/cadr";
 import { normalizeRawSettings } from "@/domain/purifier/airPurifier";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { cleanManifold, manifoldReport, meshVolume } from "../../helpers/manifoldChecks";
@@ -79,6 +80,34 @@ describe("tower bottom fan grille (CSG)", () => {
     // The grille cut removes solid, so the bottom-fan body has less volume.
     expect(meshVolume(withBottom.parts[0].mesh)).toBeLessThan(meshVolume(withoutBottom.parts[0].mesh));
   }, 30000);
+});
+
+describe("tower auto foot length", () => {
+  test("returns 100 mm when there is no bottom fan or filter", () => {
+    expect(
+      recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 0, group: "140", active: false }),
+    ).toBe(100);
+  });
+
+  test("sizes the legs from the bottom-fan flow (curtain velocity ~2 m/s)", () => {
+    // 16 x 140 mm fans on an 832 mm base: ~0.54 m3/s over a ~2.9 m perimeter at
+    // 2 m/s is roughly 90 mm.
+    const h = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, group: "140", active: true });
+    expect(h).toBeGreaterThan(60);
+    expect(h).toBeLessThan(130);
+  });
+
+  test("more fans need taller legs", () => {
+    const few = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 4, group: "140", active: true });
+    const many = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, group: "140", active: true });
+    expect(many).toBeGreaterThan(few);
+  });
+
+  test("the -1 Auto sentinel and manual heights both survive normalize", () => {
+    const tower: RawPurifierSettings = { ...defaultSettings, printDesign: "nukit-tempest", tempestArrangement: "four-side-filter-tower", filterWidth: 290, filterDepth: 290 };
+    expect(normalizeRawSettings({ ...tower, feetLength: -1 }).feetLength).toBe(-1);
+    expect(normalizeRawSettings({ ...tower, feetLength: 120 }).feetLength).toBe(120);
+  });
 });
 
 describe("tower bottom fan validation", () => {
