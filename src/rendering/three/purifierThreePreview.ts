@@ -1414,20 +1414,22 @@ export class PurifierThreePreview {
             collectFanRotors(fan, this.fanRotors);
           }
         }
-        // Bottom fan grid (mirror of the top), mounted under the chamber floor in
-        // the feet standoff, drawing air up into the chamber.
+        // Bottom fan grid: the mirror of the top grid, recessed just above the
+        // chamber floor (the top of the bottom plate) and facing out the bottom.
+        // Uses the same interior-plane helpers as the sandwich bottom-plate fans.
         const bottomInteriorZ = m.filterLayout.bottomPlateThickness;
-        const bottomFanCenterZ = bottomInteriorZ - fanPreviewRearDepthMillimeters;
+        const bottomFanCenterZ = bottomInteriorZ + fanPreviewRearDepthMillimeters;
         for (const x of fanLayout.bottomPositionsX) {
           for (const y of fanLayout.bottomPositionsY) {
             const fan = createFan({
               axis: tempestCsgAxisToSceneAxis("z", pose),
               position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
               radius: (model.settings.fan.diameter / 2) * sceneScale,
-              facing: "axis-negative",
+              facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
               appearance: fanAppearance,
             });
             fan.userData["tempestPreviewFan"] = true;
+            moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
             this.parentPreviewFanToChunk(fan, chunkBoxes);
             if (exploded) {
               explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
