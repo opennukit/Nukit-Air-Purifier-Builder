@@ -125,6 +125,10 @@ export type FanConfiguration = {
   spec: FanSpec;
   color: FanColor;
   banks: FanBanks<FanCountRequest>;
+  // Resolved free-air airflow of the selected PC fan model (m³/h), used for
+  // flow-based sizing such as the tower's Auto foot length. Custom fans use their
+  // entered airflow; unknown models fall back to the size default.
+  freeAirM3h: number;
 };
 
 export type SingleFanConfiguration = {

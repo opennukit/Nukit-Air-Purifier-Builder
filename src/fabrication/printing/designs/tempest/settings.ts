@@ -42,7 +42,7 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
             probe.fanLayout.bottomFanCount > 0
               ? probe.fanLayout.bottomFanCount
               : probe.fanLayout.fanCount,
-          group: configuration.fan.spec.diameter >= 135 ? "140" : "120",
+          fanFreeAirM3h: configuration.fan.freeAirM3h,
           active: probe.fanLayout.bottomFanCount > 0 || probe.filterLayout.bottomFilter,
         })
       : 100;

@@ -1,4 +1,5 @@
 import { clampRimForGeometry } from "@/domain/purifier/geometry";
+import { pcFanFreeAirM3h } from "@/domain/purifier/buildCadr";
 import { findFanSpec, type FanConfiguration } from "@/domain/purifier/fans";
 import {
   findPrintDesignPreset,
@@ -87,6 +88,12 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       top: fanCountRequestFromRawSetting(raw.fansTop),
       bottom: fanCountRequestFromRawSetting(raw.fansBottom),
     },
+    freeAirM3h: pcFanFreeAirM3h(
+      raw.fanModel,
+      fanSpec.diameter >= 135 ? "140" : "120",
+      raw.customFanAirflow,
+      filter.width,
+    ),
   };
   const frameConstruction: FilterFrameConstruction = raw.splitFrames
     ? { type: "split-rails" }

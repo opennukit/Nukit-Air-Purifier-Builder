@@ -66,6 +66,23 @@ export function resolveFanModelId(
   return model !== undefined && model.group === group ? fanModel : DEFAULT_PC_FAN_ID[group];
 }
 
+// Resolved free-air airflow (m³/h) of the selected PC fan: the model's rating, the
+// entered custom airflow, or the size default as a fallback. Used for flow-based
+// sizing such as the tower's Auto foot length so it tracks the chosen fan.
+export function pcFanFreeAirM3h(
+  fanModel: string,
+  group: FanGroup,
+  customAirflowM3h: number,
+  filterWidthMm: number,
+): number {
+  const groupDefault = findPcFanModel(DEFAULT_PC_FAN_ID[group])?.q0 ?? 0;
+  const id = resolveFanModelId(fanModel, "pc", group, filterWidthMm);
+  if (id === CUSTOM_FAN_ID) {
+    return customAirflowM3h > 0 ? customAirflowM3h : groupDefault;
+  }
+  return findPcFanModel(id)?.q0 ?? groupDefault;
+}
+
 // Number of filters in the air path (parallel area), by arrangement.
 function buildFilterCount(config: PurifierSettings): number {
   if (config.design.type === "tempest") {

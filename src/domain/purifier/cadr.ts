@@ -184,13 +184,13 @@ export function recommendedTowerFeetLengthMm(p: {
   readonly boxDepthMm: number;
   readonly structuralOffsetMm: number;
   readonly fanCount: number;
-  readonly group: FanGroup;
+  readonly fanFreeAirM3h: number;
   readonly active: boolean;
 }): number {
   if (!p.active) {
     return FEET_PLAIN_MM;
   }
-  const q0 = findPcFanModel(DEFAULT_PC_FAN_ID[p.group])?.q0 ?? 0;
+  const q0 = p.fanFreeAirM3h;
   if (p.fanCount <= 0 || q0 <= 0) {
     return FEET_PLAIN_MM;
   }

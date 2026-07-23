@@ -85,22 +85,22 @@ describe("tower bottom fan grille (CSG)", () => {
 describe("tower auto foot length", () => {
   test("returns 100 mm when there is no bottom fan or filter", () => {
     expect(
-      recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 0, group: "140", active: false }),
+      recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 0, fanFreeAirM3h: 122.2, active: false }),
     ).toBe(100);
   });
 
   test("sizes the legs from the bottom-fan flow (curtain velocity ~2 m/s)", () => {
-    // 16 x 140 mm fans on an 832 mm base: ~0.54 m3/s over a ~2.9 m perimeter at
-    // 2 m/s is roughly 90 mm.
-    const h = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, group: "140", active: true });
+    // 16 x 140 mm fans (122 m3/h free-air each) on an 832 mm base: ~0.54 m3/s over
+    // a ~2.9 m perimeter at 2 m/s is roughly 90 mm.
+    const h = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, fanFreeAirM3h: 122.2, active: true });
     expect(h).toBeGreaterThan(60);
     expect(h).toBeLessThan(130);
   });
 
-  test("more fans need taller legs", () => {
-    const few = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 4, group: "140", active: true });
-    const many = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, group: "140", active: true });
-    expect(many).toBeGreaterThan(few);
+  test("a higher-flow fan needs taller legs", () => {
+    const quiet = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, fanFreeAirM3h: 122.2, active: true });
+    const highFlow = recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 16, fanFreeAirM3h: 193.2, active: true });
+    expect(highFlow).toBeGreaterThan(quiet);
   });
 
   test("the -1 Auto sentinel and manual heights both survive normalize", () => {
