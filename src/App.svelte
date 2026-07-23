@@ -421,8 +421,19 @@
   // Fan-placement checkboxes: all four walls for the horizontal layouts; only
   // "Top" for the four-side tower (its other faces are filters), where it
   // toggles the top-panel fan grid.
+  // The tower shows Top and Bottom fan-plate checkboxes. Bottom fans are 3D-print
+  // only, unavailable in Box/Exhaust, and mutually exclusive with the bottom filter
+  // (hidden while it is on; the bottom filter is likewise hidden while bottom fans
+  // are on).
   $: fanPlacementCheckboxControls = isFourFilterTower
-    ? fanPlacementControls.filter((control) => control.name === "fansTop")
+    ? fanPlacementControls.filter(
+        (control) =>
+          control.name === "fansTop" ||
+          (control.name === "fansBottom" &&
+            fabricationMethod === "print-3mf" &&
+            settings.topExhaust !== "box-exhaust" &&
+            !(settings.bottomFilter && isSquareTowerFilter)),
+      )
     : fanPlacementControls;
   $: showHexGrillControls = isTempestControlsActive && selectedFanSizeChoice !== "box-exhaust";
   // Box/exhaust uses its own ring screws, so the PC-fan screw-hole input is hidden.
@@ -882,6 +893,17 @@
   // Advanced write the same setting and so override this.
   function updateFanAuto(name: FanCountSettingName, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
+    // Turning on the tower's bottom fan plate raises the box on feet by default so
+    // the intake can breathe (matches the bottom-filter default; the user can still
+    // adjust). Turning it off drops the feet back to zero.
+    if (name === "fansBottom" && isFourFilterTower) {
+      commitSettings({
+        ...settings,
+        fansBottom: checked ? automaticFanCount : 0,
+        feetLength: checked ? 100 : 0,
+      });
+      return;
+    }
     commitSettings({ ...settings, [name]: checked ? automaticFanCount : 0 });
   }
 
@@ -2022,7 +2044,7 @@
                         {/each}
                       </div>
                     </fieldset>
-                    {#if isFourFilterTower && isSquareTowerFilter}
+                    {#if isFourFilterTower && isSquareTowerFilter && settings.fansBottom === 0}
                       <fieldset class="fan-placement-field" data-tempest-bottom-filter>
                         <legend>Bottom filter {@render infoTip("info-bottomFilter", "Adds a fifth filter on the underside of the tower for extra airflow. Available for square filters only. Raise the box on feet so air can reach it.")}</legend>
                         <div class="fan-placement-checks">

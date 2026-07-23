@@ -11,6 +11,7 @@ import {
   towerCornerChamfer,
   towerFeet,
   quadTopExhaust,
+  quadBottomFans,
   towerFilterPocket,
   towerFilterSlots,
   towerSideOpening,
@@ -149,6 +150,7 @@ function assembleQuad<Solid, Region>(
       ];
     }),
     ...quadTopExhaust(ctx, model, filterLayout, fanLayout), // 5. top exhaust: fan grid or single box-fan opening
+    ...quadBottomFans(ctx, model, filterLayout, fanLayout), // 5b. bottom fan grid (mirror of the top), when enabled
     ...towerFilterSlots(ctx, model, filterLayout), // 6. slots you push the filters through
     ...quadBottomFilterCuts(ctx, model, filterLayout), // 7. bottom intake filter holder (square filter only)
   ]);

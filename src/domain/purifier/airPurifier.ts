@@ -143,8 +143,32 @@ export function normalizeRawSettings(
     donutFilter.outerDiameter,
     donutFilter.holeDiameter,
   );
+  // Four-side tower bottom fans: mutually exclusive with the bottom filter and
+  // unavailable in Box/Exhaust mode. The bottom filter wins a conflicting link.
+  // Only enforced while the tower is the active design, so a stored bottom-fan
+  // count survives switching to other designs and back.
+  const towerActive =
+    isTempestPrintDesignId(input.printDesign) &&
+    tempestArrangement === "four-side-filter-tower";
+  const squareTowerFilter = Math.abs(input.filterWidth - input.filterDepth) <= 1;
+  const bottomFilterActive = input.bottomFilter && squareTowerFilter;
+  const towerBottomFansOff =
+    towerActive && (input.topExhaust === "box-exhaust" || bottomFilterActive);
+  // The tower historically dropped the bottom bank in the design pipeline, so for a
+  // live tower preserve the raw bottom-fan count (the configuration reads it from
+  // raw.fansBottom directly). Force it to 0 when Box/Exhaust or the bottom filter is
+  // on; leave non-tower designs on the pipeline value.
+  const fansBottom = towerBottomFansOff
+    ? 0
+    : towerActive
+      ? Number.isFinite(input.fansBottom)
+        ? Math.trunc(input.fansBottom)
+        : 0
+      : normalized.fansBottom;
+
   return canonicalizePrintDesignRawSettings({
     ...normalized,
+    fansBottom,
     tempestArrangement,
     tempestDesign: canonicalTempestDesign(input.tempestDesign),
     filterSlotWall: canonicalFilterSlotWall(input.filterSlotWall),
@@ -1001,11 +1025,12 @@ function canonicalizePrintDesignRawSettings(
     return settings;
   }
   const arrangement = canonicalTempestArrangement(settings.tempestArrangement);
-  // The tower has no side-wall fans (those faces are filters), so left/right/
-  // bottom are always 0; "top" is kept so the top-panel fan grid can be toggled
-  // on/off. The 1-top and 2-filter sandwich modes keep all of the user's
-  // per-wall fan counts. A true arrangement switch resets them explicitly via
-  // applyTempestArrangementDefaults in the UI / URL defaults.
+  // The tower has no side-wall fans (those faces are filters), so left/right are
+  // always 0; "top" toggles the top-panel fan grid and "bottom" the bottom fan
+  // plate, so both are preserved (normalizeRawSettings has already forced the
+  // bottom bank off for Box/Exhaust or the bottom filter). The 1-top and 2-filter
+  // sandwich modes keep all of the user's per-wall fan counts. A true arrangement
+  // switch resets them explicitly via applyTempestArrangementDefaults.
   if (arrangement === "four-side-filter-tower") {
     return {
       ...settings,
@@ -1013,7 +1038,6 @@ function canonicalizePrintDesignRawSettings(
       filters: 2,
       fansLeft: 0,
       fansRight: 0,
-      fansBottom: 0,
     };
   }
   return {

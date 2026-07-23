@@ -69,6 +69,13 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
             },
       // Tower top-panel fan grid toggle (top bank: automatic = grid on, 0 = off).
       topFans: tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.top),
+      // Tower bottom-panel fan grid (bottom bank), mirroring the top. Box/Exhaust
+      // and the bottom filter force the bottom bank to 0 upstream
+      // (normalizeRawSettings), so this is a live grid only on a plain-bottom tower.
+      bottomFans:
+        design.arrangement === "four-side-filter-tower"
+          ? tempestFanCountRequestFromPurifierRequest(configuration.fan.banks.bottom)
+          : undefined,
       // "Back" fan grid on the single-filter solid plate (opposite the filter).
       // -1 = automatic (fill the grid), 0 = none, N = that many fans.
       bottomPlateFans: design.backPlateFans < 0 ? { type: "automatic" } : { type: "fixed", count: design.backPlateFans },

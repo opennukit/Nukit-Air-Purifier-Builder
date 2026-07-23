@@ -218,7 +218,7 @@ function createBuildFanSummary(
 
 function resolvedTempestFanCount(fanLayout: TempestFanLayout): number {
   return matchTopology(fanLayout, {
-    quad: (fans) => fans.fanCount,
+    quad: (fans) => fans.fanCount + fans.bottomFanCount,
     sandwich: (fans) =>
       fans.walls.front.actualCount +
       fans.walls.back.actualCount +

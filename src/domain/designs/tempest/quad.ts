@@ -209,6 +209,19 @@ export function createQuadFanLayout(
   const positionsY = topFansOff
     ? []
     : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
+  // The bottom fan grid mirrors the top: same auto-filled positions. It is
+  // independent of the top exhaust (Box/Exhaust is a top-only feed); Box/Exhaust
+  // and the bottom filter force bottomFans off upstream, so here we only honor
+  // the resolved bottom bank.
+  const bottomFans = settings.fan.bottomFans;
+  const bottomFansOff =
+    bottomFans === undefined || (bottomFans.type === "fixed" && bottomFans.count === 0);
+  const bottomPositionsX = bottomFansOff
+    ? []
+    : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
+  const bottomPositionsY = bottomFansOff
+    ? []
+    : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
   return {
     topology: "quad",
     bodyDepth,
@@ -220,6 +233,9 @@ export function createQuadFanLayout(
     positionsX,
     positionsY,
     fanCount: positionsX.length * positionsY.length,
+    bottomPositionsX,
+    bottomPositionsY,
+    bottomFanCount: bottomPositionsX.length * bottomPositionsY.length,
   };
 }
 

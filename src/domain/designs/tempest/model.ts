@@ -186,6 +186,12 @@ export type TempestFanLayout =
       readonly positionsX: readonly Millimeters[];
       readonly positionsY: readonly Millimeters[];
       readonly fanCount: number;
+      // Bottom fan grid, mirroring the top grid (same auto-filled positions).
+      // Empty when there are no bottom fans (the default, or Box/Exhaust, or when
+      // the bottom filter is on).
+      readonly bottomPositionsX: readonly Millimeters[];
+      readonly bottomPositionsY: readonly Millimeters[];
+      readonly bottomFanCount: number;
     };
 
 // ##############################

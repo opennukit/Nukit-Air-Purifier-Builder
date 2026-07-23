@@ -208,6 +208,28 @@ export function quadTopExhaust<Solid, Region>(
   );
 }
 
+// The bottom fan grid: an exact mirror of the top fan-grid branch above, cut
+// through the bottom (grid) plate instead of the top plate. The bottom plate is
+// one wall thick with its top face at the air-chamber floor
+// (filterLayout.bottomPlateThickness), so the grid centers half a wall below it.
+// Feet (defaulted on with bottom fans) provide the intake standoff underneath.
+// Empty unless a bottom fan bank is on (Box/Exhaust and the bottom filter force
+// it off upstream, so this never coexists with either).
+export function quadBottomFans<Solid, Region>(
+  ctx: GeometryContext<Solid, Region>,
+  model: TempestModel,
+  filterLayout: Extract<TempestFilterLayout, { readonly topology: "quad" }>,
+  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
+): Solid[] {
+  const plate = model.frame.wallThickness;
+  const centerZ = filterLayout.bottomPlateThickness - plate / 2;
+  return fanLayout.bottomPositionsX.flatMap((x) =>
+    fanLayout.bottomPositionsY.map((y) =>
+      fanPatternCut(ctx, model, "z", [x, y, centerZ], plate + 2 * EPSILON_LIP),
+    ),
+  );
+}
+
 // A single central box/exhaust-fan hole over the air chamber, plus up to two
 // evenly-spaced rings of screw holes around it (matches tempest-builder.html's
 // tower_box_exhaust). All sizes come pre-resolved from settings.fan.boxExhaust.

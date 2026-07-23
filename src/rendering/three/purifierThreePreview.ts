@@ -1414,6 +1414,27 @@ export class PurifierThreePreview {
             collectFanRotors(fan, this.fanRotors);
           }
         }
+        // Bottom fan grid (mirror of the top), mounted under the chamber floor in
+        // the feet standoff, drawing air up into the chamber.
+        const bottomInteriorZ = m.filterLayout.bottomPlateThickness;
+        const bottomFanCenterZ = bottomInteriorZ - fanPreviewRearDepthMillimeters;
+        for (const x of fanLayout.bottomPositionsX) {
+          for (const y of fanLayout.bottomPositionsY) {
+            const fan = createFan({
+              axis: tempestCsgAxisToSceneAxis("z", pose),
+              position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
+              radius: (model.settings.fan.diameter / 2) * sceneScale,
+              facing: "axis-negative",
+              appearance: fanAppearance,
+            });
+            fan.userData["tempestPreviewFan"] = true;
+            this.parentPreviewFanToChunk(fan, chunkBoxes);
+            if (exploded) {
+              explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
+            }
+            collectFanRotors(fan, this.fanRotors);
+          }
+        }
       },
     });
   }
