@@ -4,9 +4,8 @@ import {
   createTempestModel,
   defaultTempestSettings,
   defaultTempestTowerFilter,
-  type TempestSettings,
 } from "@/domain/designs/tempest/model";
-import type { TempestFanCountRequest } from "@/domain/designs/tempest/shared";
+import type { TempestFanCountRequest, TempestSettings } from "@/domain/designs/tempest/shared";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { normalizeRawSettings } from "@/domain/purifier/airPurifier";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";

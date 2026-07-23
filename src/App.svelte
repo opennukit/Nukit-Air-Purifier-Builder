@@ -2387,9 +2387,12 @@
                   <div class="fan-selection">
                     {@render fanSizeSegment()}
 
-                    <!-- The four-side tower exhausts only through the top, so there
-                         is nothing to choose: hide Fan placement entirely. -->
-                    {#if !isFourFilterTower}
+                    <!-- Sandwich/one-side layouts choose per-wall fans; the four-side
+                         tower instead offers Top and Bottom fan plates (bottom is 3D
+                         print only and excluded by Box/Exhaust or the bottom filter,
+                         handled in fanPlacementCheckboxControls). Hidden entirely in
+                         Box/Exhaust mode, where there is no PC fan grid to place. -->
+                    {#if !isFourFilterTower || selectedFanSizeChoice !== "box-exhaust"}
                       <fieldset class="fan-placement-field" data-tempest-fan-auto>
                         <legend>Fan placement {@render infoTip("info-fanPlacement", "Choose which walls get fans. 'Auto' fills a wall with as many fans as fit; open Advanced to set an exact count per wall.")}</legend>
                         <div class="fan-placement-checks">
