@@ -6,6 +6,7 @@
     serializePurifierDraft,
   } from "@/domain/purifier/airPurifier";
   import { decodePurifierDraftSettings, encodeSettings } from "@/domain/purifier/settingsCodec";
+  import { decodeShareToken, encodeShareToken } from "@/domain/purifier/shareLinkCodec";
   import {
     applyTempestArrangement,
     applyTempestDesign,
@@ -173,9 +174,23 @@
   const DEFAULT_SESSION_QUERY = `${encodeSettings(
     applyTempestDesign({ ...defaultSettings, printDesign: "nukit-tempest" }, "nukit-tempest-original"),
   )}&previewMode=enclosure&fabricationMethod=print-3mf&printVolume=bed-256`;
-  const initialSearch =
-    window.location.search.replace(/^\?/, "").length > 0 ? window.location.search : `?${DEFAULT_SESSION_QUERY}`;
-  const initialUrlParams = new URLSearchParams(initialSearch.startsWith("?") ? initialSearch.slice(1) : initialSearch);
+  // A compact shared link carries everything in a single `d` token; expand it back
+  // to the canonical query string. Any other URL (legacy long links, hand-edited
+  // params, or none) takes the original path unchanged. A malformed token falls
+  // back to the default session rather than breaking the load.
+  const rawInitialQuery = window.location.search.replace(/^\?/, "");
+  const rawInitialParams = new URLSearchParams(rawInitialQuery);
+  let initialSearch: string;
+  if (rawInitialParams.has("d")) {
+    try {
+      initialSearch = decodeShareToken(rawInitialParams.get("d") ?? "");
+    } catch {
+      initialSearch = DEFAULT_SESSION_QUERY;
+    }
+  } else {
+    initialSearch = rawInitialQuery.length > 0 ? rawInitialQuery : DEFAULT_SESSION_QUERY;
+  }
+  const initialUrlParams = new URLSearchParams(initialSearch);
 
   // Reduced-motion users get a still model by default; an explicit autoRotate
   // URL param is a deliberate choice in a shared link, so it still wins.
@@ -1175,7 +1190,13 @@
 
   async function copyUrl(buttonKey: TransientButtonKey): Promise<void> {
     const url = new URL(window.location.href);
-    url.search = encodeShareState();
+    // Prefer the compact `d` token; fall back to the full query string if encoding
+    // ever fails, so copy always produces a working link.
+    try {
+      url.search = `d=${encodeShareToken(encodeShareState())}`;
+    } catch {
+      url.search = encodeShareState();
+    }
     try {
       await navigator.clipboard.writeText(url.toString());
       showTransientButtonLabel(buttonKey, "Copied", 1200);
