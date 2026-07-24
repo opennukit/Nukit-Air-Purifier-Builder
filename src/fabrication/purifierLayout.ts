@@ -63,6 +63,10 @@ export type LayoutResult = {
   // Resolved four-side-tower foot length (mm), with "Auto" already resolved to a
   // concrete height. 0 for non-tower builds. Lets the UI show the auto value.
   readonly towerFeetLengthMm: number;
+  // Most fans that fit the tower's top / bottom fan plate (the "automatic" count),
+  // so the UI can offer 0..max as exact counts. 0 for non-tower builds.
+  readonly towerTopFanMax: number;
+  readonly towerBottomFanMax: number;
 };
 
 export function createLayout(input: RawPurifierSettings | PurifierDraft): LayoutResult {
@@ -99,6 +103,9 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     towerSettings?.arrangement.type === "four-side-filter-tower"
       ? towerSettings.arrangement.feetLength
       : 0;
+  const towerFan = towerSettings ? createTempestModel(towerSettings).fanLayout : undefined;
+  const towerTopFanMax = towerFan?.topology === "quad" ? towerFan.top.maximumCount : 0;
+  const towerBottomFanMax = towerFan?.topology === "quad" ? towerFan.bottom.maximumCount : 0;
 
   return {
     settingsDraft,
@@ -107,6 +114,8 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     fabrication,
     summary,
     towerFeetLengthMm,
+    towerTopFanMax,
+    towerBottomFanMax,
   };
 }
 

@@ -422,6 +422,14 @@
   // the layout (sized from the bottom fan/filter flow, or 100 mm when neither).
   $: feetLengthIsAuto = settings.feetLength < 0;
   $: resolvedFeetLengthMm = layout.towerFeetLengthMm;
+  // Tower Top/Bottom fan-count selectors (Advanced): available for PC fans; the
+  // bottom count follows the same rules as the bottom fan plate (3D print only,
+  // not Box/Exhaust, not while the bottom filter is on).
+  $: towerTopFanMax = layout.towerTopFanMax;
+  $: towerBottomFanMax = layout.towerBottomFanMax;
+  $: showTowerTopFanCount = isFourFilterTower && selectedFanSizeChoice !== "box-exhaust";
+  $: showTowerBottomFanCount =
+    showTowerTopFanCount && fabricationMethod === "print-3mf" && !(settings.bottomFilter && isSquareTowerFilter);
   // Fan-placement checkboxes: all four walls for the horizontal layouts; only
   // "Top" for the four-side tower (its other faces are filters), where it
   // toggles the top-panel fan grid.
@@ -2534,6 +2542,28 @@
                           </select>
                         </label>
                       {/if}
+                    {/if}
+                    {#if showTowerTopFanCount}
+                      <label class="field compact-field">
+                        <span>Top fans {@render infoTip("info-fansTopCount", "Number of fans on the tower's top plate. Auto fills the grid; pick fewer to place exactly that many, spread evenly.")}</span>
+                        <select name="fansTopCount" onchange={(event) => updateFanCountSetting("fansTop", event)}>
+                          <option value={automaticFanCount} selected={settings.fansTop === automaticFanCount}>Auto</option>
+                          {#each countOptionsUpTo(towerTopFanMax) as count}
+                            <option value={count} selected={settings.fansTop === count}>{count === 0 ? "None" : String(count)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                    {/if}
+                    {#if showTowerBottomFanCount}
+                      <label class="field compact-field">
+                        <span>Bottom fans {@render infoTip("info-fansBottomCount", "Number of fans on the tower's bottom plate. Auto fills the grid; pick fewer to place exactly that many, spread evenly.")}</span>
+                        <select name="fansBottomCount" onchange={(event) => updateFanCountSetting("fansBottom", event)}>
+                          <option value={automaticFanCount} selected={settings.fansBottom === automaticFanCount}>Auto</option>
+                          {#each countOptionsUpTo(towerBottomFanMax) as count}
+                            <option value={count} selected={settings.fansBottom === count}>{count === 0 ? "None" : String(count)}</option>
+                          {/each}
+                        </select>
+                      </label>
                     {/if}
                     {#each tempestAdvancedGeometryControls as control}
                       <label class="field">
