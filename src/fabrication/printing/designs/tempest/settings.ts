@@ -39,11 +39,11 @@ export function createTempestSettingsFromConfiguration(configuration: PurifierSe
           boxDepthMm: probe.box.depth,
           structuralOffsetMm: probe.filterLayout.structuralOffset,
           fanCount:
-            probe.fanLayout.bottomFanCount > 0
-              ? probe.fanLayout.bottomFanCount
-              : probe.fanLayout.fanCount,
+            probe.fanLayout.bottom.fanCount > 0
+              ? probe.fanLayout.bottom.fanCount
+              : probe.fanLayout.top.fanCount,
           fanFreeAirM3h: configuration.fan.freeAirM3h,
-          active: probe.fanLayout.bottomFanCount > 0 || probe.filterLayout.bottomFilter,
+          active: probe.fanLayout.bottom.fanCount > 0 || probe.filterLayout.bottomFilter,
         })
       : 100;
   return { ...settings, arrangement: { ...settings.arrangement, feetLength } };

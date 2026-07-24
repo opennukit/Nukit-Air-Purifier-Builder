@@ -185,11 +185,12 @@ describe("Tempest OpenSCAD model port", () => {
       throw new Error("Expected tower fan layout");
     }
     expect(model.fanLayout.minimumCenterFromEdge).toBeCloseTo(130.6);
-    expect(model.fanLayout.columns).toBe(3);
-    expect(model.fanLayout.rows).toBe(3);
-    expect(model.fanLayout.fanCount).toBe(9);
-    expect(model.fanLayout.positionsX).toEqual([158.7, 308.7, 458.7]);
-    expect(model.fanLayout.positionsY).toEqual([158.7, 308.7, 458.7]);
+    expect(model.fanLayout.top.fanCount).toBe(9);
+    expect(model.fanLayout.top.positions).toHaveLength(9);
+    // The full 3x3 grid at these coordinates.
+    expect(model.fanLayout.top.positions).toContainEqual({ x: 158.7, y: 158.7 });
+    expect(model.fanLayout.top.positions).toContainEqual({ x: 308.7, y: 308.7 });
+    expect(model.fanLayout.top.positions).toContainEqual({ x: 458.7, y: 458.7 });
 
     expect(model.chunkGrid).toMatchObject({
       countX: 3,

@@ -851,13 +851,11 @@ function quadTopPlateHoles(
   const screwRadius = model.settings.fan.screwHoleDiameter / 2;
   const screwDelta = fanLayout.screwPitch / 2;
   const circles: TopPlateHoleCircle[] = [];
-  for (const fx of fanLayout.positionsX) {
-    for (const fy of fanLayout.positionsY) {
-      circles.push({ cx: fx, cy: fy, r: grillRadius });
-      for (const sx of [fx - screwDelta, fx + screwDelta]) {
-        for (const sy of [fy - screwDelta, fy + screwDelta]) {
-          circles.push({ cx: sx, cy: sy, r: screwRadius });
-        }
+  for (const { x: fx, y: fy } of fanLayout.top.positions) {
+    circles.push({ cx: fx, cy: fy, r: grillRadius });
+    for (const sx of [fx - screwDelta, fx + screwDelta]) {
+      for (const sy of [fy - screwDelta, fy + screwDelta]) {
+        circles.push({ cx: sx, cy: sy, r: screwRadius });
       }
     }
   }

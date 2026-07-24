@@ -1396,46 +1396,42 @@ export class PurifierThreePreview {
         const { fanLayout } = m;
         const topInteriorZ = m.box.height - m.filterLayout.topPlateThickness;
         const topFanCenterZ = topInteriorZ - fanPreviewRearDepthMillimeters;
-        for (const x of fanLayout.positionsX) {
-          for (const y of fanLayout.positionsY) {
-            const fan = createFan({
-              axis: tempestCsgAxisToSceneAxis("z", pose),
-              position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
-              radius: (model.settings.fan.diameter / 2) * sceneScale,
-              facing: "axis-positive",
-              appearance: fanAppearance,
-            });
-            fan.userData["tempestPreviewFan"] = true;
-            moveTempestFanInsideTop(fan, m, pose, topInteriorZ);
-            this.parentPreviewFanToChunk(fan, chunkBoxes);
-            if (exploded) {
-              explodeTempestTopFanOutward(fan, m, pose, topInteriorZ, generatedPreviewExplodeDistance);
-            }
-            collectFanRotors(fan, this.fanRotors);
+        for (const { x, y } of fanLayout.top.positions) {
+          const fan = createFan({
+            axis: tempestCsgAxisToSceneAxis("z", pose),
+            position: tempestCsgPointToScene({ x, y, z: topFanCenterZ }, pose),
+            radius: (model.settings.fan.diameter / 2) * sceneScale,
+            facing: "axis-positive",
+            appearance: fanAppearance,
+          });
+          fan.userData["tempestPreviewFan"] = true;
+          moveTempestFanInsideTop(fan, m, pose, topInteriorZ);
+          this.parentPreviewFanToChunk(fan, chunkBoxes);
+          if (exploded) {
+            explodeTempestTopFanOutward(fan, m, pose, topInteriorZ, generatedPreviewExplodeDistance);
           }
+          collectFanRotors(fan, this.fanRotors);
         }
         // Bottom fan grid: the mirror of the top grid, recessed just above the
         // chamber floor (the top of the bottom plate) and facing out the bottom.
         // Uses the same interior-plane helpers as the sandwich bottom-plate fans.
         const bottomInteriorZ = m.filterLayout.bottomPlateThickness;
         const bottomFanCenterZ = bottomInteriorZ + fanPreviewRearDepthMillimeters;
-        for (const x of fanLayout.bottomPositionsX) {
-          for (const y of fanLayout.bottomPositionsY) {
-            const fan = createFan({
-              axis: tempestCsgAxisToSceneAxis("z", pose),
-              position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
-              radius: (model.settings.fan.diameter / 2) * sceneScale,
-              facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
-              appearance: fanAppearance,
-            });
-            fan.userData["tempestPreviewFan"] = true;
-            moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
-            this.parentPreviewFanToChunk(fan, chunkBoxes);
-            if (exploded) {
-              explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
-            }
-            collectFanRotors(fan, this.fanRotors);
+        for (const { x, y } of fanLayout.bottom.positions) {
+          const fan = createFan({
+            axis: tempestCsgAxisToSceneAxis("z", pose),
+            position: tempestCsgPointToScene({ x, y, z: bottomFanCenterZ }, pose),
+            radius: (model.settings.fan.diameter / 2) * sceneScale,
+            facing: tempestBottomFanFacing(m, pose, bottomInteriorZ),
+            appearance: fanAppearance,
+          });
+          fan.userData["tempestPreviewFan"] = true;
+          moveTempestFanInsideBottom(fan, m, pose, bottomInteriorZ);
+          this.parentPreviewFanToChunk(fan, chunkBoxes);
+          if (exploded) {
+            explodeTempestBottomFanOutward(fan, m, pose, bottomInteriorZ, generatedPreviewExplodeDistance);
           }
+          collectFanRotors(fan, this.fanRotors);
         }
       },
     });

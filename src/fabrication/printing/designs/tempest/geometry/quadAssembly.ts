@@ -195,15 +195,13 @@ export function quadTopExhaust<Solid, Region>(
   if (fanLayout.topExhaust === "box-exhaust") {
     return towerBoxExhaustCuts(ctx, model, filterLayout);
   }
-  return fanLayout.positionsX.flatMap((x) =>
-    fanLayout.positionsY.map((y) =>
-      fanPatternCut(
-        ctx,
-        model,
-        "z",
-        [x, y, model.box.height - filterLayout.topPlateThickness / 2],
-        filterLayout.topPlateThickness + 2 * EPSILON_LIP,
-      ),
+  return fanLayout.top.positions.map(({ x, y }) =>
+    fanPatternCut(
+      ctx,
+      model,
+      "z",
+      [x, y, model.box.height - filterLayout.topPlateThickness / 2],
+      filterLayout.topPlateThickness + 2 * EPSILON_LIP,
     ),
   );
 }
@@ -223,10 +221,8 @@ export function quadBottomFans<Solid, Region>(
 ): Solid[] {
   const plate = model.frame.wallThickness;
   const centerZ = filterLayout.bottomPlateThickness - plate / 2;
-  return fanLayout.bottomPositionsX.flatMap((x) =>
-    fanLayout.bottomPositionsY.map((y) =>
-      fanPatternCut(ctx, model, "z", [x, y, centerZ], plate + 2 * EPSILON_LIP),
-    ),
+  return fanLayout.bottom.positions.map(({ x, y }) =>
+    fanPatternCut(ctx, model, "z", [x, y, centerZ], plate + 2 * EPSILON_LIP),
   );
 }
 

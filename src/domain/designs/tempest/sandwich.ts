@@ -246,9 +246,6 @@ function createBottomPlateFanLayout(
   }
   const diameter = settings.fan.diameter;
   const minimumCenterFromEdge = settings.frame.wallThickness + diameter / 2;
-  const maxCols = plateFansPerSide(box.width, minimumCenterFromEdge, diameter);
-  const maxRows = plateFansPerSide(box.depth, minimumCenterFromEdge, diameter);
-
   const radius = diameter / 2;
   const flange = settings.frame.outsideFlangeThickness;
   const backZ0 = flange;
@@ -259,10 +256,30 @@ function createBottomPlateFanLayout(
       aabbOverlap({ x0: x - radius, x1: x + radius, y0: y - radius, y1: y + radius, z0: backZ0, z1: backZ1 }, wallBox, BACK_FAN_WALL_CLEARANCE_MM),
     );
 
-  // The full grid, used both as the maximum and as the exact placement once the
-  // requested count reaches it.
-  const fullXs = plateFanPositions(maxCols, box.width, diameter);
-  const fullYs = plateFanPositions(maxRows, box.depth, diameter);
+  return createPlateFanGrid(box.width, box.depth, minimumCenterFromEdge, diameter, requested, clearsWalls);
+}
+
+// A rectangular fan grid on a flat plate that honors an exact requested count.
+// Auto (or a count at/above the maximum) fills the full grid; a smaller count is
+// distributed evenly across rows so the fans sit at balanced margins and gaps for
+// uniform airflow. `clearsWalls` drops any position that would collide with a
+// side-wall fan (the sandwich Back plate); the tower passes none. Shared by the
+// single-filter Back plate and the four-side tower's top/bottom fan plates.
+export function createPlateFanGrid(
+  widthMm: Millimeters,
+  depthMm: Millimeters,
+  minimumCenterFromEdge: Millimeters,
+  diameter: Millimeters,
+  requested: TempestFanCountRequest | undefined,
+  clearsWalls: (position: TempestPlateFanPosition) => boolean = () => true,
+): TempestPlateFanLayout {
+  if (requested === undefined) {
+    return { positions: [], fanCount: 0, maximumCount: 0 };
+  }
+  const maxCols = plateFansPerSide(widthMm, minimumCenterFromEdge, diameter);
+  const maxRows = plateFansPerSide(depthMm, minimumCenterFromEdge, diameter);
+  const fullXs = plateFanPositions(maxCols, widthMm, diameter);
+  const fullYs = plateFanPositions(maxRows, depthMm, diameter);
   const fullGrid: TempestPlateFanPosition[] = [];
   for (const x of fullXs) {
     for (const y of fullYs) {
@@ -280,28 +297,21 @@ function createBottomPlateFanLayout(
     return { positions: fullGrid, fanCount: maximumCount, maximumCount };
   }
 
-  // Fewer than the full grid: distribute the fans evenly so each one sits at the
-  // centre of an equal division of the plate (balanced margins and gaps), for
-  // uniform airflow through the filter. Not clustered at the centre, not jammed to
-  // the edges.
-  const { rows } = chooseBackGrid(target, maxCols, maxRows, box.width, box.depth);
+  const { rows } = chooseBackGrid(target, maxCols, maxRows, widthMm, depthMm);
   const rowCounts = distributeBackRows(target, rows);
-  const evenYs = evenlyDistribute(rows, box.depth, minimumCenterFromEdge);
+  const evenYs = evenlyDistribute(rows, depthMm, minimumCenterFromEdge);
   const evenPositions = rowCounts
     .flatMap((rowCount, rowIndex) =>
-      evenlyDistribute(rowCount, box.width, minimumCenterFromEdge).map((x) => ({ x, y: evenYs[rowIndex] })),
+      evenlyDistribute(rowCount, widthMm, minimumCenterFromEdge).map((x) => ({ x, y: evenYs[rowIndex] })),
     )
     .filter(clearsWalls);
   if (evenPositions.length === target) {
     return { positions: evenPositions, fanCount: target, maximumCount };
   }
 
-  // Some evenly-spread fans would land on a side-wall fan and get dropped (designs
-  // that combine the Back grid with wall fans). Fall back to the centred,
-  // minimum-spacing grid, which keeps clear of the wall fans.
-  const ys = plateFanPositions(rows, box.depth, diameter);
+  const ys = plateFanPositions(rows, depthMm, diameter);
   const positions = rowCounts
-    .flatMap((rowCount, rowIndex) => plateFanPositions(rowCount, box.width, diameter).map((x) => ({ x, y: ys[rowIndex] })))
+    .flatMap((rowCount, rowIndex) => plateFanPositions(rowCount, widthMm, diameter).map((x) => ({ x, y: ys[rowIndex] })))
     .filter(clearsWalls);
   return { positions, fanCount: positions.length, maximumCount };
 }

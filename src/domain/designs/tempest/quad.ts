@@ -1,17 +1,18 @@
 import type { Millimeters } from "@/domain/units";
 import { assertNever } from "./topology";
 import {
-  fanSpacing,
   filterPocketThickness,
   mapTempestWalls,
   tempestFanBodyDepth,
   tempestFanScrewPitch,
   type TempestCordPassThrough,
+  type TempestFanCountRequest,
   type TempestFilterArrangement,
   type TempestFrameSettings,
   type TempestSettings,
   type TempestWall,
 } from "./shared";
+import { createPlateFanGrid } from "./sandwich";
 import type {
   TempestBoxEnvelope,
   TempestFanLayout,
@@ -197,63 +198,27 @@ export function createQuadFanLayout(
   const bodyDepth = tempestFanBodyDepth(settings.fan.diameter);
   const screwPitch = tempestFanScrewPitch(settings.fan.diameter);
   const topExhaust = settings.fan.topExhaust ?? "fan-grid";
-  const minimumCenterFromEdge = quadFilter.structuralOffset + settings.fan.diameter / 2;
-  // No grid of PC fans when: Box/Exhaust feeds the tower from an external box fan
-  // over the central hole, or the user turned the top fans off (top bank = 0).
-  const topFans = settings.fan.topFans;
-  const topFansOff =
-    topExhaust === "box-exhaust" || (topFans?.type === "fixed" && topFans.count === 0);
-  const positionsX = topFansOff
-    ? []
-    : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
-  const positionsY = topFansOff
-    ? []
-    : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
-  // The bottom fan grid mirrors the top: same auto-filled positions. It is
-  // independent of the top exhaust (Box/Exhaust is a top-only feed); Box/Exhaust
-  // and the bottom filter force bottomFans off upstream, so here we only honor
-  // the resolved bottom bank.
-  const bottomFans = settings.fan.bottomFans;
-  const bottomFansOff =
-    bottomFans === undefined || (bottomFans.type === "fixed" && bottomFans.count === 0);
-  const bottomPositionsX = bottomFansOff
-    ? []
-    : towerFanPositions(towerFansPerSide(box.width, minimumCenterFromEdge, settings.fan.diameter), box.width, settings.fan.diameter);
-  const bottomPositionsY = bottomFansOff
-    ? []
-    : towerFanPositions(towerFansPerSide(box.depth, minimumCenterFromEdge, settings.fan.diameter), box.depth, settings.fan.diameter);
+  const diameter = settings.fan.diameter;
+  const minimumCenterFromEdge = quadFilter.structuralOffset + diameter / 2;
+  // Box/Exhaust feeds the tower from an external box fan over the central hole, so
+  // there is no top PC-fan grid. Otherwise the top plate honors the requested top
+  // bank (Auto fills the grid; a fixed count places exactly that many, distributed
+  // evenly, like the single-filter Back plate). The bottom plate mirrors it from
+  // its own bank (empty by default; Box/Exhaust and the bottom filter force it off
+  // upstream).
+  const topRequest: TempestFanCountRequest =
+    topExhaust === "box-exhaust" ? { type: "fixed", count: 0 } : settings.fan.topFans ?? { type: "automatic" };
+  const top = createPlateFanGrid(box.width, box.depth, minimumCenterFromEdge, diameter, topRequest);
+  const bottom = createPlateFanGrid(box.width, box.depth, minimumCenterFromEdge, diameter, settings.fan.bottomFans);
   return {
     topology: "quad",
     bodyDepth,
     screwPitch,
     minimumCenterFromEdge,
     topExhaust,
-    columns: positionsX.length,
-    rows: positionsY.length,
-    positionsX,
-    positionsY,
-    fanCount: positionsX.length * positionsY.length,
-    bottomPositionsX,
-    bottomPositionsY,
-    bottomFanCount: bottomPositionsX.length * bottomPositionsY.length,
+    top,
+    bottom,
   };
-}
-
-function towerFansPerSide(length: Millimeters, minimumCenterFromEdge: Millimeters, fanDiameter: Millimeters): number {
-  const span = length - 2 * minimumCenterFromEdge;
-  if (span < 0) {
-    return 0;
-  }
-  return Math.max(0, Math.floor(1 + span / fanSpacing(fanDiameter)));
-}
-
-function towerFanPositions(fanCount: number, length: Millimeters, fanDiameter: Millimeters): readonly Millimeters[] {
-  if (fanCount === 0) {
-    return [];
-  }
-  const total = fanCount <= 1 ? 0 : (fanCount - 1) * fanSpacing(fanDiameter);
-  const first = fanCount === 1 ? length / 2 : (length - total) / 2;
-  return Array.from({ length: fanCount }, (_, index) => first + index * fanSpacing(fanDiameter));
 }
 
 export function createQuadCordPlacement(
@@ -301,18 +266,20 @@ function avoidTowerFans(
   const xMax = chamber.xMax - inset;
   const yMin = chamber.yMin + inset;
   const yMax = chamber.yMax - inset;
-  const { positionsX, positionsY } = fanLayout;
+  // The cord routes up through the top plate where the fan grid lives, so avoid the
+  // top fans' square footprints.
+  const positions = fanLayout.top.positions;
   const clear = (x: number, y: number): boolean =>
-    positionsX.every((fx) => positionsY.every((fy) => Math.abs(x - fx) >= reach || Math.abs(y - fy) >= reach));
-  if (positionsX.length === 0 || positionsY.length === 0 || clear(desiredX, desiredY)) {
+    positions.every((fan) => Math.abs(x - fan.x) >= reach || Math.abs(y - fan.y) >= reach);
+  if (positions.length === 0 || clear(desiredX, desiredY)) {
     return { x: desiredX, y: desiredY };
   }
   const clampX = (value: number): number => Math.min(xMax, Math.max(xMin, value));
   const clampY = (value: number): number => Math.min(yMax, Math.max(yMin, value));
-  // Candidate coordinates: the desired value, the bounds, and the points just
-  // clear of each fan row/column. The nearest valid (x, y) pair wins.
-  const xs = [desiredX, xMin, xMax, ...positionsX.flatMap((fx) => [fx - reach, fx + reach])].map(clampX);
-  const ys = [desiredY, yMin, yMax, ...positionsY.flatMap((fy) => [fy - reach, fy + reach])].map(clampY);
+  // Candidate coordinates: the desired value, the bounds, and the points just clear
+  // of each fan. The nearest valid (x, y) pair wins.
+  const xs = [desiredX, xMin, xMax, ...positions.flatMap((fan) => [fan.x - reach, fan.x + reach])].map(clampX);
+  const ys = [desiredY, yMin, yMax, ...positions.flatMap((fan) => [fan.y - reach, fan.y + reach])].map(clampY);
   let best: { x: number; y: number; distance: number } | null = null;
   for (const x of xs) {
     for (const y of ys) {

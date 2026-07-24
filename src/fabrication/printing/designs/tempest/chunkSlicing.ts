@@ -162,7 +162,7 @@ function grillFacesSource(model: TempestModel): GrillFace[] {
         return [];
       }
       const z = box.height - filterLayout.topPlateThickness / 2;
-      return fanLayout.positionsX.flatMap((x) => fanLayout.positionsY.map((y): GrillFace => ({ centre: [x, y, z], normal: [0, 0, 1] })));
+      return fanLayout.top.positions.map(({ x, y }): GrillFace => ({ centre: [x, y, z], normal: [0, 0, 1] }));
     },
   });
 }

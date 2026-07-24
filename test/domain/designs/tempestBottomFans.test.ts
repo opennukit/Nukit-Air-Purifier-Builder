@@ -35,24 +35,29 @@ function towerFanLayout(
 describe("tower bottom fan grid (model)", () => {
   test("an automatic bottom bank fills a grid that mirrors the top", () => {
     const layout = towerFanLayout({ type: "automatic" });
-    expect(layout.bottomFanCount).toBeGreaterThan(0);
-    expect(layout.bottomFanCount).toBe(layout.bottomPositionsX.length * layout.bottomPositionsY.length);
+    expect(layout.bottom.fanCount).toBeGreaterThan(0);
+    expect(layout.bottom.fanCount).toBe(layout.bottom.positions.length);
     // Same auto-filled positions as the top grid.
-    expect(layout.bottomPositionsX).toEqual(layout.positionsX);
-    expect(layout.bottomPositionsY).toEqual(layout.positionsY);
+    expect(layout.bottom.positions).toEqual(layout.top.positions);
   });
 
   test("no bottom bank leaves the bottom plate solid", () => {
-    expect(towerFanLayout(undefined).bottomFanCount).toBe(0);
-    expect(towerFanLayout({ type: "fixed", count: 0 }).bottomFanCount).toBe(0);
+    expect(towerFanLayout(undefined).bottom.fanCount).toBe(0);
+    expect(towerFanLayout({ type: "fixed", count: 0 }).bottom.fanCount).toBe(0);
+  });
+
+  test("a fixed bottom count places exactly that many fans", () => {
+    const layout = towerFanLayout({ type: "fixed", count: 3 });
+    expect(layout.bottom.fanCount).toBe(3);
+    expect(layout.bottom.positions).toHaveLength(3);
   });
 
   test("bottom fans are independent of a Box/Exhaust top", () => {
     // Box/Exhaust removes the top grid but the bottom grid still fills (the app
     // forces bottom off upstream in that case; the geometry itself is independent).
     const layout = towerFanLayout({ type: "automatic" }, "box-exhaust");
-    expect(layout.fanCount).toBe(0);
-    expect(layout.bottomFanCount).toBeGreaterThan(0);
+    expect(layout.top.fanCount).toBe(0);
+    expect(layout.bottom.fanCount).toBeGreaterThan(0);
   });
 });
 

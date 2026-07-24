@@ -50,9 +50,8 @@ describe("tempest box/exhaust settings", () => {
     const settings = createTempestSettingsFromLayout(createLayout(decodeSettings(towerBoxExhaust)));
     const fanLayout = createTempestModel(settings).fanLayout;
     if (fanLayout.topology !== "quad") throw new Error("expected a quad tower layout");
-    expect(fanLayout.fanCount).toBe(0);
-    expect(fanLayout.positionsX.length).toBe(0);
-    expect(fanLayout.positionsY.length).toBe(0);
+    expect(fanLayout.top.fanCount).toBe(0);
+    expect(fanLayout.top.positions).toHaveLength(0);
 
     // sanity: the fan grid still places fans
     const grid = createTempestModel(
@@ -61,7 +60,7 @@ describe("tempest box/exhaust settings", () => {
       ),
     ).fanLayout;
     if (grid.topology !== "quad") throw new Error("expected a quad tower layout");
-    expect(grid.fanCount).toBeGreaterThan(0);
+    expect(grid.top.fanCount).toBeGreaterThan(0);
   });
 
   test("turning the tower top fans off removes the grid", () => {
@@ -71,6 +70,6 @@ describe("tempest box/exhaust settings", () => {
       ),
     ).fanLayout;
     if (off.topology !== "quad") throw new Error("expected a quad tower layout");
-    expect(off.fanCount).toBe(0);
+    expect(off.top.fanCount).toBe(0);
   });
 });

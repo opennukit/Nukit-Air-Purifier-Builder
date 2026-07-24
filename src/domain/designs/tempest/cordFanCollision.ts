@@ -27,11 +27,9 @@ export function tempestCordFanCollision(model: TempestModel): boolean {
     // footprint (half-width = fan diameter / 2) rather than a circle: the cord can
     // otherwise sit in a fan's corner (inside the body) while clearing its round
     // opening.
-    for (const fanX of model.fanLayout.positionsX) {
-      for (const fanY of model.fanLayout.positionsY) {
-        if (Math.abs(cord.x - fanX) < reach && Math.abs(cord.y - fanY) < reach) {
-          return true;
-        }
+    for (const fan of model.fanLayout.top.positions) {
+      if (Math.abs(cord.x - fan.x) < reach && Math.abs(cord.y - fan.y) < reach) {
+        return true;
       }
     }
     return false;

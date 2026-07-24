@@ -180,18 +180,13 @@ export type TempestFanLayout =
       readonly bodyDepth: Millimeters;
       readonly screwPitch: Millimeters;
       readonly minimumCenterFromEdge: Millimeters;
-      readonly topExhaust: TempestTowerTopExhaust; // resolved from the optional fan setting, total here
-      readonly columns: number;
-      readonly rows: number;
-      readonly positionsX: readonly Millimeters[];
-      readonly positionsY: readonly Millimeters[];
-      readonly fanCount: number;
-      // Bottom fan grid, mirroring the top grid (same auto-filled positions).
-      // Empty when there are no bottom fans (the default, or Box/Exhaust, or when
-      // the bottom filter is on).
-      readonly bottomPositionsX: readonly Millimeters[];
-      readonly bottomPositionsY: readonly Millimeters[];
-      readonly bottomFanCount: number;
+      readonly topExhaust: TempestTowerTopExhaust; // resolved from the optional fan setting
+      // Top and bottom fan grids as plate layouts (positions + fanCount +
+      // maximumCount) so the tower honors an exact requested count like the
+      // single-filter Back plate. The bottom grid is empty by default, and with
+      // Box/Exhaust or the bottom filter.
+      readonly top: TempestPlateFanLayout;
+      readonly bottom: TempestPlateFanLayout;
     };
 
 // ##############################
