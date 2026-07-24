@@ -2551,32 +2551,6 @@
                         </span>
                       </label>
                     {/each}
-                    {#if isFourFilterTower}
-                      <div class="foot-length-group">
-                        <label class="field">
-                          <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Auto sizes them from the bottom fan or filter airflow so the intake gap around the base doesn't restrict it (about 100 mm when there's no bottom fan or filter). Uncheck Auto to set your own length; 0 removes the feet.")}</span>
-                          <span class="input-shell">
-                            <input
-                              type="number"
-                              name="feetLength"
-                              min="0"
-                              max="500"
-                              step="1"
-                              inputmode="decimal"
-                              value={feetLengthIsAuto ? "" : settings.feetLength}
-                              placeholder={feetLengthIsAuto ? `Auto (${resolvedFeetLengthMm})` : ""}
-                              disabled={feetLengthIsAuto}
-                              onchange={(event) => updateNumberSetting("feetLength", event)}
-                            />
-                            <small>mm</small>
-                          </span>
-                        </label>
-                        <label class="toggle-field">
-                          <input type="checkbox" name="feetAuto" checked={feetLengthIsAuto} onchange={updateFeetAuto} />
-                          <span>Auto foot length</span>
-                        </label>
-                      </div>
-                    {/if}
                     {#if selectedFanSizeChoice === "box-exhaust"}
                       {#each tempestBoxExhaustControls as control}
                         <label class="field">
@@ -2597,6 +2571,33 @@
                       {/each}
                     {/if}
                   </div>
+                  {#if isFourFilterTower}
+                    <div class="advanced-group" data-tempest-feet-group>
+                      <p class="eyebrow advanced-group-label">Feet</p>
+                      <label class="field">
+                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Auto sizes them from the bottom fan or filter airflow so the intake gap around the base doesn't restrict it (about 100 mm when there's no bottom fan or filter). Uncheck Auto to set your own length; 0 removes the feet.")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="feetLength"
+                            min="0"
+                            max="500"
+                            step="1"
+                            inputmode="decimal"
+                            value={feetLengthIsAuto ? "" : settings.feetLength}
+                            placeholder={feetLengthIsAuto ? `Auto (${resolvedFeetLengthMm})` : ""}
+                            disabled={feetLengthIsAuto}
+                            onchange={(event) => updateNumberSetting("feetLength", event)}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                      <label class="toggle-field">
+                        <input type="checkbox" name="feetAuto" checked={feetLengthIsAuto} onchange={updateFeetAuto} />
+                        <span>Auto foot length</span>
+                      </label>
+                    </div>
+                  {/if}
                   <div class="advanced-group" data-fan-model-group>
                     <p class="eyebrow advanced-group-label">Performance</p>
                     {@render fanModelControls()}
