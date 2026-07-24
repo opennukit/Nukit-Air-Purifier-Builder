@@ -1171,6 +1171,15 @@ Panel Grids
   grid-column: 1 / -1;
 }
 
+/* Keep the tower Foot length input and its Auto toggle in one grid cell so the
+   checkbox reads as part of the foot-length control rather than flowing into the
+   next column under an unrelated field. */
+.advanced-group .foot-length-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .parts-list-section {
   grid-column: 1 / -1;
 }
