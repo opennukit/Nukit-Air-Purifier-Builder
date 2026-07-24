@@ -29,7 +29,6 @@ import {
 import {
   automaticFanCount,
   defaultFanColor,
-  fixedFanCountOptions,
   type FanBanks,
   type FanColor,
   type FanConfiguration,
@@ -1152,17 +1151,17 @@ function requiredPreviewMaterialColorPreset(
 }
 
 export function fanCountRequestFromRawSetting(value: number): FanCountRequest {
-  const clamped = clampInteger(
-    value,
-    automaticFanCount,
-    fixedFanCountOptions[fixedFanCountOptions.length - 1],
-  );
-  if (clamped === automaticFanCount) {
+  if (!Number.isFinite(value)) {
+    return { type: "fixed", count: 0 };
+  }
+  const rounded = Math.trunc(value);
+  // automaticFanCount (-1) or below means "auto"; otherwise a non-negative count.
+  // No upper cap here (each layout clamps to the number that actually fits), but
+  // guard against an absurd value from a hand-edited URL.
+  if (rounded <= automaticFanCount) {
     return { type: "auto" };
   }
-  const fixedCount =
-    fixedFanCountOptions.find((count) => count === clamped) ?? 0;
-  return { type: "fixed", count: fixedCount };
+  return { type: "fixed", count: Math.min(999, Math.max(0, rounded)) };
 }
 
 export function fanCountRequestToRawSetting(request: FanCountRequest): number {
@@ -1199,8 +1198,4 @@ export function clamp(value: number, min: number, max: number): number {
     return min;
   }
   return Math.min(max, Math.max(min, value));
-}
-
-function clampInteger(value: number, min: number, max: number): number {
-  return Math.trunc(clamp(value, min, max));
 }

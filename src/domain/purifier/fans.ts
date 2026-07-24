@@ -25,11 +25,16 @@ export const fanSpecs: readonly FanSpec[] = [
 // Fan Count Types
 // ##############################
 
+// Fixed-count choices offered for a single wall (a wall fits a short run); other
+// controls (e.g. the tower fan plate) offer their own larger range.
 export const fixedFanCountOptions = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export const automaticFanCount = -1;
 
-export type FixedFanCount = (typeof fixedFanCountOptions)[number];
+// A fixed fan count is any non-negative integer; each layout clamps it to the
+// number that actually fits (a wall's run, or the tower's top/bottom fan plate,
+// which can take far more than a single wall). The UI offers 0..max per control.
+export type FixedFanCount = number;
 
 export type FanCountRequest =
   | {

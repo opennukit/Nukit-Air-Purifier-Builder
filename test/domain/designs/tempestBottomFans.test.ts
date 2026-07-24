@@ -52,6 +52,45 @@ describe("tower bottom fan grid (model)", () => {
     expect(layout.bottom.positions).toHaveLength(3);
   });
 
+  test("a fixed count above the single-wall limit (8) is honored on a large plate", () => {
+    // A big tower plate (730 mm face -> ~832 mm box, 120 mm fans -> a 5x5 = 25 grid)
+    // must accept counts well over the old 0..8 wall cap.
+    const model = createTempestModel({
+      ...defaultTempestSettings,
+      arrangement: {
+        type: "four-side-filter-tower",
+        filter: { faceWidth: 730, faceHeight: 285, thickness: 19 },
+        bottomFilter: false,
+        feetLength: 100,
+      },
+      fan: {
+        ...defaultTempestSettings.fan,
+        diameter: 120,
+        topFans: { type: "fixed", count: 12 },
+        bottomFans: { type: "fixed", count: 12 },
+      },
+    });
+    if (model.fanLayout.topology !== "quad") throw new Error("expected a quad tower fan layout");
+    expect(model.fanLayout.top.maximumCount).toBeGreaterThanOrEqual(12);
+    expect(model.fanLayout.top.fanCount).toBe(12);
+    expect(model.fanLayout.bottom.fanCount).toBe(12);
+  });
+
+  test("normalize keeps a tower fan count above 8 (no wall-size cap)", () => {
+    const out = normalizeRawSettings({
+      ...defaultSettings,
+      printDesign: "nukit-tempest",
+      tempestArrangement: "four-side-filter-tower",
+      filterWidth: 730,
+      filterDepth: 285,
+      fanDiameter: 120,
+      fansTop: 12,
+      fansBottom: 12,
+    });
+    expect(out.fansTop).toBe(12);
+    expect(out.fansBottom).toBe(12);
+  });
+
   test("bottom fans are independent of a Box/Exhaust top", () => {
     // Box/Exhaust removes the top grid but the bottom grid still fills (the app
     // forces bottom off upstream in that case; the geometry itself is independent).
