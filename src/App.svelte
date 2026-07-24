@@ -2273,7 +2273,7 @@
                           <input
                             type="checkbox"
                             name={`auto-${control.name}`}
-                            checked={settings[control.name] === automaticFanCount}
+                            checked={settings[control.name] !== 0}
                             onchange={(event) => updateFanAuto(control.name, event)}
                           />
                           <span>{control.label}</span>
@@ -2412,7 +2412,7 @@
                               <input
                                 type="checkbox"
                                 name={`auto-${control.name}`}
-                                checked={settings[control.name] === automaticFanCount}
+                                checked={settings[control.name] !== 0}
                                 onchange={(event) => updateFanAuto(control.name, event)}
                               />
                               <span>{control.label}</span>
