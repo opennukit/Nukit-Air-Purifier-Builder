@@ -402,6 +402,8 @@
     tempestFanModel !== null && tempestFanModel.topology === "sandwich"
       ? tempestFanModel.fanLayout.bottomPlate.maximumCount
       : 0;
+  // Most fans the laser one-side Back plate can fit, so the advanced count offers 0..max.
+  $: laserBackFanMax = layout.laserBackFanMax;
   const countOptionsUpTo = (max: number): number[] => Array.from({ length: Math.max(0, max) + 1 }, (_, index) => index);
   // The horizontal layouts (1 top / 2 sandwich) take per-wall fans; the tower
   // exhausts through the top instead.
@@ -2801,6 +2803,17 @@
                         </select>
                       </label>
                     {/each}
+                    {#if laserBackFansSelected}
+                      <label class="field compact-field">
+                        <span>Back fans {@render infoTip("info-laserBackPlateFansCount", "Number of fans on the back plate. 'Auto' fills it with as many as fit; choose fewer if you prefer.")}</span>
+                        <select name="backPlateFansCount" onchange={(event) => updateBackFanCount(event)}>
+                          <option value={automaticFanCount} selected={settings.backPlateFans === automaticFanCount}>Auto</option>
+                          {#each countOptionsUpTo(laserBackFanMax) as count}
+                            <option value={count} selected={settings.backPlateFans === count}>{count === 0 ? "None" : String(count)}</option>
+                          {/each}
+                        </select>
+                      </label>
+                    {/if}
                   </div>
                   <div class="advanced-group" data-fan-model-group>
                     <p class="eyebrow advanced-group-label">Performance</p>

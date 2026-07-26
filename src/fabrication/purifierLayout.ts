@@ -21,7 +21,7 @@ import { matchTopology } from "@/domain/designs/tempest/topology";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import type { CutPanel } from "@/fabrication/laser/cutGeometry";
 import { cutPanelsCordThroughFan } from "@/fabrication/laser/cutGeometry";
-import { createAirPurifierCutSheet, resolveFanCount } from "@/fabrication/laser/panels";
+import { createAirPurifierCutSheet, resolveFanCount, laserBackPlateFanMax } from "@/fabrication/laser/panels";
 import { createTempestSettingsFromConfiguration } from "@/fabrication/printing/designs/tempest/settings";
 import { renderBoxesDocumentSvg } from "@/ports/boxes/svg";
 import { renderBoxesDocumentDxf } from "@/ports/boxes/dxf";
@@ -67,6 +67,9 @@ export type LayoutResult = {
   // so the UI can offer 0..max as exact counts. 0 for non-tower builds.
   readonly towerTopFanMax: number;
   readonly towerBottomFanMax: number;
+  // Most fans the laser one-side Back plate can fit (0 otherwise), so the UI can
+  // offer an exact Back fan count like the tower plates.
+  readonly laserBackFanMax: number;
 };
 
 export function createLayout(input: RawPurifierSettings | PurifierDraft): LayoutResult {
@@ -106,6 +109,10 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
   const towerFan = towerSettings ? createTempestModel(towerSettings).fanLayout : undefined;
   const towerTopFanMax = towerFan?.topology === "quad" ? towerFan.top.maximumCount : 0;
   const towerBottomFanMax = towerFan?.topology === "quad" ? towerFan.bottom.maximumCount : 0;
+  const laserBackFanMax =
+    configuration.design.type === "laser-cut" && configuration.filterCount === 1
+      ? laserBackPlateFanMax(configuration)
+      : 0;
 
   return {
     settingsDraft,
@@ -116,6 +123,7 @@ export function createLayout(input: RawPurifierSettings | PurifierDraft): Layout
     towerFeetLengthMm,
     towerTopFanMax,
     towerBottomFanMax,
+    laserBackFanMax,
   };
 }
 

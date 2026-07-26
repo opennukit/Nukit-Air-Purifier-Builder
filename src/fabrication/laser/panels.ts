@@ -385,6 +385,19 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
 // panel, kept a fan-radius-plus-wall in from each edge. `requested` < 0 fills the
 // grid; a positive count lays out as a centred near-square block. Mirrors the
 // 3D-Print bottom-plate grid.
+// The most fans the one-side Back plate can fit (maxCols x maxRows), so the UI can
+// offer 0..max like the 3D-print bottom plate. Mirrors createBackPlateFanGrid's grid.
+export function laserBackPlateFanMax(settings: PurifierSettings): number {
+  const geometry = createAirPurifierGeometry(settings);
+  const fanDiameter = settings.fan.spec.diameter;
+  const minEdge = settings.cutting.materialThickness + fanDiameter / 2;
+  const pitch = fanDiameter + repackedFanGap;
+  return (
+    backFansPerSide(geometry.filterDimensions.width, minEdge, pitch) *
+    backFansPerSide(geometry.workingDepth, minEdge, pitch)
+  );
+}
+
 function createBackPlateFanGrid(width: number, height: number, requested: number, settings: PurifierSettings): CutFeature[] {
   const fanDiameter = settings.fan.spec.diameter;
   const t = settings.cutting.materialThickness;
