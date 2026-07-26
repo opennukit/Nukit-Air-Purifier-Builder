@@ -63,6 +63,7 @@ export const filterSizePresets: readonly FilterSizePreset[] = [
   { id: "filter-16x25x1", label: '16" x 25" x 1" (394 x 622 x 19 mm)', width: 394, depth: 622, thickness: 19 },
   { id: "filter-20x20x1", label: '20" x 20" x 1" (501 x 501 x 19 mm)', width: 501, depth: 501, thickness: 19 },
   { id: "filter-20x20x2", label: '20" x 20" x 2" (495 x 495 x 44 mm)', width: 495, depth: 495, thickness: 44 },
+  { id: "filter-14x30x1", label: '14" x 30" x 1" (350 x 757 x 19 mm)', width: 350, depth: 757, thickness: 19 },
   { id: "filter-20x25x1", label: '20" x 25" x 1" (500 x 622 x 19 mm)', width: 500, depth: 622, thickness: 19 },
   { id: "filter-24x24x1", label: '24" x 24" x 1" (603 x 603 x 19 mm)', width: 603, depth: 603, thickness: 19 },
   { id: "filter-20x30x1", label: '20" x 30" x 1" (495 x 749 x 19 mm)', width: 495, depth: 749, thickness: 19 },
