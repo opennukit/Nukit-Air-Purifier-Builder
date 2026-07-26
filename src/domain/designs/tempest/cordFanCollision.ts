@@ -26,8 +26,9 @@ export function tempestCordFanCollision(model: TempestModel): boolean {
     // A PC fan is a square frame, so test the cord against each fan's square
     // footprint (half-width = fan diameter / 2) rather than a circle: the cord can
     // otherwise sit in a fan's corner (inside the body) while clearing its round
-    // opening.
-    for (const fan of model.fanLayout.top.positions) {
+    // opening. Test the plate the cord actually pierces (top or bottom grid).
+    const grid = cord.face === "bottom" ? model.fanLayout.bottom : model.fanLayout.top;
+    for (const fan of grid.positions) {
       if (Math.abs(cord.x - fan.x) < reach && Math.abs(cord.y - fan.y) < reach) {
         return true;
       }

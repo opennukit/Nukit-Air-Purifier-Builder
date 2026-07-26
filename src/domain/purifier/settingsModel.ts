@@ -210,7 +210,10 @@ export const tempestDesignLabels: Readonly<Record<TempestDesign, string>> = {
 };
 
 // Tempest cord pass-through choices (mirrors tempest-builder.html).
-export const cordHoleWalls = ["none", "front", "back", "left", "right"] as const;
+// "bottom" is a four-side-tower-only route: the cord exits down through the bottom
+// plate into the feet standoff (for bottom-fan towers). Horizontal layouts ignore
+// it; the tower ignores front/back/left/right (those pick the top-plate corner).
+export const cordHoleWalls = ["none", "front", "back", "left", "right", "bottom"] as const;
 export type CordHoleWall = (typeof cordHoleWalls)[number];
 export const cordHoleSides = ["left", "center", "right"] as const;
 export type CordHoleSide = (typeof cordHoleSides)[number];

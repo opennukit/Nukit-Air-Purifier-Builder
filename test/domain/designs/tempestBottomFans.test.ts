@@ -91,6 +91,37 @@ describe("tower bottom fan grid (model)", () => {
     expect(out.fansBottom).toBe(12);
   });
 
+  test("the bottom cord route drills the bottom plate clear of the bottom fans", () => {
+    const model = createTempestModel({
+      ...defaultTempestSettings,
+      arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter, bottomFilter: false, feetLength: 100 },
+      fan: { ...defaultTempestSettings.fan, topFans: { type: "fixed", count: 0 }, bottomFans: { type: "automatic" } },
+      cordPassThrough: { type: "wall", wall: "back", side: "center", diameter: 10, cornerOffset: 17, towerBottomExit: true },
+    });
+    const c = model.cordPassThrough;
+    if (c.type === "none" || c.topology !== "quad") throw new Error("expected a quad cord");
+    if (model.filterLayout.topology !== "quad" || model.fanLayout.topology !== "quad") throw new Error("expected a quad tower");
+    expect(c.face).toBe("bottom");
+    // Drills the bottom (grid) plate, just below the chamber floor.
+    expect(c.zStart).toBeLessThan(model.filterLayout.bottomPlateThickness);
+    // Clear of the bottom fan grid (PC fans are square frames).
+    const reach = c.diameter / 2 + model.settings.fan.diameter / 2 + 1;
+    const clear = model.fanLayout.bottom.positions.every((f) => Math.abs(c.x - f.x) >= reach || Math.abs(c.y - f.y) >= reach);
+    expect(clear).toBe(true);
+  });
+
+  test("a top cord route stays on the top plate", () => {
+    const model = createTempestModel({
+      ...defaultTempestSettings,
+      arrangement: { type: "four-side-filter-tower", filter: defaultTempestTowerFilter, bottomFilter: false, feetLength: 0 },
+      fan: { ...defaultTempestSettings.fan, topFans: { type: "automatic" }, bottomFans: { type: "fixed", count: 0 } },
+      cordPassThrough: { type: "wall", wall: "right", side: "center", diameter: 10, cornerOffset: 17 },
+    });
+    const c = model.cordPassThrough;
+    if (c.type === "none" || c.topology !== "quad") throw new Error("expected a quad cord");
+    expect(c.face).toBe("top");
+  });
+
   test("bottom fans are independent of a Box/Exhaust top", () => {
     // Box/Exhaust removes the top grid but the bottom grid still fills (the app
     // forces bottom off upstream in that case; the geometry itself is independent).
@@ -110,6 +141,18 @@ describe("tower bottom fan grille (CSG)", () => {
       feetLength: 100,
     },
   };
+
+  test("a bottom-cord bottom-fan tower stays watertight", () => {
+    const kit = createTempestPrintableKit(
+      {
+        ...towerBase,
+        fan: { ...towerBase.fan, topFans: { type: "fixed", count: 0 }, bottomFans: { type: "automatic" } },
+        cordPassThrough: { type: "wall", wall: "back", side: "center", diameter: 10, cornerOffset: 17, towerBottomExit: true },
+      },
+      "unsplit",
+    );
+    expect(manifoldReport(kit.parts[0].mesh)).toEqual(cleanManifold);
+  }, 30000);
 
   test("a bottom fan tower is watertight and its grille removes material", () => {
     const withBottom = createTempestPrintableKit(

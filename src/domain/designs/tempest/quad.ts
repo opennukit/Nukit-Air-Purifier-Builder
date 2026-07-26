@@ -20,6 +20,7 @@ import type {
   TempestFrameModel,
   TempestModelPlan,
   TempestNoCord,
+  TempestPlateFanPosition,
   TempestPrintablePose,
   TempestQuadCord,
   TempestQuadWallRect,
@@ -231,21 +232,29 @@ export function createQuadCordPlacement(
   }
   const cord = settings.cordPassThrough;
   const chamber = quadFilter.airChamber;
+  // towerBottomExit routes the cord down through the bottom plate into the feet
+  // standoff (for bottom-fan towers); otherwise the default top-plate route.
+  const isBottom = cord.towerBottomExit === true;
   const offset = Math.max(cord.diameter / 2 + CORD_TOWER_MIN_EDGE_MM, cord.cornerOffset);
   const corner = quadCordCorner(cord);
   const desiredX = corner.x === "max" ? chamber.xMax - offset : chamber.xMin + offset;
   const desiredY = corner.y === "max" ? chamber.yMax - offset : chamber.yMin + offset;
-  // The tower routes the cord up through the top plate where the fan grid lives,
-  // so auto-shift it to the nearest fan-free spot over the air chamber.
-  const placement = avoidTowerFans(desiredX, desiredY, cord.diameter, settings.fan.diameter, chamber, fanLayout);
+  // The cord pierces one cap plate where a fan grid lives, so auto-shift it to the
+  // nearest fan-free spot over the air chamber (the top grid, or the bottom grid).
+  const fanPositions = isBottom ? fanLayout.bottom.positions : fanLayout.top.positions;
+  const placement = avoidTowerFans(desiredX, desiredY, cord.diameter, settings.fan.diameter, chamber, fanPositions);
+  const wallThickness = settings.frame.wallThickness;
   return {
     topology: "quad",
     type: "top-cylinder",
+    face: isBottom ? "bottom" : "top",
     diameter: cord.diameter,
     x: placement.x,
     y: placement.y,
-    zStart: chamber.zMax,
-    depth: quadFilter.topPlateThickness,
+    // Top: through the top plate above the chamber. Bottom: through the one-wall
+    // grid plate just below the chamber floor (chamber.zMin), into the feet gap.
+    zStart: isBottom ? chamber.zMin - wallThickness : chamber.zMax,
+    depth: isBottom ? wallThickness : quadFilter.topPlateThickness,
   };
 }
 
@@ -258,7 +267,7 @@ function avoidTowerFans(
   cordDiameter: Millimeters,
   fanDiameter: Millimeters,
   chamber: { readonly xMin: Millimeters; readonly xMax: Millimeters; readonly yMin: Millimeters; readonly yMax: Millimeters },
-  fanLayout: Extract<TempestFanLayout, { readonly topology: "quad" }>,
+  positions: readonly TempestPlateFanPosition[],
 ): { readonly x: Millimeters; readonly y: Millimeters } {
   const reach = cordDiameter / 2 + fanDiameter / 2 + CORD_FAN_CLEARANCE_MM;
   const inset = cordDiameter / 2 + CORD_TOWER_MIN_EDGE_MM;
@@ -266,9 +275,7 @@ function avoidTowerFans(
   const xMax = chamber.xMax - inset;
   const yMin = chamber.yMin + inset;
   const yMax = chamber.yMax - inset;
-  // The cord routes up through the top plate where the fan grid lives, so avoid the
-  // top fans' square footprints.
-  const positions = fanLayout.top.positions;
+  // Avoid the pierced plate's fans' square footprints (PC fans are square frames).
   const clear = (x: number, y: number): boolean =>
     positions.every((fan) => Math.abs(x - fan.x) >= reach || Math.abs(y - fan.y) >= reach);
   if (positions.length === 0 || clear(desiredX, desiredY)) {

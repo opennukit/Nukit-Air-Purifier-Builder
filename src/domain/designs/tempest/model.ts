@@ -209,7 +209,12 @@ export type TempestCordPassThroughPlacement =
     }
   | {
       readonly topology: "quad";
-      readonly type: "top-cylinder";
+      readonly type: "top-cylinder"; // a vertical (z) cylinder through a cap plate
+      // Which cap plate it pierces: the top plate (default) or the bottom plate
+      // (into the feet standoff), so bottom-fan towers can route the cord down by
+      // the wiring. zStart/depth already encode the plate span; face is for the
+      // preview and to pick which fan grid to avoid.
+      readonly face: "top" | "bottom";
       readonly diameter: Millimeters;
       readonly x: Millimeters; // corner resolved — kills the towerCordUsesHigh* booleans
       readonly y: Millimeters;

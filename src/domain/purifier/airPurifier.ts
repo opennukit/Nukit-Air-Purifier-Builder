@@ -161,6 +161,10 @@ export function normalizeRawSettings(
   const bottomFilterActive = input.bottomFilter && squareTowerFilter;
   const towerBottomFansOff =
     towerActive && (input.topExhaust === "box-exhaust" || bottomFilterActive);
+  // "bottom" is a tower-only cord route; on any other design fall back to a real
+  // wall so the horizontal cord placement never receives it.
+  const cordHoleWall =
+    input.cordHoleWall === "bottom" && !towerActive ? "back" : input.cordHoleWall;
   // The tower historically dropped the bottom bank in the design pipeline, so for a
   // live tower preserve the raw bottom-fan count (the configuration reads it from
   // raw.fansBottom directly). Force it to 0 when Box/Exhaust or the bottom filter is
@@ -183,7 +187,7 @@ export function normalizeRawSettings(
     // non-tempest design is active, so switching back keeps the user's fit.
     filterFitClearance: normalizeFilterFitClearance(input.filterFitClearance),
     cordHoleDiameter: normalizeCordHoleDiameter(input.cordHoleDiameter),
-    cordHoleWall: input.cordHoleWall,
+    cordHoleWall,
     cordHoleSide: input.cordHoleSide,
     cordHoleCornerOffset: normalizeCordHoleCornerOffset(input.cordHoleCornerOffset),
     outsideFlangeThickness: normalizeOutsideFlangeThickness(input.outsideFlangeThickness),

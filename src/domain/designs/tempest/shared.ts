@@ -182,6 +182,9 @@ export type TempestCordPassThrough =
       readonly wall: TempestWall;
       readonly side: "left" | "center" | "right";
       readonly cornerOffset: Millimeters;
+      // Four-side tower only: route the cord down through the bottom plate (into the
+      // feet standoff) instead of the top plate. `wall`/`side` still pick the corner.
+      readonly towerBottomExit?: boolean;
     };
 
 // The shipped cord hole: an 8 mm bore hugging the right corner of the right

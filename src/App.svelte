@@ -430,6 +430,10 @@
   $: showTowerTopFanCount = isFourFilterTower && selectedFanSizeChoice !== "box-exhaust";
   $: showTowerBottomFanCount =
     showTowerTopFanCount && fabricationMethod === "print-3mf" && !(settings.bottomFilter && isSquareTowerFilter);
+  // The tower can route the cord out the bottom plate (into the feet standoff) when
+  // it has bottom fans or is raised on feet; otherwise it's top-only.
+  $: showTowerBottomCord =
+    isFourFilterTower && fabricationMethod === "print-3mf" && (settings.fansBottom !== 0 || settings.feetLength !== 0);
   // Fan-placement checkboxes: all four walls for the horizontal layouts; only
   // "Top" for the four-side tower (its other faces are filters), where it
   // toggles the top-panel fan grid.
@@ -2675,14 +2679,21 @@
                     <p class="eyebrow advanced-group-label">Cord</p>
                     {#if settings.cordHoleDiameter > 0}
                       <label class="field">
-                        <span>Power cord wall {@render infoTip("info-cordHoleWall", "Diameter of the hole the fan power cables exit through. The 4-side tower routes it through the top-plate corner instead.")}</span>
+                        <span>Power cord wall {@render infoTip("info-cordHoleWall", "Which face the fan power cables exit through. The 4-side tower routes it through the top plate, or through the bottom plate (into the feet standoff) when it has bottom fans or feet.")}</span>
                         {#if isFourFilterTower}
-                          <select name="cordHoleWall">
-                            <option value={settings.cordHoleWall} selected>Top</option>
-                          </select>
+                          {#if showTowerBottomCord}
+                            <select name="cordHoleWall" onchange={updateCordHoleWall}>
+                              <option value="right" selected={settings.cordHoleWall !== "bottom"}>Top</option>
+                              <option value="bottom" selected={settings.cordHoleWall === "bottom"}>Bottom</option>
+                            </select>
+                          {:else}
+                            <select name="cordHoleWall" disabled>
+                              <option value={settings.cordHoleWall} selected>Top</option>
+                            </select>
+                          {/if}
                         {:else}
                           <select name="cordHoleWall" onchange={updateCordHoleWall}>
-                            {#each cordHoleWalls.filter((wall) => wall !== "none") as wall}
+                            {#each cordHoleWalls.filter((wall) => wall !== "none" && wall !== "bottom") as wall}
                               <option value={wall} selected={settings.cordHoleWall === wall}>{cordWallLabel(wall)}</option>
                             {/each}
                           </select>

@@ -138,9 +138,12 @@ function buildTempestSettings(configuration: PurifierSettings): TempestSettings 
         : {
             type: "wall",
             diameter: design.cordHoleDiameter,
-            wall: design.cordHoleWall,
+            // "bottom" is a tower-only route carried on towerBottomExit; keep a real
+            // wall for the corner (only the tower reads towerBottomExit).
+            wall: design.cordHoleWall === "bottom" ? "back" : design.cordHoleWall,
             side: design.cordHoleSide,
             cornerOffset: design.cordHoleCornerOffset,
+            towerBottomExit: design.cordHoleWall === "bottom",
           },
   };
 }
