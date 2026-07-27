@@ -1,7 +1,7 @@
 import type { CordHoleWall, PurifierSettings } from "@/domain/purifier/settingsModel";
 import type { FilterCount } from "@/domain/purifier/designPresets";
 import type { FanCountRequest, FanDiameter } from "@/domain/purifier/fans";
-import { createAirPurifierGeometry, fanCenterYForWall, oneSideBackFanBoxDepth, type AirPurifierGeometry } from "@/domain/purifier/geometry";
+import { createAirPurifierGeometry, fanCenterYForWall, oneSideBackFanBoxDepth, twoFilterFanChamberOverride, type AirPurifierGeometry } from "@/domain/purifier/geometry";
 import {
   cutPanelsToDocument,
   edgeSections,
@@ -83,7 +83,13 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   // The laser rear fan wall only covers the fan band; the hand-cut box is a plain
   // rectangular prism, so its rear (top) panel is the full box face like the sides
   // and bottom.
-  const rearWallHeight = handCut ? chamberHeight : (oneSideBackFanBoxDepth(settings) ?? fanDiameter);
+  // The laser rear ("top") fan wall covers only the fan-clear band between the two
+  // filter flanges; the flanges cover the rest of that face. Normally that band is
+  // the fan diameter, but a two-filter fan-chamber override widens it, so the wall
+  // must grow to match or the top of the box is left open.
+  const rearWallHeight = handCut
+    ? chamberHeight
+    : (oneSideBackFanBoxDepth(settings) ?? twoFilterFanChamberOverride(settings) ?? fanDiameter);
   const panels: CutPanelDraft[] = [];
   const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
   // Hand cut has no filter rails poking through the walls, so no filter-tab slots.

@@ -4,6 +4,7 @@ import { createLayout } from "@/fabrication/purifierLayout";
 import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import { createTempestModel } from "@/domain/designs/tempest/model";
 import { createTempestSettingsFromConfiguration } from "@/fabrication/printing/designs/tempest/settings";
+import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";
 import { createTempestPrintableKit } from "@/fabrication/printing/designs/tempest/printableKit";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
 import { cleanManifold, manifoldReport } from "../helpers/manifoldChecks";
@@ -77,6 +78,20 @@ describe("two-filter fan-chamber width override", () => {
   test("a non-positive override normalizes back to Auto", () => {
     expect(createLayout({ ...laserTwoFilter, fanChamberDepth: 0 }).configuration.cutting.fanChamberDepth).toBe(-1);
     expect(createLayout({ ...laserTwoFilter, fanChamberDepth: 150 }).configuration.cutting.fanChamberDepth).toBe(150);
+  });
+
+  test("laser: the rear (top) fan wall grows with the override so the top stays sealed", () => {
+    // The rear fan wall covers the fan-clear band between the two filter flanges.
+    // It must track the override (a fixed fanDiameter would leave the top open).
+    const topWallHeight = (raw: RawPurifierSettings): number => {
+      const panel = createAirPurifierCutPanels(createLayout(raw).configuration).find((p) => p.id === "top-fan-wall");
+      if (!panel) throw new Error("no top-fan-wall");
+      return panel.height;
+    };
+    const at200 = topWallHeight({ ...laserTwoFilter, fanChamberDepth: 200 });
+    const at300 = topWallHeight({ ...laserTwoFilter, fanChamberDepth: 300 });
+    // Kerf growth cancels in the difference, leaving the 100 mm chamber delta.
+    expect(at300 - at200).toBeCloseTo(100, 5);
   });
 
   test("a 3D-print sandwich with an override still prints watertight", () => {
