@@ -2611,7 +2611,7 @@
                     <div class="advanced-group" data-tempest-feet-group>
                       <p class="eyebrow advanced-group-label">Feet</p>
                       <label class="field">
-                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Auto sizes them from the bottom fan or filter airflow so the intake gap around the base doesn't restrict it (about 100 mm when there's no bottom fan or filter). Uncheck Auto to set your own length; 0 removes the feet.")}</span>
+                        <span>Foot length {@render infoTip("info-feetLength", "Length of the four corner feet that lift the tower, in mm. Auto sizes them from the bottom fan or filter airflow so the intake gap around the base doesn't restrict it, and leaves them off when there's no bottom fan or filter. Uncheck Auto to set your own length; 0 removes the feet.")}</span>
                         <span class="input-shell">
                           <input
                             type="number"

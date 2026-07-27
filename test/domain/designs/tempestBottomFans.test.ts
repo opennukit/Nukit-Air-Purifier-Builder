@@ -170,10 +170,10 @@ describe("tower bottom fan grille (CSG)", () => {
 });
 
 describe("tower auto foot length", () => {
-  test("returns 100 mm when there is no bottom fan or filter", () => {
+  test("returns 0 (no feet) when there is no bottom fan or filter", () => {
     expect(
       recommendedTowerFeetLengthMm({ boxWidthMm: 832, boxDepthMm: 832, structuralOffsetMm: 50.6, fanCount: 0, fanFreeAirM3h: 122.2, active: false }),
-    ).toBe(100);
+    ).toBe(0);
   });
 
   test("sizes the legs from the bottom-fan flow (curtain velocity ~2 m/s)", () => {

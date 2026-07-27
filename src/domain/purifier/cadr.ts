@@ -187,8 +187,11 @@ export function recommendedTowerFeetLengthMm(p: {
   readonly fanFreeAirM3h: number;
   readonly active: boolean;
 }): number {
+  // A plain tower (no bottom fan or filter) does not need feet, so Auto leaves them
+  // off by default. Feet only appear automatically when a bottom fan or filter needs
+  // an intake gap under the base.
   if (!p.active) {
-    return FEET_PLAIN_MM;
+    return 0;
   }
   const q0 = p.fanFreeAirM3h;
   if (p.fanCount <= 0 || q0 <= 0) {
