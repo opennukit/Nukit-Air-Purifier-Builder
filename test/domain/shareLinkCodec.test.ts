@@ -129,6 +129,23 @@ describe("share-link codec", () => {
     expect(restored.get("fansLeft")).toBe("-1");
   });
 
+  test("fanChamberDepth round-trips through a v2 token", () => {
+    const query = shareQuery(
+      { ...defaultSettings, printDesign: "nukit-open-air", filters: 2, fanChamberDepth: 128 },
+      "previewMode=cut-sheet&fabricationMethod=laser-svg",
+    );
+    const restored = new URLSearchParams(decodeShareToken(encodeShareToken(query)));
+    expect(restored.get("fanChamberDepth")).toBe("128");
+  });
+
+  test("v1 tokens (which predate fanChamberDepth) still decode, defaulting it to Auto", () => {
+    // A real token generated before the fan-chamber field existed (version byte 1).
+    const v1Token =
+      "AQGAreIEwKP3BeCYF8DPJAGAvpIBEmFyY3RpYy1wMTQtcHdtLXBzdAAAAAAAAYDTDoDTDoDiCaCcAcobASTAuAIBAp-cAQAAAAIGY3VzdG9tAuBdwJoMBQKg4BTAmgwBAMCaDID6AQAAwLlVwLgCAJ-cAQHgiLoEgPEEwKkHwKP3BYDxBMCpB-Dujwegy5gBwI23AYCncMCaDMCaDAGgjQagjQbQD8C4AsC4AgCgnAGgnAHAuAKgnAHAhD0BAQEAAAAACm1hdHRlLWdyYXkBAQGAiXoBAgdiZWQtMjU2";
+    const restored = decodeShareToken(v1Token); // must not throw
+    expect(decodeSettings(restored).fanChamberDepth).toBe(-1);
+  });
+
   test("throws on a malformed token", () => {
     expect(() => decodeShareToken("!!!!not-valid!!!!")).toThrow();
     expect(() => decodeShareToken("")).toThrow();

@@ -107,6 +107,7 @@ export function encodeSettings(
   params.set("hexFullCellsOnly", String(settings.hexFullCellsOnly));
   params.set("backPlateFans", String(settings.backPlateFans));
   params.set("boxDepth", formatNumber(settings.boxDepth));
+  params.set("fanChamberDepth", formatNumber(settings.fanChamberDepth));
   params.set("alignmentPinDiameter", formatNumber(settings.alignmentPinDiameter));
   params.set("bottomFilter", String(settings.bottomFilter));
   params.set("feetLength", formatNumber(settings.feetLength));
@@ -459,6 +460,7 @@ const purifierSettingsFieldKeys: Record<
   hexFullCellsOnly: "hexFullCellsOnly",
   backPlateFans: "backPlateFans",
   boxDepth: "boxDepth",
+  fanChamberDepth: "fanChamberDepth",
   alignmentPinDiameter: "alignmentPinDiameter",
   bottomFilter: "bottomFilter",
   feetLength: "feetLength",

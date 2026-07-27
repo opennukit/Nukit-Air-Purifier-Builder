@@ -104,6 +104,7 @@ export type PurifierSettingsFieldFallbacks = {
   readonly hexFullCellsOnly: boolean;
   readonly backPlateFans: number;
   readonly boxDepth: number;
+  readonly fanChamberDepth: number;
   readonly alignmentPinDiameter: number;
   // Tempest 4-filter tower only: add a fifth (bottom) filter when the filter is
   // square, and the length of the corner feet that lift the box, in mm.
@@ -184,6 +185,7 @@ export const createPurifierSettingsFieldsSchema = (
     hexFullCellsOnly: zBooleanField(fallbacks.hexFullCellsOnly),
     backPlateFans: zBackFanCountField(fallbacks.backPlateFans),
     boxDepth: zNumberField(fallbacks.boxDepth),
+    fanChamberDepth: zNumberField(fallbacks.fanChamberDepth),
     alignmentPinDiameter: zNumberField(fallbacks.alignmentPinDiameter),
     bottomFilter: zBooleanField(fallbacks.bottomFilter),
     feetLength: zNumberField(fallbacks.feetLength),

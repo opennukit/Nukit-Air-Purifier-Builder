@@ -424,6 +424,19 @@
   // the layout (sized from the bottom fan/filter flow, or 100 mm when neither).
   $: feetLengthIsAuto = settings.feetLength < 0;
   $: resolvedFeetLengthMm = layout.towerFeetLengthMm;
+  // Fan-chamber width override (Advanced): the gap between the two inside filter
+  // flanges where the fans sit. Two-filter builds only: the laser/hand two-filter
+  // box, or the 3D-print dual-horizontal sandwich. -1 = Auto (fan-diameter driven).
+  $: isTwoFilterSandwich =
+    (isNukitControlsActive && settings.filters === 2) ||
+    (isTempestControlsActive && settings.tempestArrangement === "dual-horizontal-sandwich");
+  $: fanChamberIsAuto = settings.fanChamberDepth <= 0;
+  // The auto value shown as the placeholder: hand-cut keeps 8 mm of clearance, the
+  // laser box and 3D-print sandwich keep 2 mm.
+  $: fanChamberAutoMm =
+    isNukitControlsActive && settings.cutStyle === "hand"
+      ? settings.fanDiameter + 8
+      : settings.fanDiameter + 2;
   // Tower Top/Bottom fan-count selectors (Advanced): available for PC fans; the
   // bottom count follows the same rules as the bottom fan plate (3D print only,
   // not Box/Exhaust, not while the bottom filter is on).
@@ -888,6 +901,13 @@
   function updateFeetAuto(event: Event): void {
     const auto = readCheckboxInput(event);
     commitSettings({ ...settings, feetLength: auto ? -1 : Math.max(0, layout.towerFeetLengthMm) });
+  }
+
+  // Two-filter fan-chamber gap override. A blank field (or a non-positive value)
+  // means Auto (-1, fan-diameter driven); a positive number is the manual width.
+  function updateFanChamberDepth(event: Event): void {
+    const value = readNumberInput(event, -1);
+    commitSettings({ ...settings, fanChamberDepth: value > 0 ? value : -1 });
   }
 
   function updatePreviewMaterialColor(color: PreviewMaterialColorId): void {
@@ -2634,6 +2654,27 @@
                       </label>
                     </div>
                   {/if}
+                  {#if isTwoFilterSandwich}
+                    <div class="advanced-group" data-fan-chamber-group>
+                      <p class="eyebrow advanced-group-label">Fan chamber</p>
+                      <label class="field">
+                        <span>Chamber width {@render infoTip("info-fanChamberDepth", "The gap between the two inside filter flanges, where the fans sit. Auto sizes it to the fan diameter. Increase it if your vibration-damping fan gaskets are a little larger than the fans. Leave blank for Auto; enter a value to set the exact width.")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="fanChamberDepth"
+                            min="1"
+                            step="1"
+                            inputmode="decimal"
+                            value={fanChamberIsAuto ? "" : settings.fanChamberDepth}
+                            placeholder={fanChamberIsAuto ? `Auto (${fanChamberAutoMm})` : ""}
+                            onchange={updateFanChamberDepth}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    </div>
+                  {/if}
                   <div class="advanced-group" data-fan-model-group>
                     <p class="eyebrow advanced-group-label">Performance</p>
                     {@render fanModelControls()}
@@ -2815,6 +2856,27 @@
                       </label>
                     {/if}
                   </div>
+                  {#if isTwoFilterSandwich}
+                    <div class="advanced-group" data-fan-chamber-group>
+                      <p class="eyebrow advanced-group-label">Fan chamber</p>
+                      <label class="field">
+                        <span>Chamber width {@render infoTip("info-fanChamberDepth", "The gap between the two inside filter flanges, where the fans sit. Auto sizes it to the fan diameter. Increase it if your vibration-damping fan gaskets are a little larger than the fans. Leave blank for Auto; enter a value to set the exact width.")}</span>
+                        <span class="input-shell">
+                          <input
+                            type="number"
+                            name="fanChamberDepth"
+                            min="1"
+                            step="1"
+                            inputmode="decimal"
+                            value={fanChamberIsAuto ? "" : settings.fanChamberDepth}
+                            placeholder={fanChamberIsAuto ? `Auto (${fanChamberAutoMm})` : ""}
+                            onchange={updateFanChamberDepth}
+                          />
+                          <small>mm</small>
+                        </span>
+                      </label>
+                    </div>
+                  {/if}
                   <div class="advanced-group" data-fan-model-group>
                     <p class="eyebrow advanced-group-label">Performance</p>
                     {@render fanModelControls()}

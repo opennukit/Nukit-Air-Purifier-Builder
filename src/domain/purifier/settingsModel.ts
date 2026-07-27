@@ -124,6 +124,10 @@ export type CuttingSettings = {
   referenceScale: ReferenceScale;
   joints: JointSettings;
   cordHole: CuttingCordHole;
+  // Two-filter sandwich only: manual override for the gap between the two inside
+  // filter flanges (where the fans sit), in mm. -1 = Auto (fan-diameter driven).
+  // Lets builders open the chamber for oversized fan gaskets.
+  fanChamberDepth: Millimeters;
 };
 
 // Power-cord pass-through bore for the laser enclosure. diameter <= 0 (or
@@ -301,6 +305,9 @@ export type RawPurifierSettings = {
   // Tempest one-side "panel" (Back on) only: the chamber depth between the inside
   // filter flange and the inside back wall, in mm.
   boxDepth: Millimeters;
+  // Two-filter sandwich only: manual override for the gap between the two inside
+  // filter flanges (where the fans sit), in mm. -1 = Auto (fan-diameter driven).
+  fanChamberDepth: Millimeters;
   // Tempest-only: diameter of the printed alignment-pin holes along each seam, in
   // mm. 0 disables the pins entirely; values above 0 (up to 2.5) size the holes.
   alignmentPinDiameter: Millimeters;
@@ -367,6 +374,8 @@ export type PurifierCuttingDraft = {
   readonly screwHoleDiameter: Millimeters;
   readonly kerfFit: Millimeters;
   readonly joints: JointSettings;
+  // Two-filter sandwich fan-chamber gap override (-1 = Auto). See CuttingSettings.
+  readonly fanChamberDepth: Millimeters;
 };
 
 export type LaserCutDesignDraft = {
@@ -645,6 +654,7 @@ export const defaultSettings: RawPurifierSettings = {
   hexFullCellsOnly: false,
   backPlateFans: 0,
   boxDepth: 70,
+  fanChamberDepth: -1, // -1 = Auto (fan-diameter driven; override for oversized gaskets)
   alignmentPinDiameter: 2,
   bottomFilter: false,
   feetLength: -1, // -1 = Auto (flow-based when a bottom fan/filter is present, else no feet)

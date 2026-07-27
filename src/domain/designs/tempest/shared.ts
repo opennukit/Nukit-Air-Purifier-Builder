@@ -269,6 +269,10 @@ export type TempestSettings = {
   // between the inside filter flange and the inside back wall. When omitted, the
   // one-side box height is driven by the fan diameter (the original wall-mount).
   readonly oneSidePanelDepth?: Millimeters;
+  // Two-filter sandwich only: manual override for the gap between the two inside
+  // filter flanges (where the fans sit), so oversized fan gaskets fit. When omitted,
+  // the gap is fan-diameter driven.
+  readonly twoFilterChamberDepth?: Millimeters;
   readonly filterSlot: TempestFilterSlotSettings;
   readonly cordPassThrough: TempestCordPassThrough;
   readonly alignmentPins: TempestAlignmentPinSettings;

@@ -83,6 +83,13 @@ function buildTempestSettings(configuration: PurifierSettings): TempestSettings 
       design.arrangement === "single-horizontal-top-filter" && design.backPlateFans && !hasAnyWallFan(configuration)
         ? design.boxDepth
         : undefined,
+    // Two-filter sandwich fan-chamber gap override (Advanced). A positive value in
+    // cutting.fanChamberDepth is the manual inside-flange-to-inside-flange width;
+    // -1 (the default) leaves it fan-diameter driven.
+    twoFilterChamberDepth:
+      design.arrangement === "dual-horizontal-sandwich" && configuration.cutting.fanChamberDepth > 0
+        ? configuration.cutting.fanChamberDepth
+        : undefined,
     fan: {
       ...defaultTempestSettings.fan,
       diameter: configuration.fan.spec.diameter,

@@ -68,7 +68,9 @@ export function createSandwichBox(settings: TempestSettings, frame: TempestFrame
   const chamberDepth =
     filterCount === 1 && settings.oneSidePanelDepth !== undefined
       ? settings.oneSidePanelDepth
-      : settings.fan.diameter + HORIZONTAL_FAN_VERTICAL_PADDING_MM;
+      : filterCount === 2 && settings.twoFilterChamberDepth !== undefined
+        ? settings.twoFilterChamberDepth
+        : settings.fan.diameter + HORIZONTAL_FAN_VERTICAL_PADDING_MM;
   const height =
     chamberDepth +
     2 * frame.outsideFlangeThickness +

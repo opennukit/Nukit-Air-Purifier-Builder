@@ -112,6 +112,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       side: raw.cordHoleSide,
       cornerOffset: normalizeCordHoleCornerOffset(raw.cordHoleCornerOffset),
     },
+    fanChamberDepth: normalizeFanChamberDepth(raw.fanChamberDepth),
   };
 
   return {
@@ -286,6 +287,7 @@ export function createPurifierDraft(
       screwHoleDiameter: configuration.cutting.screwHoleDiameter,
       kerfFit: configuration.cutting.kerfFit,
       joints: configuration.cutting.joints,
+      fanChamberDepth: configuration.cutting.fanChamberDepth,
     },
     preview: configuration.preview,
   };
@@ -316,6 +318,7 @@ export function serializePurifierDraft(
     screwHoleDiameter: draft.cutting.screwHoleDiameter,
     materialThickness: draft.cutting.materialThickness,
     kerfFit: draft.cutting.kerfFit,
+    fanChamberDepth: draft.cutting.fanChamberDepth,
     fingerWidthMultiplier: draft.cutting.joints.finger.widthMultiplier,
     fingerSpaceMultiplier: draft.cutting.joints.finger.spaceMultiplier,
     fingerPlayMultiplier: draft.cutting.joints.finger.playMultiplier,
@@ -510,6 +513,7 @@ function toRawSettings(input: PurifierInput): RawPurifierSettings {
     screwHoleDiameter: input.cutting.screwHoleDiameter,
     materialThickness: input.cutting.materialThickness,
     kerfFit: input.cutting.kerfFit,
+    fanChamberDepth: input.cutting.fanChamberDepth,
     fingerWidthMultiplier: input.cutting.joints.finger.widthMultiplier,
     fingerSpaceMultiplier: input.cutting.joints.finger.spaceMultiplier,
     fingerPlayMultiplier: input.cutting.joints.finger.playMultiplier,
@@ -976,6 +980,13 @@ function normalizeHexSpacing(value: Millimeters): Millimeters {
 
 function normalizeBoxDepth(value: Millimeters): Millimeters {
   return Number.isFinite(value) && value > 0 ? clamp(value, 1, 1000) : defaultSettings.boxDepth;
+}
+
+// Two-filter fan-chamber gap override, in mm. A positive value is the manual
+// inside-flange-to-inside-flange width (clamped to a buildable range); anything
+// else (including the -1 sentinel) means Auto (fan-diameter driven).
+function normalizeFanChamberDepth(value: Millimeters): Millimeters {
+  return Number.isFinite(value) && value > 0 ? clamp(value, 1, 1000) : -1;
 }
 
 // Alignment-pin hole diameter, in mm. 0 disables the pins entirely; positive

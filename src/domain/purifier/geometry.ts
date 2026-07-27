@@ -50,13 +50,18 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   // The one-side "Back" box uses the user's Box depth as the chamber instead of
   // the fan-diameter chamber (fans live on the back plate, not the walls).
   const backFanChamberDepth = oneSideBackFanBoxDepth(settings);
+  // Two-filter sandwich only: a manual override for the fan-chamber gap (the space
+  // between the two inside filter flanges where the fans sit), so builders can open
+  // it up for oversized fan gaskets. Undefined = Auto (fan-diameter driven).
+  const fanChamberOverride = twoFilterFanChamberOverride(settings);
   // Hand-cut depth is the airflow gap plus one filter thickness (the filter taped
   // against the fans). The gap is the user's Box depth when the back-plate fan box
-  // is active, otherwise just the fan frame, so the Box depth control drives the
-  // depth exactly like it does for the laser box.
+  // is active, otherwise the manual override or just the fan frame, so the Box depth
+  // control drives the depth exactly like it does for the laser box.
   const chamberHeight = handCut
-    ? (backFanChamberDepth ?? fanDiameter + HAND_CUT_FAN_CHAMBER_CLEARANCE_MM) + settings.filterCount * dimensions.thickness
-    : (backFanChamberDepth ?? fanDiameter + 2) +
+    ? (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + HAND_CUT_FAN_CHAMBER_CLEARANCE_MM) +
+      settings.filterCount * dimensions.thickness
+    : (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + 2) +
       settings.filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(settings.cutting.rim, dimensions.width, workingDepth, chamberHeight);
 
@@ -71,6 +76,17 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
     filterLayers: createFilterLayers(settings.filterCount, chamberHeight, dimensions.thickness, materialThickness),
     filterFingerHoleYs: createFilterFingerHoleYs(settings.filterCount, chamberHeight, dimensions.thickness, materialThickness),
   };
+}
+
+// The manual fan-chamber gap override for a two-filter sandwich (any fabrication
+// style). Returns the user's inside-flange-to-inside-flange width when set, or
+// undefined for Auto (the -1 sentinel) or any non-two-filter build.
+export function twoFilterFanChamberOverride(settings: PurifierSettings): number | undefined {
+  if (settings.filterCount !== 2) {
+    return undefined;
+  }
+  const value = settings.cutting.fanChamberDepth;
+  return value > 0 ? value : undefined;
 }
 
 // The one-side "Back" box (laser cut, single filter, Back fan grid on, no wall

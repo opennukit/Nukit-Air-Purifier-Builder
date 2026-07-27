@@ -27,7 +27,10 @@ import {
 } from "@/domain/purifier/designPresets";
 import { defaultSettings } from "@/domain/purifier/settingsModel";
 
-const SHARE_TOKEN_VERSION = 1;
+// Bump when appending trailing fields (see `since`). The decoder accepts every
+// version from 1..SHARE_TOKEN_VERSION: older tokens simply lack the newer trailing
+// fields and fall back to their defaults, so existing links keep working.
+const SHARE_TOKEN_VERSION = 2;
 
 // ##############################
 // Field schema
@@ -47,6 +50,9 @@ type Field = {
   // Only emitted to the reconstructed query string when this predicate passes,
   // mirroring the conditional writes in encodeSettings / encodeWorkbenchState.
   readonly emitWhen?: (ctx: EmitContext) => boolean;
+  // Token version this trailing field first appeared in (default 1). The decoder
+  // skips reading it from older tokens (they end before it) and uses the fallback.
+  readonly since?: number;
 };
 
 type EmitContext = {
@@ -177,6 +183,9 @@ const SCHEMA: readonly Field[] = [
   { key: "previewMode", type: enm(PREVIEW_MODE) },
   { key: "fabricationMethod", type: enm(FAB_METHOD) },
   { key: "printVolume", type: str(), emitWhen: isPrint3mf },
+  // v2: two-filter fan-chamber gap override (-1 = Auto). Appended last so v1 tokens
+  // (which end before it) stay decodable; they fall back to the Auto default.
+  { key: "fanChamberDepth", type: num(), since: 2 },
 ];
 
 // Fallback string values for optional fields that may be absent from the source
@@ -187,6 +196,8 @@ const FALLBACKS: Record<string, string> = {
   splitFrames: String(defaultSettings.splitFrames),
   cutStyle: defaultSettings.cutStyle,
   printVolume: "bed-256",
+  // v1 tokens predate this field; decode them as the Auto default.
+  fanChamberDepth: String(defaultSettings.fanChamberDepth),
 };
 
 // Exposed for the schema-coverage test.
@@ -216,11 +227,17 @@ export function encodeShareToken(query: string): string {
 export function decodeShareToken(token: string): string {
   const r = new ByteReader(base64UrlToBytes(token));
   const version = r.u8();
-  if (version !== SHARE_TOKEN_VERSION) {
+  if (version < 1 || version > SHARE_TOKEN_VERSION) {
     throw new Error(`Unsupported share token version: ${version}`);
   }
   const values: Record<string, string> = {};
   for (const field of SCHEMA) {
+    // A field newer than this token's version is not present in the byte stream, so
+    // do not read it (that would run past the end); use its fallback/default.
+    if ((field.since ?? 1) > version) {
+      values[field.key] = FALLBACKS[field.key] ?? "";
+      continue;
+    }
     values[field.key] = readField(r, field.type);
   }
   const ctx: EmitContext = {
