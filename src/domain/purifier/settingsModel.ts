@@ -935,6 +935,21 @@ const nukitLaserDesignFields = {
   "nukit-tempest-pro": { filterWidth: 500, filterDepth: 622, filterThickness: 19, fansLeft: automaticFanCount, fansRight: automaticFanCount, fansTop: 0, fansBottom: 0 },
 } satisfies Readonly<Record<Exclude<NukitLaserDesign, "custom">, Partial<RawPurifierSettings>>>;
 
+// Hand-cut Nukit Tempest Pro: the full foamcore build (a single-filter one-side box
+// with 140 mm ARCTIC P14 side fans, 9 mm foamcore, split rails, and the cord on the
+// left wall). Laser and 3D-print Pro keep the two-filter sandwich; these extras only
+// apply when the cut style is hand.
+const nukitTempestProHandCutOverrides = {
+  filters: 1,
+  fanDiameter: 140,
+  materialThickness: 9,
+  splitFrames: true,
+  cordHoleWall: "left",
+  cordHoleSide: "right",
+  boxDepth: 50,
+  previewMaterialColor: "matte-gray",
+} satisfies Partial<RawPurifierSettings>;
+
 export function applyNukitLaserDesign(settings: RawPurifierSettings, design: NukitLaserDesign): RawPurifierSettings {
   if (design === "custom") {
     return settings;
@@ -949,6 +964,15 @@ export function applyNukitLaserDesign(settings: RawPurifierSettings, design: Nuk
       ...settings,
       ...nukitTempestEuroDesignOverrides,
       previewMaterialColor: settings.cutStyle === "hand" ? "matte-gray" : "forest-green",
+    };
+  }
+  // Hand-cut Pro applies its full foamcore build on top of the shared geometry.
+  if (design === "nukit-tempest-pro" && settings.cutStyle === "hand") {
+    return {
+      ...settings,
+      ...nukitLaserDesignFields[design],
+      fanModel: "arctic-p14-pwm-pst",
+      ...nukitTempestProHandCutOverrides,
     };
   }
   // Original / Pro: their geometry plus the standard ARCTIC P14 PWM PST fan model
