@@ -90,6 +90,12 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
   const rearWallHeight = handCut
     ? chamberHeight
     : (oneSideBackFanBoxDepth(settings) ?? twoFilterFanChamberOverride(settings) ?? fanDiameter);
+  // Hand-cut lap joints: the top/bottom fan walls wrap OUTSIDE the two side walls,
+  // so they run the full outer width (filter width plus one wall thickness at each
+  // end) while the side walls fit BETWEEN them at the filter depth. The cavity then
+  // equals the filter for a snug press-fit. Finger-jointed (laser) construction
+  // keeps its own edge joinery, so its fan walls stay the plain filter width.
+  const fanWallWidth = handCut ? width + 2 * thickness : width;
   const panels: CutPanelDraft[] = [];
   const cordCut = (wall: CordHoleWall): CircleCut | null => createCordHoleCut(wall, geometry, settings);
   // Hand cut has no filter rails poking through the walls, so no filter-tab slots.
@@ -108,7 +114,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     createFanWallPanel({
       id: "top-fan-wall",
       name: "Top fan wall",
-      width,
+      width: fanWallWidth,
       height: rearWallHeight,
       requestedFans: settings.fan.banks.top,
       // Hand cut makes the rear wall span the FULL chamber, so centering the fans
@@ -123,9 +129,10 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "rear-fan-wall",
         placement: {
-          // Hand cut: sit the rear wall flush inside the side walls' depth (butt
-          // joint) instead of centred on the face, so it doesn't protrude above.
-          position: [0, rearFanWallY, handCut ? workingDepth / 2 - thickness / 2 : workingDepth / 2],
+          // Hand cut: the rear fan wall wraps OUTSIDE the side walls (its inner face
+          // sits at the filter depth), so shift it out by half a thickness. Its ends
+          // lap over the side walls' outer faces.
+          position: [0, rearFanWallY, handCut ? workingDepth / 2 + thickness / 2 : workingDepth / 2],
           rotation: [0, 0, 0],
         },
       },
@@ -136,7 +143,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
     createFanWallPanel({
       id: "bottom-fan-wall",
       name: "Bottom fan wall",
-      width,
+      width: fanWallWidth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.bottom,
       fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight),
@@ -148,9 +155,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "front-fan-wall",
         placement: {
-          // Hand cut has no finger-hole lap offset: sit the front wall flush at the
-          // bottom (butt joint) so it isn't raised off the floor.
-          position: [0, 0, handCut ? -workingDepth / 2 + thickness / 2 : -workingDepth / 2 + fingerHoleInset],
+          // Hand cut: the front fan wall also wraps outside the side walls, so shift
+          // it out by half a thickness (mirror of the rear wall).
+          position: [0, 0, handCut ? -(workingDepth / 2 + thickness / 2) : -workingDepth / 2 + fingerHoleInset],
           rotation: [0, 0, 0],
         },
       },
@@ -197,7 +204,9 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
           // flip reads correctly. The one-filter wall is asymmetric, so it must be
           // a true mirror (reflection) of the right wall — rotation alone can't do
           // that, so reflect it (mirrored) and place it un-flipped.
-          position: [-width / 2, 0, 0],
+          // Hand cut: nudge the side wall out by half a thickness so its inner face
+          // lands at the filter edge and the fan walls lap over its outer face.
+          position: [handCut ? -(width / 2 + thickness / 2) : -width / 2, 0, 0],
           rotation: filterCount === 1 ? [0, -Math.PI / 2, 0] : [Math.PI, -Math.PI / 2, 0],
           mirrored: filterCount === 1,
         },
@@ -223,7 +232,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
         type: "placed",
         role: "right-side-wall",
         placement: {
-          position: [width / 2, 0, 0],
+          position: [handCut ? width / 2 + thickness / 2 : width / 2, 0, 0],
           rotation: [0, Math.PI / 2, 0],
         },
       },
