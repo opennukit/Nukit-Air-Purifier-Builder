@@ -121,7 +121,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       // on the wall (rearWallHeight / 2) drops them into the filter zone. Center
       // them on the fan-clear zone instead, matching the bottom and side walls. The
       // laser rear wall is only fan-diameter tall and already sits in the fan zone.
-      fanCenterY: handCut ? fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight) : rearWallHeight / 2,
+      fanCenterY: handCut ? fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight, fanDiameter, handCut) : rearWallHeight / 2,
       settings,
       edges: structuralEdges("ffff"),
       cordHole: cordCut("back"),
@@ -146,7 +146,7 @@ export function createAirPurifierCutPanels(settings: PurifierSettings): CutPanel
       width: fanWallWidth,
       height: chamberHeight,
       requestedFans: settings.fan.banks.bottom,
-      fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight),
+      fanCenterY: fanCenterYForWall(filterCount, chamberHeight, thickness, filterHeight, fanDiameter, handCut),
       settings,
       edges: structuralEdges("ffff"),
       cuts: createFilterFingerHoleCuts(width, settings, fanWallFilterRows),
@@ -608,12 +608,16 @@ function createSideWallPanel(input: {
   cordHole?: CircleCut | null;
   assembly: CutPanelAssembly;
 }): CutPanelDraft {
+  const sideWallHandCut =
+    input.settings.design.type === "laser-cut" && input.settings.design.cutStyle === "hand";
   const fanCenterY =
     fanCenterYForWall(
       input.settings.filterCount,
       input.height,
       input.settings.cutting.materialThickness,
       input.settings.filter.thickness,
+      input.settings.fan.spec.diameter,
+      sideWallHandCut,
     );
   const fanCuts = createFanCuts(input.width, input.height, input.requestedFans, input.settings, fanCenterY, input.cordHole);
   return rectangularPanel({
@@ -682,7 +686,7 @@ function createCordHoleCut(wall: CordHoleWall, geometry: AirPurifierGeometry, se
   // fan-diameter tall and already sits in the fan zone, so its own center is right.
   const handCut = settings.design.type === "laser-cut" && settings.design.cutStyle === "hand";
   const cy = handCut
-    ? fanCenterYForWall(settings.filterCount, chamberHeight, t, filterHeight)
+    ? fanCenterYForWall(settings.filterCount, chamberHeight, t, filterHeight, settings.fan.spec.diameter, handCut)
     : (wall === "back" ? settings.fan.spec.diameter : chamberHeight) / 2;
   const along = cord.side === "center" ? width / 2 : cord.side === "left" ? Math.max(cord.cornerOffset, margin) : width - Math.max(cord.cornerOffset, margin);
   const cx = clamp(along, margin, width - margin);

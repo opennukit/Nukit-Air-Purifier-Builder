@@ -162,7 +162,16 @@ export class AirPurifierGenerator extends Boxes {
 
       const segmentWidth = (length - 20) / fanCount;
       const screwOffset = this.configuration.fan.spec.screwSpacing / 2;
-      const fanCenterY = fanCenterYForWall(this.configuration.filterCount, height, t, geometry.filterDimensions.thickness);
+      const generatorHandCut =
+        this.configuration.design.type === "laser-cut" && this.configuration.design.cutStyle === "hand";
+      const fanCenterY = fanCenterYForWall(
+        this.configuration.filterCount,
+        height,
+        t,
+        geometry.filterDimensions.thickness,
+        fanDiameter,
+        generatorHandCut,
+      );
 
       for (let index = 0; index < fanCount; index += 1) {
         const fanCenterX = 10 + segmentWidth / 2 + index * segmentWidth;
