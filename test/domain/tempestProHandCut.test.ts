@@ -23,6 +23,8 @@ describe("Nukit Tempest Pro hand-cut preset", () => {
       fansTop: 0,
       fansBottom: 0,
       materialThickness: 9,
+      // Taped in place, so no slide-in gap around the filter.
+      filterFitClearance: 0,
       splitFrames: true,
       cordHoleWall: "left",
       cordHoleSide: "right",

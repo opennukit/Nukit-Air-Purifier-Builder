@@ -562,11 +562,12 @@
     let nextSettings = serializePurifierDraft(nextDraft);
     // The cut-sheet mode picks the construction style: Hand cut = foamcore (plain
     // taped edges), Laser cut = finger-jointed. 3D print leaves it untouched.
-    // Entering Hand cut defaults the material to 5 mm foamcore.
+    // Entering Hand cut defaults the material to 5 mm foamcore and drops the filter
+    // fit clearance to 0 (the filter is taped in place, so it wants a snug cavity).
     if (isCutSheetExportFormat(nextMethod)) {
       nextSettings = { ...nextSettings, cutStyle: nextMethod === "hand-svg" ? "hand" : "laser" };
       if (nextMethod === "hand-svg") {
-        nextSettings = { ...nextSettings, materialThickness: 5 };
+        nextSettings = { ...nextSettings, materialThickness: 5, filterFitClearance: 0 };
       }
       nextDraft = normalizePurifierDraft(nextSettings);
     }

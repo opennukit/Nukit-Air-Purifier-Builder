@@ -949,6 +949,8 @@ const nukitTempestProHandCutOverrides = {
   filters: 1,
   fanDiameter: 140,
   materialThickness: 9,
+  // Taped in place, so the cavity is snug to the filter.
+  filterFitClearance: 0,
   splitFrames: true,
   cordHoleWall: "left",
   cordHoleSide: "right",
