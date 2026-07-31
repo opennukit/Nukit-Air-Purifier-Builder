@@ -288,14 +288,11 @@
   ];
   const laserMaterialControls = generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter");
   // "Fit allowance" (kerf) only matters for laser cutting; hand-cut foamcore has no
-  // kerf, so drop it there. "Filter fit clearance" (the slide-in gap around the
-  // filter) applies to both laser and hand cut, mirroring the 3D-print control.
-  $: laserPanelFitControls = [
-    ...nukitPanelFitControls.filter(
-      (control) => control.name !== "rim" && !(settings.cutStyle === "hand" && control.name === "kerfFit"),
-    ),
-    ...tempestFitControls,
-  ];
+  // kerf, so drop it there. "Filter fit clearance" renders under Parts > Filter
+  // (shared with 3D print), not here.
+  $: laserPanelFitControls = nukitPanelFitControls.filter(
+    (control) => control.name !== "rim" && !(settings.cutStyle === "hand" && control.name === "kerfFit"),
+  );
   // Chunk-label deboss is parked: hide its control until the placement is reworked.
   const SHOW_CHUNK_LABELS_CONTROL = true;
   let showBoxExhaustOption = false;
@@ -2247,7 +2244,7 @@
                   </div>
                 {/if}
 
-                {#if isTempestControlsActive}
+                {#if isTempestControlsActive || isNukitControlsActive}
                   <div data-tempest-fit-controls>
                     {#each tempestFitControls as control}
                       <label class="field">
