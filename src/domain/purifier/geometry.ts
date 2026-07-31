@@ -37,6 +37,14 @@ const minimumFrameOpening = 1;
 // oracle) and adds a material flange, so it is not touched here.
 const HAND_CUT_FAN_CHAMBER_CLEARANCE_MM = 8;
 
+// Clearance the hand-cut fan-clear zone keeps beyond the fan frame. Foamcore walls
+// are thick, and the perpendicular walls capping the fan zone eat into it, so the
+// clearance scales with the wall thickness (one thickness of breathing room on each
+// side of the fan) and never drops below the base 8 mm for thin stock.
+function handCutFanChamberClearance(materialThickness: number): number {
+  return Math.max(HAND_CUT_FAN_CHAMBER_CLEARANCE_MM, 2 * materialThickness);
+}
+
 export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifierGeometry {
   const dimensions = settings.filter;
   const materialThickness = settings.cutting.materialThickness;
@@ -59,7 +67,7 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   // is active, otherwise the manual override or just the fan frame, so the Box depth
   // control drives the depth exactly like it does for the laser box.
   const chamberHeight = handCut
-    ? (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + HAND_CUT_FAN_CHAMBER_CLEARANCE_MM) +
+    ? (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + handCutFanChamberClearance(materialThickness)) +
       settings.filterCount * dimensions.thickness
     : (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + 2) +
       settings.filterCount * (dimensions.thickness + materialThickness);

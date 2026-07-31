@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";
+import { createAirPurifierGeometry } from "@/domain/purifier/geometry";
 import { assembledPanelWidthInset } from "@/rendering/three/preview/panelMeshes";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
 
@@ -87,6 +88,19 @@ describe("hand-cut lap joints", () => {
     // Side walls never inset, in either mode.
     expect(assembledPanelWidthInset("left-side-wall", THICK, true)).toBe(0);
     expect(assembledPanelWidthInset("left-side-wall", THICK, false)).toBe(0);
+  });
+
+  test("hand-cut fan chamber deepens with material thickness (laser does not)", () => {
+    const chamber = (raw: RawPurifierSettings): number => createAirPurifierGeometry(createLayout(raw).configuration).chamberHeight;
+    const thin = chamber({ ...handCut, filters: 1, materialThickness: 5 });
+    const thick = chamber({ ...handCut, filters: 1, materialThickness: 50 });
+    // Thicker foamcore gives the fan more room: the chamber grows ~2 mm per extra mm
+    // of wall (one thickness of clearance on each side of the fan).
+    expect(thick).toBeGreaterThan(thin + 80);
+    // Laser chamber is fan-diameter driven and does not balloon with material.
+    const laserThin = chamber({ ...handCut, cutStyle: "laser", filters: 1, materialThickness: 5 });
+    const laserThick = chamber({ ...handCut, cutStyle: "laser", filters: 1, materialThickness: 9 });
+    expect(laserThick - laserThin).toBeLessThan(20);
   });
 
   test("laser (finger-jointed) construction is unaffected: no 2-thickness lap", () => {
