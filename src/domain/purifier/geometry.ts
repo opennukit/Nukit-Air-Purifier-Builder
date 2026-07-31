@@ -146,9 +146,6 @@ export function filterFrameFaceY(
     : chamberHeight / 2 - filterHeight - materialThickness / 2;
 }
 
-// Margin between a single-filter fan and the filter it sits next to (hand cut).
-const HAND_CUT_FAN_FILTER_MARGIN_MM = 4;
-
 export function fanCenterYForWall(
   filters: FilterCount,
   wallHeight: number,
@@ -160,11 +157,12 @@ export function fanCenterYForWall(
   if (filters === 2) {
     return wallHeight / 2;
   }
-  // Single filter, hand cut: seat the fan just clear of the filter so the deepened
-  // chamber's extra depth sits BEHIND the fan (the closed-back / panel side), not
-  // between the fan and the filter. Laser keeps its tight chamber centered.
+  // Single filter, hand cut: the filter rests directly against the fan frames (they
+  // support it), so seat the fan with its frame edge flush at the filter's inner
+  // face. All the deepened chamber's extra depth then sits BEHIND the fan (the
+  // closed-back / panel side). Laser keeps its tight chamber centered.
   if (handCut) {
-    return filterHeight + fanDiameter / 2 + HAND_CUT_FAN_FILTER_MARGIN_MM;
+    return filterHeight + fanDiameter / 2;
   }
   return (wallHeight + materialThickness + filterHeight) / 2;
 }

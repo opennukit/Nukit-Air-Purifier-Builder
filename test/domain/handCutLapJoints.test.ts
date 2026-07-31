@@ -103,7 +103,7 @@ describe("hand-cut lap joints", () => {
     expect(laserThick - laserThin).toBeLessThan(20);
   });
 
-  test("single-filter hand-cut fan sits by the filter; the extra depth is on the panel side", () => {
+  test("single-filter hand-cut fan sits flush against the filter; extra depth is on the panel side", () => {
     const fanGaps = (mat: number) => {
       const raw: RawPurifierSettings = { ...handCut, filters: 1, materialThickness: mat, fansLeft: -1, fansRight: -1 };
       const g = createAirPurifierGeometry(createLayout(raw).configuration);
@@ -112,9 +112,10 @@ describe("hand-cut lap joints", () => {
       const r = 140 / 2;
       return { filterSide: fan.cy - r - raw.filterThickness, panelSide: g.chamberHeight - (fan.cy + r) };
     };
-    // Fan stays a small fixed margin off the filter regardless of thickness...
-    expect(fanGaps(5).filterSide).toBeCloseTo(4, 0);
-    expect(fanGaps(50).filterSide).toBeCloseTo(4, 0);
+    // The fan frame edge sits flush at the filter face (the filter rests on it), at
+    // any thickness...
+    expect(fanGaps(5).filterSide).toBeCloseTo(0, 0);
+    expect(fanGaps(50).filterSide).toBeCloseTo(0, 0);
     // ...and the deepened chamber's extra room lands behind the fan (panel side).
     expect(fanGaps(50).panelSide).toBeGreaterThan(fanGaps(5).panelSide + 80);
   });
