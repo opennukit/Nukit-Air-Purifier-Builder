@@ -68,6 +68,15 @@ describe("hand-cut lap joints", () => {
     expect(2 * (Math.abs(side.pos[0]) - THICK / 2)).toBeCloseTo(495, 5); // width cavity
   });
 
+  test("hand-cut allows thick stock (up to 50 mm); laser stays capped at 9 mm", () => {
+    const thk = (raw: RawPurifierSettings): number => createLayout(raw).configuration.cutting.materialThickness;
+    expect(thk({ ...handCut, materialThickness: 10 })).toBe(10);
+    expect(thk({ ...handCut, materialThickness: 40 })).toBe(40);
+    expect(thk({ ...handCut, materialThickness: 60 })).toBe(50); // clamped to the 50 mm max
+    // Laser (finger-jointed) construction still caps at 9 mm.
+    expect(thk({ ...handCut, cutStyle: "laser", materialThickness: 10 })).toBe(9);
+  });
+
   test("laser (finger-jointed) construction is unaffected: no 2-thickness lap", () => {
     const p = panelsById({ ...handCut, cutStyle: "laser" });
     const top = p.get("top-fan-wall")!;

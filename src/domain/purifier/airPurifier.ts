@@ -56,7 +56,11 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       : input;
   const printDesign = findPrintDesignPreset(raw.printDesign);
   const dimensions = normalizeFilterDimensions(rawFilterDimensions(raw));
-  const materialThickness = clamp(raw.materialThickness, 1.5, 9);
+  // Finger-jointed (laser) and 3D-print construction is tuned for thinner stock, so
+  // it caps at 9 mm. Hand-cut foamcore is a plain lap box and is often 10 mm or
+  // laminated thicker, so it allows up to 50 mm.
+  const isHandCut = isLaserCutDesignPreset(printDesign) && raw.cutStyle === "hand";
+  const materialThickness = clamp(raw.materialThickness, 1.5, isHandCut ? 50 : 9);
   const fanSpec = findFanSpec(raw.fanDiameter);
   const filterCount = raw.filters === 1 ? 1 : 2;
   const workingDepth = dimensions.depth - materialThickness;
