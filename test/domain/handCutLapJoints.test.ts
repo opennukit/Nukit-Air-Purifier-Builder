@@ -18,6 +18,9 @@ const handCut: RawPurifierSettings = {
   filterThickness: 44,
   materialThickness: THICK,
   fanDiameter: 140,
+  // Snug (no fit clearance) so the lap-joint cavity tests measure the pure geometry;
+  // the fit-clearance behavior is exercised in its own test.
+  filterFitClearance: 0,
 };
 
 function panelsById(raw: RawPurifierSettings) {
@@ -68,6 +71,15 @@ describe("hand-cut lap joints", () => {
     expect(top.width).toBeGreaterThan(side.width);
     expect(2 * (Math.abs(top.pos[2]) - THICK / 2)).toBeCloseTo(400, 5); // depth cavity
     expect(2 * (Math.abs(side.pos[0]) - THICK / 2)).toBeCloseTo(495, 5); // width cavity
+  });
+
+  test("filter fit clearance enlarges the laser/hand box interior by 2x the clearance", () => {
+    const boxWidth = (cutStyle: "laser" | "hand", fc: number): number =>
+      createAirPurifierGeometry(
+        createLayout({ ...handCut, filters: 1, cutStyle, filterFitClearance: fc }).configuration,
+      ).filterDimensions.width;
+    expect(boxWidth("laser", 2) - boxWidth("laser", 0)).toBeCloseTo(4, 5);
+    expect(boxWidth("hand", 2) - boxWidth("hand", 0)).toBeCloseTo(4, 5);
   });
 
   test("hand-cut has no kerf: fit allowance is forced to 0 (laser keeps it)", () => {

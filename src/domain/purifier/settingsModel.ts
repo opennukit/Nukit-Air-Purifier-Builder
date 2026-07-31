@@ -128,6 +128,10 @@ export type CuttingSettings = {
   // filter flanges (where the fans sit), in mm. -1 = Auto (fan-diameter driven).
   // Lets builders open the chamber for oversized fan gaskets.
   fanChamberDepth: Millimeters;
+  // Laser/hand-cut box: extra gap left around the filter so it slides into the box
+  // without forcing (interior = filter + 2 x this), in mm. Mirrors the 3D-print
+  // filter fit clearance.
+  filterFitClearance: Millimeters;
 };
 
 // Power-cord pass-through bore for the laser enclosure. diameter <= 0 (or
@@ -376,6 +380,8 @@ export type PurifierCuttingDraft = {
   readonly joints: JointSettings;
   // Two-filter sandwich fan-chamber gap override (-1 = Auto). See CuttingSettings.
   readonly fanChamberDepth: Millimeters;
+  // Laser/hand-cut filter fit clearance. See CuttingSettings.
+  readonly filterFitClearance: Millimeters;
 };
 
 export type LaserCutDesignDraft = {

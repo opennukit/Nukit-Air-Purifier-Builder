@@ -43,9 +43,21 @@ const HAND_CUT_FAN_CHAMBER_CLEARANCE_MM = 8;
 const HAND_CUT_SINGLE_PANEL_GAP_MM = 4;
 
 export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifierGeometry {
-  const dimensions = settings.filter;
   const materialThickness = settings.cutting.materialThickness;
   const fanDiameter = settings.fan.spec.diameter;
+  // Laser and hand-cut boxes leave a fit clearance around the filter so it slides in
+  // without forcing: the in-plane cavity grows by the clearance on each side
+  // (interior = filter + 2 x clearance). Filter thickness is untouched. 3D-print
+  // applies its own clearance inside the tempest model.
+  const filterFitClearance = settings.design.type === "laser-cut" ? settings.cutting.filterFitClearance : 0;
+  const dimensions =
+    filterFitClearance > 0
+      ? {
+          ...settings.filter,
+          width: settings.filter.width + 2 * filterFitClearance,
+          depth: settings.filter.depth + 2 * filterFitClearance,
+        }
+      : settings.filter;
   // Hand cut (foamcore) sizes the box snugly to the filter with no joinery overlap:
   // the inner depth equals the filter depth, and the chamber (the side panel's
   // "width") is the fan frame plus the filter thickness — the filter rests against

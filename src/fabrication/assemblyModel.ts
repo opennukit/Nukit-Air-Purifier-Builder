@@ -67,7 +67,6 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
   const cutPanelFabrication = requireCutPanelFabricationPlan(layout, "createAssemblyModel");
   const geometry = createAirPurifierGeometry(settings);
   const width = geometry.filterDimensions.width;
-  const filterDepth = geometry.filterDimensions.depth;
   const height = geometry.chamberHeight;
   const depth = geometry.workingDepth;
   const thickness = settings.cutting.materialThickness;
@@ -86,7 +85,9 @@ export function createAssemblyModel(layout: LayoutResult): AssemblyModel {
       id: `filter-media-${layer.index + 1}`,
       role: "filter-media",
       position: [0, layer.mediaCenterY, 0],
-      size: [width, filterThickness, filterDepth],
+      // The media is the actual (nominal) filter; the box around it carries the fit
+      // clearance, so it can read slightly smaller than the cavity.
+      size: [settings.filter.width, filterThickness, settings.filter.depth],
       explodeDirection: [0, layer.explodeDirectionY, 0],
     })),
     seams: createPanelSeams(width, height, depth),

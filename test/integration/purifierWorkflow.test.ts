@@ -444,7 +444,8 @@ describe("FilterBoxBuilder purifier workflow", () => {
   // ##############################
 
   test("builds explicit assembly parts for walls, filter frames, media, and dimensions", () => {
-    const layout = createLayout(defaultSettings);
+    // No fit clearance here so the box dimensions read straight off the filter size.
+    const layout = createLayout({ ...defaultSettings, filterFitClearance: 0 });
     const assembly = createAssemblyModel(layout);
     const frontRailPanel = requiredPanel(cutPanels(layout), "filter-1-front-long-rail");
     const frontRail = assembly.filterRails.find((part) => part.id === "filter-1-front-long-rail");

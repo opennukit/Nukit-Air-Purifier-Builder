@@ -118,6 +118,7 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
       cornerOffset: normalizeCordHoleCornerOffset(raw.cordHoleCornerOffset),
     },
     fanChamberDepth: normalizeFanChamberDepth(raw.fanChamberDepth),
+    filterFitClearance: normalizeFilterFitClearance(raw.filterFitClearance),
   };
 
   return {
@@ -293,6 +294,7 @@ export function createPurifierDraft(
       kerfFit: configuration.cutting.kerfFit,
       joints: configuration.cutting.joints,
       fanChamberDepth: configuration.cutting.fanChamberDepth,
+      filterFitClearance: configuration.cutting.filterFitClearance,
     },
     preview: configuration.preview,
   };
@@ -324,6 +326,7 @@ export function serializePurifierDraft(
     materialThickness: draft.cutting.materialThickness,
     kerfFit: draft.cutting.kerfFit,
     fanChamberDepth: draft.cutting.fanChamberDepth,
+    filterFitClearance: draft.cutting.filterFitClearance,
     fingerWidthMultiplier: draft.cutting.joints.finger.widthMultiplier,
     fingerSpaceMultiplier: draft.cutting.joints.finger.spaceMultiplier,
     fingerPlayMultiplier: draft.cutting.joints.finger.playMultiplier,
