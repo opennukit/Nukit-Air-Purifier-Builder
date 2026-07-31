@@ -48,12 +48,12 @@ describe("two-filter fan-chamber width override", () => {
     expect(override.chamberHeight).toBe(auto.chamberHeight + (150 - 122));
   });
 
-  test("hand-cut: the override applies there too (auto gap scales with wall thickness)", () => {
-    // Hand-cut auto gap = fanDiameter + max(8, 2 x materialThickness) = 120 + 10 = 130
-    // at 5 mm stock.
+  test("hand-cut: the override applies there too (auto gap is fanDiameter + 8)", () => {
+    // Two-filter hand-cut auto gap = fanDiameter + 8 = 128 (the fan is centered
+    // between the two filters).
     const auto = geometryFor(handTwoFilter);
     const override = geometryFor({ ...handTwoFilter, fanChamberDepth: 150 });
-    expect(override.chamberHeight).toBe(auto.chamberHeight + (150 - 130));
+    expect(override.chamberHeight).toBe(auto.chamberHeight + (150 - 128));
   });
 
   test("3D-print sandwich: the override widens the box between the filter flanges", () => {

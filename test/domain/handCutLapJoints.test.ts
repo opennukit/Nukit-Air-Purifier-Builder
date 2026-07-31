@@ -90,13 +90,13 @@ describe("hand-cut lap joints", () => {
     expect(assembledPanelWidthInset("left-side-wall", THICK, false)).toBe(0);
   });
 
-  test("hand-cut fan chamber deepens with material thickness (laser does not)", () => {
+  test("single-filter hand-cut chamber grows by one wall thickness (closed-back inset), not more", () => {
     const chamber = (raw: RawPurifierSettings): number => createAirPurifierGeometry(createLayout(raw).configuration).chamberHeight;
     const thin = chamber({ ...handCut, filters: 1, materialThickness: 5 });
     const thick = chamber({ ...handCut, filters: 1, materialThickness: 50 });
-    // Thicker foamcore gives the fan more room: the chamber grows ~2 mm per extra mm
-    // of wall (one thickness of clearance on each side of the fan).
-    expect(thick).toBeGreaterThan(thin + 80);
+    // The chamber grows exactly by the extra closed-back thickness (45 mm here), so
+    // the fan stays flush at the filter with the panel almost touching, no ballooning.
+    expect(thick - thin).toBeCloseTo(45, 0);
     // Laser chamber is fan-diameter driven and does not balloon with material.
     const laserThin = chamber({ ...handCut, cutStyle: "laser", filters: 1, materialThickness: 5 });
     const laserThick = chamber({ ...handCut, cutStyle: "laser", filters: 1, materialThickness: 9 });
@@ -110,14 +110,17 @@ describe("hand-cut lap joints", () => {
       const side = createAirPurifierCutPanels(createLayout(raw).configuration).find((p) => p.id === "left-side-wall")!;
       const fan = side.cuts.find((c) => c.type === "circle" && c.role === "fan") as { cy: number };
       const r = 140 / 2;
-      return { filterSide: fan.cy - r - raw.filterThickness, panelSide: g.chamberHeight - (fan.cy + r) };
+      // Closed-back panel is inset one material thickness from the chamber edge.
+      const closedBackInner = g.chamberHeight - mat;
+      return { filterSide: fan.cy - r - raw.filterThickness, panelSide: closedBackInner - (fan.cy + r) };
     };
-    // The fan frame edge sits flush at the filter face (the filter rests on it), at
-    // any thickness...
+    // The fan frame edge sits flush at the filter face (the filter rests on it), and
+    // the closed-back panel almost touches the other side (a small constant gap), at
+    // any material thickness.
     expect(fanGaps(5).filterSide).toBeCloseTo(0, 0);
     expect(fanGaps(50).filterSide).toBeCloseTo(0, 0);
-    // ...and the deepened chamber's extra room lands behind the fan (panel side).
-    expect(fanGaps(50).panelSide).toBeGreaterThan(fanGaps(5).panelSide + 80);
+    expect(fanGaps(5).panelSide).toBeLessThan(12);
+    expect(fanGaps(50).panelSide).toBeLessThan(12);
   });
 
   test("laser (finger-jointed) construction is unaffected: no 2-thickness lap", () => {

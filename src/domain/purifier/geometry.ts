@@ -37,13 +37,10 @@ const minimumFrameOpening = 1;
 // oracle) and adds a material flange, so it is not touched here.
 const HAND_CUT_FAN_CHAMBER_CLEARANCE_MM = 8;
 
-// Clearance the hand-cut fan-clear zone keeps beyond the fan frame. Foamcore walls
-// are thick, and the perpendicular walls capping the fan zone eat into it, so the
-// clearance scales with the wall thickness (one thickness of breathing room on each
-// side of the fan) and never drops below the base 8 mm for thin stock.
-function handCutFanChamberClearance(materialThickness: number): number {
-  return Math.max(HAND_CUT_FAN_CHAMBER_CLEARANCE_MM, 2 * materialThickness);
-}
+// Single-filter hand-cut: the fan sits flush against the filter on one side, so the
+// only extra depth is a small "almost touching" gap to the closed-back panel on the
+// other side.
+const HAND_CUT_SINGLE_PANEL_GAP_MM = 4;
 
 export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifierGeometry {
   const dimensions = settings.filter;
@@ -66,9 +63,21 @@ export function createAirPurifierGeometry(settings: PurifierSettings): AirPurifi
   // against the fans). The gap is the user's Box depth when the back-plate fan box
   // is active, otherwise the manual override or just the fan frame, so the Box depth
   // control drives the depth exactly like it does for the laser box.
+  //
+  // A single-filter one-side box sandwiches the fan between the filter (flush, one
+  // side) and the closed-back panel (almost touching, other side). That closed-back
+  // panel is inset one material thickness into the chamber, so its thickness is
+  // added to keep the fan's clear gap intact regardless of how thick the foamcore is
+  // (the earlier fixed gap left the fan too shallow, or too deep, with thick stock).
+  const handFanGap = settings.filterCount === 1 ? HAND_CUT_SINGLE_PANEL_GAP_MM : HAND_CUT_FAN_CHAMBER_CLEARANCE_MM;
+  const handClosedBackInset =
+    handCut && settings.filterCount === 1 && backFanChamberDepth === undefined && fanChamberOverride === undefined
+      ? materialThickness
+      : 0;
   const chamberHeight = handCut
-    ? (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + handCutFanChamberClearance(materialThickness)) +
-      settings.filterCount * dimensions.thickness
+    ? (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + handFanGap) +
+      settings.filterCount * dimensions.thickness +
+      handClosedBackInset
     : (backFanChamberDepth ?? fanChamberOverride ?? fanDiameter + 2) +
       settings.filterCount * (dimensions.thickness + materialThickness);
   const rim = clampRimForGeometry(settings.cutting.rim, dimensions.width, workingDepth, chamberHeight);
