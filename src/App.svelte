@@ -287,7 +287,11 @@
     ...generatedGeometryControls.filter((control) => control.name === "screwHoleDiameter"),
   ];
   const laserMaterialControls = generatedGeometryControls.filter((control) => control.name !== "screwHoleDiameter");
-  const laserPanelFitControls = nukitPanelFitControls.filter((control) => control.name !== "rim");
+  // "Fit allowance" (kerf) only matters for laser cutting; hand-cut foamcore has no
+  // kerf, so drop it there.
+  $: laserPanelFitControls = nukitPanelFitControls.filter(
+    (control) => control.name !== "rim" && !(settings.cutStyle === "hand" && control.name === "kerfFit"),
+  );
   // Chunk-label deboss is parked: hide its control until the placement is reworked.
   const SHOW_CHUNK_LABELS_CONTROL = true;
   let showBoxExhaustOption = false;

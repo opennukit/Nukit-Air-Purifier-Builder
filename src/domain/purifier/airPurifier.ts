@@ -106,7 +106,8 @@ export function normalizeSettings(input: PurifierInput): PurifierSettings {
     materialThickness,
     rim,
     screwHoleDiameter: clamp(raw.screwHoleDiameter, 2, 10),
-    kerfFit: clamp(raw.kerfFit, 0, 1),
+    // Hand-cut foamcore has no kerf, so no fit-allowance compensation applies.
+    kerfFit: isHandCut ? 0 : clamp(raw.kerfFit, 0, 1),
     labels: raw.labels,
     referenceScale: referenceScaleFromNumber(raw.referenceScale),
     joints: normalizeJointSettings(raw),

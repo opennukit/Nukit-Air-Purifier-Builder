@@ -70,6 +70,13 @@ describe("hand-cut lap joints", () => {
     expect(2 * (Math.abs(side.pos[0]) - THICK / 2)).toBeCloseTo(495, 5); // width cavity
   });
 
+  test("hand-cut has no kerf: fit allowance is forced to 0 (laser keeps it)", () => {
+    const kerf = (cutStyle: "hand" | "laser"): number =>
+      createLayout({ ...handCut, cutStyle, kerfFit: 0.1 }).configuration.cutting.kerfFit;
+    expect(kerf("hand")).toBe(0);
+    expect(kerf("laser")).toBe(0.1);
+  });
+
   test("hand-cut allows thick stock (up to 50 mm); laser stays capped at 9 mm", () => {
     const thk = (raw: RawPurifierSettings): number => createLayout(raw).configuration.cutting.materialThickness;
     expect(thk({ ...handCut, materialThickness: 10 })).toBe(10);
