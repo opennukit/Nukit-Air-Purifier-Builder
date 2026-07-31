@@ -492,6 +492,7 @@ export class PurifierThreePreview {
         wood,
         darkEdge,
         screwMark,
+        handCut,
       );
       collectFanRotors(panelGroup, this.fanRotors);
       this.modelGroup.add(panelGroup);

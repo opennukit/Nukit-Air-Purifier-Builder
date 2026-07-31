@@ -152,10 +152,11 @@ export function createPanelGroup(
   material: Material,
   edgeMaterial: Material,
   screwMarkMaterial: Material,
+  handCut = false,
 ): Group {
   const panel = part.panel;
   const group = new Group();
-  const geometry = createPanelGeometry(panel, materialThickness, exploded);
+  const geometry = createPanelGeometry(panel, materialThickness, exploded, handCut);
   // Mirrored panels are reflected via a negative group scale (below), which flips
   // triangle winding; render that one mesh double-sided so the (default
   // front-side) wood material isn't back-face culled.
@@ -205,7 +206,21 @@ export function createPanelGroup(
   return group;
 }
 
-function createPanelGeometry(panel: CutPanel, materialThickness: number, exploded: boolean): ExtrudeGeometry {
+// How much to shrink a wall's rendered width in the clean assembled view. In
+// finger-jointed (laser) construction the fan/back walls seat BETWEEN the side
+// walls, so they inset one thickness. Hand-cut lap joints put the fan walls
+// OUTSIDE at full width, so they must not inset (or they leave the side walls
+// uncovered). Side walls never inset.
+export function assembledPanelWidthInset(
+  role: string | undefined,
+  materialThickness: number,
+  handCut: boolean,
+): number {
+  const seatsBetween = role === "front-fan-wall" || role === "rear-fan-wall" || role === "closed-back";
+  return seatsBetween && !handCut ? materialThickness : 0;
+}
+
+function createPanelGeometry(panel: CutPanel, materialThickness: number, exploded: boolean, handCut: boolean): ExtrudeGeometry {
   const shape = new Shape();
   if (exploded) {
     // Exploded view: extrude the real toothed cut outline (finger combs +
@@ -227,11 +242,13 @@ function createPanelGeometry(panel: CutPanel, materialThickness: number, explode
     }
   } else {
     // Assembled view: draw each part as a clean nominal rectangle so the box reads
-    // as a solid enclosure with no finger teeth or slots showing. Fan walls inset
-    // one thickness in width to seat between the side walls. Functional openings
-    // (fans, windows, vents) are kept; finger-hole / slot joinery is hidden.
+    // as a solid enclosure with no finger teeth or slots showing. In finger-jointed
+    // (laser) construction the fan walls seat BETWEEN the side walls, so they inset
+    // one thickness in width. Hand-cut lap joints invert this (the fan walls wrap
+    // OUTSIDE at full width), so they must not be inset or they leave the side walls
+    // uncovered. Functional openings (fans) are kept; joinery is hidden.
     const role = panel.assembly?.type === "placed" ? panel.assembly.role : undefined;
-    const widthInset = role === "front-fan-wall" || role === "rear-fan-wall" || role === "closed-back" ? materialThickness : 0;
+    const widthInset = assembledPanelWidthInset(role, materialThickness, handCut);
     const halfWidth = ((panel.nominalWidth - widthInset) / 2) * sceneScale;
     const halfHeight = (panel.nominalHeight / 2) * sceneScale;
     shape.moveTo(-halfWidth, -halfHeight);

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { createLayout } from "@/fabrication/purifierLayout";
 import { createAirPurifierCutPanels } from "@/fabrication/laser/panels";
+import { assembledPanelWidthInset } from "@/rendering/three/preview/panelMeshes";
 import { defaultSettings, type RawPurifierSettings } from "@/domain/purifier/settingsModel";
 
 const THICK = 5;
@@ -75,6 +76,17 @@ describe("hand-cut lap joints", () => {
     expect(thk({ ...handCut, materialThickness: 60 })).toBe(50); // clamped to the 50 mm max
     // Laser (finger-jointed) construction still caps at 9 mm.
     expect(thk({ ...handCut, cutStyle: "laser", materialThickness: 10 })).toBe(9);
+  });
+
+  test("assembled preview does not inset hand-cut fan walls (they wrap outside)", () => {
+    // Hand-cut fan walls render at full width so they cover the side walls; laser
+    // fan walls still inset one thickness to seat between them.
+    expect(assembledPanelWidthInset("rear-fan-wall", THICK, true)).toBe(0);
+    expect(assembledPanelWidthInset("front-fan-wall", THICK, true)).toBe(0);
+    expect(assembledPanelWidthInset("rear-fan-wall", THICK, false)).toBe(THICK);
+    // Side walls never inset, in either mode.
+    expect(assembledPanelWidthInset("left-side-wall", THICK, true)).toBe(0);
+    expect(assembledPanelWidthInset("left-side-wall", THICK, false)).toBe(0);
   });
 
   test("laser (finger-jointed) construction is unaffected: no 2-thickness lap", () => {
