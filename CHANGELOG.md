@@ -5,6 +5,14 @@ commit-by-commit list is in the Appendix at the bottom. Every change is
 committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
+## UTM tags on the Tempest Pro upsell links
+- The two outbound Tempest Pro product links on the help page (the "air purifiers"
+  reference link and the "View the Nukit Tempest Pro" button) now carry
+  `?utm_source=filterboxbuilder&utm_medium=upsell&utm_campaign=diy-funnel`, so the
+  store can attribute purchases that come through the builder. This is a link URL
+  change only: no script, cookie, storage, or network call was added to
+  FilterBoxBuilder, so the no-tracking privacy promise is unaffected.
+
 ## Fill stray-piece seam faces at the normal pin spacing (v10, in progress, local only)
 - A disconnected stray piece got a single coverage pin at each seam's centre, even
   when the face had room for a row. Coverage now steps a grid across each spanned
