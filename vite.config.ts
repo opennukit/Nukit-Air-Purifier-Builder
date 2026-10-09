@@ -2,7 +2,10 @@ import { defineConfig, type Plugin } from "vite";
 import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
-const allowedHosts = (process.env.VITE_ALLOWED_HOSTS ?? "676f-85-242-148-33.ngrok-free.app")
+// Extra hostnames the dev server will answer to, for example a tunnel used to test
+// on a phone. Set VITE_ALLOWED_HOSTS locally as a comma separated list; it defaults
+// to empty so no one else's tunnel hostname ships in the repo.
+const allowedHosts = (process.env.VITE_ALLOWED_HOSTS ?? "")
   .split(",")
   .map((host) => host.trim())
   .filter((host) => host.length > 0);

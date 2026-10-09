@@ -5,6 +5,37 @@ commit-by-commit list is in the Appendix at the bottom. Every change is
 committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
+## Dev server allowed hosts no longer hardcoded
+- `vite.config.ts` defaulted `allowedHosts` to one developer's ngrok tunnel
+  hostname, which embedded that machine's public IP address. The default is now
+  empty. To reach the dev server over a tunnel, set `VITE_ALLOWED_HOSTS` locally
+  as a comma separated list. Local development over `127.0.0.1` is unaffected.
+
+## Privacy policy now describes the page-view count
+- The policy said "No analytics" while the production build injects a Cloudflare
+  Web Analytics beacon into the builder page. The claim is now accurate: no
+  cookies, no advertising, no fingerprinting, and no tracking across sites, plus
+  a plain description of the cookieless page-view count and what it records.
+- The count applies to the builder page only. The beacon is injected by a Vite
+  plugin that transforms `index.html`, and the static pages under `public/` are
+  copied without transformation, so help, methodology, both calculators, the fan
+  gauge, contact, thanks, and the policy itself load nothing. The policy now says
+  so explicitly.
+- The GDPR section no longer claims that no processing takes place at all.
+- The same corrected sentence replaces the old one in the page's meta
+  description and its Open Graph description.
+
+## Link previews and structured data
+- The eight static pages now carry Open Graph and Twitter card tags, reusing each
+  page's existing title and description with the shared preview image. Links
+  shared to forums and chat apps get a title, description, and image instead of a
+  bare URL. Previously only the builder itself had these.
+- Added JSON-LD: `SoftwareApplication` for the builder, `WebApplication` for the
+  two calculators, the fan gauge, and the plenum builder, and `TechArticle` for
+  the help and methodology pages. Each records that the tool is free and names
+  its license.
+- No visual or layout change: every tag sits in `<head>` and renders nothing.
+
 ## Search engine crawlability
 - Added `robots.txt` and `sitemap.xml`, so crawlers can discover every page
   directly instead of relying on the client-rendered app to surface the links.
@@ -12,11 +43,15 @@ tests) pass.
   gauge, the plenum builder, contact, and privacy.
 - Added a `rel="canonical"` link to each static page, pointing at the `www` host
   that the apex already redirects to.
-- The superseded pages under `/fangauge/` are now marked `noindex` and point
-  their canonical at the current `/fan-gauge/` and `/plenum-builder.html` URLs.
-  They duplicated the live pages, titles included, which split their ranking.
-  The directory itself stays, because the current fan gauge page still serves
-  its images from it.
+- Removed the superseded `/fangauge/` directory. Its three HTML pages duplicated
+  the live fan gauge and plenum builder, titles included, which split their
+  search ranking. The images it held moved to `/fan-gauge/images/`, and the two
+  pages that referenced them (the fan gauge and the CADR calculator) now point
+  at the new path. The old `/fangauge/` URLs no longer resolve.
+- The in-app "Measure" link next to a custom fan pointed at the apex host and at
+  the superseded `/fangauge/` page; it now points at `/fan-gauge/`.
+- `robots.txt` deliberately leaves `/assets/` crawlable. It holds the app's
+  JavaScript and CSS, which search engines need in order to render the builder.
 - The plenum builder had no meta description; it now has one. The contact form's
   thanks page is marked `noindex`, since it is a post-submit confirmation.
 - Replaced the en dashes in the methodology page's numeric ranges with hyphens,

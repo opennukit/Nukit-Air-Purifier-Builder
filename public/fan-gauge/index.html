@@ -148,6 +148,38 @@
   }
 </style>
   <link rel="canonical" href="https://www.filterboxbuilder.com/fan-gauge/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Nukit FilterBoxBuilder" />
+  <meta property="og:title" content="Nukit PC Fan Gauge: limited accuracy P-Q calculator" />
+  <meta property="og:description" content="A free, low-resolution gauge for roughly measuring the pressure and airflow of unlabeled, scavenged, or recycled 120mm and 140mm PC fans, using a 3D-printed plenum and a phone barometer running phyphox." />
+  <meta property="og:url" content="https://www.filterboxbuilder.com/fan-gauge/" />
+  <meta property="og:image" content="https://www.filterboxbuilder.com/og-preview.png" />
+  <meta property="og:image:alt" content="3D preview of a DIY air purifier in the FilterBoxBuilder web app" />
+  <meta name="twitter:card" content="summary_large_image" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Nukit PC Fan Gauge",
+  "description": "A low-resolution gauge for measuring the pressure and airflow of unlabeled or scavenged 120mm and 140mm PC fans, using a 3D-printed plenum and a phone barometer.",
+  "url": "https://www.filterboxbuilder.com/fan-gauge/",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any (web browser)",
+  "browserRequirements": "Requires JavaScript",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Nukit",
+    "url": "https://github.com/opennukit"
+  },
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html"
+}
+</script>
 </head>
 <body>
 <div class="page">
@@ -192,8 +224,8 @@
       A live <b>print estimate</b> (dimensions and filament) shows for each part. Everything prints support-free: plenum upright with the fan opening
       up, cover flat, gasket flat. Print the gasket (in soft TPU) only if you cannot get a commercial silicone one, which is strongly preferred.</p>
     <div class="figrow">
-      <a href="/fangauge/images/fan-gauge-slicer-plenum.png" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-slicer-plenum.png" alt="Plenum laid out in the slicer" loading="lazy"></a>
-      <a href="/fangauge/images/fan-gauge-slicer-door.png" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-slicer-door.png" alt="Sliding door laid out in the slicer" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-slicer-plenum.png" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-slicer-plenum.png" alt="Plenum laid out in the slicer" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-slicer-door.png" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-slicer-door.png" alt="Sliding door laid out in the slicer" loading="lazy"></a>
     </div>
     <p class="note">A well-fitted door provides the best seal and holds by friction alone: you should be able to turn the plenum upside-down and
       shake it gently without the door falling out. If it does, print additional doors, adjusting the <b>door-fit</b> sliders between them, until one
@@ -207,9 +239,9 @@
       <b>Remote Access</b>. Note the IP address it shows, and confirm you can open that page from another device's browser
       <b>on the same Wi-Fi network</b> (it will not work over mobile data).</p>
     <div class="figrow">
-      <a href="/fangauge/images/phyphox-1-pressure.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-1-pressure.png" alt="phyphox Pressure experiment" loading="lazy"></a>
-      <a href="/fangauge/images/phyphox-2-start.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-2-start.png" alt="phyphox measurement running" loading="lazy"></a>
-      <a href="/fangauge/images/phyphox-3-remote_access.png" target="_blank" rel="noopener"><img src="/fangauge/images/phyphox-3-remote_access.png" alt="phyphox Remote Access enabled" loading="lazy"></a>
+      <a href="/fan-gauge/images/phyphox-1-pressure.png" target="_blank" rel="noopener"><img src="/fan-gauge/images/phyphox-1-pressure.png" alt="phyphox Pressure experiment" loading="lazy"></a>
+      <a href="/fan-gauge/images/phyphox-2-start.png" target="_blank" rel="noopener"><img src="/fan-gauge/images/phyphox-2-start.png" alt="phyphox measurement running" loading="lazy"></a>
+      <a href="/fan-gauge/images/phyphox-3-remote_access.png" target="_blank" rel="noopener"><img src="/fan-gauge/images/phyphox-3-remote_access.png" alt="phyphox Remote Access enabled" loading="lazy"></a>
     </div>
 
     <h3><span class="n">3</span>Assemble</h3>
@@ -217,8 +249,8 @@
       Place the phone inside, then screw the fan and gasket on so the fan blows <b>outward</b>. Check that the sliding door opens and closes fully
       and is not blocked by the gasket.</p>
     <div class="figrow">
-      <a href="/fangauge/images/fan-gauge-setup-1.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-1.jpg" alt="Fan gauge assembly" loading="lazy"></a>
-      <a href="/fangauge/images/fan-gauge-setup-2.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-2.jpg" alt="Fan gauge assembly" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-1.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-1.jpg" alt="Fan gauge assembly" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-2.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-2.jpg" alt="Fan gauge assembly" loading="lazy"></a>
     </div>
 
     <h3><span class="n">4</span>Take the readings</h3>
@@ -230,10 +262,10 @@
       <li><b>2 ports:</b> open the second port, read.</li>
     </ol>
     <div class="figrow">
-      <a href="/fangauge/images/fan-gauge-setup-3.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-3.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
-      <a href="/fangauge/images/fan-gauge-setup-4.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-4.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
-      <a href="/fangauge/images/fan-gauge-setup-5.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-5.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
-      <a href="/fangauge/images/fan-gauge-setup-6.jpg" target="_blank" rel="noopener"><img src="/fangauge/images/fan-gauge-setup-6.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-3.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-3.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-4.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-4.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-5.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-5.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
+      <a href="/fan-gauge/images/fan-gauge-setup-6.jpg" target="_blank" rel="noopener"><img src="/fan-gauge/images/fan-gauge-setup-6.jpg" alt="Fan gauge test in progress" loading="lazy"></a>
     </div>
     <div class="note big"><b>Keep the whole run under 30 seconds</b> (baseline through 2 ports); the barometer drifts the
       entire time, so speed beats waiting for a stable number.</div>

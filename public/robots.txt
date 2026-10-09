@@ -1,8 +1,7 @@
 User-agent: *
 Allow: /
 
-# Build output and vendored assets hold no indexable content.
-Disallow: /assets/
-Disallow: /vendor/
+# /assets/ is deliberately crawlable: it holds the app's JavaScript and CSS,
+# which search engines need in order to render the builder.
 
 Sitemap: https://www.filterboxbuilder.com/sitemap.xml
