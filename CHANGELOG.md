@@ -5,6 +5,24 @@ commit-by-commit list is in the Appendix at the bottom. Every change is
 committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
+## Search engine crawlability
+- Added `robots.txt` and `sitemap.xml`, so crawlers can discover every page
+  directly instead of relying on the client-rendered app to surface the links.
+  The sitemap lists the builder, help, methodology, both calculators, the fan
+  gauge, the plenum builder, contact, and privacy.
+- Added a `rel="canonical"` link to each static page, pointing at the `www` host
+  that the apex already redirects to.
+- The superseded pages under `/fangauge/` are now marked `noindex` and point
+  their canonical at the current `/fan-gauge/` and `/plenum-builder.html` URLs.
+  They duplicated the live pages, titles included, which split their ranking.
+  The directory itself stays, because the current fan gauge page still serves
+  its images from it.
+- The plenum builder had no meta description; it now has one. The contact form's
+  thanks page is marked `noindex`, since it is a post-submit confirmation.
+- Replaced the en dashes in the methodology page's numeric ranges with hyphens,
+  per the house style.
+- No visual or layout change: every edit is inside `<head>`.
+
 ## UTM tags on the Tempest Pro upsell links
 - The two outbound Tempest Pro product links on the help page (the "air purifiers"
   reference link and the "View the Nukit Tempest Pro" button) now carry
