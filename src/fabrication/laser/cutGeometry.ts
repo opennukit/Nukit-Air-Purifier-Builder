@@ -535,10 +535,19 @@ export function fingerHoleCutsAt(
   jointSettings: CutJointSettings = defaultCutJointSettings,
 ): RectCut[] {
   const settings = jointSettings.finger;
-  const { fingers, leftover } = calcFingers(length, thickness, settings);
+  let { fingers, leftover } = calcFingers(length, thickness, settings);
   const space = settings.spaceMultiplier * thickness;
-  const finger = settings.widthMultiplier * thickness;
+  let finger = settings.widthMultiplier * thickness;
   const play = settings.playMultiplier * thickness;
+  // boxes.py: too small for normal fingers, so one centered rectangular finger.
+  // appendFingerProfile applies this same fallback to the mating "f" edge, so the
+  // hole side has to match it. Without this, a short edge (one whose length is
+  // under widthMultiplier + 1 thicknesses, for example a narrow filter rim) still
+  // grows a tab but gets no slot, and the joint cannot be assembled.
+  if (fingers === 0 && finger > 0 && leftover > 0.75 * thickness && leftover > 4 * play) {
+    fingers = 1;
+    finger = leftover = leftover / 2;
+  }
   const alongHole = finger + play; // hole size along the edge
   const acrossHole = settings.holeWidthMultiplier * thickness + play; // perpendicular depth
   const cuts: RectCut[] = [];

@@ -5,6 +5,21 @@ commit-by-commit list is in the Appendix at the bottom. Every change is
 committed; the build (`bun run build`) and full test suite (`bun test`, 243
 tests) pass.
 
+## Laser: short joint edges now get their finger slots
+- A joint edge too short for a regular finger gets a single centered one instead.
+  The tab side already did this (`appendFingerProfile`), but the hole side
+  (`fingerHoleCutsAt`) did not, so the mating panel grew a finger with no slot to
+  receive it and the joint could not be assembled. The hole side now applies the
+  same fallback, matching Boxes.py, which has it on both sides.
+- This bit the filter rails hardest. Their slotted edge is the rim, which is fixed
+  while finger width scales with material thickness, so the slots vanished once
+  the rim fell below roughly one finger width plus a thickness. A two-filter laser
+  box at 30 mm rim lost every slot on both outer top rails at 5 mm material while
+  looking correct at 3 mm. A 12 mm rim was affected at every thickness.
+- Cut sheets change only for designs that were already unbuildable at those
+  joints. Output is unchanged wherever the slots were being produced correctly,
+  including every hand cut and 3D print design.
+
 ## Dev server allowed hosts no longer hardcoded
 - `vite.config.ts` defaulted `allowedHosts` to one developer's ngrok tunnel
   hostname, which embedded that machine's public IP address. The default is now
